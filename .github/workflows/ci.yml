@@ -15,19 +15,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
-      - name: Install Poetry
-        run: python -m pip install --upgrade pip poetry
+      - name: Install pipx and Poetry
+        run: |
+          python -m pip install --upgrade pip pipx
+          python -m pipx ensurepath
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          pipx install poetry
 
       - name: Install dependencies
-        run: python -m poetry install --no-interaction --with dev
+        run: poetry install --no-interaction --with dev
 
       - name: Lint
         run: |
-          python -m poetry run black --check .
-          python -m poetry run isort --check-only .
-          python -m poetry run mypy sccfm_cli
+          poetry run black --check .
+          poetry run isort --check-only .
+          poetry run mypy sccfm_cli
 
       - name: Test
-        run: python -m poetry run pytest --color=yes
+        run: poetry run pytest --color=yes
