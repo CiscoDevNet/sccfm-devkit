@@ -58,7 +58,7 @@ class DevicesListCommand(BaseCommand):
         if output_format == "json":
             items = page.items or []
             items_dict = [item.to_dict() for item in items]
-            self.console.print(json.dumps(items_dict, indent=2))
+            self.console.print(json.dumps(items_dict, indent=2, default=str))
             return
 
         self.console.print(f"Number of entries:  {page.count}")
