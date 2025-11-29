@@ -31,7 +31,7 @@ poetry run mypy sccfm_cli
 poetry run black .
 ```
 
-See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expectations.
+See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expectations. The setup script also installs a local `git cz` alias that runs `./scripts/cz.sh commit` so you can use `git cz` for conventional commits with visible pre-commit output.
 
 ## Packaging for pip
 

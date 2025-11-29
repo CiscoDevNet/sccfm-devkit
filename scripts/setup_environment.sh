@@ -55,6 +55,15 @@ function create_venv() {
   fi
 }
 
+function configure_git_alias() {
+  if git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "${PROJECT_ROOT}" config alias.cz '!./scripts/cz.sh commit'
+  else
+    echo "Skipping git alias setup (not a git repository)" >&2
+  fi
+}
+
 ensure_pyenv
 ensure_python
 create_venv
+configure_git_alias
