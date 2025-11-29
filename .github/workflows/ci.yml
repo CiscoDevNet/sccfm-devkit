@@ -17,17 +17,20 @@ jobs:
           python-version: "3.12"
           cache: "poetry"
 
+      - name: Ensure Poetry on PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Install Poetry
         run: python -m pip install --upgrade pip poetry
 
       - name: Install dependencies
-        run: poetry install --no-interaction --with dev
+        run: python -m poetry install --no-interaction --with dev
 
       - name: Lint
         run: |
-          poetry run black --check .
-          poetry run isort --check-only .
-          poetry run mypy sccfm_cli
+          python -m poetry run black --check .
+          python -m poetry run isort --check-only .
+          python -m poetry run mypy sccfm_cli
 
       - name: Test
-        run: poetry run pytest --color=yes
+        run: python -m poetry run pytest --color=yes
