@@ -1,4 +1,4 @@
-# sccfm-cli
+# sccfm-cli ![CI](https://github.com/cisco-lockhart/sccfm-cli/actions/workflows/ci.yml/badge.svg)
 
 Command-line tool for interacting with the SCC Firewall Manager (SCCFM). The CLI follows a strict command pattern so new commands can be added safely and consistently.
 
