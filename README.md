@@ -1,6 +1,6 @@
-# sccfm-cli ![CI](https://github.com/cisco-lockhart/sccfm-cli/actions/workflows/ci.yml/badge.svg)
+# sccfm-devkit ![CI](https://github.com/cisco-lockhart/sccfm-cli/actions/workflows/ci.yml/badge.svg)
 
-Command-line tool for interacting with the SCC Firewall Manager (SCCFM). The CLI follows a strict command pattern so new commands can be added safely and consistently.
+Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcoming Ansible collection. The CLI follows a strict command pattern so new commands can be added safely and consistently; the Ansible collection will reuse the same services for intent-driven tasks (e.g., onboarding devices, listing inventory).
 
 ## Getting started
 
