@@ -55,7 +55,8 @@ class DevicesListCommand(BaseCommand):
 
     def _render_page(self, page: DevicePage, output_format: str) -> None:
         if output_format == "json":
-            items_dict = [item.to_dict() for item in page.items]
+            items = page.items or []
+            items_dict = [item.to_dict() for item in items]
             self.console.print(json.dumps(items_dict, indent=2))
             return
 
@@ -67,7 +68,8 @@ class DevicesListCommand(BaseCommand):
         table.add_column("Software Version")
         table.add_column("Connectivity")
         table.add_column("Configuration")
-        for device in page.items:
+        items = page.items or []
+        for device in items:
             table.add_row(
                 device.uid,
                 device.name,

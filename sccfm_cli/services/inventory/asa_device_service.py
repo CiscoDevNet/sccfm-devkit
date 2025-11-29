@@ -15,5 +15,5 @@ class AsaCommandLineService:
     def execute_cli(self, device_uids: List[str], asa_commands: List[str]) -> None:
         script = "\n".join(asa_commands)
         self.command_line_interface_api.execute_cli_command(
-            cli_command_input=CliCommandInput(device_uids=device_uids, script=script)
+            cli_command_input=CliCommandInput(deviceUids=device_uids, script=script)
         )

@@ -21,12 +21,12 @@ def _build_cli() -> click.Group:
     console = Console()
 
     @click.group(help="SCC Firewall Manager CLI")  # type: ignore[misc]
-    @click.option(
+    @click.option(  # type: ignore[misc]
         "--profile",
         default="default",
         show_default=True,
         help="Configuration profile to use",
-    )  # type: ignore[misc]
+    )
     @click.pass_context  # type: ignore[misc]
     def group(ctx: click.Context, profile: str) -> None:
         ctx.ensure_object(dict)

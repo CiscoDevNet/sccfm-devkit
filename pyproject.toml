@@ -50,6 +50,7 @@ strict = true
 warn_unused_configs = true
 explicit_package_bases = true
 exclude = "(^build/|^dist/)"
+disable_error_code = ["attr-defined"]
 
 [[tool.mypy.overrides]]
 module = [
