@@ -20,14 +20,14 @@ def _build_commands(console: Console) -> list[BaseCommand]:
 def _build_cli() -> click.Group:
     console = Console()
 
-    @click.group(help="SCC Firewall Manager CLI")  # type: ignore[misc]
-    @click.option(  # type: ignore[misc]
+    @click.group(help="SCC Firewall Manager CLI")
+    @click.option(
         "--profile",
         default="default",
         show_default=True,
         help="Configuration profile to use",
     )
-    @click.pass_context  # type: ignore[misc]
+    @click.pass_context
     def group(ctx: click.Context, profile: str) -> None:
         ctx.ensure_object(dict)
         ctx.obj["profile"] = profile
