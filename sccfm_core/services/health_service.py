@@ -5,8 +5,8 @@ from typing import List
 
 from scc_firewall_manager_sdk import UsersApi
 
-from sccfm_cli.factories import ApiClientFactory
-from sccfm_cli.models import Config
+from sccfm_core.factories import ApiClientFactory
+from sccfm_core.types import ConfigLike
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class HealthStatus:
 
 
 class HealthService:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: ConfigLike) -> None:
         api_client = ApiClientFactory().build(config)
         self.users_api = UsersApi(api_client)
 

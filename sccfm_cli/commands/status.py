@@ -9,7 +9,8 @@ from rich.console import Console
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.services import ConfigService, HealthService
+from sccfm_cli.services import ConfigService
+from sccfm_core.services import HealthService
 
 
 class StatusCommand(BaseCommand):

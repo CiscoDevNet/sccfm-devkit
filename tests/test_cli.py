@@ -9,7 +9,8 @@ from scc_firewall_manager_sdk import ConfigState, ConnectivityState, Device, Dev
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
-from sccfm_cli.services import ConfigService, InventoryService
+from sccfm_cli.services import ConfigService
+from sccfm_core.services import InventoryService
 
 
 def test_inventory_devices_command_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

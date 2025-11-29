@@ -1,6 +1,6 @@
-# sccfm-devkit ![CI](https://github.com/cisco-lockhart/sccfm-cli/actions/workflows/ci.yml/badge.svg)
+# sccfm-devkit ![CI](https://github.com/cisco-lockhart/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
-Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcoming Ansible collection. The CLI follows a strict command pattern so new commands can be added safely and consistently; the Ansible collection will reuse the same services for intent-driven tasks (e.g., onboarding devices, listing inventory).
+Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcoming Ansible collection. Shared business logic lives in `sccfm_core` so both the CLI and the collection can reuse the same inventory/health SDK integrations; the CLI remains in `sccfm_cli`.
 
 ## Getting started
 
@@ -49,4 +49,4 @@ Key tooling:
 - `click` plus `click-option-group` power the CLI ergonomics, and `rich` handles presentation.
 - `pytest`, `coverage`, `mypy`, `black`, `isort`, and `pre-commit` enforce correctness and consistency.
 
-To add a new command, drop a file under `sccfm_cli/commands/`, subclass `BaseCommand`, and register it in `sccfm_cli/cli.py`. Delegating integrations to `sccfm_cli/services/` keeps external dependencies isolated and easy to mock.
+To add a new command, drop a file under `sccfm_cli/commands/`, subclass `BaseCommand`, and register it in `sccfm_cli/cli.py`. SDK integrations live in `sccfm_core/`, keeping external dependencies isolated and easy to reuse (CLI or Ansible).

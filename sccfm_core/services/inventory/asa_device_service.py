@@ -2,12 +2,12 @@ from typing import List
 
 from scc_firewall_manager_sdk import CliCommandInput, CommandLineInterfaceApi
 
-from sccfm_cli.factories import ApiClientFactory
-from sccfm_cli.models import Config
+from sccfm_core.factories import ApiClientFactory
+from sccfm_core.types import ConfigLike
 
 
 class AsaCommandLineService:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: ConfigLike) -> None:
         self.command_line_interface_api = CommandLineInterfaceApi(
             ApiClientFactory().build(config=config)
         )

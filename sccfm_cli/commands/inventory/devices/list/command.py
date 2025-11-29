@@ -11,7 +11,8 @@ from scc_firewall_manager_sdk import DevicePage
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
 from sccfm_cli.models import Config
-from sccfm_cli.services import ConfigService, InventoryService
+from sccfm_cli.services import ConfigService
+from sccfm_core.services import InventoryService
 
 
 class DevicesListCommand(BaseCommand):

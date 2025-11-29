@@ -1,10 +1,10 @@
 from scc_firewall_manager_sdk import ApiClient, Configuration
 
-from sccfm_cli.models import Config
+from sccfm_core.types import ConfigLike
 
 
 class ApiClientFactory:
-    def build(self, config: Config) -> ApiClient:
+    def build(self, config: ConfigLike) -> ApiClient:
         return ApiClient(
             Configuration(
                 host=f"https://api.{config.region}.security.cisco.com/firewall",
