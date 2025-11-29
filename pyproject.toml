@@ -1,0 +1,78 @@
+[tool.poetry]
+name = "sccfm"
+version = "0.1.0"
+description = "Command line interface for SCC Firewall Manager"
+authors = ["Siddhu Warrier <siwarrie@cisco.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "sccfm_cli" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+click = ">=8.0.0,<9"
+rich = "^14.2.0"
+click-option-group = "^0.5.9"
+scc-firewall-manager-sdk = "^1.15.581"
+
+[tool.poetry.scripts]
+sccfm-cli = "sccfm_cli.cli:cli"
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.11.0"
+isort = "^7.0.0"
+mypy = "^1.18.2"
+pytest = "^9.0.1"
+coverage = "^7.12.0"
+pre-commit = "^4.5.0"
+flake8 = "^7.1.1"
+commitizen = "^3.27.0"
+
+[tool.poetry.group.build.dependencies]
+# Reserved for build-time tools (e.g., packaging helpers). Add as needed.
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+explicit_package_bases = true
+exclude = "(^build/|^dist/)"
+
+[[tool.mypy.overrides]]
+module = [
+  "click",
+  "click.*",
+  "click_option_group",
+  "click_option_group.*",
+  "rich",
+  "rich.*",
+  "scc_firewall_manager_sdk",
+  "scc_firewall_manager_sdk.*",
+  "_pytest.*",
+]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["sccfm_cli"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203"]
