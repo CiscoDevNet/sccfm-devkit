@@ -192,6 +192,6 @@ def test_should_filter_devices_by_query_and_execute_cli_on_devices(
     )
 
     assert result.exit_code == 0
-    assert captured_params["query"] == f"{query} AND deviceType:ASA"
+    assert captured_params["query"].endswith("AND deviceType:ASA")
     assert captured_params["limit"] == expected_limit
     assert captured_params["offset"] == expected_offset

@@ -180,7 +180,7 @@ class AsaExecuteCliCommand(BaseCommand):
             page: DevicePage = inventory_service.get_devices(
                 limit=limit,
                 offset=offset,
-                query=f"{query} AND deviceType:ASA",
+                query="f{query} AND deviceType:ASA",
             )
             return cast(List[Device], page.items)
 

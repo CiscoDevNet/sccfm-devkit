@@ -1,3 +1,9 @@
+## v0.3.0 (2025-12-01)
+
+### Feat
+
+- **sccfm-cli**: Add command to smart license ASAs using sccfm-cli (#1)
+
 ## v0.2.1 (2025-12-01)
 
 ### Fix
