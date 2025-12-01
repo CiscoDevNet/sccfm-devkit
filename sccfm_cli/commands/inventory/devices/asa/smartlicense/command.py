@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Final, Sequence, cast
+from typing import Any, Dict, Final, Sequence, cast
 
 import click
 from rich.table import Table
@@ -70,7 +70,7 @@ class SmartlicenseCommand(BaseCommand):
         )
 
         script_commands = self._build_script(feature_tier, throughput_level, token)
-        uid_to_device = {device.uid: device for device in devices}
+        uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uids = [device.uid for device in devices]
 
         asa_cli_service = AsaCommandLineService(config=config_like)
