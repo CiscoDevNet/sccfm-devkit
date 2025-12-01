@@ -1,3 +1,9 @@
+## v0.2.1 (2025-12-01)
+
+### Fix
+
+- **github-actions**: Fix tagging and release
+
 ## v0.2.0 (2025-12-01)
 
 ### Feat
