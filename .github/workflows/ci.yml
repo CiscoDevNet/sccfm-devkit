@@ -30,7 +30,7 @@ jobs:
         run: |
           poetry run black --check .
           poetry run isort --check-only .
-          poetry run mypy sccfm_cli
+          poetry run mypy sccfm_cli sccfm_core
 
       - name: Test
         run: poetry run pytest --color=yes
@@ -39,6 +39,8 @@ jobs:
     needs: lint-and-test
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,12 +58,20 @@ jobs:
           python -m pipx ensurepath
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           pipx install poetry
+          pipx install commitizen
 
       - name: Install dependencies
         run: poetry install --no-interaction --with dev
 
-      - name: Build wheel
-        run: poetry build -f wheel
+      - name: Bump version with Commitizen
+        id: bump
+        run: |
+          set -e
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.cisco.com"
+          cz bump --dry-run --yes --changelog || exit 0
+          cz bump --yes --changelog
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
 
       - name: Push tag
         id: tag_version
@@ -69,7 +79,11 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build wheel
+        run: poetry build -f wheel
+
       - name: Create release
+        if: steps.bump.outputs.bumped == 'true'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}

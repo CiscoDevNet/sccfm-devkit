@@ -27,6 +27,8 @@ class AsaCommandLineService:
         transaction: CdoTransaction = self.command_line_interface_api.execute_cli_command(
             cli_command_input=CliCommandInput(deviceUids=device_uids, script=script)
         )
+        if transaction.transaction_uid is None:
+            raise ValueError("Transaction UID missing from response.")
         completed_transaction: CdoTransaction = (
             self.transaction_service.wait_for_transaction_to_finish(
                 transaction_uid=transaction.transaction_uid, polling_interval_sec=3
@@ -36,12 +38,14 @@ class AsaCommandLineService:
             raise Exception(
                 f"Transaction failed with status: {completed_transaction.cdo_transaction_status}"
             )
+        if completed_transaction.entity_uid is None:
+            raise ValueError("Execution UID missing from completed transaction.")
         return self.get_cli_results(completed_transaction.entity_uid)
 
     def get_cli_result(self, cli_result_uid: str) -> CdoCliResult:
         return self.command_line_interface_api.get_cli_result(cli_result_uid=cli_result_uid)
 
-    def get_cli_results(self, execution_uid: List[str]) -> List[CdoCliResult]:
+    def get_cli_results(self, execution_uid: str) -> List[CdoCliResult]:
         q = f"executionUid:{execution_uid}"
-        cli_results: List[CdoCliResult] = self.command_line_interface_api.get_cli_results(q=q).items
-        return cli_results
+        results = self.command_line_interface_api.get_cli_results(q=q).items or []
+        return list(results)

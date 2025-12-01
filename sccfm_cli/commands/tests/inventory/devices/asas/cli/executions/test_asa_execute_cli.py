@@ -132,7 +132,8 @@ def test_should_display_cli_results_as_table(
     assert expected_script in output_text
     for device in sample_devices:
         assert device.name in output_text
-        assert device.uid in output_text
+        if device.uid:
+            assert device.uid in output_text
 
 
 def test_should_filter_devices_by_query_and_execute_cli_on_devices(
