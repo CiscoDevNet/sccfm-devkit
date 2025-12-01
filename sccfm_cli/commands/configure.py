@@ -68,12 +68,7 @@ class ConfigureCommand(BaseCommand):
         api_token = kwargs["api_token"]
         config_path = kwargs["config_path"]
 
-        config_service = self._get_config_service(config_path)
+        config_service = ConfigService(config_path)
         config = Config(profile=profile, region=region.lower(), api_token=api_token)
         config_service.save(config)
         self.console.print(f"[green]Profile '{profile}' updated[/green]")
-
-    def _get_config_service(self, path: Path | None) -> ConfigService:
-        if self._config_service is None:
-            self._config_service = ConfigService(path=path)
-        return self._config_service

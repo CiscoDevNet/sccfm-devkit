@@ -6,7 +6,7 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.devices.asas import AsaCommand
+from sccfm_cli.commands.inventory.devices.asa import AsaCommand
 from sccfm_cli.commands.inventory.devices.list import DevicesListCommand
 
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Sequence, cast
 
 import click
@@ -10,9 +9,8 @@ from scc_firewall_manager_sdk import DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
-from sccfm_cli.models import Config
-from sccfm_cli.services import ConfigService
 from sccfm_core.services import InventoryService
+from sccfm_core.types import ConfigLike
 
 
 class DevicesListCommand(BaseCommand):
@@ -28,30 +26,24 @@ class DevicesListCommand(BaseCommand):
         return inventory_list_params()
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        profile = ctx.obj["profile"]
-        config_path = cast(Path | None, kwargs.get("config_path"))
         limit = cast(int, kwargs.get("limit"))
         offset = cast(int, kwargs.get("offset"))
         query = cast(str, kwargs.get("query"))
         output_format = cast(str, kwargs.get("format"))
 
-        config_service = ConfigService(path=config_path)
-        config: Config | None = config_service.load(profile)
+        config = self.get_profile(ctx=ctx, **kwargs)
         if not config:
-            warning = (
-                f"[yellow]Profile '{profile}' not found. Run 'sccfm-cli --profile "
-                f"{profile} configure'.[/yellow]"
-            )
+            warning = "[yellow]Profile not found. Run 'sccfm-cli --profile " "configure'.[/yellow]"
             self.console.print(warning)
             return
-
-        inventory_service = InventoryService(config)
+        config_like = cast(ConfigLike, cast(object, config))
+        inventory_service = InventoryService(config_like)
         page: DevicePage = inventory_service.get_devices(
-            config=config,
             limit=limit,
             offset=offset,
             query=query,
         )
+
         self._render_page(page, output_format)
 
     def _render_page(self, page: DevicePage, output_format: str) -> None:

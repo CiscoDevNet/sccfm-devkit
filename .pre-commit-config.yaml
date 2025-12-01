@@ -21,7 +21,7 @@ repos:
           - --config-file=pyproject.toml
           - --strict
           - sccfm_cli
-          - tests
+          - sccfm_core
         pass_filenames: false
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.27.0

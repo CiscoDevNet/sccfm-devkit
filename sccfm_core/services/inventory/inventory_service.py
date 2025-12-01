@@ -11,9 +11,7 @@ class InventoryService:
         api_client = ApiClientFactory().build(config)
         self.inventory_api = InventoryApi(api_client)
 
-    def get_devices(
-        self, *, config: ConfigLike, limit: int, offset: int, query: str | None
-    ) -> DevicePage:
+    def get_devices(self, *, limit: int, offset: int, query: str | None) -> DevicePage:
         return self.inventory_api.get_devices(limit=str(limit), offset=str(offset), q=query)
 
     def get_managers(

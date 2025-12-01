@@ -27,10 +27,17 @@ def _build_cli() -> click.Group:
         show_default=True,
         help="Configuration profile to use",
     )
+    @click.option(
+        "--silent",
+        is_flag=True,
+        default=False,
+        help="Suppress progress indicators (useful for piping output)",
+    )
     @click.pass_context
-    def group(ctx: click.Context, profile: str) -> None:
+    def group(ctx: click.Context, profile: str, silent: bool) -> None:
         ctx.ensure_object(dict)
         ctx.obj["profile"] = profile
+        ctx.obj["silent"] = silent
 
     for command in _build_commands(console):
         command.register(group)

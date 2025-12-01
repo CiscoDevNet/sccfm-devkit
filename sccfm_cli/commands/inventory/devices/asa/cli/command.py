@@ -4,7 +4,7 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.devices.asas.cli.executions import AsaExecuteCliCommand
+from sccfm_cli.commands.inventory.devices.asa.cli.execute import AsaExecuteCliCommand
 
 
 class AsaCliCommand(BaseCommand):

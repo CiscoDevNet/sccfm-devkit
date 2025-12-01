@@ -9,21 +9,21 @@ import click
 def inventory_list_params() -> List[click.Parameter]:
     return [
         click.Option(
-            ["--limit"],
+            ["-l", "--limit"],
             default=50,
             show_default=True,
             type=click.IntRange(min=1, max=200),
             help="Maximum records to return",
         ),
         click.Option(
-            ["--offset"],
+            ["-o", "--offset"],
             default=0,
             show_default=True,
             type=click.IntRange(min=0),
             help="Pagination offset",
         ),
         click.Option(
-            ["--query"],
+            ["-q", "--query"],
             default=None,
             show_default=False,
             help=("The query to execute. Use the Lucene Query Syntax to construct your " "query."),

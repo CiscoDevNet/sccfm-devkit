@@ -7,7 +7,7 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices import DevicesCommand
-from sccfm_cli.commands.inventory.managers import ManagersCommand
+from sccfm_cli.commands.inventory.manager import ManagersCommand
 
 
 class InventoryCommand(BaseCommand):
@@ -31,4 +31,4 @@ class InventoryCommand(BaseCommand):
         return group
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:  # pragma: no cover
-        ctx.fail("Specify a subcommand: devices or managers")
+        ctx.fail("Specify a subcommand: devices or manager")

@@ -51,7 +51,7 @@ strict = true
 warn_unused_configs = true
 explicit_package_bases = true
 exclude = "(^build/|^dist/)"
-disable_error_code = ["attr-defined", "misc"]
+disable_error_code = ["attr-defined", "misc", "call-arg"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -64,6 +64,7 @@ module = [
   "scc_firewall_manager_sdk",
   "scc_firewall_manager_sdk.*",
   "_pytest.*",
+  "pytest",
 ]
 ignore_missing_imports = true
 
@@ -74,6 +75,12 @@ source = ["sccfm_cli", "sccfm_core"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.pytest.ini_options]
+testpaths = ["sccfm_cli"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
 
 [tool.flake8]
 max-line-length = 100

@@ -4,7 +4,8 @@ from sccfm_core.types import ConfigLike
 
 
 class ApiClientFactory:
-    def build(self, config: ConfigLike) -> ApiClient:
+    @staticmethod
+    def build(config: ConfigLike) -> ApiClient:
         return ApiClient(
             Configuration(
                 host=f"https://api.{config.region}.security.cisco.com/firewall",

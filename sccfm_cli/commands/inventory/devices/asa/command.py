@@ -1,34 +1,32 @@
-from __future__ import annotations
-
 from typing import Any, List
 
 import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.managers.list import ManagersListCommand
+from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
 
 
-class ManagersCommand(BaseCommand):
+class AsaCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
-            ManagersListCommand(console),
+            AsaCliCommand(console),
         ]
 
     @property
     def name(self) -> str:
-        return "managers"
+        return "asa"
 
     @property
     def help_text(self) -> str:
-        return "Manager inventory operations."
+        return "ASA device operations."
 
     def build(self) -> click.Command:
         group = click.Group(name=self.name, help=self.help_text)
-        for command in self._subcommands:
-            group.add_command(command.build())
+        for subcommand in self._subcommands:
+            group.add_command(subcommand.build())
         return group
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:  # pragma: no cover
-        ctx.fail("Specify a subcommand for managers (e.g., list).")
+        ctx.fail(f"Specify a subcommand: {', '.join([c.name for c in self._subcommands])}")

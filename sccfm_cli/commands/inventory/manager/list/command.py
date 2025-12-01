@@ -22,7 +22,7 @@ class ManagersListCommand(BaseCommand):
 
     @property
     def help_text(self) -> str:
-        return "List managers."
+        return "List manager."
 
     def build_params(self) -> Sequence[click.Parameter]:
         return inventory_list_params()
