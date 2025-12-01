@@ -32,25 +32,34 @@ Replace the path with where you saved the wheel. You can also install into a vir
 
 ## Enable shell completion
 
-Add one of the following lines to your shell startup file, then reload your shell (`source ~/.bashrc`, `source ~/.zshrc`, etc.).
+Add one of the following lines to your shell startup file, then reload your shell (`source ~/.bashrc`, `source ~/.zshrc`, etc.). Note: the env var must match the CLI name (`_SCCFM_CLI_COMPLETE`).
 
 - **bash**
 
   ```bash
-  eval "$(_SCCFM_COMPLETE=bash_source sccfm)"
+  eval "$(_SCCFM_CLI_COMPLETE=bash_source sccfm-cli)"
   ```
 
 - **zsh**
 
   ```bash
-  eval "$(_SCCFM_COMPLETE=zsh_source sccfm-cli)"
   autoload -U compinit && compinit
+  eval "$(_SCCFM_CLI_COMPLETE=zsh_source sccfm-cli)"
   ```
 
 - **fish**
 
   ```fish
-  eval (env _SCCFM_COMPLETE=fish_source sccfm)
+  eval (env _SCCFM_CLI_COMPLETE=fish_source sccfm-cli)
   ```
+
+If zsh still runs the command instead of installing completions, generate a static file instead:
+
+```bash
+mkdir -p ~/.zfunc
+_SCCFM_CLI_COMPLETE=zsh_source sccfm-cli > ~/.zfunc/_sccfm-cli
+echo 'fpath+=(~/.zfunc)' >> ~/.zshrc
+autoload -U compinit && compinit
+```
 
 After sourcing, tab completion will work for all `sccfm` commands and options.

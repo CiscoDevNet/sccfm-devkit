@@ -71,6 +71,11 @@ class BaseCommand(ABC):
                     f"[bold]Error Details:[/bold]\n{json.dumps(error['details'], indent=2)}"
                 )
                 sys.exit(-1)
+        except click.ClickException:
+            # Preserve Click's default error handling so usage/help is shown for user errors.
+            raise
+        except (click.Abort, click.exceptions.Exit):
+            raise
         except Exception as e:
             self.console.print(f"[red]Error: {e}[/red]")
             sys.exit(-1)

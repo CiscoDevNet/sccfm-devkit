@@ -390,3 +390,31 @@ def test_should_fail_with_both_query_and_device_uids(
 
     assert result.exit_code != 0
     assert "Provide exactly one of --query or --device-uids" in result.output
+
+
+def test_should_display_usage_on_validation_error(
+    cli_runner: CliRunner, default_config: Config
+) -> None:
+    """Validation errors should keep Click's usage/help output intact."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "smartlicense",
+            "--token",
+            "token-1",
+            "--feature-tier",
+            "standard",
+            "--query",
+            "name:asa",
+            "--device-uids",
+            "uid-1",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert result.output.startswith("Usage:")
+    assert "inventory devices asa smartlicense" in result.output
+    assert "Provide exactly one of --query or --device-uids." in result.output
