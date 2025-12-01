@@ -1,3 +1,9 @@
+## v0.3.2 (2025-12-01)
+
+### Fix
+
+- **sccfm-cli**: Fix auto-completion issues
+
 ## v0.3.1 (2025-12-01)
 
 ### Fix
