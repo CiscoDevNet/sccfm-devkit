@@ -146,7 +146,7 @@ def test_should_filter_devices_by_query_and_execute_cli_on_devices(
 ) -> None:
     """ASA execute CLI command should pass query filter to inventory service."""
     captured_params: dict[str, Any] = {}
-    expected_query = "deviceType:ASA"
+    query = "name:burak"
     expected_limit = 10
     expected_offset = 5
 
@@ -179,7 +179,7 @@ def test_should_filter_devices_by_query_and_execute_cli_on_devices(
             "cli",
             "execute",
             "--query",
-            expected_query,
+            query,
             "--limit",
             str(expected_limit),
             "--offset",
@@ -192,6 +192,6 @@ def test_should_filter_devices_by_query_and_execute_cli_on_devices(
     )
 
     assert result.exit_code == 0
-    assert captured_params["query"] == expected_query
+    assert captured_params["query"].endswith("AND deviceType:ASA")
     assert captured_params["limit"] == expected_limit
     assert captured_params["offset"] == expected_offset
