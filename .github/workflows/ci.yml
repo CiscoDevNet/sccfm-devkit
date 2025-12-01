@@ -73,11 +73,13 @@ jobs:
           cz bump --yes --changelog
           echo "bumped=true" >> "$GITHUB_OUTPUT"
 
-      - name: Push tag
-        id: tag_version
-        uses: mathieudutour/github-tag-action@v6.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push changes and tags
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          git push origin HEAD:${BRANCH}
+          git push origin --tags
 
       - name: Build wheel
         run: poetry build -f wheel

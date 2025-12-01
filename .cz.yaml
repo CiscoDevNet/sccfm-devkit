@@ -1,5 +1,5 @@
 commitizen:
   name: cz_conventional_commits
-  version: 0.1.0
+  version_provider: poetry
   tag_format: v$version
   update_changelog_on_bump: false
