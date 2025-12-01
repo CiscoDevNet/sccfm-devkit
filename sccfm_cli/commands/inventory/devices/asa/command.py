@@ -5,6 +5,7 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
+from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
 
 
 class AsaCommand(BaseCommand):
@@ -12,6 +13,7 @@ class AsaCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             AsaCliCommand(console),
+            SmartlicenseCommand(console),
         ]
 
     @property

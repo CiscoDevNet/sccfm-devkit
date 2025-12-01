@@ -88,7 +88,7 @@ class AsaExecuteCliCommand(BaseCommand):
         offset = cast(int, kwargs.get("offset"))
         script = cast(str | None, kwargs.get("script"))
         script_file = cast(Path | None, kwargs.get("script_file"))
-        format = cast(str, kwargs.get("format"))
+        response_format = cast(str, kwargs.get("format"))
 
         self._validate_filters(
             ctx,
@@ -123,7 +123,7 @@ class AsaExecuteCliCommand(BaseCommand):
             results=results,
             uid_to_device=uid_to_device,
             script=script,  # type: ignore[arg-type]
-            format=format,
+            format=response_format,
         )
 
     def _render_results(
@@ -180,7 +180,7 @@ class AsaExecuteCliCommand(BaseCommand):
             page: DevicePage = inventory_service.get_devices(
                 limit=limit,
                 offset=offset,
-                query=query,
+                query="f{query} AND deviceType:ASA",
             )
             return cast(List[Device], page.items)
 
