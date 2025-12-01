@@ -71,7 +71,9 @@ jobs:
           git config user.email "github-actions@users.noreply.cisco.com"
           cz bump --dry-run --yes --changelog || exit 0
           cz bump --yes --changelog
+          NEW_TAG=$(git describe --tags --abbrev=0)
           echo "bumped=true" >> "$GITHUB_OUTPUT"
+          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Push changes and tags
         if: steps.bump.outputs.bumped == 'true'
@@ -88,6 +90,6 @@ jobs:
         if: steps.bump.outputs.bumped == 'true'
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.tag_version.outputs.new_tag }}
+          tag: ${{ steps.bump.outputs.new_tag }}
           artifacts: "dist/*.whl"
           token: ${{ secrets.GITHUB_TOKEN }}
