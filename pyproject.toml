@@ -19,8 +19,10 @@ scc-firewall-manager-sdk = "^1.15.581"
 
 [tool.poetry.scripts]
 sccfm-cli = "sccfm_cli.cli:cli"
+build-ansible-collection = "scripts.build_ansible_collection:main"
 
 [tool.poetry.group.dev.dependencies]
+ansible-core = "^2.17.0"
 black = "^25.11.0"
 isort = "^7.0.0"
 mypy = "^1.18.2"
@@ -51,10 +53,14 @@ strict = true
 warn_unused_configs = true
 explicit_package_bases = true
 exclude = "(^build/|^dist/)"
-disable_error_code = ["attr-defined", "misc", "call-arg"]
+
+disable_error_code = ["attr-defined", "misc", "call-arg", "arg-type"]
 
 [[tool.mypy.overrides]]
 module = [
+  "ansible_collections.*",
+  "ansible",
+  "ansible.*",
   "click",
   "click.*",
   "click_option_group",

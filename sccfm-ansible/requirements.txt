@@ -1,0 +1,7 @@
+# Python dependencies for cisco.sccfm Ansible collection
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+scc-firewall-manager-sdk>=1.15.581
+# Note: sccfm includes both sccfm_cli and sccfm_core
+# For local development, use: poetry install from parent directory

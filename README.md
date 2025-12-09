@@ -22,6 +22,15 @@ sccfm-cli --help
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
 Every command lives in `sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
 
+## Ansible collection
+
+- macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
+- Install the collection locally from the collection root (`sccfm-ansible/`) with `ansible-galaxy collection install ./sccfm-ansible`.
+- For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
+- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `aus`, `uae`, or `in`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
+- Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
+- A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
+
 ## Development
 
 ```bash

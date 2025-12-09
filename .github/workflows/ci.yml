@@ -86,10 +86,13 @@ jobs:
       - name: Build wheel
         run: poetry build -f wheel
 
+      - name: Build Ansible collection
+        run: poetry run build-ansible-collection
+
       - name: Create release
         if: steps.bump.outputs.bumped == 'true'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.bump.outputs.new_tag }}
-          artifacts: "dist/*.whl"
+          artifacts: "dist/*.whl,dist/*.tar.gz"
           token: ${{ secrets.GITHUB_TOKEN }}

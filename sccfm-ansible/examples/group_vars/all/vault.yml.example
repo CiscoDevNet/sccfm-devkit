@@ -1,0 +1,22 @@
+---
+# This is an EXAMPLE of what the unencrypted vault.yml should contain
+# DO NOT commit the actual vault.yml unencrypted to version control!
+#
+# To create your own encrypted vault.yml:
+# 1. Copy this file: cp vault.yml.example vault.yml.temp
+# 2. Edit vault.yml.temp with your actual secrets
+# 3. Encrypt it: ansible-vault encrypt vault.yml.temp --output vault.yml --vault-password-file ../../.vault_pass
+# 4. Remove the temp file: rm vault.yml.temp
+
+# SCC Firewall Manager API token
+# Obtain this from your CDO/SCCFM tenant
+sccfm_api_token: "your-api-token-here-abc123xyz789"
+
+# ASA device passwords - each device can have its own password
+# Use descriptive names that match your device naming in the playbook
+vault_asa_branch_office_01_password: "BranchOffice01-SecurePass!"
+vault_asa_datacenter_01_password: "Datacenter01-SecurePass!"
+vault_asa_dmz_01_password: "DMZ01-SecurePass!"
+
+# Add more ASA passwords as needed for additional devices
+# vault_asa_<device_name>_password: "password"

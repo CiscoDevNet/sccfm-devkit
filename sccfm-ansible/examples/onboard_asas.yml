@@ -1,0 +1,81 @@
+---
+- name: Onboard ASA devices to SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+  
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  
+  vars:
+    # List of ASAs to onboard
+    # Each device references its own password from the encrypted vault file
+    asas_to_onboard:
+      - name: branch-office-asa-01
+        device_address: "123.63.117.124:11100"
+        username: asavuser
+        password: "{{ vault_asa_branch_office_01_password }}"  # From vault.yml
+        connector_type: CDG
+        ignore_certificate: true
+        grouped_labels:
+          location: ["branch-office"]
+          environment: ["production"]
+        ungrouped_labels:
+          - asa
+          - firewall
+          - branch
+#
+#      - name: datacenter-asa-01
+#        device_address: "198.51.100.50:443"
+#        username: admin
+#        password: "{{ vault_asa_datacenter_01_password }}"  # From vault.yml
+#        connector_type: CDG
+#        ignore_certificate: false
+#        grouped_labels:
+#          location: ["datacenter"]
+#          environment: ["production"]
+#        ungrouped_labels:
+#          - asa
+#          - firewall
+#          - datacenter
+#
+#      - name: dmz-asa-01
+#        device_address: "203.0.113.100:443"
+#        username: admin
+#        password: "{{ vault_asa_dmz_01_password }}"  # From vault.yml
+#        connector_type: SDC
+#        connector_name: dmz-sdc-01
+#        ignore_certificate: true
+#        grouped_labels:
+#          location: ["dmz"]
+#          environment: ["production"]
+#        ungrouped_labels:
+#          - asa
+#          - firewall
+#          - dmz
+  
+  tasks:
+    - name: Onboard ASA devices
+      cisco.sccfm.onboard_asa:
+        name: "{{ item.name }}"
+        device_address: "{{ item.device_address }}"
+        username: "{{ item.username }}"
+        password: "{{ item.password }}"
+        connector_type: "{{ item.connector_type }}"
+        connector_name: "{{ item.connector_name | default(omit) }}"
+        ignore_certificate: "{{ item.ignore_certificate | default(false) }}"
+        grouped_labels: "{{ item.grouped_labels | default(omit) }}"
+        ungrouped_labels: "{{ item.ungrouped_labels | default(omit) }}"
+      loop: "{{ asas_to_onboard }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: onboard_results
+    
+    - name: Display onboarding results
+      ansible.builtin.debug:
+        msg: "ASA {{ item.item.name }} onboarding initiated"
+      loop: "{{ onboard_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"

@@ -1,0 +1,12 @@
+---
+requires_ansible: ">=2.15.0"
+
+action_groups:
+  cisco.sccfm.all:
+    - onboard_asa
+    # Add future modules here as they are created
+
+module_defaults:
+  group/cisco.sccfm.all:
+    region: null
+    api_token: null
