@@ -122,7 +122,7 @@ class AsaExecuteCliCommand(BaseCommand):
         self._render_results(
             results=results,
             uid_to_device=uid_to_device,
-            script=script,  # type: ignore[arg-type]
+            script=script,
             format=response_format,
         )
 
