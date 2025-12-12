@@ -53,9 +53,11 @@ class InventoryHostBuilder:
         self._inventory.set_variable(device.name, "sccfm_uid", device.uid)
         self._inventory.set_variable(device.name, "sccfm_name", device.name)
         self._inventory.set_variable(device.name, "sccfm_region", self._region)
-        self._inventory.set_variable(device.name, "sccfm_device_type", device.device_type)
         self._inventory.set_variable(
-            device.name, "sccfm_connectivity_state", device.connectivity_state
+            device.name, "sccfm_device_type", str(device.device_type).replace("EntityType.", "")
         )
-        self._inventory.set_variable(device.name, "sccfm_config_state", device.config_state)
+        self._inventory.set_variable(
+            device.name, "sccfm_connectivity_state", str(device.connectivity_state)
+        )
+        self._inventory.set_variable(device.name, "sccfm_config_state", str(device.config_state))
         self._inventory.set_variable(device.name, "sccfm_software_version", device.software_version)

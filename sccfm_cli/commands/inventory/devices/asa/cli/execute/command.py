@@ -100,13 +100,8 @@ class AsaExecuteCliCommand(BaseCommand):
         if script_file is not None:
             script = script_file.read_text()
         config = self.get_profile(ctx=ctx, **kwargs)
-        if not config:
-            warning = "[yellow]Profile not found. Run 'sccfm-cli --profile " "configure'.[/yellow]"
-            self.console.print(warning)
-            return
-        config_like = cast(ConfigLike, cast(object, config))
         devices: List[Device] = self._get_devices(
-            config=config_like,
+            config=config,
             query=query,
             device_uids=device_uids_param,
             limit=limit,
@@ -114,7 +109,7 @@ class AsaExecuteCliCommand(BaseCommand):
         )
         uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uids: List[str] = [device.uid for device in devices]
-        asa_cli_service = AsaCommandLineService(config=config_like)
+        asa_cli_service = AsaCommandLineService(config=config)
         results: CdoTransaction | List[CdoCliResult] = asa_cli_service.execute_cli(
             device_uids=device_uids,
             asa_commands=script.split("\n"),  # type: ignore[union-attr]

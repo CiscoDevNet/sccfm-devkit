@@ -9,7 +9,6 @@ from rich.console import Console
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.services import ConfigService
 from sccfm_core.services import HealthService
 
 
@@ -44,16 +43,7 @@ class StatusCommand(BaseCommand):
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         profile = ctx.obj["profile"]
-        config_path = kwargs["config_path"]
-        config_service = ConfigService(path=config_path)
-        config = config_service.load(profile)
-        if not config:
-            warning = (
-                f"[yellow]Profile '{profile}' not found. Run 'sccfm-cli --profile "
-                f"{profile} configure'.[/yellow]"
-            )
-            self.console.print(warning)
-            return
+        config = self.get_profile(ctx=ctx, **kwargs)
 
         health_service = HealthService(config=config)
         table = Table(title=f"Health status for '{profile}'")

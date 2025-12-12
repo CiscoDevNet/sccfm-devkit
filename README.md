@@ -59,3 +59,21 @@ Key tooling:
 - `pytest`, `coverage`, `mypy`, `black`, `isort`, and `pre-commit` enforce correctness and consistency.
 
 To add a new command, drop a file under `sccfm_cli/commands/`, subclass `BaseCommand`, and register it in `sccfm_cli/cli.py`. SDK integrations live in `sccfm_core/`, keeping external dependencies isolated and easy to reuse (CLI or Ansible).
+
+## Troubleshooting
+
+### Tests fail with "No such command" errors
+
+If tests fail with messages like `Usage: group inventory devices asa [OPTIONS] COMMAND [ARGS]...` instead of executing commands, you likely have stale Python bytecode caches.
+
+**Solution:**
+
+```bash
+poetry install  # Reinstall the package in editable mode
+find . -type d -name "__pycache__" -exec rm -rf {} +  # Clear all bytecode caches
+poetry run pytest  # Rerun tests
+```
+
+**Why this happens:** When you modify command structure or add new CLI commands, Python's `__pycache__` directories can retain old `.pyc` files that don't reflect your changes. Tests then run against the cached version instead of your updated source code.
+
+**Prevention:** After modifying command registrations or CLI structure, always reinstall the package and clear caches before running tests.

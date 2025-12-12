@@ -75,7 +75,7 @@
     
     - name: Display onboarding results
       ansible.builtin.debug:
-        msg: "ASA {{ item.item.name }} onboarding initiated"
+        msg: "{{ item.item.name }}: changed={{ item.changed }}, msg={{ item.msg }}, uid={{ item.device.uid }}"
       loop: "{{ onboard_results.results }}"
       loop_control:
         label: "{{ item.item.name }}"

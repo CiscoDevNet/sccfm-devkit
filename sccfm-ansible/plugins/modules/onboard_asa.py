@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import os
+from typing import Optional, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import AsaCreateOrUpdateInput, ConnectorType, Device, Labels
+from scc_firewall_manager_sdk import (
+    AsaCreateOrUpdateInput,
+    ConnectorType,
+    Device,
+    DevicePage,
+    Labels,
+)
 
+from sccfm_core import InventoryService
 from sccfm_core.services.inventory import AsaOnboardService
+from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config
 
@@ -199,23 +208,50 @@ def run_module() -> None:
     region, api_token = validate_connection_params(module)
 
     try:
-        config = Config(region=region, api_token=api_token)
+        config = cast(ConfigLike, Config(region=region, api_token=api_token))
     except ValueError as e:
         module.fail_json(msg=str(e))
 
     params = module.params
     asa_create_or_update_input = build_asa_input(params)
-
     try:
         # Business logic
-        asa_onboard_service = AsaOnboardService(config=config)
-        asa_device: Device = asa_onboard_service.onboard_asa(
-            asa_create_or_update_input=asa_create_or_update_input
+        existing_device_opt = _get_existing_device(
+            config=config, asa_create_or_update_input=asa_create_or_update_input
         )
+        if existing_device_opt is not None:
+            module.exit_json(
+                changed=False,
+                msg="ASA device already exists",
+                device=existing_device_opt.to_dict(),
+            )
+        asa_device = _onboard_asa(config, asa_create_or_update_input)
+        module.exit_json(changed=True, msg="Onboarded successfulyl", device=asa_device.to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to onboard ASA: {str(e)}")
 
-    module.exit_json(changed=True, device=asa_device.to_dict(), region=region)
+
+def _onboard_asa(config: ConfigLike, asa_create_or_update_input: AsaCreateOrUpdateInput) -> Device:
+    try:
+        asa_onboard_service = AsaOnboardService(config=config)
+        return asa_onboard_service.onboard_asa(
+            asa_create_or_update_input=asa_create_or_update_input
+        )
+    except Exception as e:
+        raise e
+
+
+def _get_existing_device(
+    config: ConfigLike, asa_create_or_update_input: AsaCreateOrUpdateInput
+) -> Optional[Device]:
+    try:
+        inventory_service = InventoryService(config=config)
+        device_page: DevicePage = inventory_service.get_devices(
+            limit=1, offset=0, query=f"deviceType:ASA AND name:{asa_create_or_update_input.name}"
+        )
+        return device_page.items[0] if device_page.count > 0 else None
+    except Exception as e:
+        raise e
 
 
 def main() -> None:

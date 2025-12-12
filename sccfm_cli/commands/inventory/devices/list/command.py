@@ -11,7 +11,6 @@ from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
 from sccfm_cli.utils import with_spinner
 from sccfm_core.services import InventoryService
-from sccfm_core.types import ConfigLike
 
 
 class DevicesListCommand(BaseCommand):
@@ -34,12 +33,7 @@ class DevicesListCommand(BaseCommand):
         output_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
-        if not config:
-            warning = "[yellow]Profile not found. Run 'sccfm-cli --profile " "configure'.[/yellow]"
-            self.console.print(warning)
-            return
-        config_like = cast(ConfigLike, cast(object, config))
-        inventory_service = InventoryService(config_like)
+        inventory_service = InventoryService(config)
         page: DevicePage = inventory_service.get_devices(
             limit=limit,
             offset=offset,

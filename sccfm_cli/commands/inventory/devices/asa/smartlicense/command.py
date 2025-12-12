@@ -52,16 +52,9 @@ class SmartlicenseCommand(BaseCommand):
         self._validate_filters(ctx, query=query, device_uids=device_uids_param)
 
         config = self.get_profile(ctx=ctx, **kwargs)
-        if not config:
-            self.console.print(
-                "[yellow]Profile not found. Run 'sccfm-cli --profile configure'.[/yellow]"
-            )
-            return
-
-        config_like = cast(ConfigLike, cast(object, config))
         devices = self._get_devices(
             ctx=ctx,
-            config=config_like,
+            config=config,
             query=query,
             device_uids=device_uids_param,
             limit=limit,
@@ -73,7 +66,7 @@ class SmartlicenseCommand(BaseCommand):
         uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uids: List[str] = [device.uid for device in devices]
 
-        asa_cli_service = AsaCommandLineService(config=config_like)
+        asa_cli_service = AsaCommandLineService(config=config)
         results = asa_cli_service.execute_cli(device_uids=device_uids, asa_commands=script_commands)
 
         self._render_results(

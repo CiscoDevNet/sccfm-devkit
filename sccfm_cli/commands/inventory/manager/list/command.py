@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Sequence, cast
 
 import click
@@ -10,8 +9,6 @@ from scc_firewall_manager_sdk import DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
-from sccfm_cli.models import Config
-from sccfm_cli.services import ConfigService
 from sccfm_core.services import InventoryService
 
 
@@ -28,22 +25,12 @@ class ManagersListCommand(BaseCommand):
         return inventory_list_params()
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        profile = ctx.obj["profile"]
-        config_path = cast(Path | None, kwargs.get("config_path"))
         limit = cast(int, kwargs.get("limit"))
         offset = cast(int, kwargs.get("offset"))
         query = cast(str, kwargs.get("query"))
         output_format = cast(str, kwargs.get("format"))
 
-        config_service = ConfigService(path=config_path)
-        config: Config | None = config_service.load(profile)
-        if not config:
-            warning = (
-                f"[yellow]Profile '{profile}' not found. Run 'sccfm-cli --profile "
-                f"{profile} configure'.[/yellow]"
-            )
-            self.console.print(warning)
-            return
+        config = self.get_profile(ctx=ctx, **kwargs)
 
         inventory_service = InventoryService(config)
         page: DevicePage = inventory_service.get_managers(
