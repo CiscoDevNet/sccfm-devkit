@@ -61,21 +61,31 @@ jobs:
           pipx install commitizen
 
       - name: Install dependencies
-        run: poetry install --no-interaction --with dev
+        run: poetry install --no-interaction --with dev,build
 
-      - name: Build Ansible collection
-        run: poetry run build-ansible-collection
-
-      - name: Bump version with Commitizen
+      - name: Bump version and build collection
         id: bump
         run: |
           set -e
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.cisco.com"
+
+          # Check if version bump is needed
           cz bump --dry-run --yes --changelog || exit 0
+
+          # Bump version in files only (no commit/tag yet)
+          cz bump --yes --changelog --files-only
+          NEW_VERSION=$(poetry version -s)
+          NEW_TAG="v${NEW_VERSION}"
+
+          # Build Ansible collection with updated version
+          poetry run build-ansible-collection
+
+          # Now commit everything together
           git add .
-          cz bump --yes --changelog
-          NEW_TAG=$(git describe --tags --abbrev=0)
+          git commit -m "bump: version ${NEW_VERSION}" -m "[skip ci]"
+          git tag "${NEW_TAG}"
+
           echo "bumped=true" >> "$GITHUB_OUTPUT"
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
 
