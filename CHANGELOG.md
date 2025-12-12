@@ -1,3 +1,9 @@
+## v0.4.0 (2025-12-12)
+
+### Feat
+
+- **LH-101462**: Add Ansible task to onboard ASA devices, add new onboard-asa command (#3)
+
 ## v0.3.2 (2025-12-01)
 
 ### Fix
