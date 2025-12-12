@@ -110,7 +110,7 @@ class AsaOnboardCommand(BaseCommand):
         device_page = inventory_service.get_devices(
             limit=1, offset=0, query=f"name:{asa_input.name}"
         )
-        if device_page.count > 0:
+        if device_page.count is not None and device_page.count > 0:
             ctx.fail(f"ASA device with name {asa_input.name} already exists.")
         asa_onboard_service = AsaOnboardService(config=config)
         device: Device = asa_onboard_service.onboard_asa(asa_create_or_update_input=asa_input)
