@@ -55,7 +55,6 @@ pip install /path/to/sccfm-<version>-py3-none-any.whl
 Replace the path with where you saved the wheel. You can also install into a virtual environment if desired.
 
 ### Enable shell completion
-
 Add one of the following lines to your shell startup file, then reload your shell (`source ~/.bashrc`, `source ~/.zshrc`, etc.). Note: the env var must match the CLI name (`_SCCFM_CLI_COMPLETE`). 
 
 > ⚠️ Do this only the first time you install sccfm-cli; you don't need to do this every time.
