@@ -1,3 +1,9 @@
+## v0.4.2 (2025-12-12)
+
+### Fix
+
+- **LH-101462**: Fix how galaxy.yml always ended up a version behind pyproject.toml
+
 ## v0.4.1 (2025-12-12)
 
 ### Fix
