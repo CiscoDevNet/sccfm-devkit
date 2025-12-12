@@ -10,8 +10,8 @@ import click
 from rich.console import Console
 from scc_firewall_manager_sdk import ApiException, CdoTransaction
 
-from sccfm_cli.models import Config
 from sccfm_cli.services import ConfigService
+from sccfm_core.types import ConfigLike
 
 
 class BaseCommand(ABC):
@@ -40,11 +40,17 @@ class BaseCommand(ABC):
             params=list(self.build_params()),
         )
 
-    def get_profile(self, ctx: click.Context, **kwargs: Any) -> Config | None:
+    def get_profile(self, ctx: click.Context, **kwargs: Any) -> ConfigLike:
         profile = ctx.obj["profile"]
         config_path = cast(Path | None, kwargs.get("config_path"))
         config_service = ConfigService(path=config_path)
-        return config_service.load(profile)
+        config = config_service.load(profile)
+        if not config:
+            raise click.ClickException(
+                f"Profile '{profile}' not found. "
+                f"Run 'sccfm-cli --profile {profile} configure' to set it up."
+            )
+        return cast(ConfigLike, cast(object, config))
 
     def build_params(self) -> Sequence[click.Parameter]:
         return []

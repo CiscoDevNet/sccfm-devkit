@@ -1,0 +1,12 @@
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show SCCFM metadata for each device
+      ansible.builtin.debug:
+        msg:
+          name: "{{ inventory_hostname }}"
+          uid: "{{ sccfm_uid }}"
+          device_type: "{{ sccfm_device_type }}"
+          connectivity: "{{ sccfm_connectivity_state }}"
+          config_state: "{{ sccfm_config_state }}"
+          software_version: "{{ sccfm_software_version }}"

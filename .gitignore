@@ -22,3 +22,10 @@ htmlcov/
 /.eggs/
 .poetry_cache/
 /pip-wheel-metadata/
+# Vault password file (NEVER commit this!)
+**/.vault_pass
+
+# Unencrypted vault files (if you accidentally decrypt)
+**/group_vars/*/vault.yml.decrypted
+
+.ansible

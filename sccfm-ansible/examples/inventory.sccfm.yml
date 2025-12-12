@@ -1,0 +1,7 @@
+plugin: cisco.sccfm.sccfm
+region: "{{ lookup('env', 'SCCFM_REGION') }}"
+api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+group_by_device_type: true
+# limit: 100
+# query: "deviceType:ASA"
+# group: sccfm

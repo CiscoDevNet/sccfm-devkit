@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scc_firewall_manager_sdk import DevicePage, InventoryApi
+from scc_firewall_manager_sdk import Device, DevicePage, InventoryApi
 
 from sccfm_core.factories import ApiClientFactory
 from sccfm_core.types import ConfigLike
@@ -13,6 +13,9 @@ class InventoryService:
 
     def get_devices(self, *, limit: int, offset: int, query: str | None) -> DevicePage:
         return self.inventory_api.get_devices(limit=str(limit), offset=str(offset), q=query)
+
+    def get_device_by_uid(self, device_uid: str) -> Device:
+        return self.inventory_api.get_device(device_uid=device_uid)
 
     def get_managers(
         self, *, config: ConfigLike, limit: int, offset: int, query: str = ""
