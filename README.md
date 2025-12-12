@@ -2,6 +2,20 @@
 
 Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcoming Ansible collection. Shared business logic lives in `sccfm_core` so both the CLI and the collection can reuse the same inventory/health SDK integrations; the CLI remains in `sccfm_cli`.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Getting started](#getting-started)
+- [Commands](#commands)
+- [Ansible collection](#ansible-collection)
+- [Development](#development)
+- [Packaging for pip](#packaging-for-pip)
+- [Troubleshooting](#troubleshooting)
+  - [Tests fail with "No such command" errors](#tests-fail-with-no-such-command-errors)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Getting started
 
 ```bash

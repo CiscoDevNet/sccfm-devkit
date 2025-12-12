@@ -63,6 +63,9 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction --with dev
 
+      - name: Build Ansible collection
+        run: poetry run build-ansible-collection
+
       - name: Bump version with Commitizen
         id: bump
         run: |
@@ -70,6 +73,7 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.cisco.com"
           cz bump --dry-run --yes --changelog || exit 0
+          git add .
           cz bump --yes --changelog
           NEW_TAG=$(git describe --tags --abbrev=0)
           echo "bumped=true" >> "$GITHUB_OUTPUT"
@@ -85,9 +89,6 @@ jobs:
 
       - name: Build wheel
         run: poetry build -f wheel
-
-      - name: Build Ansible collection
-        run: poetry run build-ansible-collection
 
       - name: Create release
         if: steps.bump.outputs.bumped == 'true'

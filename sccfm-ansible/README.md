@@ -2,6 +2,39 @@
 
 Ansible collection for managing Cisco Security Cloud Control Firewall Manager (SCCFM) devices. Includes inventory plugin and modules for device onboarding.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+  - [Local Development](#local-development)
+- [Trying out examples](#trying-out-examples)
+  - [1. Set Up Ansible Vault](#1-set-up-ansible-vault)
+  - [2. Edit playbook](#2-edit-playbook)
+  - [2. Create Encrypted Secrets](#2-create-encrypted-secrets)
+  - [3. Configure Plain Variables](#3-configure-plain-variables)
+  - [4. Run Examples](#4-run-examples)
+  - [Test Inventory](#test-inventory)
+  - [Host Variables](#host-variables)
+- [Modules](#modules)
+  - [cisco.sccfm.onboard_asa](#ciscosccfmonboard_asa)
+- [Ansible Vault Management](#ansible-vault-management)
+  - [What is Ansible Vault?](#what-is-ansible-vault)
+  - [Vault Commands Reference](#vault-commands-reference)
+- [Module Defaults Pattern](#module-defaults-pattern)
+- [Authentication Methods](#authentication-methods)
+- [Security Best Practices](#security-best-practices)
+- [Troubleshooting](#troubleshooting)
+  - ["Decryption failed" error](#decryption-failed-error)
+  - ["region is required" error](#region-is-required-error)
+  - ["api_token is required" error](#api_token-is-required-error)
+  - [Inventory returns no hosts](#inventory-returns-no-hosts)
+- [Examples](#examples)
+- [Additional Resources](#additional-resources)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Features
 
 - **Dynamic Inventory Plugin**: Automatically load SCCFM devices into Ansible inventory
@@ -12,36 +45,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 
 ## Installation
 
-Assumption for the rest of this doc: you are in the `sccfm-ansible directory`
-
-### From GitHub Releases (Recommended)
-
-Each GitHub Release contains two artifacts:
-- `sccfm-{version}-py3-none-any.whl` - Python package with core functionality
-- `cisco-sccfm-{version}.tar.gz` - Ansible collection
-
-**Download and install both artifacts:**
-```bash
-# 1. Install Python dependencies
-pip install /path/to/sccfm-{version}-py3-none-any.whl
-
-# 2. Install Ansible collection
-ansible-galaxy collection install /path/to/cisco-sccfm-{version}.tar.gz
-```
-
-**Verify installation:**
-```bash
-python -c "import sccfm_core; print('✅ Python package installed')"
-ansible-galaxy collection list | grep cisco.sccfm
-```
-
-### From Ansible Galaxy
-
-> ⚠️ This collection is not yet available on Ansible Galaxy.
-
-```bash
-ansible-galaxy collection install cisco.sccfm
-```
+See instructions in the [INSTALL.md](INSTALL.md) file.
 
 ### Local Development
 

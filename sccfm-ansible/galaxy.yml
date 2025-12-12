@@ -1,27 +1,27 @@
 namespace: cisco
 name: sccfm
-version: 0.1.0
+version: 0.4.0
 readme: README.md
 authors:
-  - Cisco Security Cloud Control Firewall Manager Team
+- Cisco Security Cloud Control Firewall Manager Team
 description: Ansible inventory plugin for Cisco SCC Firewall Manager (SCCFM).
-license_file: 'LICENSE'
+license_file: LICENSE
 tags:
-  - cisco
-  - sccfm
-  - security
-  - firewall
-  - cloud
-  - collection
+- cisco
+- sccfm
+- security
+- firewall
+- cloud
+- collection
 repository: https://github.com/cisco-lockhart/sccfm-devkit
 documentation: https://github.com/cisco-lockhart/sccfm-devkit
 homepage: https://github.com/cisco-lockhart/sccfm-devkit
 issues: https://github.com/cisco-lockhart/sccfm-devkit/issues
 build_ignore:
-  - ".venv"
-  - ".pytest_cache"
-  - ".mypy_cache"
-  - ".idea"
-  - ".vscode"
-  - "dist"
-  - "ansible_collections"
+- .venv
+- .pytest_cache
+- .mypy_cache
+- .idea
+- .vscode
+- dist
+- ansible_collections
