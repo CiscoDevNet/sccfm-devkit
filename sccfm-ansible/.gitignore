@@ -1,0 +1,3 @@
+**/vault.yml
+**/.vault_pass~
+examples/group_vars/all/vault.yml

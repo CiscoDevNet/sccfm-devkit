@@ -6,8 +6,8 @@
 sccfm_region: int
 
 # Common ASA configuration
-default_asa_username: admin
+default_asa_username: asavuser
 default_ignore_certificate: true
 
 # Default connector settings
-default_connector_type: SDC
+default_connector_type: CDG
