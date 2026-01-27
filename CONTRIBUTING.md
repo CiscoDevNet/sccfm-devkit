@@ -38,11 +38,31 @@ has been discussed in the past, or if the change was already implemented but not
 We expect new pull requests to include tests for any affected behavior, and, as we follow semantic versioning, we may
 reserve breaking changes until the next major version release.
 
+## Development Setup
+
+1. Run `scripts/setup_environment.sh` to install dependencies and create the virtualenv.
+
+2. Install [direnv](https://direnv.net/) for automatic environment activation:
+   ```bash
+   brew install direnv
+   echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+   source ~/.zshrc
+   direnv allow
+   ```
+
+3. Set up your SCCFM credentials:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API token
+   ```
+
+Now whenever you `cd` into the project, the virtualenv activates and env vars load automatically.
+
 ## Committing Changes
 
 We enforce conventional commits via Commitizen. Please:
 
-- Run `scripts/setup_environment.sh` (installs dev/build deps including Commitizen) and `scripts/activate.sh` to ensure the virtualenv is active.
+- Ensure the virtualenv is active (happens automatically with direnv, or run `source .venv/bin/activate`).
 - Install the `pre-commit` hooks (`pre-commit install && pre-commit install --hook-type commit-msg`).
 - Use `./scripts/cz.sh commit` (runs `pre-commit` visibly, then Commitizen) or `poetry run cz commit` to create commits, or ensure your commit messages
   follow the Conventional Commits spec (e.g., `feat: add inventory managers list pagination`).
