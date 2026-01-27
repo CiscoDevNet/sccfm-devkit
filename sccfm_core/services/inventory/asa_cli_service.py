@@ -35,9 +35,9 @@ class AsaCommandLineService:
             )
         )
         if completed_transaction.cdo_transaction_status != CdoTransactionStatus.DONE:
-            raise Exception(
-                f"Transaction failed with status: {completed_transaction.cdo_transaction_status}"
-            )
+            # Return the failed transaction instead of raising an exception
+            # This allows the caller to inspect the error details
+            return completed_transaction
         if completed_transaction.entity_uid is None:
             raise ValueError("Execution UID missing from completed transaction.")
         return self.get_cli_results(completed_transaction.entity_uid)

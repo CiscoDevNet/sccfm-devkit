@@ -20,7 +20,7 @@ Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcomin
 
 ```bash
 scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
-scripts/activate.sh            # activates the project virtualenv
+source scripts/activate.sh     # activates the project virtualenv
 sccfm-cli --help
 ```
 
@@ -48,7 +48,7 @@ Every command lives in `sccfm_cli/commands/` as a concrete implementation of the
 ## Development
 
 ```bash
-scripts/activate.sh
+source scripts/activate.sh
 poetry run pytest
 poetry run mypy sccfm_cli
 poetry run black .
