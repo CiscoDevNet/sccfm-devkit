@@ -18,6 +18,8 @@ htmlcov/
 /.idea/
 /.vscode/
 /.env
+/.env.*
+!/.env.example
 /.tox/
 /.eggs/
 .poetry_cache/
@@ -27,5 +29,6 @@ htmlcov/
 
 # Unencrypted vault files (if you accidentally decrypt)
 **/group_vars/*/vault.yml.decrypted
+**/group_vars/*/vault.yml
 
 .ansible
