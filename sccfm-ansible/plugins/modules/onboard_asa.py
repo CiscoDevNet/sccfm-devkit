@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import os
-from typing import Optional, cast
+from typing import Optional
 
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import (
@@ -16,7 +15,7 @@ from sccfm_core import InventoryService
 from sccfm_core.services.inventory import AsaOnboardService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, resolve_connection_params
 
 DOCUMENTATION = r"""
 ---
@@ -179,25 +178,6 @@ def build_asa_input(
     )
 
 
-def validate_connection_params(module: AnsibleModule) -> tuple[str, str]:
-    """Validate and retrieve region and api_token from params or environment."""
-    region = module.params.get("region") or os.getenv("SCCFM_REGION")
-    api_token = module.params.get("api_token") or os.getenv("SCCFM_API_TOKEN")
-
-    if not region:
-        module.fail_json(
-            msg="region is required. Provide it via module parameter, module_defaults, or "
-            "SCCFM_REGION environment variable."
-        )
-    if not api_token:
-        module.fail_json(
-            msg="api_token is required. Provide it via module parameter, module_defaults, or "
-            "SCCFM_API_TOKEN environment variable."
-        )
-
-    return region, api_token
-
-
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
@@ -205,10 +185,9 @@ def run_module() -> None:
         required_if=[("connector_type", "SDC", ["connector_name"])],
     )
 
-    region, api_token = validate_connection_params(module)
-
+    region, api_token = resolve_connection_params(module)
     try:
-        config = cast(ConfigLike, Config(region=region, api_token=api_token))
+        config = Config(region=region, api_token=api_token)
     except ValueError as e:
         module.fail_json(msg=str(e))
 

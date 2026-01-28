@@ -1,0 +1,124 @@
+---
+# Execute CLI commands on ASA devices via SCCFM
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.execute_asa_cli \
+#     -a 'query="configState:SYNCED AND connectivityState:ONLINE" limit=1 commands="show version"'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/execute_asa_cli.yml
+#
+# NOTE: Devices must be SYNCED and ONLINE for CLI execution to succeed.
+
+- name: Execute CLI commands on ASA devices
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    # Example: Commands to execute on devices
+    show_commands:
+      - "show version"
+      - "show running-config"
+      - "show interface"
+
+  tasks:
+    # ============================================================
+    # QUICK TEST: Run this first to verify the module works
+    # Only SYNCED + ONLINE devices can execute CLI commands
+    # ============================================================
+    - name: "Quick test: Show version on first available synced device"
+      cisco.sccfm.execute_asa_cli:
+        query: "configState:SYNCED AND connectivityState:ONLINE"
+        limit: 1
+        commands:
+          - "show version"
+      register: quick_test_result
+
+    - name: Display quick test result
+      ansible.builtin.debug:
+        msg: |
+          SUCCESS! Device {{ quick_test_result.results[0].deviceUid }} responded:
+          {{ quick_test_result.results[0].result }}
+      when: quick_test_result.results is defined and quick_test_result.results | length > 0
+
+    # ============================================================
+    # Example 1: Filter by device name pattern
+    # Uncomment and adjust the name pattern to match your devices
+    # ============================================================
+    # - name: Show version on branch ASAs
+    #   cisco.sccfm.execute_asa_cli:
+    #     query: "name:branch-* AND configState:SYNCED AND connectivityState:ONLINE"
+    #     commands:
+    #       - "show version"
+    #   register: branch_results
+
+    # ============================================================
+    # Example 2: Execute CLI commands on specific devices by UUID
+    # This approach skips the inventory lookup - faster when you know the UIDs
+    # ============================================================
+    - name: "UUID test: Execute commands on specific ASA by UUID"
+      cisco.sccfm.execute_asa_cli:
+        uuids:
+          - "e7ba548a-3e73-43dc-8442-83813af8bc37"  # asa-to-upgrade-2
+        commands:
+          - "show clock"
+          - "show hostname"
+      register: uuid_results
+
+    - name: Display UUID-based execution results
+      ansible.builtin.debug:
+        msg: |
+          Device {{ uuid_results.results[0].deviceUid }}:
+          {{ uuid_results.results[0].result }}
+      when: uuid_results.results is defined and uuid_results.results | length > 0
+
+    # ============================================================
+    # Example 3: Execute multiple commands using a variable
+    # ============================================================
+    - name: Run multiple show commands on all synced ASAs
+      cisco.sccfm.execute_asa_cli:
+        query: "configState:SYNCED AND connectivityState:ONLINE"
+        commands: "{{ show_commands }}"
+      register: multi_cmd_results
+
+    - name: Display multi-command results
+      ansible.builtin.debug:
+        msg: |
+          Device {{ item.deviceUid }}:
+          {{ item.result | default('No output') }}
+      loop: "{{ multi_cmd_results.results | default([]) }}"
+      loop_control:
+        label: "{{ item.deviceUid }}"
+      when: multi_cmd_results.results is defined and multi_cmd_results.results | length > 0
+
+    # ============================================================
+    # Example 4: Load commands from a file
+    # Create a file called 'scripts/show_commands.txt' with one command per line
+    # - name: Execute commands from file
+    #   cisco.sccfm.execute_asa_cli:
+    #     query: "configState:SYNCED AND connectivityState:ONLINE"
+    #     commands: "{{ lookup('file', 'scripts/show_commands.txt').splitlines() }}"
+    #   register: file_results
+
+    # Example 5: Using pagination for large device sets
+    # NOTE: Always filter for SYNCED + ONLINE devices to avoid API errors/hangs
+    - name: Execute on first 10 matching devices
+      cisco.sccfm.execute_asa_cli:
+        query: "configState:SYNCED AND connectivityState:ONLINE"
+        limit: 10
+        offset: 0
+        commands:
+          - "show clock"
+      register: paginated_results
+      ignore_errors: true
+
+    - name: Summary of execution
+      ansible.builtin.debug:
+        msg: "Executed commands on {{ paginated_results.results | length }} device(s)"
+      when: paginated_results.results is defined
