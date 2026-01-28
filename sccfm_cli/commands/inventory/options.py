@@ -30,7 +30,7 @@ def offset_option() -> click.Option:
 
 def query_option(help_text: str | None = None) -> click.Option:
     """Reusable --query option for filtering.
-    
+
     Args:
         help_text: Custom help text. Defaults to Lucene query description.
     """
