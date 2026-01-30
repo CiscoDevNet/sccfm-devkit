@@ -8,6 +8,13 @@ from rich.table import Table
 from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device, DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.options import (
+    config_path_option,
+    format_option,
+    limit_option,
+    offset_option,
+    query_option,
+)
 from sccfm_cli.utils import with_spinner
 from sccfm_core import AsaCommandLineService, InventoryService
 from sccfm_core.types import ConfigLike
@@ -28,23 +35,12 @@ class AsaExecuteCliCommand(BaseCommand):
     def build_params(self) -> Sequence[click.Parameter]:
         return [
             click.Option(
-                ["-q", "--query"],
-                help="Filter devices to execute the CLI on by a Lucene query.",
+                ["-n", "--device-name"],
+                help="Device name to search for (supports wildcards like 'branch-*').",
             ),
-            click.Option(
-                ["-l", "--limit"],
-                default=50,
-                show_default=True,
-                type=click.IntRange(min=1, max=200),
-                help="Maximum records to return (ignored if --query is not used)",
-            ),
-            click.Option(
-                ["-o", "--offset"],
-                default=0,
-                show_default=True,
-                type=click.IntRange(min=0),
-                help="Pagination offset (ignored if --query is not used)",
-            ),
+            query_option(help_text="Filter devices to execute the CLI on by a Lucene query."),
+            limit_option(),
+            offset_option(),
             click.Option(
                 ["-u", "--device-uids"],
                 help="List of device UIDs to execute the CLI on.",
@@ -63,25 +59,13 @@ class AsaExecuteCliCommand(BaseCommand):
                     "separated by a newline."
                 ),
             ),
-            click.Option(
-                ["--format"],
-                type=click.Choice(["table", "json"], case_sensitive=False),
-                default="table",
-                show_default=True,
-                help="Output format",
-            ),
-            click.Option(
-                ["--config-path"],
-                type=click.Path(path_type=Path, resolve_path=True),
-                default=None,
-                envvar="SCCFM_CONFIG",
-                show_default=False,
-                help="Path to the configuration file (defaults to ~/.sccfm-cli/config.json).",
-            ),
+            format_option(),
+            config_path_option(),
         ]
 
     @with_spinner("Executing CLI commands...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
+        device_name = cast(str | None, kwargs.get("device_name"))
         query = cast(str | None, kwargs.get("query"))
         device_uids_param = cast(tuple[str, ...] | None, kwargs.get("device_uids"))
         limit = cast(int, kwargs.get("limit"))
@@ -92,11 +76,16 @@ class AsaExecuteCliCommand(BaseCommand):
 
         self._validate_filters(
             ctx,
+            device_name=device_name,
             query=query,
             device_uids=device_uids_param,
             script=script,
             script_file=script_file,
         )
+
+        # Convert device_name to query if provided
+        if device_name:
+            query = f"name:{device_name}"
         if script_file is not None:
             script = script_file.read_text()
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -187,15 +176,21 @@ class AsaExecuteCliCommand(BaseCommand):
         self,
         ctx: click.Context,
         *,
+        device_name: str | None,
         query: str | None,
         device_uids: tuple[str, ...] | None,
         script: str | None,
         script_file: Path | None,
     ) -> None:
+        has_device_name = bool(device_name)
         has_query = bool(query)
         has_uids = bool(device_uids)
-        if has_query == has_uids:
-            ctx.fail("Provide exactly one of --query or --device-uids.")
+        filter_count = sum([has_device_name, has_query, has_uids])
+
+        if filter_count == 0:
+            ctx.fail("Provide one of: --device-name, --query, or --device-uids.")
+        if filter_count > 1:
+            ctx.fail("Provide only one of: --device-name, --query, or --device-uids.")
 
         has_script = bool(script)
         has_script_file = bool(script_file)
