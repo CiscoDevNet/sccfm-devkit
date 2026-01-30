@@ -109,7 +109,7 @@ EXAMPLES = r"""
         commands:
           - "show version"
 
-# Example 4: Load commands from a file
+# Example 4: Use Ansible's lookup to read commands from a file (one command per line)
 - name: Execute commands from file
   cisco.sccfm.execute_asa_cli:
     query: "name:prod-* AND connectivityState:ONLINE"

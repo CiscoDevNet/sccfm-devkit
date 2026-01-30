@@ -98,7 +98,7 @@
       when: multi_cmd_results.results is defined and multi_cmd_results.results | length > 0
 
     # ============================================================
-    # Example 4: Load commands from a file
+    # Example 4: Use Ansible's lookup to read commands from a file
     # Create a file called 'scripts/show_commands.txt' with one command per line
     # - name: Execute commands from file
     #   cisco.sccfm.execute_asa_cli:
