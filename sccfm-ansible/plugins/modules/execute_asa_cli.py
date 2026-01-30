@@ -16,18 +16,20 @@ module: execute_asa_cli
 short_description: Execute CLI commands on ASA devices via SCC Firewall Manager
 description:
   - Execute CLI commands on one or more ASA devices managed by SCC Firewall Manager.
-  - Devices can be selected by query or by explicit UUIDs.
+  - Devices can be selected by a Lucene query or by specifying a list of UIDs.
+  - The query uses the same syntax as the Get Devices API.
+  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/) for query documentation.
 options:
   query:
     description:
       - Lucene query to filter ASA devices.
-      - Mutually exclusive with C(uuids).
+      - Mutually exclusive with C(uids).
       - The query is automatically combined with C(deviceType:ASA).
     required: false
     type: str
-  uuids:
+  uids:
     description:
-      - List of device UUIDs to execute commands on.
+      - List of device UIDs to execute commands on.
       - Mutually exclusive with C(query).
     required: false
     type: list
@@ -42,14 +44,14 @@ options:
   limit:
     description:
       - Maximum number of devices to return when using C(query).
-      - Ignored when using C(uuids).
+      - Ignored when using C(uids).
     required: false
     type: int
     default: 50
   offset:
     description:
       - Pagination offset when using C(query).
-      - Ignored when using C(uuids).
+      - Ignored when using C(uids).
     required: false
     type: int
     default: 0
@@ -74,7 +76,7 @@ EXAMPLES = r"""
 # Example 1: Execute commands on devices matching a query
 - name: Show version on all production ASAs
   cisco.sccfm.execute_asa_cli:
-    query: "name:prod-*"
+    query: "name:prod-* AND connectivityState:ONLINE"
     commands:
       - "show version"
       - "show running-config"
@@ -82,10 +84,10 @@ EXAMPLES = r"""
     api_token: "{{ sccfm_api_token }}"
   register: cli_results
 
-# Example 2: Execute commands on specific devices by UUID
+# Example 2: Execute commands on specific devices by UID
 - name: Show interface on specific ASAs
   cisco.sccfm.execute_asa_cli:
-    uuids:
+    uids:
       - "12345678-1234-1234-1234-123456789abc"
       - "87654321-4321-4321-4321-cba987654321"
     commands:
@@ -103,14 +105,14 @@ EXAMPLES = r"""
   tasks:
     - name: Show version on branch ASAs
       cisco.sccfm.execute_asa_cli:
-        query: "name:branch-*"
+        query: "name:branch-* AND connectivityState:ONLINE"
         commands:
           - "show version"
 
 # Example 4: Load commands from a file
 - name: Execute commands from file
   cisco.sccfm.execute_asa_cli:
-    query: "name:prod-*"
+    query: "name:prod-* AND connectivityState:ONLINE"
     commands: "{{ lookup('file', 'scripts/show_commands.txt').splitlines() }}"
 """
 
@@ -122,19 +124,25 @@ results:
   elements: dict
   contains:
     device_uid:
-      description: The UUID of the device.
+      description: The UID of the device.
       type: str
     result:
       description: The CLI command output.
       type: str
     error_msg:
-      description: Error message if execution failed on this device.
+      description: Error message if execution failed on this device (None if successful).
       type: str
     script:
       description: The script that was executed.
       type: str
     execution_uid:
-      description: The UUID of the CLI execution.
+      description: The UID of the CLI execution.
+      type: str
+    start_time:
+      description: The time the CLI execution started (ISO 8601 format).
+      type: str
+    uid:
+      description: The UID of the CLI result.
       type: str
 """
 
@@ -142,7 +150,7 @@ results:
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "query": {"type": "str", "required": False},
-        "uuids": {"type": "list", "elements": "str", "required": False},
+        "uids": {"type": "list", "elements": "str", "required": False},
         "commands": {"type": "list", "elements": "str", "required": True},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
@@ -180,8 +188,8 @@ def execute_cli_commands(
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        mutually_exclusive=[["query", "uuids"]],
-        required_one_of=[["query", "uuids"]],
+        mutually_exclusive=[["query", "uids"]],
+        required_one_of=[["query", "uids"]],
     )
 
     region, api_token = resolve_connection_params(module)
@@ -191,15 +199,15 @@ def run_module() -> None:
         module.fail_json(msg=str(e))
 
     query: str | None = module.params.get("query")
-    uuids: list[str] | None = module.params.get("uuids")
+    uids: list[str] | None = module.params.get("uids")
     commands: list[str] = module.params["commands"]
     limit: int = module.params["limit"]
     offset: int = module.params["offset"]
 
     try:
-        # Resolve device UIDs: use provided UUIDs directly, or query for them
-        if uuids:
-            device_uids = uuids
+        # Resolve device UIDs: use provided UIDs directly, or query for them
+        if uids:
+            device_uids = uids
         else:
             device_uids = resolve_device_uids_from_query(
                 config=config,
@@ -210,7 +218,7 @@ def run_module() -> None:
             if not device_uids:
                 module.fail_json(msg="No devices found matching the specified query.")
 
-        results = execute_cli_commands(
+        results: list[CdoCliResult] | CdoTransaction = execute_cli_commands(
             config=config,
             device_uids=device_uids,
             commands=commands,
@@ -224,7 +232,7 @@ def run_module() -> None:
                 transaction_details=results.transaction_details,
             )
 
-        results_data = [result.to_dict() for result in results]
+        results_data = [result.model_dump(mode="json") for result in results]
         module.exit_json(
             changed=True,
             msg=f"Successfully executed CLI commands on {len(device_uids)} device(s)",

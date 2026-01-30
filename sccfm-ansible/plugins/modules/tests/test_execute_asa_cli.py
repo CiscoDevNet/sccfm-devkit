@@ -33,12 +33,12 @@ def sample_device() -> Device:
 def sample_cli_result() -> CdoCliResult:
     """Provides a sample CLI result for testing."""
     return CdoCliResult(
-        uid="result-uid-123",
-        deviceUid="asa-uid-123",
-        executionUid="exec-uid-123",
+        uid="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        device_uid="b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        execution_uid="c3d4e5f6-a7b8-9012-cdef-123456789012",
         result="ASA Version 9.16.1\nDevice Manager Version 7.16(1)",
         script="show version",
-        errorMsg=None,
+        error_msg=None,
     )
 
 
@@ -47,7 +47,7 @@ def base_module_params_with_query() -> dict[str, Any]:
     """Provides base module parameters with query."""
     return {
         "query": "name:test-*",
-        "uuids": None,
+        "uids": None,
         "commands": ["show version", "show running-config"],
         "limit": 50,
         "offset": 0,
@@ -57,11 +57,11 @@ def base_module_params_with_query() -> dict[str, Any]:
 
 
 @pytest.fixture
-def base_module_params_with_uuids() -> dict[str, Any]:
-    """Provides base module parameters with UUIDs."""
+def base_module_params_with_uids() -> dict[str, Any]:
+    """Provides base module parameters with UIDs."""
     return {
         "query": None,
-        "uuids": ["asa-uid-123", "asa-uid-456"],
+        "uids": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890", "b2c3d4e5-f6a7-8901-bcde-f12345678901"],
         "commands": ["show version"],
         "limit": 50,
         "offset": 0,
@@ -81,10 +81,10 @@ def mock_module_instance_query(base_module_params_with_query: dict[str, Any]) ->
 
 
 @pytest.fixture
-def mock_module_instance_uuids(base_module_params_with_uuids: dict[str, Any]) -> MagicMock:
-    """Creates a mock module instance with UUIDs params."""
+def mock_module_instance_uids(base_module_params_with_uids: dict[str, Any]) -> MagicMock:
+    """Creates a mock module instance with UIDs params."""
     mock_module = MagicMock()
-    mock_module.params = base_module_params_with_uuids.copy()
+    mock_module.params = base_module_params_with_uids.copy()
     mock_module.exit_json.side_effect = SystemExit(0)
     mock_module.fail_json.side_effect = SystemExit(1)
     return mock_module
@@ -130,16 +130,16 @@ def test_should_execute_cli_commands_with_query(
 @patch("plugins.modules.execute_asa_cli.AsaCommandLineService")
 @patch("plugins.modules.execute_asa_cli.InventoryService")
 @patch("plugins.modules.execute_asa_cli.AnsibleModule")
-def test_should_execute_cli_commands_with_uuids_without_inventory_lookup(
+def test_should_execute_cli_commands_with_uids_without_inventory_lookup(
     mock_ansible_module_class: MagicMock,
     mock_inventory_service_class: MagicMock,
     mock_cli_service_class: MagicMock,
     _mock_config_class: MagicMock,
-    mock_module_instance_uuids: MagicMock,
+    mock_module_instance_uids: MagicMock,
     sample_cli_result: CdoCliResult,
 ) -> None:
-    """run_module should execute CLI commands using UUIDs directly without inventory lookup."""
-    mock_ansible_module_class.return_value = mock_module_instance_uuids
+    """run_module should execute CLI commands using UIDs directly without inventory lookup."""
+    mock_ansible_module_class.return_value = mock_module_instance_uids
 
     mock_cli = MagicMock()
     mock_cli.execute_cli.return_value = [sample_cli_result]
@@ -148,14 +148,14 @@ def test_should_execute_cli_commands_with_uuids_without_inventory_lookup(
     with pytest.raises(SystemExit):
         execute_asa_cli.run_module()
 
-    # Verify InventoryService was NOT called when UUIDs are provided
+    # Verify InventoryService was NOT called when UIDs are provided
     mock_inventory_service_class.assert_not_called()
 
-    mock_module_instance_uuids.exit_json.assert_called_once()
-    call_kwargs = mock_module_instance_uuids.exit_json.call_args[1]
+    mock_module_instance_uids.exit_json.assert_called_once()
+    call_kwargs = mock_module_instance_uids.exit_json.call_args[1]
     assert call_kwargs["changed"] is True
     assert len(call_kwargs["results"]) == 1
-    # Verify the message includes the correct device count (2 UUIDs provided)
+    # Verify the message includes the correct device count (2 UIDs provided)
     assert "2 device(s)" in call_kwargs["msg"]
 
 

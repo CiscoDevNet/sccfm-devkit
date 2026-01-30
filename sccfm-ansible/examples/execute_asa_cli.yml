@@ -3,12 +3,12 @@
 #
 # QUICK TEST (adhoc command):
 #   ansible localhost -m cisco.sccfm.execute_asa_cli \
-#     -a 'query="configState:SYNCED AND connectivityState:ONLINE" limit=1 commands="show version"'
+#     -a 'query="connectivityState:ONLINE" limit=1 commands="show version"'
 #
 # RUN THIS PLAYBOOK:
 #   ansible-playbook examples/execute_asa_cli.yml
 #
-# NOTE: Devices must be SYNCED and ONLINE for CLI execution to succeed.
+# NOTE: Show commands require ONLINE. Config commands require SYNCED.
 
 - name: Execute CLI commands on ASA devices
   hosts: localhost
@@ -30,11 +30,11 @@
   tasks:
     # ============================================================
     # QUICK TEST: Run this first to verify the module works
-    # Only SYNCED + ONLINE devices can execute CLI commands
+    # Devices must be ONLINE for CLI execution to succeed
     # ============================================================
-    - name: "Quick test: Show version on first available synced device"
+    - name: "Quick test: Show version on first available online device"
       cisco.sccfm.execute_asa_cli:
-        query: "configState:SYNCED AND connectivityState:ONLINE"
+        query: "connectivityState:ONLINE"
         limit: 1
         commands:
           - "show version"
@@ -43,7 +43,7 @@
     - name: Display quick test result
       ansible.builtin.debug:
         msg: |
-          SUCCESS! Device {{ quick_test_result.results[0].deviceUid }} responded:
+          SUCCESS! Device {{ quick_test_result.results[0].device_uid }} responded:
           {{ quick_test_result.results[0].result }}
       when: quick_test_result.results is defined and quick_test_result.results | length > 0
 
@@ -53,48 +53,48 @@
     # ============================================================
     # - name: Show version on branch ASAs
     #   cisco.sccfm.execute_asa_cli:
-    #     query: "name:branch-* AND configState:SYNCED AND connectivityState:ONLINE"
+    #     query: "name:branch-* AND connectivityState:ONLINE"
     #     commands:
     #       - "show version"
     #   register: branch_results
 
     # ============================================================
-    # Example 2: Execute CLI commands on specific devices by UUID
+    # Example 2: Execute CLI commands on specific devices by UID
     # This approach skips the inventory lookup - faster when you know the UIDs
     # ============================================================
-    - name: "UUID test: Execute commands on specific ASA by UUID"
+    - name: "UID test: Execute commands on specific ASA by UID"
       cisco.sccfm.execute_asa_cli:
-        uuids:
+        uids:
           - "e7ba548a-3e73-43dc-8442-83813af8bc37"  # asa-to-upgrade-2
         commands:
           - "show clock"
           - "show hostname"
-      register: uuid_results
+      register: uid_results
 
-    - name: Display UUID-based execution results
+    - name: Display UID-based execution results
       ansible.builtin.debug:
         msg: |
-          Device {{ uuid_results.results[0].deviceUid }}:
-          {{ uuid_results.results[0].result }}
-      when: uuid_results.results is defined and uuid_results.results | length > 0
+          Device {{ uid_results.results[0].device_uid }}:
+          {{ uid_results.results[0].result }}
+      when: uid_results.results is defined and uid_results.results | length > 0
 
     # ============================================================
     # Example 3: Execute multiple commands using a variable
     # ============================================================
     - name: Run multiple show commands on all synced ASAs
       cisco.sccfm.execute_asa_cli:
-        query: "configState:SYNCED AND connectivityState:ONLINE"
+        query: "connectivityState:ONLINE"
         commands: "{{ show_commands }}"
       register: multi_cmd_results
 
     - name: Display multi-command results
       ansible.builtin.debug:
         msg: |
-          Device {{ item.deviceUid }}:
+          Device {{ item.device_uid }}:
           {{ item.result | default('No output') }}
       loop: "{{ multi_cmd_results.results | default([]) }}"
       loop_control:
-        label: "{{ item.deviceUid }}"
+        label: "{{ item.device_uid }}"
       when: multi_cmd_results.results is defined and multi_cmd_results.results | length > 0
 
     # ============================================================
@@ -102,15 +102,62 @@
     # Create a file called 'scripts/show_commands.txt' with one command per line
     # - name: Execute commands from file
     #   cisco.sccfm.execute_asa_cli:
-    #     query: "configState:SYNCED AND connectivityState:ONLINE"
+    #     query: "connectivityState:ONLINE"
     #     commands: "{{ lookup('file', 'scripts/show_commands.txt').splitlines() }}"
     #   register: file_results
 
-    # Example 5: Using pagination for large device sets
-    # NOTE: Always filter for SYNCED + ONLINE devices to avoid API errors/hangs
+    # ============================================================
+    # Example 5: Configuration commands (not just show commands)
+    # NOTE: Config commands require device to be in SYNCED state!
+    # Show commands only require ONLINE state.
+    # ============================================================
+    # - name: Add a local user
+    #   cisco.sccfm.execute_asa_cli:
+    #     uids:
+    #       - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+    #     commands:
+    #       - "username testuser password TestPass123 privilege 15"
+    #   register: user_result
+
+    # ============================================================
+    # Example 6: Multi-line configuration commands
+    # Some ASA configs require entering a submode (e.g., object network)
+    # Use a multi-line string with the | (literal block) YAML syntax
+    # ============================================================
+    # - name: Create a network object with host
+    #   cisco.sccfm.execute_asa_cli:
+    #     uids:
+    #       - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+    #     commands:
+    #       - |
+    #         object network my-test-host
+    #         host 192.168.1.100
+    #   register: object_result
+
+    # ============================================================
+    # Example 7: Multiple multi-line config blocks
+    # ============================================================
+    # - name: Create multiple network objects
+    #   cisco.sccfm.execute_asa_cli:
+    #     uids:
+    #       - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+    #     commands:
+    #       - |
+    #         object network web-server
+    #         host 10.0.0.10
+    #         description Production web server
+    #       - |
+    #         object network db-server
+    #         host 10.0.0.20
+    #         description Production database server
+    #   register: multi_object_result
+
+    # ============================================================
+    # Example 8: Using pagination for large device sets
+    # ============================================================
     - name: Execute on first 10 matching devices
       cisco.sccfm.execute_asa_cli:
-        query: "configState:SYNCED AND connectivityState:ONLINE"
+        query: "connectivityState:ONLINE"
         limit: 10
         offset: 0
         commands:

@@ -207,7 +207,7 @@ Onboard an ASA device to your SCCFM tenant.
 
 ### cisco.sccfm.execute_asa_cli
 
-Execute CLI commands on ASA devices via SCCFM. Devices must be in `SYNCED` and `ONLINE` state.
+Execute CLI commands on ASA devices via SCCFM. Show commands require devices to be `ONLINE`. Config commands require devices to be `SYNCED`.
 
 See [`examples/execute_asa_cli.yml`](examples/execute_asa_cli.yml) for usage, or run `ansible-doc cisco.sccfm.execute_asa_cli` for full parameter documentation.
 

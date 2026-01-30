@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.basic import AnsibleModule
 
 ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in")
 
@@ -30,9 +28,10 @@ class Config:
                 "authentication/"
             )
         if not self.region:
+            allowed = ", ".join(ALLOWED_REGIONS)
             raise ValueError(
-                "region is required. Provide it via module parameter, module_defaults, or "
-                "SCCFM_REGION environment variable."
+                f"region is required. Provide it via module parameter, module_defaults, or "
+                f"SCCFM_REGION environment variable. Allowed regions: {allowed}"
             )
         if self.region not in ALLOWED_REGIONS:
             allowed = ", ".join(ALLOWED_REGIONS)
