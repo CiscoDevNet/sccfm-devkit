@@ -19,6 +19,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
   - [Host Variables](#host-variables)
 - [Modules](#modules)
   - [cisco.sccfm.onboard_asa](#ciscosccfmonboard_asa)
+  - [cisco.sccfm.execute_asa_cli](#ciscosccfmexecute_asa_cli)
 - [Ansible Vault Management](#ansible-vault-management)
   - [What is Ansible Vault?](#what-is-ansible-vault)
   - [Vault Commands Reference](#vault-commands-reference)
@@ -39,6 +40,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 
 - **Dynamic Inventory Plugin**: Automatically load SCCFM devices into Ansible inventory
 - **ASA Onboarding Module**: Onboard ASA devices to your SCCFM tenant
+- **ASA CLI Execution Module**: Execute CLI commands on ASA devices
 - **Device Grouping**: Automatically group devices by type (ASA, CDFMC_MANAGED_FTD, etc.)
 - **Ansible Vault Integration**: Secure credential management for API tokens and device passwords
 - **Module Defaults Support**: Set region/API token once for all tasks
@@ -203,6 +205,12 @@ Onboard an ASA device to your SCCFM tenant.
           - firewall
 ```
 
+### cisco.sccfm.execute_asa_cli
+
+Execute CLI commands on ASA devices via SCCFM. Show commands require devices to be `ONLINE`. Config commands require devices to be `SYNCED`.
+
+See [`examples/execute_asa_cli.yml`](examples/execute_asa_cli.yml) for usage, or run `ansible-doc cisco.sccfm.execute_asa_cli` for full parameter documentation.
+
 ## Ansible Vault Management
 
 ### What is Ansible Vault?
@@ -325,6 +333,7 @@ See the `examples/` directory for complete working examples:
 - **`inventory.sccfm.yml`** - Dynamic inventory configuration
 - **`show_devices.yml`** - Display all devices from inventory
 - **`onboard_asas.yml`** - Onboard multiple ASA devices with vault passwords
+- **`execute_asa_cli.yml`** - Execute CLI commands on ASA devices
 - **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
 - **`group_vars/all/vault.yml`** - Encrypted secrets (API token, passwords)
 - **`group_vars/all/vault.yml.example`** - Template for vault structure

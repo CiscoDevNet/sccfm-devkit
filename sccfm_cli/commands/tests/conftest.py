@@ -104,13 +104,13 @@ def sample_cli_results() -> list[CdoCliResult]:
         CdoCliResult(
             uid="uid-3",
             device_uid="uid-1",
-            result="show version\nCisco Adaptive Security Appliance Software Version 9.16.1",
+            result="Cisco Adaptive Security Appliance Software Version 9.16.1",
             error_msg=None,
         ),
         CdoCliResult(
             uid="uid-122",
             device_uid="uid-2",
-            result="show version\nCisco Adaptive Security Appliance Software Version 9.18.2",
+            result="Cisco Adaptive Security Appliance Software Version 9.18.2",
             error_msg=None,
         ),
     ]
