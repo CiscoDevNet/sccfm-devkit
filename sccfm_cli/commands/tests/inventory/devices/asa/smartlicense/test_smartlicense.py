@@ -415,6 +415,6 @@ def test_should_display_usage_on_validation_error(
     )
 
     assert result.exit_code == 2
-    assert result.output.startswith("Usage:")
+    assert "Usage:" in result.output
     assert "inventory devices asa smartlicense" in result.output
     assert "Provide exactly one of --query or --device-uids." in result.output

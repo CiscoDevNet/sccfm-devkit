@@ -11,6 +11,7 @@ from sccfm_core.factories import ApiClientFactory
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
+from sccfm_core.utils import validate_uids
 
 
 class AsaCommandLineService:
@@ -23,6 +24,7 @@ class AsaCommandLineService:
     def execute_cli(
         self, device_uids: List[str], asa_commands: List[str]
     ) -> CdoTransaction | List[CdoCliResult]:
+        validate_uids(device_uids)
         script = "\n".join(asa_commands)
         transaction: CdoTransaction = self.command_line_interface_api.execute_cli_command(
             cli_command_input=CliCommandInput(deviceUids=device_uids, script=script)

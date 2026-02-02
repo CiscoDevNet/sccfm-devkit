@@ -54,6 +54,5 @@ sys.modules["plugins.module_utils"] = module_utils_module
 # Add config as a submodule
 config_submodule = ModuleType("plugins.module_utils.config")
 config_submodule.Config = config_module.Config
-config_submodule.resolve_connection_params = config_module.resolve_connection_params
 config_submodule.__package__ = "plugins.module_utils"
 sys.modules["plugins.module_utils.config"] = config_submodule

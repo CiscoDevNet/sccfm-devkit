@@ -8,7 +8,7 @@ from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, DevicePage
 from sccfm_core import AsaCommandLineService, InventoryService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, resolve_connection_params
+from ..module_utils.config import Config
 
 DOCUMENTATION = r"""
 ---
@@ -192,9 +192,11 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
     )
 
-    region, api_token = resolve_connection_params(module)
     try:
-        config = Config(region=region, api_token=api_token)
+        config = Config(
+            region=module.params.get("region") or "",
+            api_token=module.params.get("api_token") or "",
+        )
     except ValueError as e:
         module.fail_json(msg=str(e))
 

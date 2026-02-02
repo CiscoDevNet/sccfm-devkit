@@ -20,7 +20,7 @@ from scc_firewall_manager_sdk import (
 def sample_device() -> Device:
     """Provides a sample ASA device for testing."""
     return Device(
-        uid="asa-uid-123",
+        uid="d4e5f6a7-b8c9-0123-def4-567890abcdef",
         name="test-asa-01",
         deviceType=EntityType.ASA,
         softwareVersion="9.16.1",
@@ -239,7 +239,7 @@ def test_should_fail_if_transaction_returns_error(
 
     # Return a failed transaction instead of results
     failed_transaction = CdoTransaction(
-        transactionUid="tx-123",
+        transactionUid="e5f6a7b8-c9d0-1234-ef56-7890abcdef12",
         cdoTransactionStatus="ERROR",
         errorMessage="Device unreachable",
     )
