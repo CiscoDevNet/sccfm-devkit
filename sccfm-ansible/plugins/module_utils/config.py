@@ -19,8 +19,8 @@ class Config:
 
     def __post_init__(self) -> None:
         # Resolve from environment if not provided
-        resolved_region = self.region or os.getenv("SCCFM_REGION") or ""
-        resolved_token = self.api_token or os.getenv("SCCFM_API_TOKEN") or ""
+        resolved_region = self.region or os.getenv("SCCFM_REGION")
+        resolved_token = self.api_token or os.getenv("SCCFM_API_TOKEN")
 
         # Use object.__setattr__ since dataclass is frozen
         object.__setattr__(self, "region", resolved_region)
