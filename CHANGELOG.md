@@ -1,3 +1,9 @@
+## v0.5.0 (2026-02-02)
+
+### Feat
+
+- Add execute_asa_cli Ansible module for executing CLI commands on ASA devices (#5)
+
 ## v0.4.2 (2025-12-12)
 
 ### Fix
