@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from plugins.modules import execute_asa_cli  # noqa: E402
 from scc_firewall_manager_sdk import (
+    ApiException,
     CdoCliResult,
     CdoTransaction,
     ConfigState,
@@ -313,3 +314,43 @@ def test_should_fail_if_api_token_not_provided(
     mock_module_instance_query.fail_json.assert_called_once()
     call_kwargs = mock_module_instance_query.fail_json.call_args[1]
     assert "api_token is required" in call_kwargs["msg"]
+
+
+@patch("plugins.modules.execute_asa_cli.Config")
+@patch("plugins.modules.execute_asa_cli.AsaCommandLineService")
+@patch("plugins.modules.execute_asa_cli.InventoryService")
+@patch("plugins.modules.execute_asa_cli.AnsibleModule")
+def test_should_return_structured_error_on_api_exception(
+    mock_ansible_module_class: MagicMock,
+    mock_inventory_service_class: MagicMock,
+    mock_cli_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance_query: MagicMock,
+    sample_device: Device,
+) -> None:
+    """run_module should return structured error info when ApiException occurs."""
+    mock_ansible_module_class.return_value = mock_module_instance_query
+
+    mock_inventory = MagicMock()
+    mock_inventory.get_devices.return_value = DevicePage(
+        count=1, limit=50, offset=0, items=[sample_device]
+    )
+    mock_inventory_service_class.return_value = mock_inventory
+
+    # Create ApiException with structured JSON body
+    api_error = ApiException(status=403, reason="Forbidden")
+    api_error.body = '{"errorMsg": "Access denied", "errorCode": "FORBIDDEN", "details": {"resource": "device"}}'
+
+    mock_cli = MagicMock()
+    mock_cli.execute_cli.side_effect = api_error
+    mock_cli_service_class.return_value = mock_cli
+
+    with pytest.raises(SystemExit):
+        execute_asa_cli.run_module()
+
+    mock_module_instance_query.fail_json.assert_called_once()
+    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
+    assert call_kwargs["msg"] == "Access denied"
+    assert call_kwargs["error_code"] == "FORBIDDEN"
+    assert call_kwargs["error_details"] == {"resource": "device"}
+    assert call_kwargs["status_code"] == 403

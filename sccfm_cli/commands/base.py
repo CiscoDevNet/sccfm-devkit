@@ -11,6 +11,7 @@ from rich.console import Console
 from scc_firewall_manager_sdk import ApiException, CdoTransaction
 
 from sccfm_cli.services import ConfigService
+from sccfm_core import SccApiError
 from sccfm_core.types import ConfigLike
 
 
@@ -61,22 +62,22 @@ class BaseCommand(ABC):
             self.handle(ctx=ctx, **kwargs)
         except ApiException as e:
             output_format = cast(str | None, kwargs.get("format"))
-            error = json.loads(e.body or "{}")
+            error = SccApiError.from_exception(e)
 
             if output_format == "json":
-                self.console.print(json.dumps(error, indent=2))
+                self.console.print(json.dumps(json.loads(e.body or "{}"), indent=2))
             else:
                 self.console.print(
                     "[yellow]Error executing operation using the SCC Firewall Manager API. "
                     "If you think you should not be getting this error, please file a Github issue"
                     " with the details below.[/yellow]"
                 )
-                self.console.print(f"[bold]Error message:[/bold] {error['errorMsg']}")
-                self.console.print(f"[bold]Error Code:[/bold] {error['errorCode']}")
+                self.console.print(f"[bold]Error message:[/bold] {error.message}")
+                self.console.print(f"[bold]Error Code:[/bold] {error.error_code}")
                 self.console.print(
-                    f"[bold]Error Details:[/bold]\n{json.dumps(error['details'], indent=2)}"
+                    f"[bold]Error Details:[/bold]\n{json.dumps(error.details, indent=2)}"
                 )
-                sys.exit(-1)
+            sys.exit(-1)
         except click.ClickException:
             # Preserve Click's default error handling so usage/help is shown for user errors.
             raise
