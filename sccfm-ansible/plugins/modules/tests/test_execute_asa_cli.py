@@ -339,7 +339,9 @@ def test_should_return_structured_error_on_api_exception(
 
     # Create ApiException with structured JSON body
     api_error = ApiException(status=403, reason="Forbidden")
-    api_error.body = '{"errorMsg": "Access denied", "errorCode": "FORBIDDEN", "details": {"resource": "device"}}'
+    api_error.body = (
+        '{"errorMsg": "Access denied", "errorCode": "FORBIDDEN", "details": {"resource": "device"}}'
+    )
 
     mock_cli = MagicMock()
     mock_cli.execute_cli.side_effect = api_error
