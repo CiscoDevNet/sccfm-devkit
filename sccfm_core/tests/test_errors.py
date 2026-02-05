@@ -18,7 +18,7 @@ def _create_mock_api_exception(
     exc = MagicMock()
     exc.status = status
     exc.body = body
-    exc.__str__ = MagicMock(return_value=f"({status})\nReason: Test error")
+    exc.__str__ = MagicMock(return_value=f"({status})\nReason: Test error")  # type: ignore[method-assign]
     return exc
 
 
