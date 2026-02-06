@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, DevicePage
+from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
-from sccfm_core import AsaCommandLineService, InventoryService
+from sccfm_core import AsaCommandLineService, InventoryService, SccApiError
 from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config
@@ -241,8 +241,11 @@ def run_module() -> None:
             results=results_data,
         )
 
+    except ApiException as e:
+        error = SccApiError.from_exception(e)
+        module.fail_json(**error.to_dict())
     except Exception as e:
-        module.fail_json(msg=f"Failed to execute CLI commands: {str(e)}")
+        module.fail_json(msg=f"Unexpected error: {str(e)}")
 
 
 def main() -> None:

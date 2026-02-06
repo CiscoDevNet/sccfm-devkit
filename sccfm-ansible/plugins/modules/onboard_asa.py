@@ -4,6 +4,7 @@ from typing import Optional
 
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import (
+    ApiException,
     AsaCreateOrUpdateInput,
     ConnectorType,
     Device,
@@ -11,7 +12,7 @@ from scc_firewall_manager_sdk import (
     Labels,
 )
 
-from sccfm_core import InventoryService
+from sccfm_core import InventoryService, SccApiError
 from sccfm_core.services.inventory import AsaOnboardService
 from sccfm_core.types import ConfigLike
 
@@ -208,8 +209,11 @@ def run_module() -> None:
             )
         asa_device = _onboard_asa(config, asa_create_or_update_input)
         module.exit_json(changed=True, msg="Onboarded successfulyl", device=asa_device.to_dict())
+    except ApiException as e:
+        error = SccApiError.from_exception(e)
+        module.fail_json(**error.to_dict())
     except Exception as e:
-        module.fail_json(msg=f"Failed to onboard ASA: {str(e)}")
+        module.fail_json(msg=f"Unexpected error: {str(e)}")
 
 
 def _onboard_asa(config: ConfigLike, asa_create_or_update_input: AsaCreateOrUpdateInput) -> Device:

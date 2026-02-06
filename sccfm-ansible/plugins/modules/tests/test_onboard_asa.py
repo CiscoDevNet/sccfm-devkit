@@ -5,7 +5,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from plugins.modules import onboard_asa  # noqa: E402
-from scc_firewall_manager_sdk import ConfigState, ConnectivityState, Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import (
+    ApiException,
+    ConfigState,
+    ConnectivityState,
+    Device,
+    DevicePage,
+    EntityType,
+)
 
 
 @pytest.fixture
@@ -205,3 +212,40 @@ def test_should_fail_if_api_token_not_provided(
     mock_module_instance.fail_json.assert_called_once()
     call_kwargs = mock_module_instance.fail_json.call_args[1]
     assert "api_token is required" in call_kwargs["msg"]
+
+
+@patch("plugins.modules.onboard_asa.Config")
+@patch("plugins.modules.onboard_asa.AsaOnboardService")
+@patch("plugins.modules.onboard_asa.InventoryService")
+@patch("plugins.modules.onboard_asa.AnsibleModule")
+def test_should_return_structured_error_on_api_exception(
+    mock_ansible_module_class: MagicMock,
+    mock_inventory_service_class: MagicMock,
+    mock_asa_onboard_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module should return structured error info when ApiException occurs."""
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_inventory = MagicMock()
+    mock_inventory.get_devices.return_value = DevicePage(count=0, limit=1, offset=0, items=[])
+    mock_inventory_service_class.return_value = mock_inventory
+
+    # Create ApiException with structured JSON body
+    api_error = ApiException(status=400, reason="Bad Request")
+    api_error.body = '{"errorMsg": "Invalid device address", "errorCode": "VALIDATION_ERROR", "details": {"field": "deviceAddress"}}'
+
+    mock_onboard = MagicMock()
+    mock_onboard.onboard_asa.side_effect = api_error
+    mock_asa_onboard_service_class.return_value = mock_onboard
+
+    with pytest.raises(SystemExit):
+        onboard_asa.run_module()
+
+    mock_module_instance.fail_json.assert_called_once()
+    call_kwargs = mock_module_instance.fail_json.call_args[1]
+    assert call_kwargs["msg"] == "Invalid device address"
+    assert call_kwargs["error_code"] == "VALIDATION_ERROR"
+    assert call_kwargs["error_details"] == {"field": "deviceAddress"}
+    assert call_kwargs["status_code"] == 400

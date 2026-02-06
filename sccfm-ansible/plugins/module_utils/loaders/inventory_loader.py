@@ -5,6 +5,7 @@ from typing import List, Optional
 from ansible.errors import AnsibleParserError
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
+from sccfm_core import SccApiError
 from sccfm_core.services import InventoryService
 from sccfm_core.types import ConfigLike
 
@@ -20,7 +21,8 @@ class InventoryLoader:
         try:
             return self._fetch_all_pages()
         except ApiException as exc:
-            raise AnsibleParserError(f"Failed to load SCCFM devices: {exc.body or exc}") from exc
+            error = SccApiError.from_exception(exc)
+            raise AnsibleParserError(f"Failed to load SCCFM devices: {error}") from exc
         except Exception as exc:  # noqa: BLE001
             raise AnsibleParserError(f"Failed to load SCCFM devices: {exc}") from exc
 
