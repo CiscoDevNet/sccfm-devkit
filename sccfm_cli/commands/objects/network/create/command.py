@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+import json
+from typing import Any, Sequence, cast
+
+import click
+from rich.table import Table
+
+from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.objects.options import object_create_params, parse_tags
+from sccfm_cli.utils import with_spinner
+from sccfm_core.services import NetworkObjectService
+from sccfm_core.services.object_management import NetworkObjectResponse
+
+
+class NetworkCreateCommand(BaseCommand):
+    """Create a network object in SCC Firewall Manager."""
+
+    @property
+    def name(self) -> str:
+        return "create"
+
+    @property
+    def help_text(self) -> str:
+        return "Create a network object."
+
+    def build_params(self) -> Sequence[click.Parameter]:
+        return object_create_params()
+
+    @with_spinner("Creating network object...")
+    def handle(self, ctx: click.Context, **kwargs: Any) -> None:
+        name = cast(str, kwargs.get("name"))
+        value = cast(str, kwargs.get("value"))
+        description = cast(str | None, kwargs.get("description"))
+        labels_tuple = kwargs.get("labels")
+        labels = list(labels_tuple) if labels_tuple else None
+        tags_tuple = cast(tuple[str, ...] | None, kwargs.get("tags"))
+        tags = parse_tags(tags_tuple)
+        output_format = cast(str, kwargs.get("format"))
+
+        config = self.get_profile(ctx=ctx, **kwargs)
+        service = NetworkObjectService(config)
+        response: NetworkObjectResponse = service.create_network_object(
+            name=name,
+            value=value,
+            description=description,
+            labels=labels,
+            tags=tags,
+        )
+
+        self._render_response(response, output_format)
+
+    def _render_response(self, response: NetworkObjectResponse, output_format: str) -> None:
+        if output_format == "json":
+            self.console.print(json.dumps(response.to_dict(), indent=2, default=str))
+            return
+
+        table = Table(title="Network Object", width=120)
+        table.add_column("UID")
+        table.add_column("Name")
+        table.add_column("Type")
+        table.add_column("Literal")
+        table.add_row(
+            response.uid or "-",
+            response.name or "-",
+            response.object_type or "-",
+            response.literal or "-",
+        )
+        self.console.print("[green]\u2713[/green] Network object created")
+        self.console.print(table)
