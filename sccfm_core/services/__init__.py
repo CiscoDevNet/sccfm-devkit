@@ -1,4 +1,14 @@
 from sccfm_core.services.health_service import HealthService, HealthStatus
-from sccfm_core.services.inventory import AsaCommandLineService, InventoryService
+from sccfm_core.services.inventory import (
+    AsaCommandLineService,
+    AsaDiskFileService,
+    InventoryService,
+)
 
-__all__ = ["AsaCommandLineService", "HealthService", "HealthStatus", "InventoryService"]
+__all__ = [
+    "AsaCommandLineService",
+    "AsaDiskFileService",
+    "HealthService",
+    "HealthStatus",
+    "InventoryService",
+]

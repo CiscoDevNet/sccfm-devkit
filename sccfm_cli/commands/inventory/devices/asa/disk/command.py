@@ -4,29 +4,25 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
-from sccfm_cli.commands.inventory.devices.asa.disk import AsaDiskCommand
-from sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
-from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
+from sccfm_cli.commands.inventory.devices.asa.disk.list_files import (
+    AsaDiskListFilesCommand,
+)
 
 
-class AsaCommand(BaseCommand):
+class AsaDiskCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
-            AsaCliCommand(console),
-            AsaDiskCommand(console),
-            SmartlicenseCommand(console),
-            AsaOnboardCommand(console),
+            AsaDiskListFilesCommand(console),
         ]
 
     @property
     def name(self) -> str:
-        return "asa"
+        return "disk"
 
     @property
     def help_text(self) -> str:
-        return "ASA device operations."
+        return "ASA device disk operations."
 
     def build(self) -> click.Command:
         group = click.Group(name=self.name, help=self.help_text)

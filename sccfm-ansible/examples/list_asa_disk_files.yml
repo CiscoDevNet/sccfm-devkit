@@ -1,0 +1,102 @@
+---
+# List OS and AnyConnect files on ASA device disks via SCCFM
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.list_asa_disk_files \
+#     -a 'query="connectivityState:ONLINE" limit=1'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/list_asa_disk_files.yml
+#
+# NOTE: Devices must be ONLINE for the dir command to succeed.
+# TIP:  The demoRed tenant (prod/us) has ASA devices with AnyConnect packages
+#       on disk if you want to test AnyConnect classification.
+
+- name: List OS and AnyConnect files on ASA device disks
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # ============================================================
+    # QUICK TEST: List disk files on first available online device
+    # ============================================================
+    - name: "Quick test: List disk files on first available online ASA"
+      cisco.sccfm.list_asa_disk_files:
+        query: "connectivityState:ONLINE"
+        limit: 1
+      register: quick_test_result
+
+    - name: Display all files found
+      ansible.builtin.debug:
+        var: quick_test_result.results
+      when: quick_test_result.results is defined
+
+    # ============================================================
+    # Example 1: List files on a specific device by UID
+    # ============================================================
+    - name: "UID test: List disk files on a specific ASA"
+      cisco.sccfm.list_asa_disk_files:
+        uids:
+          - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+      register: uid_result
+
+    - name: Display files by type
+      ansible.builtin.debug:
+        msg: "{{ item.file_name }} ({{ item.file_type }}, {{ item.size }} bytes)"
+      loop: "{{ uid_result.results | default([]) }}"
+      loop_control:
+        label: "{{ item.file_name }}"
+
+    # ============================================================
+    # Example 2: Filter results to show only OS images
+    # ============================================================
+    - name: List disk files on all online ASAs
+      cisco.sccfm.list_asa_disk_files:
+        query: "connectivityState:ONLINE"
+      register: all_disk_files
+
+    - name: Show only OS images
+      ansible.builtin.debug:
+        msg: "Device {{ item.device_uid }}: {{ item.file_name }} ({{ item.size }} bytes)"
+      loop: "{{ all_disk_files.results | default([]) | selectattr('file_type', 'equalto', 'OS_IMAGE') | list }}"
+      loop_control:
+        label: "{{ item.device_uid }}"
+
+    # ============================================================
+    # Example 3: Show only AnyConnect packages
+    # ============================================================
+    - name: Show only AnyConnect packages
+      ansible.builtin.debug:
+        msg: "Device {{ item.device_uid }}: {{ item.file_name }} ({{ item.size }} bytes)"
+      loop: "{{ all_disk_files.results | default([]) | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE') | list }}"
+      loop_control:
+        label: "{{ item.device_uid }}"
+
+    # ============================================================
+    # Example 4: Filter by device name pattern
+    # Uncomment and adjust the name pattern to match your devices
+    # ============================================================
+    # - name: List disk files on branch ASAs
+    #   cisco.sccfm.list_asa_disk_files:
+    #     query: "name:branch-* AND connectivityState:ONLINE"
+    #   register: branch_disk_files
+
+    # ============================================================
+    # Example 5: Using pagination for large device sets
+    # ============================================================
+    - name: List disk files on first 10 matching devices
+      cisco.sccfm.list_asa_disk_files:
+        query: "connectivityState:ONLINE"
+        limit: 10
+        offset: 0
+      register: paginated_results
+      ignore_errors: true
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: "Found {{ paginated_results.results | default([]) | length }} file(s) across queried devices"
