@@ -1,3 +1,15 @@
+## v0.7.0 (2026-02-11)
+
+### Feat
+
+- **LH-103781**: ansible playbook for creating network objects (#9)
+
+## v0.6.0 (2026-02-11)
+
+### Feat
+
+- **LH-102407**: add cli command for network object creation (#8)
+
 ## v0.5.0 (2026-02-02)
 
 ### Feat
