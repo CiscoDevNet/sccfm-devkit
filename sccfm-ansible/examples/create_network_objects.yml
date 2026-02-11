@@ -1,0 +1,78 @@
+---
+# Create network objects in SCC Firewall Manager
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.create_network_object \
+#     -a 'name=test-host value=10.0.1.100 description="Test host"'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/create_network_objects.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+
+- name: Create network objects in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    # Define network objects to create
+    network_objects:
+      - name: web-server-01
+        value: "10.0.1.100"
+        description: "Production web server"
+        labels:
+          - production
+          - web-tier
+        tags:
+          environment:
+            - production
+
+      - name: app-server-subnet
+        value: "10.0.2.0/24"
+        description: "Application server subnet"
+        labels:
+          - production
+          - app-tier
+        tags:
+          environment:
+            - production
+
+#      - name: dhcp-pool
+#        value: "192.168.1.100-192.168.1.200"
+#        description: "DHCP address pool for guest network"
+#        labels:
+#          - guest
+#          - dhcp
+
+  tasks:
+    # ============================================================
+    # Create each network object from the list
+    # ============================================================
+    - name: Create network objects
+      cisco.sccfm.create_network_object:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        description: "{{ item.description | default(omit) }}"
+        labels: "{{ item.labels | default(omit) }}"
+        tags: "{{ item.tags | default(omit) }}"
+      loop: "{{ network_objects }}"
+      register: create_results
+
+    - name: Display created network objects
+      ansible.builtin.debug:
+        msg: >-
+          Created '{{ item.network_object.name }}'
+          (uid={{ item.network_object.uid }},
+          value={{ item.network_object.literal }})
+      loop: "{{ create_results.results }}"
+      when: item.network_object is defined
+      loop_control:
+        label: "{{ item.network_object.name | default('unknown') }}"
