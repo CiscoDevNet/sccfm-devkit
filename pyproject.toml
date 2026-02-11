@@ -15,7 +15,7 @@ python = "^3.12"
 click = ">=8.0.0,<9"
 rich = "^14.2.0"
 click-option-group = "^0.5.9"
-scc-firewall-manager-sdk = "^1.15.581"
+scc-firewall-manager-sdk = "^1.17.27"
 
 [tool.poetry.scripts]
 sccfm-cli = "sccfm_cli.cli:cli"
