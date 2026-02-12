@@ -7,7 +7,7 @@ from sccfm_core.types import ConfigLike
 
 
 class AsaOnboardService:
-    def __init__(self, config: ConfigLike):
+    def __init__(self, config: ConfigLike) -> None:
         self.inventory_api = InventoryApi(ApiClientFactory().build(config=config))
         self.transaction_service = TransactionService(config=config)
 

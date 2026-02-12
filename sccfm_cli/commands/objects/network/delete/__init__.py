@@ -1,0 +1,5 @@
+from __future__ import annotations
+
+from sccfm_cli.commands.objects.network.delete.command import NetworkDeleteCommand
+
+__all__ = ["NetworkDeleteCommand"]

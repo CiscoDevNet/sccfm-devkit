@@ -89,6 +89,30 @@ def config_path_option() -> click.Option:
     )
 
 
+def uid_option() -> click.Option:
+    """Optional --uid option for object unique identifier."""
+    return click.Option(
+        ["-u", "--uid"],
+        required=False,
+        type=str,
+        help="The unique identifier (UID) of the object.",
+    )
+
+
+def object_name_option() -> click.Option:
+    """Optional --name option for object identification.
+    
+    This is distinct from name_option() which is required for creation.
+    Used in operations where either UID or name can identify an object.
+    """
+    return click.Option(
+        ["-n", "--name"],
+        required=False,
+        type=str,
+        help="The name of the object (alternative to UID).",
+    )
+
+
 def object_create_params() -> List[click.Parameter]:
     """Complete set of options for network object create command."""
     return [
@@ -140,3 +164,12 @@ def parse_tags(tags_tuple: tuple[str, ...] | None) -> dict[str, list[str]] | Non
         else:
             result[key] = values
     return result if result else None
+
+
+def object_delete_params() -> List[click.Parameter]:
+    """Complete set of options for network object delete command."""
+    return [
+        uid_option(),
+        object_name_option(),
+        config_path_option(),
+    ]
