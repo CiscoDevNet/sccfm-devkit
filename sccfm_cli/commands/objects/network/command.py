@@ -7,6 +7,7 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.network.create import NetworkCreateCommand
+from sccfm_cli.commands.objects.network.delete import NetworkDeleteCommand
 
 
 class NetworkCommand(BaseCommand):
@@ -16,6 +17,7 @@ class NetworkCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             NetworkCreateCommand(console),
+            NetworkDeleteCommand(console),
         ]
 
     @property
@@ -33,4 +35,4 @@ class NetworkCommand(BaseCommand):
         return group
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:  # pragma: no cover
-        ctx.fail("Specify a subcommand for network (e.g., create).")
+        ctx.fail("Specify a subcommand for network (e.g., create, delete).")

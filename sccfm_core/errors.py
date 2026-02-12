@@ -76,3 +76,9 @@ class SccApiError:
         if self.details:
             lines.append(f"Details: {json.dumps(self.details, indent=2)}")
         return "\n".join(lines)
+
+
+class NotFoundError(Exception):
+    """Exception raised when a resource is not found."""
+
+    pass

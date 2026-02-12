@@ -11,6 +11,7 @@ from scc_firewall_manager_sdk.models.network_object_content import NetworkObject
 from scc_firewall_manager_sdk.models.object_content import ObjectContent
 from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValue
 
+from sccfm_core.errors import NotFoundError
 from sccfm_core.factories import ApiClientFactory
 from sccfm_core.types import ConfigLike
 
@@ -112,6 +113,68 @@ class NetworkObjectService:
         self._raise_for_status(response.status, body)
         data = json.loads(body)
         return NetworkObjectResponse.from_dict(data)
+
+    def get_network_object_by_name(self, name: str) -> NetworkObjectResponse | None:
+        """Search for a network object by name.
+
+        Args:
+            name: The name of the network object to find.
+
+        Returns:
+            The NetworkObjectResponse if found, None otherwise.
+
+        Raises:
+            ApiException: If the API call fails.
+        """
+        # Use Lucene query syntax to search by name
+        query = f'name:"{name}"'
+        response = self._object_api.get_objects_without_preload_content(q=query, limit="1")
+        raw_data = response.read()
+        body = raw_data.decode("utf-8")
+        self._raise_for_status(response.status, body)
+        data = json.loads(body)
+
+        # Check if we found any results
+        items = data.get("items", [])
+        if not items:
+            return None
+
+        return NetworkObjectResponse.from_dict(items[0])
+
+    def delete_network_object(self, uid: str | None = None, name: str | None = None) -> str:
+        """Delete a network object by UID or name.
+
+        Args:
+            uid: The unique identifier of the network object to delete.
+            name: The name of the network object to delete.
+
+        Returns:
+            The UID of the deleted object.
+
+        Raises:
+            ValueError: If neither uid nor name is provided, or both are provided.
+            NotFoundError: If the object with the given name is not found.
+            ApiException: If the deletion fails.
+        """
+        if not uid and not name:
+            raise ValueError("Either 'uid' or 'name' must be provided.")
+        if uid and name:
+            raise ValueError("Only one of 'uid' or 'name' should be provided, not both.")
+
+        # If name is provided, resolve it to UID first
+        if name:
+            obj = self.get_network_object_by_name(name)
+            if not obj:
+                raise NotFoundError(f"Network object with name '{name}' not found.")
+            uid = obj.uid
+
+        # At this point uid is guaranteed to be a non-None string
+        assert uid is not None, "UID should not be None after validation"
+        response = self._object_api.delete_object_without_preload_content(uid=uid)
+        raw_data = response.read()
+        body = raw_data.decode("utf-8")
+        self._raise_for_status(response.status, body)
+        return uid
 
     @staticmethod
     def _raise_for_status(status: int, body: str) -> None:
