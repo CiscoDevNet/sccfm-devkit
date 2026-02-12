@@ -38,7 +38,7 @@ class NetworkDeleteCommand(BaseCommand):
 
         config = self.get_profile(ctx=ctx, **kwargs)
         service = NetworkObjectService(config)
-        
+
         try:
             deleted_uid = service.delete_network_object(uid=uid, name=name)
             identifier = name if name else uid
@@ -48,4 +48,3 @@ class NetworkDeleteCommand(BaseCommand):
             )
         except NotFoundError as e:
             ctx.fail(str(e))
-

@@ -101,7 +101,7 @@ def uid_option() -> click.Option:
 
 def object_name_option() -> click.Option:
     """Optional --name option for object identification.
-    
+
     This is distinct from name_option() which is required for creation.
     Used in operations where either UID or name can identify an object.
     """

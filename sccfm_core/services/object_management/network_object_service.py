@@ -128,20 +128,17 @@ class NetworkObjectService:
         """
         # Use Lucene query syntax to search by name
         query = f'name:"{name}"'
-        response = self._object_api.get_objects_without_preload_content(
-            q=query,
-            limit="1"
-        )
+        response = self._object_api.get_objects_without_preload_content(q=query, limit="1")
         raw_data = response.read()
         body = raw_data.decode("utf-8")
         self._raise_for_status(response.status, body)
         data = json.loads(body)
-        
+
         # Check if we found any results
         items = data.get("items", [])
         if not items:
             return None
-        
+
         return NetworkObjectResponse.from_dict(items[0])
 
     def delete_network_object(self, uid: str | None = None, name: str | None = None) -> str:
@@ -163,14 +160,14 @@ class NetworkObjectService:
             raise ValueError("Either 'uid' or 'name' must be provided.")
         if uid and name:
             raise ValueError("Only one of 'uid' or 'name' should be provided, not both.")
-        
+
         # If name is provided, resolve it to UID first
         if name:
             obj = self.get_network_object_by_name(name)
             if not obj:
                 raise NotFoundError(f"Network object with name '{name}' not found.")
             uid = obj.uid
-        
+
         # At this point uid is guaranteed to be a non-None string
         assert uid is not None, "UID should not be None after validation"
         response = self._object_api.delete_object_without_preload_content(uid=uid)
