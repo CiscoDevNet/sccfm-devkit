@@ -1,3 +1,9 @@
+## v0.8.0 (2026-02-13)
+
+### Feat
+
+- Add AsaDiskCommand and AsaDiskFileService to inventory management (#10)
+
 ## v0.7.0 (2026-02-11)
 
 ### Feat
