@@ -144,8 +144,11 @@ def run_module() -> None:
             msg=f"Successfully deleted network object '{identifier}' ({identifier_type})",
             deleted_uid=deleted_uid,
         )
-    except NotFoundError as e:
-        module.fail_json(msg=str(e))
+    except NotFoundError:
+        module.exit_json(
+            changed=False,
+            msg=f"Network object '{identifier}' not found — already absent.",
+        )
     except ValueError as e:
         module.fail_json(msg=f"Invalid parameters: {str(e)}")
     except Exception as e:
