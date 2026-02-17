@@ -126,6 +126,7 @@ def test_should_succeed_with_changed_false_when_object_not_found(
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
     assert "not found" in call_kwargs["msg"]
+    assert call_kwargs["deleted_uid"] is None
 
 
 @patch("plugins.modules.delete_network_object.Config")

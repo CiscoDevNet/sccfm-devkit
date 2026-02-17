@@ -86,8 +86,8 @@ EXAMPLES = r"""
 
 RETURN = r"""
 deleted_uid:
-  description: The UID of the deleted network object.
-  returned: success
+  description: The UID of the deleted network object, or null if already absent.
+  returned: always
   type: str
   sample: "abc-123-def-456"
 """
@@ -148,6 +148,7 @@ def run_module() -> None:
         module.exit_json(
             changed=False,
             msg=f"Network object '{identifier}' not found — already absent.",
+            deleted_uid=None,
         )
     except ValueError as e:
         module.fail_json(msg=f"Invalid parameters: {str(e)}")
