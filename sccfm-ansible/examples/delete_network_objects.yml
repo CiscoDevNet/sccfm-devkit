@@ -1,0 +1,56 @@
+---
+# Delete network objects in SCC Firewall Manager
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.delete_network_object \
+#     -a 'name=test-host'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/delete_network_objects.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+
+- name: Delete network objects in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    # Define network objects to delete by name
+    network_objects:
+      - web-server-01
+      - app-server-subnet
+      # - dhcp-pool
+
+  tasks:
+    # ============================================================
+    # Delete each network object from the list
+    # ============================================================
+    - name: Delete network objects
+      cisco.sccfm.delete_network_object:
+        name: "{{ item }}"
+      loop: "{{ network_objects }}"
+      register: delete_results
+
+    - name: Display deleted network objects
+      ansible.builtin.debug:
+        msg: "Deleted '{{ item.item }}' (uid={{ item.deleted_uid }})"
+      loop: "{{ delete_results.results }}"
+      when: item.changed
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Display network objects not found
+      ansible.builtin.debug:
+        msg: "Not found — '{{ item.item }}' does not exist (skipped)"
+      loop: "{{ delete_results.results }}"
+      when: not item.changed
+      loop_control:
+        label: "{{ item.item }}"
