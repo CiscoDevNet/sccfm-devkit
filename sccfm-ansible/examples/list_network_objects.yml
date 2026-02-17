@@ -1,0 +1,62 @@
+---
+# List network objects in SCC Firewall Manager
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/list_network_objects.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+
+- name: List network objects in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # ============================================================
+    # List all network objects (first page)
+    # ============================================================
+    - name: List all network objects
+      cisco.sccfm.list_network_objects:
+        limit: 50
+      register: all_objects
+
+    - name: Display network object summary
+      ansible.builtin.debug:
+        msg: "Found {{ all_objects.count }} network objects (showing {{ all_objects.network_objects | length }})"
+
+    - name: Display each network object
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.name }}
+          (type={{ item.object_type }},
+          value={{ item.literal }})
+      loop: "{{ all_objects.network_objects }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ============================================================
+    # Search for specific network objects by name
+    # ============================================================
+    - name: Search for web-related network objects
+      cisco.sccfm.list_network_objects:
+        query: "name:web*"
+        limit: 10
+      register: web_objects
+
+    - name: Display web-related objects
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.name }}
+          (uid={{ item.uid }},
+          value={{ item.literal }})
+      loop: "{{ web_objects.network_objects }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: web_objects.count > 0

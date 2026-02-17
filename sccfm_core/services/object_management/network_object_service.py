@@ -61,10 +61,43 @@ class NetworkObjectResponse:
         }
 
 
+@dataclass
+class NetworkObjectListResponse:
+    """Paginated response for listing network objects.
+
+    Mirrors the SDK's ListObjectResponse but uses our own
+    NetworkObjectResponse items to avoid oneOf deserialization issues.
+    """
+
+    count: int
+    items: list[NetworkObjectResponse]
+    limit: int
+    offset: int
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "NetworkObjectListResponse":
+        raw_items: list[dict[str, Any]] = data.get("items") or []
+        return cls(
+            count=int(data.get("count") or 0),
+            items=[NetworkObjectResponse.from_dict(item) for item in raw_items],
+            limit=int(data.get("limit") or 0),
+            offset=int(data.get("offset") or 0),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "count": self.count,
+            "items": [item.to_dict() for item in self.items],
+            "limit": self.limit,
+            "offset": self.offset,
+        }
+
+
 class NetworkObjectService:
     """Service for managing network objects via the SCC Firewall Manager API."""
 
     OBJECT_TYPE = "NETWORK_OBJECT"
+    NETWORK_TYPE_FILTER = "objectType:*NETWORK*"
 
     def __init__(self, config: ConfigLike) -> None:
         api_client = ApiClientFactory().build(config)
@@ -104,14 +137,10 @@ class NetworkObjectService:
             labels=labels,
             tags=tags,
         )
-        # Use the raw response method to avoid SDK deserialization bugs with oneOf
         response = self._object_api.create_object_without_preload_content(
             create_request=create_request
         )
-        raw_data = response.read()
-        body = raw_data.decode("utf-8")
-        self._raise_for_status(response.status, body)
-        data = json.loads(body)
+        data = self._read_raw_response(response)
         return NetworkObjectResponse.from_dict(data)
 
     def get_network_object_by_name(self, name: str) -> NetworkObjectResponse | None:
@@ -129,10 +158,7 @@ class NetworkObjectService:
         # Use Lucene query syntax to search by name
         query = f'name:"{name}"'
         response = self._object_api.get_objects_without_preload_content(q=query, limit="1")
-        raw_data = response.read()
-        body = raw_data.decode("utf-8")
-        self._raise_for_status(response.status, body)
-        data = json.loads(body)
+        data = self._read_raw_response(response)
 
         # Check if we found any results
         items = data.get("items", [])
@@ -171,14 +197,62 @@ class NetworkObjectService:
         # At this point uid is guaranteed to be a non-None string
         assert uid is not None, "UID should not be None after validation"
         response = self._object_api.delete_object_without_preload_content(uid=uid)
-        raw_data = response.read()
-        body = raw_data.decode("utf-8")
-        self._raise_for_status(response.status, body)
+        self._check_raw_response(response)
         return uid
 
+    def list_network_objects(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        query: str | None = None,
+    ) -> NetworkObjectListResponse:
+        """List network objects with optional filtering.
+
+        Args:
+            limit: Maximum number of results to return.
+            offset: Pagination offset.
+            query: Optional Lucene query string (searchable fields: name, content).
+
+        Returns:
+            A paginated NetworkObjectListResponse.
+        """
+        response = self._object_api.get_objects_without_preload_content(
+            limit=str(limit),
+            offset=str(offset),
+            q=self._build_query(query),
+        )
+        data = self._read_raw_response(response)
+        return NetworkObjectListResponse.from_dict(data)
+
+    @classmethod
+    def _build_query(cls, query: str | None) -> str:
+        """Append the network object type filter to the user's query.
+
+        Ensures only NETWORK_OBJECT and NETWORK_GROUP types are returned.
+        """
+        if query:
+            return f"{query} AND {cls.NETWORK_TYPE_FILTER}"
+        return cls.NETWORK_TYPE_FILTER
+
     @staticmethod
-    def _raise_for_status(status: int, body: str) -> None:
-        """Raise an ApiException if the HTTP status indicates an error."""
-        if 200 <= status < 300:
-            return
-        raise ApiException(status=status, body=body)
+    def _read_raw_response(response: Any) -> dict[str, Any]:
+        """Read and validate a raw HTTP response, returning parsed JSON."""
+        raw_data = response.read()
+        body = raw_data.decode("utf-8")
+        _raise_for_status(response.status, body)
+        return dict(json.loads(body))
+
+    @staticmethod
+    def _check_raw_response(response: Any) -> None:
+        """Read and validate a raw HTTP response that may have an empty body."""
+        raw_data = response.read()
+        body = raw_data.decode("utf-8")
+        _raise_for_status(response.status, body)
+
+
+def _raise_for_status(status: int, body: str) -> None:
+    """Raise an ApiException if the HTTP status indicates an error."""
+    if 200 <= status < 300:
+        return
+    raise ApiException(status=status, body=body)

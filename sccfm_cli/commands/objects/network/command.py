@@ -6,8 +6,9 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.objects.network.create import NetworkCreateCommand
-from sccfm_cli.commands.objects.network.delete import NetworkDeleteCommand
+from sccfm_cli.commands.objects.network.create import CreateNetworkObjectCommand
+from sccfm_cli.commands.objects.network.delete import DeleteNetworkObjectCommand
+from sccfm_cli.commands.objects.network.list import ListNetworkObjectCommand
 
 
 class NetworkCommand(BaseCommand):
@@ -16,8 +17,9 @@ class NetworkCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
-            NetworkCreateCommand(console),
-            NetworkDeleteCommand(console),
+            CreateNetworkObjectCommand(console),
+            ListNetworkObjectCommand(console),
+            DeleteNetworkObjectCommand(console),
         ]
 
     @property

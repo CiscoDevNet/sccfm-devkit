@@ -6,8 +6,10 @@ import pytest
 from scc_firewall_manager_sdk.exceptions import ApiException
 
 from sccfm_core.services.object_management.network_object_service import (
+    NetworkObjectListResponse,
     NetworkObjectResponse,
     NetworkObjectService,
+    _raise_for_status,
 )
 
 SAMPLE_API_RESPONSE: dict[str, Any] = {
@@ -80,20 +82,134 @@ class TestNetworkObjectResponseToDict:
 
 
 class TestRaiseForStatus:
-    """Tests for NetworkObjectService._raise_for_status."""
+    """Tests for _raise_for_status module-level helper."""
 
     def test_2xx_does_not_raise(self) -> None:
-        NetworkObjectService._raise_for_status(200, "{}")
-        NetworkObjectService._raise_for_status(201, "{}")
+        _raise_for_status(200, "{}")
+        _raise_for_status(201, "{}")
 
     def test_4xx_raises_api_exception(self) -> None:
         body = '{"errorMsg":"Duplicate","errorCode":"CONFLICT","details":{}}'
         with pytest.raises(ApiException) as exc_info:
-            NetworkObjectService._raise_for_status(409, body)
+            _raise_for_status(409, body)
         assert exc_info.value.status == 409
         assert exc_info.value.body == body
 
     def test_5xx_raises_api_exception(self) -> None:
         with pytest.raises(ApiException) as exc_info:
-            NetworkObjectService._raise_for_status(500, "error")
+            _raise_for_status(500, "error")
         assert exc_info.value.status == 500
+
+
+SAMPLE_LIST_API_RESPONSE: dict[str, Any] = {
+    "count": 2,
+    "items": [
+        SAMPLE_API_RESPONSE,
+        {
+            "uid": "def-456",
+            "name": "other-network",
+            "description": None,
+            "elements": [],
+            "labels": [],
+            "tags": {},
+            "value": {
+                "objectType": "NETWORK_OBJECT",
+                "defaultContent": {"literal": "192.168.1.0/24"},
+            },
+        },
+    ],
+    "limit": 50,
+    "offset": 0,
+}
+
+SAMPLE_LIST_WITH_MIXED_TYPES: dict[str, Any] = {
+    "count": 3,
+    "items": [
+        SAMPLE_API_RESPONSE,
+        {
+            "uid": "url-789",
+            "name": "some-url-group",
+            "description": None,
+            "elements": [],
+            "labels": [],
+            "tags": {},
+            "value": {
+                "objectType": "URL_GROUP",
+                "defaultContent": {"literal": "http://example.com"},
+            },
+        },
+        {
+            "uid": "grp-101",
+            "name": "my-net-group",
+            "description": None,
+            "elements": [],
+            "labels": [],
+            "tags": {},
+            "value": {
+                "objectType": "NETWORK_GROUP",
+                "defaultContent": {"literal": ""},
+            },
+        },
+    ],
+    "limit": 50,
+    "offset": 0,
+}
+
+
+class TestNetworkObjectListResponseFromDict:
+    """Tests for NetworkObjectListResponse.from_dict parsing."""
+
+    def test_parses_full_response(self) -> None:
+        response = NetworkObjectListResponse.from_dict(SAMPLE_LIST_API_RESPONSE)
+        assert response.count == 2
+        assert response.limit == 50
+        assert response.offset == 0
+        assert len(response.items) == 2
+        assert response.items[0].uid == "abc-123"
+        assert response.items[1].uid == "def-456"
+
+    def test_handles_empty_items(self) -> None:
+        data: dict[str, Any] = {"count": 0, "items": [], "limit": 50, "offset": 0}
+        response = NetworkObjectListResponse.from_dict(data)
+        assert response.count == 0
+        assert response.items == []
+
+    def test_handles_missing_items(self) -> None:
+        data: dict[str, Any] = {"count": 0}
+        response = NetworkObjectListResponse.from_dict(data)
+        assert response.items == []
+        assert response.limit == 0
+        assert response.offset == 0
+
+    def test_to_dict_round_trip(self) -> None:
+        response = NetworkObjectListResponse.from_dict(SAMPLE_LIST_API_RESPONSE)
+        result = response.to_dict()
+        assert result["count"] == 2
+        assert len(result["items"]) == 2
+        assert result["items"][0]["uid"] == "abc-123"
+        assert result["limit"] == 50
+        assert result["offset"] == 0
+
+    def test_parses_mixed_types_without_filtering(self) -> None:
+        """from_dict itself does not filter — it preserves all items."""
+        response = NetworkObjectListResponse.from_dict(SAMPLE_LIST_WITH_MIXED_TYPES)
+        assert response.count == 3
+        assert len(response.items) == 3
+        types = {item.object_type for item in response.items}
+        assert "URL_GROUP" in types
+
+
+class TestBuildQuery:
+    """Tests for NetworkObjectService._build_query."""
+
+    def test_appends_filter_to_user_query(self) -> None:
+        result = NetworkObjectService._build_query("name:*network-obj*")
+        assert result == "name:*network-obj* AND objectType:*NETWORK*"
+
+    def test_returns_filter_when_query_is_none(self) -> None:
+        result = NetworkObjectService._build_query(None)
+        assert result == "objectType:*NETWORK*"
+
+    def test_returns_filter_when_query_is_empty(self) -> None:
+        result = NetworkObjectService._build_query("")
+        assert result == "objectType:*NETWORK*"

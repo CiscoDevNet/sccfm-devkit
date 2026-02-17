@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 import click
 
@@ -89,6 +89,44 @@ def config_path_option() -> click.Option:
     )
 
 
+def limit_option() -> click.Option:
+    """Reusable --limit option for pagination."""
+    return click.Option(
+        ["-l", "--limit"],
+        default=50,
+        show_default=True,
+        type=click.IntRange(min=1, max=200),
+        help="Maximum records to return.",
+    )
+
+
+def offset_option() -> click.Option:
+    """Reusable --offset option for pagination."""
+    return click.Option(
+        ["-o", "--offset"],
+        default=0,
+        show_default=True,
+        type=click.IntRange(min=0),
+        help="Pagination offset.",
+    )
+
+
+def query_option(*, required: bool = False) -> click.Option:
+    """Reusable --query option for Lucene filtering.
+
+    Args:
+        required: Whether the option is mandatory.
+    """
+    kwargs: dict[str, Any] = {
+        "required": required,
+        "show_default": False,
+        "help": "Lucene query string. Searchable fields: name, content.",
+    }
+    if not required:
+        kwargs["default"] = None
+    return click.Option(["-q", "--query"], **kwargs)
+
+
 def uid_option() -> click.Option:
     """Optional --uid option for object unique identifier."""
     return click.Option(
@@ -121,6 +159,17 @@ def object_create_params() -> List[click.Parameter]:
         description_option(),
         labels_option(),
         tags_option(),
+        format_option(),
+        config_path_option(),
+    ]
+
+
+def object_list_params() -> List[click.Parameter]:
+    """Complete set of options for network object list commands."""
+    return [
+        limit_option(),
+        offset_option(),
+        query_option(),
         format_option(),
         config_path_option(),
     ]

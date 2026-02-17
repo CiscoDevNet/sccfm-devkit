@@ -11,7 +11,7 @@ from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkObjectService
 
 
-class NetworkDeleteCommand(BaseCommand):
+class DeleteNetworkObjectCommand(BaseCommand):
     """Delete a network object in SCC Firewall Manager."""
 
     @property
