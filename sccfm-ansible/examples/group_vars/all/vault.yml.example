@@ -3,10 +3,12 @@
 # DO NOT commit the actual vault.yml unencrypted to version control!
 #
 # To create your own encrypted vault.yml:
-# 1. Copy this file: cp vault.yml.example vault.yml.temp
-# 2. Edit vault.yml.temp with your actual secrets
-# 3. Encrypt it: ansible-vault encrypt vault.yml.temp --output vault.yml --vault-password-file ../../.vault_pass
-# 4. Remove the temp file: rm vault.yml.temp
+# 1. copy the ../../.vault_pass.example file: cp ../../.vault_pass_example ../../.vault_pass
+# 2. edit vault_pass with a password to encrypt
+# 3. Copy this file: cp vault.yml.example vault.yml.temp
+# 4. Edit vault.yml.temp with your actual secrets
+# 5. Encrypt it: ansible-vault encrypt vault.yml.temp --output vault.yml --vault-password-file ../../.vault_pass
+# 6. Remove the temp file: rm vault.yml.temp
 
 # SCC Firewall Manager API token
 # Obtain this from your CDO/SCCFM tenant

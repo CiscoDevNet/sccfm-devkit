@@ -102,14 +102,14 @@ def test_should_delete_network_object_by_name(
 @patch("plugins.modules.delete_network_object.Config")
 @patch("plugins.modules.delete_network_object.NetworkObjectService")
 @patch("plugins.modules.delete_network_object.AnsibleModule")
-def test_should_fail_when_object_not_found(
+def test_should_succeed_with_changed_false_when_object_not_found(
     mock_ansible_module_class: MagicMock,
     mock_service_class: MagicMock,
     _mock_config_class: MagicMock,
     mock_module_instance: MagicMock,
     base_module_params_with_name: dict[str, Any],
 ) -> None:
-    """run_module should fail when object is not found."""
+    """run_module should return changed=False when object is not found (idempotent)."""
     mock_module_instance.params = base_module_params_with_name
     mock_ansible_module_class.return_value = mock_module_instance
 
@@ -122,8 +122,9 @@ def test_should_fail_when_object_not_found(
     with pytest.raises(SystemExit):
         delete_network_object.run_module()
 
-    mock_module_instance.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance.fail_json.call_args[1]
+    mock_module_instance.exit_json.assert_called_once()
+    call_kwargs = mock_module_instance.exit_json.call_args[1]
+    assert call_kwargs["changed"] is False
     assert "not found" in call_kwargs["msg"]
 
 

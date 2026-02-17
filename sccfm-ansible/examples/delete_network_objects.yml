@@ -41,10 +41,16 @@
 
     - name: Display deleted network objects
       ansible.builtin.debug:
-        msg: >-
-          Deleted '{{ item.item }}'
-          (uid={{ item.deleted_uid }})
+        msg: "Deleted '{{ item.item }}' (uid={{ item.deleted_uid }})"
       loop: "{{ delete_results.results }}"
-      when: item.deleted_uid is defined
+      when: item.changed
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Display network objects not found
+      ansible.builtin.debug:
+        msg: "Not found — '{{ item.item }}' does not exist (skipped)"
+      loop: "{{ delete_results.results }}"
+      when: not item.changed
       loop_control:
         label: "{{ item.item }}"

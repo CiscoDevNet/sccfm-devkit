@@ -4,6 +4,7 @@ requires_ansible: ">=2.15.0"
 action_groups:
   cisco.sccfm.all:
     - create_network_object
+    - delete_network_object
     - execute_asa_cli
     - onboard_asa
     # Add future modules here as they are created
