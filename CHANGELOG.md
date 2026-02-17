@@ -1,3 +1,9 @@
+## v0.9.0 (2026-02-17)
+
+### Feat
+
+- **lh-102408**: list and search network objects (#13)
+
 ## v0.8.0 (2026-02-13)
 
 ### Feat
