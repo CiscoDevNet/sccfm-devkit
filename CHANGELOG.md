@@ -1,3 +1,9 @@
+## v0.11.0 (2026-02-18)
+
+### Feat
+
+- improve Ansible example playbooks with auto-discovery of SYNCED devices (#18)
+
 ## v0.10.0 (2026-02-18)
 
 ### Feat
