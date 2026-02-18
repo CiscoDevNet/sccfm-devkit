@@ -1,3 +1,9 @@
+## v0.10.0 (2026-02-18)
+
+### Feat
+
+- **LH-102398**: add change local password command for ASA devices (#16)
+
 ## v0.9.0 (2026-02-17)
 
 ### Feat
