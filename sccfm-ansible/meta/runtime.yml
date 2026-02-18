@@ -5,6 +5,7 @@ action_groups:
   cisco.sccfm.all:
     - create_network_object
     - execute_asa_cli
+    - list_local_users
     - onboard_asa
     # Add future modules here as they are created
 

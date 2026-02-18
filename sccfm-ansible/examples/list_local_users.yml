@@ -1,0 +1,21 @@
+- hosts: all
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+
+    - name: Get list of local users on ASA device(s) via SCCFM
+      cisco.sccfm.list_local_users:
+        uids: "{{ omit if sccfm_query is defined else sccfm_uids | default(omit) }}"
+        query: "{{ sccfm_query | default(omit) }}"
+      register: local_users_result
+
+    - name: Print local users results
+      ansible.builtin.debug:
+        msg: "{{ (pair.0.device_name ~ ' (' ~ pair.0.device_uid ~ ')') if pair.0.device_name else pair.0.device_uid }} | user={{ pair.1.user | default('?') }} | attempts={{ pair.1['failed-attempts'] | default('-') }} | locked={{ pair.1.locked | default('-') }} | expired={{ pair.1.expired | default('-') }} | new={{ pair.1['new-user'] | default('-') }}"
+      loop: "{{ local_users_result.devices | default([]) | subelements('users') }}"
+      loop_control:
+        loop_var: pair
+        label: "{{ (pair.0.device_name | default(pair.0.device_uid)) }}/{{ pair.1.user | default('?') }}"
