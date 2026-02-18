@@ -3,14 +3,14 @@ requires_ansible: ">=2.15.0"
 
 action_groups:
   cisco.sccfm.all:
+    - change_asa_local_password
     - create_network_object
-    - list_network_objects
-    - update_network_object
     - delete_network_object
     - execute_asa_cli
-    - onboard_asa
     - list_asa_disk_files
-    # Add future modules here as they are created
+    - list_network_objects
+    - onboard_asa
+    - update_network_object
 
 module_defaults:
   group/cisco.sccfm.all:
