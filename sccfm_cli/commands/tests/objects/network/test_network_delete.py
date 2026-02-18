@@ -230,10 +230,16 @@ class TestNetworkObjectServiceDelete:
     def test_delete_by_uid_calls_api(self, monkeypatch: MonkeyPatch) -> None:
         """Service should call API with correct uid parameter."""
         mock_api = Mock()
-        mock_response = Mock()
-        mock_response.read.return_value = b""
-        mock_response.status = 200
-        mock_api.delete_object_without_preload_content.return_value = mock_response
+
+        get_response = Mock()
+        get_response.status = 200
+        get_response.read.return_value = json.dumps(SAMPLE_OBJECT.to_dict()).encode("utf-8")
+        mock_api.get_object_without_preload_content.return_value = get_response
+
+        delete_response = Mock()
+        delete_response.read.return_value = b""
+        delete_response.status = 200
+        mock_api.delete_object_without_preload_content.return_value = delete_response
 
         service = NetworkObjectService.__new__(NetworkObjectService)
         service._object_api = mock_api
@@ -241,6 +247,7 @@ class TestNetworkObjectServiceDelete:
         result = service.delete_network_object(uid="test-uid")
 
         assert result == "test-uid"
+        mock_api.get_object_without_preload_content.assert_called_once_with(uid="test-uid")
         mock_api.delete_object_without_preload_content.assert_called_once_with(uid="test-uid")
 
     def test_delete_by_name_resolves_to_uid(self, monkeypatch: MonkeyPatch) -> None:

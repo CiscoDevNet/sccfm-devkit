@@ -16,11 +16,16 @@ def name_option() -> click.Option:
     )
 
 
-def value_option() -> click.Option:
-    """Required --value option for network object content."""
+def value_option(*, required: bool = True) -> click.Option:
+    """Reusable --value option for network object content.
+
+    Args:
+        required: Whether the option is mandatory (True for create, False for update).
+    """
     return click.Option(
         ["-v", "--value"],
-        required=True,
+        required=required,
+        default=None if not required else None,
         type=str,
         help="The literal value (IP address, CIDR, or range).",
     )
@@ -220,5 +225,31 @@ def object_delete_params() -> List[click.Parameter]:
     return [
         uid_option(),
         object_name_option(),
+        config_path_option(),
+    ]
+
+
+def new_name_option() -> click.Option:
+    """Optional --new-name option for renaming an object."""
+    return click.Option(
+        ["--new-name"],
+        required=False,
+        type=str,
+        default=None,
+        help="The new name for the object.",
+    )
+
+
+def object_update_params() -> List[click.Parameter]:
+    """Complete set of options for network object update command."""
+    return [
+        uid_option(),
+        object_name_option(),
+        new_name_option(),
+        value_option(required=False),
+        description_option(),
+        labels_option(),
+        tags_option(),
+        format_option(),
         config_path_option(),
     ]

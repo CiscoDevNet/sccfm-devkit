@@ -9,6 +9,7 @@ from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.network.create import CreateNetworkObjectCommand
 from sccfm_cli.commands.objects.network.delete import DeleteNetworkObjectCommand
 from sccfm_cli.commands.objects.network.list import ListNetworkObjectCommand
+from sccfm_cli.commands.objects.network.update import UpdateNetworkObjectCommand
 
 
 class NetworkCommand(BaseCommand):
@@ -19,6 +20,7 @@ class NetworkCommand(BaseCommand):
         self._subcommands: List[BaseCommand] = [
             CreateNetworkObjectCommand(console),
             ListNetworkObjectCommand(console),
+            UpdateNetworkObjectCommand(console),
             DeleteNetworkObjectCommand(console),
         ]
 
