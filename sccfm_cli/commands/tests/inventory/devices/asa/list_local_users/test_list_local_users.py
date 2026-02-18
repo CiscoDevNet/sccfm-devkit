@@ -21,7 +21,6 @@ from sccfm_cli.commands.inventory.devices.asa.list_local_users.command import (
 from sccfm_cli.models import Config
 from sccfm_core.services import AsaCommandLineService, InventoryService
 
-
 # ---------------------------------------------------------------------------
 # Unit tests for pure helper functions
 # ---------------------------------------------------------------------------
