@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-import re
 import json
+import re
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
+from scc_firewall_manager_sdk import (
+    ApiException,
+    CdoCliResult,
+    CdoTransaction,
+    DevicePage,
+)
 
 from sccfm_core import AsaCommandLineService, InventoryService, SccApiError
 from sccfm_core.types import ConfigLike
