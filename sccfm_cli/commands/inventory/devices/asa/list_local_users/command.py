@@ -1,17 +1,24 @@
 from __future__ import annotations
 
+import json
 import re
-from pathlib import Path
-from typing import Any, Sequence, cast
+from typing import Any, Dict, List, Sequence, cast
 
 import click
-from rich.console import Console
 from rich.table import Table
-from scc_firewall_manager_sdk import CdoTransaction
+from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device, DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.options import (
+    config_path_option,
+    format_option,
+    limit_option,
+    offset_option,
+    query_option,
+)
 from sccfm_cli.utils.spinner import with_spinner
 from sccfm_core import AsaCommandLineService, InventoryService
+from sccfm_core.types import ConfigLike
 
 
 def _normalize_output(result_text: str | None) -> list[str]:
@@ -56,25 +63,14 @@ def _parse_cli_table(lines: list[str], max_columns: int = 6) -> tuple[list[str],
     return (headers, rows)
 
 
-def _format_device_label(device_uid: str, device_name: str | None) -> str:
-    """Return ``name (uid)`` when *device_name* is available, otherwise just *uid*."""
-    if device_name:
-        return f"{device_name} ({device_uid})"
-    return device_uid
+def _rows_to_dicts(headers: list[str], rows: list[list[str]]) -> list[dict[str, str]]:
+    """Zip *headers* with each row to produce a list of dicts.
 
-
-def _resolve_device_name(
-    inventory_service: InventoryService | None,
-    device_uid: str,
-) -> str | None:
-    """Best-effort lookup of a device name via the inventory service."""
-    if inventory_service is None or not device_uid:
-        return None
-    try:
-        device = inventory_service.get_device_by_uid(device_uid=device_uid)
-        return getattr(device, "name", None) or None
-    except Exception:
-        return None
+    Header names are lower-cased with hyphens/spaces replaced by underscores
+    so they read naturally as JSON keys (e.g. ``"Lock-time"`` → ``"lock_time"``).
+    """
+    keys = [h.lower().replace("-", "_").replace(" ", "_") for h in headers]
+    return [dict(zip(keys, row)) for row in rows]
 
 
 class AsaListLocalUsersCommand(BaseCommand):
@@ -84,69 +80,149 @@ class AsaListLocalUsersCommand(BaseCommand):
 
     @property
     def help_text(self) -> str:
-        return "List local users on an ASA device."
+        return "List local users on ASA devices."
 
-    @with_spinner("Getting list of local users for ASA device...")
+    def build_params(self) -> Sequence[click.Parameter]:
+        return [
+            query_option(help_text="Filter devices by a Lucene query."),
+            limit_option(),
+            offset_option(),
+            click.Option(
+                ["-u", "--device-uids"],
+                help="List of device UIDs to query.",
+                multiple=True,
+                type=str,
+            ),
+            format_option(),
+            config_path_option(),
+        ]
+
+    @with_spinner("Getting list of local users for ASA devices...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        uid = cast(str | None, kwargs.get("uid"))
+        query = cast(str | None, kwargs.get("query"))
+        device_uids_param = cast(tuple[str, ...] | None, kwargs.get("device_uids"))
+        limit = cast(int, kwargs.get("limit"))
+        offset = cast(int, kwargs.get("offset"))
+        response_format = cast(str, kwargs.get("format"))
 
-        if not uid:
-            ctx.fail("--uid is required")
+        self._validate_filters(ctx, query=query, device_uids=device_uids_param)
 
         config = self.get_profile(ctx=ctx, **kwargs)
-
-        asa_cli_service = AsaCommandLineService(config=config)
-        results = asa_cli_service.execute_cli(
-            device_uids=[uid], asa_commands=["show aaa local user"]
+        devices = self._get_devices(
+            config=config,
+            query=query,
+            device_uids=device_uids_param,
+            limit=limit,
+            offset=offset,
         )
 
-        if isinstance(results, CdoTransaction):
-            self.print_failed_transaction_details(cdo_transaction=results, format="table")
+        if not devices:
+            self.console.print("No devices matched the given filter.")
             return
 
-        # Create the inventory service once for device-name lookups.
-        inventory_service: InventoryService | None
-        try:
-            inventory_service = InventoryService(config=config)
-        except Exception:
-            inventory_service = None
+        uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
+        device_uid_list: List[str] = [device.uid for device in devices]
 
+        asa_cli_service = AsaCommandLineService(config=config)
+        results: CdoTransaction | List[CdoCliResult] = asa_cli_service.execute_cli(
+            device_uids=device_uid_list,
+            asa_commands=["show aaa local user"],
+        )
+
+        self._render_results(
+            results=results,
+            uid_to_device=uid_to_device,
+            format=response_format,
+        )
+
+    def _get_devices(
+        self,
+        config: ConfigLike,
+        query: str | None,
+        device_uids: tuple[str, ...] | None,
+        limit: int,
+        offset: int,
+    ) -> List[Device]:
+        inventory_service = InventoryService(config=config)
+        if query:
+            page: DevicePage = inventory_service.get_devices(
+                limit=limit,
+                offset=offset,
+                query=f"{query} AND deviceType:ASA",
+            )
+            return cast(List[Device], page.items)
+
+        q = " OR ".join([f"uid:{uid}" for uid in cast(tuple[str, ...], device_uids)])
+        page = inventory_service.get_devices(limit=limit, offset=offset, query=q)
+        return cast(List[Device], page.items)
+
+    def _validate_filters(
+        self,
+        ctx: click.Context,
+        *,
+        query: str | None,
+        device_uids: tuple[str, ...] | None,
+    ) -> None:
+        has_query = bool(query)
+        has_uids = bool(device_uids)
+        filter_count = sum([has_query, has_uids])
+
+        if filter_count == 0:
+            ctx.fail("Provide one of: --query or --device-uids.")
+        if filter_count > 1:
+            ctx.fail("Provide only one of: --query or --device-uids.")
+
+    def _render_results(
+        self,
+        results: List[CdoCliResult] | CdoTransaction,
+        uid_to_device: Dict[str, Device],
+        format: str,
+    ) -> None:
+        if isinstance(results, CdoTransaction):
+            self.print_failed_transaction_details(cdo_transaction=results, format=format)
+            return
+
+        if format == "json":
+            self._render_json(results=results, uid_to_device=uid_to_device)
+        else:
+            self._render_table(results=results, uid_to_device=uid_to_device)
+
+    def _render_json(
+        self,
+        results: List[CdoCliResult],
+        uid_to_device: Dict[str, Device],
+    ) -> None:
+        grouped: dict[str, list[dict[str, str]]] = {}
         for item in results:
-            result_text = getattr(item, "result", "") or ""
-            device_uid = getattr(item, "device_uid", uid)
-            device_name = _resolve_device_name(inventory_service, device_uid)
-            device_label = _format_device_label(cast(str, device_uid), device_name)
+            device_name = uid_to_device[item.device_uid].name
+            lines = _normalize_output(item.result)
+            headers, rows = _parse_cli_table(lines, max_columns=6)
+            grouped[device_name] = _rows_to_dicts(headers, rows)
 
-            lines = _normalize_output(result_text)
+        # Use print() to avoid Rich escape-sequence processing.
+        print(json.dumps(grouped, indent=2, ensure_ascii=False))
+
+    def _render_table(
+        self,
+        results: List[CdoCliResult],
+        uid_to_device: Dict[str, Device],
+    ) -> None:
+        for item in results:
+            device = uid_to_device[item.device_uid]
+            lines = _normalize_output(item.result)
+
             if not lines:
-                self.console.print(f"--- CLI output for {device_label} ---")
-                self.console.print("(no output)")
+                self.console.print(f"--- {device.name} ({item.device_uid}): no output ---")
                 continue
 
             headers, rows = _parse_cli_table(lines, max_columns=6)
 
             table = Table(show_lines=False)
+            table.add_column("Device Name")
+            table.add_column("Device UID")
             for col in headers:
                 table.add_column(col)
             for row in rows:
-                table.add_row(*row)
+                table.add_row(device.name, item.device_uid, *row)
 
-            self.console.print(f"--- Local users for {device_label} ---")
             self.console.print(table)
-
-    def build_params(self) -> Sequence[click.Parameter]:
-        return [
-            click.Option(
-                ["--uid"],
-                required=True,
-                help="UID of the ASA device to list local users from.",
-            ),
-            click.Option(
-                ["--config-path"],
-                type=click.Path(path_type=Path, resolve_path=True),
-                default=None,
-                envvar="SCCFM_CONFIG",
-                show_default=False,
-                help=("Path to the configuration file " "(defaults to ~/.sccfm-cli/config.json)."),
-            ),
-        ]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
@@ -14,10 +15,10 @@ from ..module_utils.config import Config
 DOCUMENTATION = r"""
 ---
 module: list_local_users
-short_description: List local users on ASA devices via SCC Firewall Manager
+short_description: List local users on ASA devices using SCC Firewall Manager
 description:
   - Retrieve the ASA local user table by executing `show aaa local user` on selected devices.
-  - Devices can be selected by a Lucene query (combined with deviceType:ASA) or by supplying a list of UIDs.
+  - Devices can be selected by a Lucene query or by supplying a list of UIDs.
 options:
   query:
     description:
@@ -77,7 +78,7 @@ EXAMPLES = r"""
 
 RETURN = r"""
 results:
-  description: CLI execution results per device (model_dump JSON-compatible dicts)
+  description: Raw CLI execution results per device.
   returned: success
   type: list
   elements: dict
@@ -91,41 +92,20 @@ results:
     error_msg:
       description: Error message if execution failed on this device.
       type: str
-devices:
-  description: Parsed local-user table per device.
+local_users:
+  description: >-
+    Mapping of device name (or UID) to its list of parsed local-user records.
   returned: success
-  type: list
-  elements: dict
-  contains:
-    device_uid:
-      description: The UID of the device.
-      type: str
-    device_name:
-      description: The human-readable device name (when available).
-      type: str
-    users:
-      description: List of parsed user records.
-      type: list
-      elements: dict
-      contains:
-        user:
-          description: Local username.
-          type: str
-        failed-attempts:
-          description: Number of failed login attempts.
-          type: str
-        locked:
-          description: Locked flag (e.g. 'N' or 'Y').
-          type: str
-        expired:
-          description: Expired flag (e.g. 'N' or 'Y').
-          type: str
-        new-user:
-          description: New-user flag (e.g. 'N' or 'Y').
-          type: str
-        lock-time:
-          description: Lock time value if present.
-          type: str
+  type: dict
+  sample:
+    asa-to-upgrade-2:
+      - user: abragg
+        failed_attempts: "0"
+        locked: "N"
+local_users_json:
+  description: Pretty-printed JSON string of C(local_users) for human-readable output.
+  returned: success
+  type: str
 """
 
 
@@ -151,7 +131,9 @@ def _parse_users(lines: list[str]) -> list[dict[str, str]]:
     if not lines:
         return []
 
-    headers = [h.strip().lower().replace(" ", "_") for h in _split_columns(lines[0])]
+    headers = [
+        h.strip().lower().replace("-", "_").replace(" ", "_") for h in _split_columns(lines[0])
+    ]
     users: list[dict[str, str]] = []
     for data_line in lines[1:]:
         cols = [c.strip() for c in _split_columns(data_line)]
@@ -203,17 +185,20 @@ def execute_cli_command(
     return cli_service.execute_cli(device_uids=device_uids, asa_commands=["show aaa local user"])
 
 
-def _resolve_device_names(config: ConfigLike, device_uids: list[str]) -> dict[str, str]:
-    """Best-effort UID → name lookup for a list of UIDs."""
+def resolve_devices_from_uids(
+    config: ConfigLike,
+    device_uids: list[str],
+) -> tuple[list[str], dict[str, str]]:
+    """Return ``(uids, uid_to_name)`` for devices matching *device_uids* via bulk query."""
     inventory_service = InventoryService(config=config)
+    query = " OR ".join([f"uid:{uid}" for uid in device_uids])
+    page: DevicePage = inventory_service.get_devices(limit=len(device_uids), offset=0, query=query)
+    uids: list[str] = []
     names: dict[str, str] = {}
-    for uid in device_uids:
-        try:
-            dev = inventory_service.get_device_by_uid(device_uid=uid)
-            names[uid] = getattr(dev, "name", "") or ""
-        except Exception:
-            names[uid] = ""
-    return names
+    for device in page.items or []:
+        uids.append(device.uid)
+        names[device.uid] = getattr(device, "name", "") or ""
+    return uids, names
 
 
 def run_module() -> None:
@@ -237,14 +222,14 @@ def run_module() -> None:
 
     try:
         if uids:
-            device_uids = uids
-            device_names = _resolve_device_names(config, device_uids)
+            device_uids, device_names = resolve_devices_from_uids(config=config, device_uids=uids)
         else:
             device_uids, device_names = resolve_devices_from_query(
                 config=config, query=cast(str, query), limit=limit, offset=offset
             )
-            if not device_uids:
-                module.fail_json(msg="No devices found matching the specified query.")
+
+        if not device_uids:
+            module.fail_json(msg="No devices found matching the specified filter.")
 
         results: list[CdoCliResult] | CdoTransaction = execute_cli_command(
             config=config, device_uids=device_uids
@@ -260,22 +245,19 @@ def run_module() -> None:
 
         results_data = [result.model_dump(mode="json") for result in results]
 
-        # Build structured per-device user lists
-        devices: list[dict[str, Any]] = []
+        # Build a mapping of device_name (fallback to uid) -> parsed users
+        local_users: dict[str, list[dict[str, str]]] = {}
         for result in results:
             raw = getattr(result, "result", "") or ""
-            lines = _normalize_output(raw)
-            users = _parse_users(lines)
             uid = getattr(result, "device_uid", "")
-            devices.append(
-                {"device_uid": uid, "device_name": device_names.get(uid, ""), "users": users}
-            )
+            key = device_names.get(uid, "") or uid
+            local_users[key] = _parse_users(_normalize_output(raw))
 
         module.exit_json(
             changed=False,
             msg=f"Successfully retrieved local users from {len(device_uids)} device(s)",
             results=results_data,
-            devices=devices,
+            local_users=local_users,
         )
 
     except ApiException as e:
