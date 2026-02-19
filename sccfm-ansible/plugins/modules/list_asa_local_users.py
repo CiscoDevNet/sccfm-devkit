@@ -19,7 +19,7 @@ from ..module_utils.config import Config
 
 DOCUMENTATION = r"""
 ---
-module: list_local_users
+module: list_asa_local_users
 short_description: List local users on ASA devices using SCC Firewall Manager
 description:
   - Retrieve the ASA local user table by executing `show aaa local user` on selected devices.
@@ -69,13 +69,13 @@ author:
 
 EXAMPLES = r"""
 - name: List local users on one or more devices by UID
-  cisco.sccfm.list_local_users:
+  cisco.sccfm.list_asa_local_users:
     uids:
       - "544d3c3b-2440-4b94-8438-74466d95909b"
       - "abcdef01-2345-6789-abcd-ef0123456789"
 
 - name: List local users using a query
-  cisco.sccfm.list_local_users:
+  cisco.sccfm.list_asa_local_users:
     query: "name:branch-* AND connectivityState:ONLINE"
     region: "us"
     api_token: "{{ sccfm_api_token }}"
@@ -97,7 +97,7 @@ results:
     error_msg:
       description: Error message if execution failed on this device.
       type: str
-local_users:
+asa_local_users:
   description: >-
     Mapping of device name (or UID) to its list of parsed local-user records.
   returned: success
@@ -107,8 +107,8 @@ local_users:
       - user: abragg
         failed_attempts: "0"
         locked: "N"
-local_users_json:
-  description: Pretty-printed JSON string of C(local_users) for human-readable output.
+asa_local_users_json:
+  description: Pretty-printed JSON string of C(asa_local_users) for human-readable output.
   returned: success
   type: str
 """
@@ -251,18 +251,18 @@ def run_module() -> None:
         results_data = [result.model_dump(mode="json") for result in results]
 
         # Build a mapping of device_name (fallback to uid) -> parsed users
-        local_users: dict[str, list[dict[str, str]]] = {}
+        asa_local_users: dict[str, list[dict[str, str]]] = {}
         for result in results:
             raw = getattr(result, "result", "") or ""
             uid = getattr(result, "device_uid", "")
             key = device_names.get(uid, "") or uid
-            local_users[key] = _parse_users(_normalize_output(raw))
+            asa_local_users[key] = _parse_users(_normalize_output(raw))
 
         module.exit_json(
             changed=False,
             msg=f"Successfully retrieved local users from {len(device_uids)} device(s)",
             results=results_data,
-            local_users=local_users,
+            asa_local_users=asa_local_users,
         )
 
     except ApiException as e:

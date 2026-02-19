@@ -6,23 +6,23 @@
       region: "{{ sccfm_region }}"
       api_token: "{{ sccfm_api_token }}"
   tasks:
-    - name: Get list of local users for UIDs
-      cisco.sccfm.list_local_users:
+    - name: Get list of ASA local users for UIDs
+      cisco.sccfm.list_asa_local_users:
         uids:
           - "00000000-0000-0000-0000-000000000001"
           - "00000000-0000-0000-0000-000000000002"
       register: local_users_by_uids
 
-    - name: Show local users by UID
+    - name: Show ASA local users by UID
       ansible.builtin.debug:
-        msg: "{{ local_users_by_uids.local_users }}"
+        msg: "{{ local_users_by_uids.asa_local_users }}"
 
-    - name: Get list of local users by query
-      cisco.sccfm.list_local_users:
+    - name: Get list of ASA local users by query
+      cisco.sccfm.list_asa_local_users:
         query: "connectivityState:ONLINE"
       register: local_users_by_query
 
-    - name: Show local users by query
+    - name: Show ASA local users by query
       ansible.builtin.debug:
-        msg: "{{ local_users_by_query.local_users }}"
+        msg: "{{ local_users_by_query.asa_local_users }}"
 
