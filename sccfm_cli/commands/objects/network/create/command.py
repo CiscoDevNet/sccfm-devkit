@@ -13,7 +13,7 @@ from sccfm_core.services import NetworkObjectService
 from sccfm_core.services.object_management import NetworkObjectResponse
 
 
-class NetworkCreateCommand(BaseCommand):
+class CreateNetworkObjectCommand(BaseCommand):
     """Create a network object in SCC Firewall Manager."""
 
     @property

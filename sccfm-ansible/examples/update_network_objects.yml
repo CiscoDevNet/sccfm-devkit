@@ -1,0 +1,84 @@
+---
+# Update network objects in SCC Firewall Manager
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.update_network_object \
+#     -a 'name=web-server-01 value=10.0.1.200'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/update_network_objects.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+#
+# NOTE:
+#   This module is idempotent. Running the same playbook twice will
+#   report changed=false on the second run if nothing differs.
+
+- name: Update network objects in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # ============================================================
+    # Update a network object by name
+    # ============================================================
+    - name: Update web server IP address
+      cisco.sccfm.update_network_object:
+        name: web-server-01
+        value: "10.0.1.200"
+        description: "Updated web server IP"
+      register: update_result
+
+    - name: Show update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Updated' if update_result.changed else 'No change for' }}
+          '{{ update_result.network_object.name }}'
+          (uid={{ update_result.network_object.uid }},
+          value={{ update_result.network_object.literal }})
+
+    # ============================================================
+    # Rename a network object
+    # ============================================================
+#    - name: Rename a network object
+#      cisco.sccfm.update_network_object:
+#        name: old-object-name
+#        new_name: new-object-name
+#      register: rename_result
+#
+#    - name: Show rename result
+#      ansible.builtin.debug:
+#        msg: >-
+#          {{ 'Renamed' if rename_result.changed else 'No change for' }}
+#          '{{ rename_result.network_object.name }}'
+
+    # ============================================================
+    # Update labels and tags on a network object
+    # ============================================================
+    - name: Update labels and tags on app-server-subnet
+      cisco.sccfm.update_network_object:
+        name: app-server-subnet
+        labels:
+          - production
+          - app-tier
+          - monitored
+        tags:
+          environment:
+            - production
+          team:
+            - platform
+      register: tags_result
+
+    - name: Show tags update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Updated' if tags_result.changed else 'No change for' }}
+          '{{ tags_result.network_object.name }}'

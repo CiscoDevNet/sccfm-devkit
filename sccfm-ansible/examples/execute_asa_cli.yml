@@ -8,6 +8,10 @@
 # RUN THIS PLAYBOOK:
 #   ansible-playbook examples/execute_asa_cli.yml
 #
+# Optionally pass a device UID to run UID-specific examples:
+#   ansible-playbook examples/execute_asa_cli.yml \
+#     -e device_uid=<your-device-uid>
+#
 # NOTE: Show commands require ONLINE. Config commands require SYNCED.
 
 - name: Execute CLI commands on ASA devices
@@ -21,7 +25,7 @@
       api_token: "{{ sccfm_api_token }}"
 
   vars:
-    # Example: Commands to execute on devices
+    device_uid: ""
     show_commands:
       - "show version"
       - "show running-config"
@@ -34,7 +38,7 @@
     # ============================================================
     - name: "Quick test: Show version on first available online device"
       cisco.sccfm.execute_asa_cli:
-        query: "connectivityState:ONLINE"
+        query: "connectivityState:ONLINE AND configState:SYNCED"
         limit: 1
         commands:
           - "show version"
@@ -45,6 +49,11 @@
         msg: |
           SUCCESS! Device {{ quick_test_result.results[0].device_uid }} responded:
           {{ quick_test_result.results[0].result }}
+      when: quick_test_result.results is defined and quick_test_result.results | length > 0
+
+    - name: Set resolved device UID (use provided or auto-discovered)
+      ansible.builtin.set_fact:
+        resolved_uid: "{{ device_uid if device_uid | length > 0 else quick_test_result.results[0].device_uid }}"
       when: quick_test_result.results is defined and quick_test_result.results | length > 0
 
     # ============================================================
@@ -65,11 +74,12 @@
     - name: "UID test: Execute commands on specific ASA by UID"
       cisco.sccfm.execute_asa_cli:
         uids:
-          - "e7ba548a-3e73-43dc-8442-83813af8bc37"  # asa-to-upgrade-2
+          - "{{ resolved_uid }}"
         commands:
           - "show clock"
           - "show hostname"
       register: uid_results
+      when: resolved_uid is defined
 
     - name: Display UID-based execution results
       ansible.builtin.debug:
@@ -114,7 +124,7 @@
     # - name: Add a local user
     #   cisco.sccfm.execute_asa_cli:
     #     uids:
-    #       - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+    #       - "{{ device_uid }}"
     #     commands:
     #       - "username testuser password TestPass123 privilege 15"
     #   register: user_result
@@ -127,7 +137,7 @@
     # - name: Create a network object with host
     #   cisco.sccfm.execute_asa_cli:
     #     uids:
-    #       - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+    #       - "{{ device_uid }}"
     #     commands:
     #       - |
     #         object network my-test-host
@@ -140,7 +150,7 @@
     # - name: Create multiple network objects
     #   cisco.sccfm.execute_asa_cli:
     #     uids:
-    #       - "e7ba548a-3e73-43dc-8442-83813af8bc37"
+    #       - "{{ device_uid }}"
     #     commands:
     #       - |
     #         object network web-server

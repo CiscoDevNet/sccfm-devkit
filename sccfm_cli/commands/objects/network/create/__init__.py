@@ -1,3 +1,3 @@
-from sccfm_cli.commands.objects.network.create.command import NetworkCreateCommand
+from sccfm_cli.commands.objects.network.create.command import CreateNetworkObjectCommand
 
-__all__ = ["NetworkCreateCommand"]
+__all__ = ["CreateNetworkObjectCommand"]

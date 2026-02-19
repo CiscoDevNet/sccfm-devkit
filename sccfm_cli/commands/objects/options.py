@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 import click
 
@@ -16,11 +16,16 @@ def name_option() -> click.Option:
     )
 
 
-def value_option() -> click.Option:
-    """Required --value option for network object content."""
+def value_option(*, required: bool = True) -> click.Option:
+    """Reusable --value option for network object content.
+
+    Args:
+        required: Whether the option is mandatory (True for create, False for update).
+    """
     return click.Option(
         ["-v", "--value"],
-        required=True,
+        required=required,
+        default=None if not required else None,
         type=str,
         help="The literal value (IP address, CIDR, or range).",
     )
@@ -89,6 +94,44 @@ def config_path_option() -> click.Option:
     )
 
 
+def limit_option() -> click.Option:
+    """Reusable --limit option for pagination."""
+    return click.Option(
+        ["-l", "--limit"],
+        default=50,
+        show_default=True,
+        type=click.IntRange(min=1, max=200),
+        help="Maximum records to return.",
+    )
+
+
+def offset_option() -> click.Option:
+    """Reusable --offset option for pagination."""
+    return click.Option(
+        ["-o", "--offset"],
+        default=0,
+        show_default=True,
+        type=click.IntRange(min=0),
+        help="Pagination offset.",
+    )
+
+
+def query_option(*, required: bool = False) -> click.Option:
+    """Reusable --query option for Lucene filtering.
+
+    Args:
+        required: Whether the option is mandatory.
+    """
+    kwargs: dict[str, Any] = {
+        "required": required,
+        "show_default": False,
+        "help": "Lucene query string. Searchable fields: name, content.",
+    }
+    if not required:
+        kwargs["default"] = None
+    return click.Option(["-q", "--query"], **kwargs)
+
+
 def uid_option() -> click.Option:
     """Optional --uid option for object unique identifier."""
     return click.Option(
@@ -121,6 +164,17 @@ def object_create_params() -> List[click.Parameter]:
         description_option(),
         labels_option(),
         tags_option(),
+        format_option(),
+        config_path_option(),
+    ]
+
+
+def object_list_params() -> List[click.Parameter]:
+    """Complete set of options for network object list commands."""
+    return [
+        limit_option(),
+        offset_option(),
+        query_option(),
         format_option(),
         config_path_option(),
     ]
@@ -171,5 +225,31 @@ def object_delete_params() -> List[click.Parameter]:
     return [
         uid_option(),
         object_name_option(),
+        config_path_option(),
+    ]
+
+
+def new_name_option() -> click.Option:
+    """Optional --new-name option for renaming an object."""
+    return click.Option(
+        ["--new-name"],
+        required=False,
+        type=str,
+        default=None,
+        help="The new name for the object.",
+    )
+
+
+def object_update_params() -> List[click.Parameter]:
+    """Complete set of options for network object update command."""
+    return [
+        uid_option(),
+        object_name_option(),
+        new_name_option(),
+        value_option(required=False),
+        description_option(),
+        labels_option(),
+        tags_option(),
+        format_option(),
         config_path_option(),
     ]

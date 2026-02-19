@@ -1,0 +1,169 @@
+---
+# End-to-end network object management in SCC Firewall Manager
+#
+# This playbook demonstrates the full lifecycle: create, list, update, delete.
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/network_objects.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+
+- name: Network object lifecycle — create, list, update, delete
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    network_objects:
+      - name: web-server-01-full-lifecycle
+        value: "10.0.1.100"
+        description: "Production web server"
+        labels:
+          - production
+          - web-tier
+        tags:
+          environment:
+            - production
+
+      - name: app-server-subnet
+        value: "10.0.2.0/24"
+        description: "Application server subnet"
+        labels:
+          - production
+          - app-tier
+        tags:
+          environment:
+            - production
+
+  tasks:
+    # ============================================================
+    # 1. Create network objects
+    # ============================================================
+    - name: Create network objects
+      cisco.sccfm.create_network_object:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        description: "{{ item.description | default(omit) }}"
+        labels: "{{ item.labels | default(omit) }}"
+        tags: "{{ item.tags | default(omit) }}"
+      loop: "{{ network_objects }}"
+      register: create_results
+
+    - name: Display created objects
+      ansible.builtin.debug:
+        msg: >-
+          Created '{{ item.network_object.name }}'
+          (uid={{ item.network_object.uid }},
+          value={{ item.network_object.literal }})
+      loop: "{{ create_results.results }}"
+      when: item.network_object is defined
+      loop_control:
+        label: "{{ item.network_object.name | default('unknown') }}"
+
+    # ============================================================
+    # 2. List network objects
+    # ============================================================
+    - name: List all network objects
+      cisco.sccfm.list_network_objects:
+        limit: 50
+      register: all_objects
+
+    - name: Display network object summary
+      ansible.builtin.debug:
+        msg: "Found {{ all_objects.count }} network objects (showing {{ all_objects.network_objects | length }})"
+
+    - name: Display each network object
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.name }}
+          (type={{ item.object_type }},
+          value={{ item.literal }})
+      loop: "{{ all_objects.network_objects }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Search for web-related network objects
+      cisco.sccfm.list_network_objects:
+        query: "name:web*"
+        limit: 10
+      register: web_objects
+
+    - name: Display web-related objects
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.name }}
+          (uid={{ item.uid }},
+          value={{ item.literal }})
+      loop: "{{ web_objects.network_objects }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: web_objects.count > 0
+
+    # ============================================================
+    # 3. Update network objects
+    # ============================================================
+    - name: Update web server IP address
+      cisco.sccfm.update_network_object:
+        name: web-server-01-full-lifecycle
+        value: "10.0.1.200"
+        description: "Updated web server IP"
+      register: update_result
+
+    - name: Show update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Updated' if update_result.changed else 'No change for' }}
+          '{{ update_result.network_object.name }}'
+          (uid={{ update_result.network_object.uid }},
+          value={{ update_result.network_object.literal }})
+
+    - name: Update labels and tags on app-server-subnet
+      cisco.sccfm.update_network_object:
+        name: app-server-subnet
+        labels:
+          - production
+          - app-tier
+          - monitored
+        tags:
+          environment:
+            - production
+          team:
+            - platform
+      register: tags_result
+
+    - name: Show tags update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Updated' if tags_result.changed else 'No change for' }}
+          '{{ tags_result.network_object.name }}'
+
+    # ============================================================
+    # 4. Delete network objects
+    # ============================================================
+    - name: Delete network objects
+      cisco.sccfm.delete_network_object:
+        name: "{{ item.name }}"
+      loop: "{{ network_objects }}"
+      register: delete_results
+
+    - name: Display deleted objects
+      ansible.builtin.debug:
+        msg: "Deleted '{{ item.item.name }}' (uid={{ item.deleted_uid }})"
+      loop: "{{ delete_results.results }}"
+      when: item.changed
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Display objects not found
+      ansible.builtin.debug:
+        msg: "Not found — '{{ item.item.name }}' does not exist (skipped)"
+      loop: "{{ delete_results.results }}"
+      when: not item.changed
+      loop_control:
+        label: "{{ item.item.name }}"

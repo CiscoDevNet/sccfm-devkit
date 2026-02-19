@@ -1,3 +1,21 @@
+## v0.11.0 (2026-02-18)
+
+### Feat
+
+- improve Ansible example playbooks with auto-discovery of SYNCED devices (#18)
+
+## v0.10.0 (2026-02-18)
+
+### Feat
+
+- **LH-102398**: add change local password command for ASA devices (#16)
+
+## v0.9.0 (2026-02-17)
+
+### Feat
+
+- **lh-102408**: list and search network objects (#13)
+
 ## v0.8.0 (2026-02-13)
 
 ### Feat
