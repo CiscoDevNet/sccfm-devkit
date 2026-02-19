@@ -126,7 +126,8 @@ def _stub_get_devices(
     page = MagicMock(spec=DevicePage)
     items = []
     for dev in [_SAMPLE_DEVICE, _SAMPLE_DEVICE_2]:
-        if dev.uid in (query or ""):
+        # dev.uid may be Optional[str]; guard before using `in` to satisfy type checkers
+        if dev.uid and (dev.uid in (query or "")):
             items.append(dev)
     # If query-based (no uid: prefix), return all.
     if items == [] and query and "uid:" not in query:
