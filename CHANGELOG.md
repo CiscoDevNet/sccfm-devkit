@@ -1,3 +1,9 @@
+## v0.12.0 (2026-02-20)
+
+### Feat
+
+- **LH-102397**: implement list local users command for ASA devices (#17)
+
 ## v0.11.0 (2026-02-18)
 
 ### Feat
