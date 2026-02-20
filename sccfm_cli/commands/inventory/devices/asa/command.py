@@ -6,6 +6,9 @@ from rich.console import Console
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
 from sccfm_cli.commands.inventory.devices.asa.disk import AsaDiskCommand
+from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command import (
+    AsaListLocalUsersCommand,
+)
 from sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
 from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
 from sccfm_cli.commands.inventory.devices.asa.user import AsaUserCommand
@@ -19,6 +22,7 @@ class AsaCommand(BaseCommand):
             AsaDiskCommand(console),
             SmartlicenseCommand(console),
             AsaOnboardCommand(console),
+            AsaListLocalUsersCommand(console),
             AsaUserCommand(console),
         ]
 
