@@ -240,10 +240,10 @@ def new_name_option() -> click.Option:
     )
 
 
-def member_option() -> click.Option:
-    """Repeatable --member option for referencing existing objects by UID or name."""
+def referenced_object_option() -> click.Option:
+    """Repeatable --referenced-object option for referencing existing objects by UID or name."""
     return click.Option(
-        ["-m", "--member"],
+        ["-r", "--referenced-object"],
         default=None,
         multiple=True,
         type=str,
@@ -292,7 +292,7 @@ def group_create_params() -> List[click.Parameter]:
     """Complete set of options for network group create command."""
     return [
         name_option(),
-        member_option(),
+        referenced_object_option(),
         network_literal_option(),
         url_literal_option(),
         description_option(),

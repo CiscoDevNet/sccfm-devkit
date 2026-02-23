@@ -30,8 +30,8 @@ class CreateNetworkGroupCommand(BaseCommand):
     @with_spinner("Creating network group...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         name = cast(str, kwargs.get("name"))
-        members_tuple = kwargs.get("member")
-        members = list(members_tuple) if members_tuple else None
+        ref_objects_tuple = kwargs.get("referenced_object")
+        referenced_objects = list(ref_objects_tuple) if ref_objects_tuple else None
         network_literals_tuple = kwargs.get("network_literal")
         network_literals = list(network_literals_tuple) if network_literals_tuple else None
         url_literals_tuple = kwargs.get("url_literal")
@@ -43,10 +43,10 @@ class CreateNetworkGroupCommand(BaseCommand):
                 "Use --network-literal or --url-literal, not both."
             )
 
-        if not members and not network_literals and not url_literals:
+        if not referenced_objects and not network_literals and not url_literals:
             ctx.fail(
-                "At least one --member, --network-literal, or --url-literal "
-                "is required to create a network group."
+                "At least one --referenced-object, --network-literal, or "
+                "--url-literal is required to create a network group."
             )
         description = cast(str | None, kwargs.get("description"))
         labels_tuple = kwargs.get("labels")
@@ -61,7 +61,7 @@ class CreateNetworkGroupCommand(BaseCommand):
             name=name,
             network_literals=network_literals,
             url_literals=url_literals,
-            members=members,
+            referenced_objects=referenced_objects,
             description=description,
             labels=labels,
             tags=tags,
@@ -79,7 +79,7 @@ class CreateNetworkGroupCommand(BaseCommand):
         table.add_column("Name")
         table.add_column("Type")
         table.add_column("Literals")
-        table.add_column("Members")
+        table.add_column("Referenced Objects")
         table.add_row(
             response.uid or "-",
             response.name or "-",

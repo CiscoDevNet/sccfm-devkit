@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -91,7 +92,7 @@ class NetworkGroupService:
         name: str,
         network_literals: list[str] | None = None,
         url_literals: list[str] | None = None,
-        members: list[str] | None = None,
+        referenced_objects: list[str] | None = None,
         description: str | None = None,
         labels: list[str] | None = None,
         tags: dict[str, list[str]] | None = None,
@@ -102,7 +103,7 @@ class NetworkGroupService:
             name: The name of the network group.
             network_literals: Inline network literals (IP addresses, CIDRs, ranges).
             url_literals: Inline URL literals.
-            members: UIDs or names of existing network objects to include.
+            referenced_objects: UIDs or names of existing network objects to include.
             description: Optional description for the group.
             labels: Optional list of labels to attach to the group.
             tags: Optional dict of tag keys to lists of tag values.
@@ -114,13 +115,13 @@ class NetworkGroupService:
             ValueError: If no content is provided.
             ValueError: If both network_literals and url_literals are provided.
             ValueError: If any literal value is empty or blank.
-            ValueError: If any member value is empty or blank.
-            NotFoundError: If a member name cannot be resolved to a UID.
+            ValueError: If any referenced object value is empty or blank.
+            NotFoundError: If a referenced object name cannot be resolved to a UID.
         """
         has_literals = bool(network_literals or url_literals)
-        if not has_literals and not members:
+        if not has_literals and not referenced_objects:
             raise ValueError(
-                "At least one literal or member is required "
+                "At least one literal or referenced object is required "
                 "to create a network group."
             )
         if network_literals and url_literals:
@@ -129,15 +130,15 @@ class NetworkGroupService:
                 "Provide network_literals or url_literals, not both."
             )
         self._validate_literals(network_literals or url_literals or [])
-        self._validate_members(members or [])
-        resolved_members = self._resolve_member_uids(members or [])
+        self._validate_referenced_objects(referenced_objects or [])
+        resolved_uids = self._resolve_referenced_object_uids(referenced_objects or [])
         single_contents = self._build_literal_contents(
             network_literals=network_literals or [],
             url_literals=url_literals or [],
         )
         shared_value = self._build_shared_value(
             single_contents=single_contents,
-            members=resolved_members,
+            referenced_object_uids=resolved_uids,
         )
         create_request = CreateRequest(
             name=name,
@@ -146,9 +147,15 @@ class NetworkGroupService:
             labels=labels,
             tags=tags,
         )
-        response = self._object_api.create_object_without_preload_content(
-            create_request=create_request,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Pydantic serializer warnings",
+                category=UserWarning,
+            )
+            response = self._object_api.create_object_without_preload_content(
+                create_request=create_request,
+            )
         data = self._helper.read_raw_response(response)
         return NetworkGroupResponse.from_dict(data)
 
@@ -156,20 +163,20 @@ class NetworkGroupService:
         self,
         *,
         single_contents: list[SingleContent],
-        members: list[str],
+        referenced_object_uids: list[str],
     ) -> SharedObjectValue:
         """Build a SharedObjectValue for a network group.
 
         Args:
             single_contents: Pre-built SingleContent literals.
-            members: UIDs of existing objects to reference.
+            referenced_object_uids: UIDs of existing objects to reference.
 
         Returns:
             A SharedObjectValue wrapping the GroupContent.
         """
         group_content = GroupContent(
             literals=single_contents if single_contents else None,
-            referenced_object_uids=members if members else None,
+            referenced_object_uids=referenced_object_uids if referenced_object_uids else None,
         )
         object_content = ObjectContent(actual_instance=group_content)
         return SharedObjectValue(
@@ -203,31 +210,31 @@ class NetworkGroupService:
             )
         return contents
 
-    def _resolve_member_uids(self, members: list[str]) -> list[str]:
-        """Resolve member identifiers to UIDs.
+    def _resolve_referenced_object_uids(self, referenced_objects: list[str]) -> list[str]:
+        """Resolve referenced object identifiers to UIDs.
 
-        Each member value is checked: if it is a valid UUIDv4, it is used
-        as-is; otherwise it is treated as a name and looked up via the
-        network object API.
+        Each value is checked: if it is a valid UUID, it is used as-is;
+        otherwise it is treated as a name and looked up via the network
+        object API.
 
         Args:
-            members: Member values that may be UIDs or object names.
+            referenced_objects: Values that may be UIDs or object names.
 
         Returns:
             A list of resolved UID strings.
 
         Raises:
-            NotFoundError: If a member name cannot be found.
+            NotFoundError: If a referenced object name cannot be found.
         """
         resolved: list[str] = []
-        for member in members:
-            if self._is_uuid(member):
-                resolved.append(member)
+        for ref in referenced_objects:
+            if self._is_uuid(ref):
+                resolved.append(ref)
             else:
-                obj = self._network_object_service.get_network_object_by_name(member)
+                obj = self._network_object_service.get_network_object_by_name(ref)
                 if not obj:
                     raise NotFoundError(
-                        f"Network object with name '{member}' not found."
+                        f"Network object with name '{ref}' not found."
                     )
                 resolved.append(obj.uid)
         return resolved
@@ -266,18 +273,18 @@ class NetworkGroupService:
             )
 
     @staticmethod
-    def _validate_members(members: list[str]) -> None:
-        """Ensure every member identifier is non-empty.
+    def _validate_referenced_objects(referenced_objects: list[str]) -> None:
+        """Ensure every referenced object identifier is non-empty.
 
         Args:
-            members: Member UIDs or names to validate.
+            referenced_objects: Referenced object UIDs or names to validate.
 
         Raises:
-            ValueError: If any member value is empty or blank.
+            ValueError: If any referenced object value is empty or blank.
         """
-        blank = [i for i, v in enumerate(members, start=1) if not v or not v.strip()]
+        blank = [i for i, v in enumerate(referenced_objects, start=1) if not v or not v.strip()]
         if blank:
             positions = ", ".join(str(p) for p in blank)
             raise ValueError(
-                f"Member UIDs must not be empty (blank at position(s): {positions})."
+                f"Referenced object UIDs must not be empty (blank at position(s): {positions})."
             )

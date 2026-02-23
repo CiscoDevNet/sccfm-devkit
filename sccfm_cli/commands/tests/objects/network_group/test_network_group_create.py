@@ -43,7 +43,7 @@ def test_should_create_network_group_with_json_output(
         name: str,
         network_literals: list[str] | None = None,
         url_literals: list[str] | None = None,
-        members: list[str] | None = None,
+        referenced_objects: list[str] | None = None,
         description: str | None = None,
         labels: list[str] | None = None,
         tags: dict[str, list[str]] | None = None,
@@ -51,7 +51,7 @@ def test_should_create_network_group_with_json_output(
         captured["name"] = name
         captured["network_literals"] = network_literals
         captured["url_literals"] = url_literals
-        captured["members"] = members
+        captured["referenced_objects"] = referenced_objects
         captured["description"] = description
         captured["labels"] = labels
         captured["tags"] = tags
@@ -68,9 +68,9 @@ def test_should_create_network_group_with_json_output(
             "create",
             "--name",
             "my-network-group",
-            "--member",
+            "--referenced-object",
             "uid-member-1",
-            "--member",
+            "--referenced-object",
             "uid-member-2",
             "--network-literal",
             "10.10.0.0/24",
@@ -87,7 +87,7 @@ def test_should_create_network_group_with_json_output(
     assert payload["literals"] == ["10.10.0.0/24", "192.168.1.0/24"]
     assert payload["referenced_object_uids"] == ["uid-member-1", "uid-member-2"]
     assert captured["name"] == "my-network-group"
-    assert captured["members"] == ["uid-member-1", "uid-member-2"]
+    assert captured["referenced_objects"] == ["uid-member-1", "uid-member-2"]
     assert captured["network_literals"] == ["10.10.0.0/24"]
 
 
@@ -112,7 +112,7 @@ def test_should_display_table_output(
             "create",
             "--name",
             "my-network-group",
-            "--member",
+            "--referenced-object",
             "uid-member-1",
         ],
     )
@@ -234,15 +234,15 @@ def test_should_create_with_only_literals(
     assert result.exit_code == 0
     assert captured["name"] == "literals-only"
     assert captured["network_literals"] == ["10.0.0.0/8"]
-    assert captured["members"] is None
+    assert captured["referenced_objects"] is None
 
 
-def test_should_create_with_only_members(
+def test_should_create_with_only_referenced_objects(
     cli_runner: CliRunner,
     default_config: Config,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Create command should work with only member UIDs (no literals)."""
+    """Create command should work with only referenced object UIDs (no literals)."""
     captured: dict[str, Any] = {}
 
     def fake_create(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
@@ -259,8 +259,8 @@ def test_should_create_with_only_members(
             "network-group",
             "create",
             "--name",
-            "members-only",
-            "--member",
+            "refs-only",
+            "--referenced-object",
             "uid-abc",
             "--format",
             "json",
@@ -268,17 +268,17 @@ def test_should_create_with_only_members(
     )
 
     assert result.exit_code == 0
-    assert captured["name"] == "members-only"
-    assert captured["members"] == ["uid-abc"]
+    assert captured["name"] == "refs-only"
+    assert captured["referenced_objects"] == ["uid-abc"]
     assert captured["network_literals"] is None
 
 
-def test_should_fail_when_no_members_or_literals(
+def test_should_fail_when_no_referenced_objects_or_literals(
     cli_runner: CliRunner,
     default_config: Config,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Create command should fail when neither --member nor --*-literal is provided."""
+    """Create command should fail when neither --referenced-object nor --*-literal is provided."""
     monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
 
     result = cli_runner.invoke(
@@ -293,7 +293,7 @@ def test_should_fail_when_no_members_or_literals(
     )
 
     assert result.exit_code != 0
-    assert "At least one --member" in result.output
+    assert "At least one --referenced-object" in result.output
 
 
 def test_should_fail_when_both_literal_types_provided(

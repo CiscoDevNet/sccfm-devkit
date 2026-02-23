@@ -174,18 +174,18 @@ class TestNetworkGroupServiceCreateValidation:
         service = NetworkGroupService.__new__(NetworkGroupService)
         self._stub_init(service, None)
 
-        with pytest.raises(ValueError, match="At least one literal or member"):
+        with pytest.raises(ValueError, match="At least one literal or referenced object"):
             service.create_network_group(name="empty-group")
 
     def test_should_reject_explicit_empty_lists(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Service should raise ValueError for explicitly empty literals and members."""
+        """Service should raise ValueError for explicitly empty literals and referenced objects."""
         monkeypatch.setattr(NetworkGroupService, "__init__", self._stub_init)
         service = NetworkGroupService.__new__(NetworkGroupService)
         self._stub_init(service, None)
 
-        with pytest.raises(ValueError, match="At least one literal or member"):
+        with pytest.raises(ValueError, match="At least one literal or referenced object"):
             service.create_network_group(
-                name="empty-group", network_literals=[], members=[]
+                name="empty-group", network_literals=[], referenced_objects=[]
             )
 
     def test_should_reject_blank_literal(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -209,14 +209,14 @@ class TestNetworkGroupServiceCreateValidation:
         with pytest.raises(ValueError, match="Literal values must not be empty"):
             service.create_network_group(name="ws-literals", network_literals=["  "])
 
-    def test_should_reject_blank_member_uid(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Service should raise ValueError when a member UID is empty or blank."""
+    def test_should_reject_blank_referenced_object_uid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Service should raise ValueError when a referenced object UID is empty or blank."""
         monkeypatch.setattr(NetworkGroupService, "__init__", self._stub_init)
         service = NetworkGroupService.__new__(NetworkGroupService)
         self._stub_init(service, None)
 
-        with pytest.raises(ValueError, match="Member UIDs must not be empty"):
-            service.create_network_group(name="bad-members", members=["uid-1", ""])
+        with pytest.raises(ValueError, match="Referenced object UIDs must not be empty"):
+            service.create_network_group(name="bad-refs", referenced_objects=["uid-1", ""])
 
     def test_should_reject_mixed_literal_types(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Service should raise ValueError when both literal types are given."""
@@ -232,8 +232,8 @@ class TestNetworkGroupServiceCreateValidation:
             )
 
 
-class TestMemberNameResolution:
-    """Tests for _resolve_member_uids and _is_uuid."""
+class TestReferencedObjectNameResolution:
+    """Tests for _resolve_referenced_object_uids and _is_uuid."""
 
     VALID_UUID = "12345678-1234-5678-1234-567812345678"
 
@@ -251,20 +251,20 @@ class TestMemberNameResolution:
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._network_object_service = MagicMock(spec=NetworkObjectService)
 
-        result = service._resolve_member_uids([self.VALID_UUID])
+        result = service._resolve_referenced_object_uids([self.VALID_UUID])
 
         assert result == [self.VALID_UUID]
         service._network_object_service.get_network_object_by_name.assert_not_called()
 
     def test_resolve_looks_up_names(self) -> None:
-        """Non-UUID members should be resolved by name via the network object service."""
+        """Non-UUID referenced objects should be resolved by name via the network object service."""
         service = NetworkGroupService.__new__(NetworkGroupService)
         mock_obj = MagicMock(spec=NetworkObjectResponse)
         mock_obj.uid = "resolved-uid-abc"
         service._network_object_service = MagicMock(spec=NetworkObjectService)
         service._network_object_service.get_network_object_by_name.return_value = mock_obj
 
-        result = service._resolve_member_uids(["my-object"])
+        result = service._resolve_referenced_object_uids(["my-object"])
 
         assert result == ["resolved-uid-abc"]
         service._network_object_service.get_network_object_by_name.assert_called_once_with(
@@ -279,7 +279,7 @@ class TestMemberNameResolution:
         service._network_object_service = MagicMock(spec=NetworkObjectService)
         service._network_object_service.get_network_object_by_name.return_value = mock_obj
 
-        result = service._resolve_member_uids([self.VALID_UUID, "my-object"])
+        result = service._resolve_referenced_object_uids([self.VALID_UUID, "my-object"])
 
         assert result == [self.VALID_UUID, "resolved-uid-xyz"]
 
@@ -290,4 +290,4 @@ class TestMemberNameResolution:
         service._network_object_service.get_network_object_by_name.return_value = None
 
         with pytest.raises(NotFoundError, match="Network object with name 'missing' not found"):
-            service._resolve_member_uids(["missing"])
+            service._resolve_referenced_object_uids(["missing"])
