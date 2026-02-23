@@ -46,9 +46,7 @@ class NetworkGroupResponse:
         raw_literals: list[dict[str, Any]] = default_content.get("literals") or []
         raw_refs: list[str] = default_content.get("referencedObjectUids") or []
 
-        literals = [
-            str(item.get("literal") or "") for item in raw_literals if item.get("literal")
-        ]
+        literals = [str(item.get("literal") or "") for item in raw_literals if item.get("literal")]
 
         return cls(
             uid=str(data.get("uid") or ""),
@@ -201,13 +199,9 @@ class NetworkGroupService:
         """
         contents: list[SingleContent] = []
         for lit in network_literals:
-            contents.append(
-                SingleContent(actual_instance=NetworkObjectContent(literal=lit))
-            )
+            contents.append(SingleContent(actual_instance=NetworkObjectContent(literal=lit)))
         for url in url_literals:
-            contents.append(
-                SingleContent(actual_instance=UrlObjectContent(url=url))
-            )
+            contents.append(SingleContent(actual_instance=UrlObjectContent(url=url)))
         return contents
 
     def _resolve_referenced_object_uids(self, referenced_objects: list[str]) -> list[str]:
@@ -233,9 +227,7 @@ class NetworkGroupService:
             else:
                 obj = self._network_object_service.get_network_object_by_name(ref)
                 if not obj:
-                    raise NotFoundError(
-                        f"Network object with name '{ref}' not found."
-                    )
+                    raise NotFoundError(f"Network object with name '{ref}' not found.")
                 resolved.append(obj.uid)
         return resolved
 

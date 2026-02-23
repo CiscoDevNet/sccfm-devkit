@@ -328,5 +328,3 @@ class NetworkObjectService:
             defaultContent=object_content,
             objectType=self.OBJECT_TYPE,
         )
-
-

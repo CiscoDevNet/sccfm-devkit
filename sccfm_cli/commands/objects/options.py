@@ -301,6 +301,3 @@ def group_create_params() -> List[click.Parameter]:
         format_option(),
         config_path_option(),
     ]
-
-
-

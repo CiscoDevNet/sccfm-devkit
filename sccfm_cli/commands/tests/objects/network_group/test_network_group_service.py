@@ -209,7 +209,9 @@ class TestNetworkGroupServiceCreateValidation:
         with pytest.raises(ValueError, match="Literal values must not be empty"):
             service.create_network_group(name="ws-literals", network_literals=["  "])
 
-    def test_should_reject_blank_referenced_object_uid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_should_reject_blank_referenced_object_uid(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Service should raise ValueError when a referenced object UID is empty or blank."""
         monkeypatch.setattr(NetworkGroupService, "__init__", self._stub_init)
         service = NetworkGroupService.__new__(NetworkGroupService)
