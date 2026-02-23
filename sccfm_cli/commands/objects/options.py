@@ -240,6 +240,39 @@ def new_name_option() -> click.Option:
     )
 
 
+def member_option() -> click.Option:
+    """Repeatable --member option for referencing existing objects by UID or name."""
+    return click.Option(
+        ["-m", "--member"],
+        default=None,
+        multiple=True,
+        type=str,
+        help="UID or name of an existing network object to include (repeatable).",
+    )
+
+
+def network_literal_option() -> click.Option:
+    """Repeatable --network-literal option for inline network values."""
+    return click.Option(
+        ["--network-literal"],
+        default=None,
+        multiple=True,
+        type=str,
+        help="Inline network literal (IP, CIDR, or range; repeatable).",
+    )
+
+
+def url_literal_option() -> click.Option:
+    """Repeatable --url-literal option for inline URL values."""
+    return click.Option(
+        ["--url-literal"],
+        default=None,
+        multiple=True,
+        type=str,
+        help="Inline URL literal (repeatable).",
+    )
+
+
 def object_update_params() -> List[click.Parameter]:
     """Complete set of options for network object update command."""
     return [
@@ -253,3 +286,21 @@ def object_update_params() -> List[click.Parameter]:
         format_option(),
         config_path_option(),
     ]
+
+
+def group_create_params() -> List[click.Parameter]:
+    """Complete set of options for network group create command."""
+    return [
+        name_option(),
+        member_option(),
+        network_literal_option(),
+        url_literal_option(),
+        description_option(),
+        labels_option(),
+        tags_option(),
+        format_option(),
+        config_path_option(),
+    ]
+
+
+
