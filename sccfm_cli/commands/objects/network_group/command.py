@@ -7,15 +7,17 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.network_group.create import CreateNetworkGroupCommand
+from sccfm_cli.commands.objects.network_group.delete import DeleteNetworkGroupCommand
 
 
 class NetworkGroupCommand(BaseCommand):
-    """Command group for network group operations."""
+    """Command group for network group object operations."""
 
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             CreateNetworkGroupCommand(console),
+            DeleteNetworkGroupCommand(console),
         ]
 
     @property
@@ -24,7 +26,7 @@ class NetworkGroupCommand(BaseCommand):
 
     @property
     def help_text(self) -> str:
-        return "Manage network groups."
+        return "Manage network group objects."
 
     def build(self) -> click.Command:
         group = click.Group(name=self.name, help=self.help_text)
@@ -33,4 +35,4 @@ class NetworkGroupCommand(BaseCommand):
         return group
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:  # pragma: no cover
-        ctx.fail("Specify a subcommand for network-group (e.g., create).")
+        ctx.fail("Specify a subcommand for network-group (e.g., create, delete).")

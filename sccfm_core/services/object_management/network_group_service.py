@@ -36,8 +36,8 @@ class NetworkGroupResponse:
     labels: list[str]
     tags: dict[str, list[str]]
     object_type: str
-    literals: list[str] = field(default_factory=list)
-    referenced_object_uids: list[str] = field(default_factory=list)
+    literals: list[str] = field(default_factory=lambda: [])
+    referenced_object_uids: list[str] = field(default_factory=lambda: [])
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> NetworkGroupResponse:
@@ -82,11 +82,109 @@ class NetworkGroupService:
     """Service for managing network groups via the SCC Firewall Manager API."""
 
     OBJECT_TYPE = "NETWORK_GROUP"
+    GROUP_TYPE_FILTER = "objectType:NETWORK_GROUP"
 
     def __init__(self, config: ConfigLike) -> None:
         self._helper = ObjectApiHelper(config)
         self._object_api = self._helper.api
         self._network_object_service = NetworkObjectService(config)
+
+    def _get_network_group(self, uid: str) -> NetworkGroupResponse | None:
+        """Fetch a network group by UID.
+
+        Args:
+            uid: The unique identifier of the network group.
+
+        Returns:
+            The NetworkGroupResponse if found, None if a 404 is returned.
+
+        Raises:
+            ApiException: If the API call fails with a non-404 error.
+        """
+        response = self._object_api.get_object_without_preload_content(uid=uid)
+        if response.status == 404:
+            return None
+        data = self._helper.read_raw_response(response)
+        return NetworkGroupResponse.from_dict(data)
+
+    def _get_network_group_by_name(self, name: str) -> NetworkGroupResponse | None:
+        """Search for a network group object by name.
+
+        Uses an objectType filter so that plain network objects with the
+        same name are not matched.
+
+        Args:
+            name: The name of the network group to find.
+
+        Returns:
+            The NetworkGroupResponse if found, None otherwise.
+
+        Raises:
+            ApiException: If the API call fails.
+        """
+        query = f'name:"{name}" AND {self.GROUP_TYPE_FILTER}'
+        response = self._object_api.get_objects_without_preload_content(q=query, limit="1")
+        data = self._helper.read_raw_response(response)
+
+        items = data.get("items", [])
+        if not items:
+            return None
+
+        return NetworkGroupResponse.from_dict(items[0])
+
+    def delete_network_group(self, uid: str | None = None, name: str | None = None) -> str:
+        """Delete a network group object by UID or name.
+
+        Args:
+            uid: The unique identifier of the network group to delete.
+            name: The name of the network group to delete.
+
+        Returns:
+            The UID of the deleted object.
+
+        Raises:
+            ValueError: If neither uid nor name is provided, or both are provided.
+            NotFoundError: If the group with the given name is not found.
+            ApiException: If the deletion fails.
+        """
+        resolved_uid = self._resolve_uid(uid=uid, name=name)
+        response = self._object_api.delete_object_without_preload_content(uid=resolved_uid)
+        self._helper.check_raw_response(response)
+        return resolved_uid
+
+    def _resolve_uid(self, *, uid: str | None, name: str | None) -> str:
+        """Resolve a network group identifier to a UID.
+
+        Validates that exactly one of uid or name is provided. If name is
+        given, queries the API with an objectType filter to find the UID.
+
+        Args:
+            uid: The unique identifier of the network group.
+            name: The name of the network group (resolved to UID via API lookup).
+
+        Returns:
+            The resolved UID string.
+
+        Raises:
+            ValueError: If neither or both identifiers are provided.
+            NotFoundError: If the network group is not found.
+        """
+        if not uid and not name:
+            raise ValueError("Either 'uid' or 'name' must be provided.")
+        if uid and name:
+            raise ValueError("Only one of 'uid' or 'name' should be provided, not both.")
+
+        if name:
+            obj = self._get_network_group_by_name(name)
+            if not obj:
+                raise NotFoundError(f"Network group with name '{name}' not found.")
+            return obj.uid
+
+        assert uid is not None
+        obj = self._get_network_group(uid)
+        if not obj:
+            raise NotFoundError(f"Network group with UID '{uid}' not found.")
+        return uid
 
     def create_network_group(
         self,

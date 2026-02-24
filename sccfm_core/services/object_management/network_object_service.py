@@ -16,7 +16,7 @@ from sccfm_core.types import ConfigLike
 
 @dataclass
 class NetworkObjectResponse:
-    """Simplified response for network object creation.
+    """Simplified response for network object operations.
 
     The SDK's ObjectResponse has deserialization issues with oneOf schemas,
     so we parse the raw response into a simpler dataclass.

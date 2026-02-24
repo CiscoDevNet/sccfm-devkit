@@ -1,0 +1,56 @@
+---
+# Delete network groups in SCC Firewall Manager
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.delete_network_group \
+#     -a 'name=test-group'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/delete_network_groups.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+
+- name: Delete network groups in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    # Define network groups to delete by name
+    network_groups:
+      - web-server-group
+      - web-subnet-group
+      # - test-group
+
+  tasks:
+    # ============================================================
+    # Delete each network group from the list
+    # ============================================================
+    - name: Delete network groups
+      cisco.sccfm.delete_network_group:
+        name: "{{ item }}"
+      loop: "{{ network_groups }}"
+      register: delete_results
+
+    - name: Display deleted network groups
+      ansible.builtin.debug:
+        msg: "Deleted '{{ item.item }}' (uid={{ item.deleted_uid }})"
+      loop: "{{ delete_results.results }}"
+      when: item.changed
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Display network groups not found
+      ansible.builtin.debug:
+        msg: "Not found — '{{ item.item }}' does not exist (skipped)"
+      loop: "{{ delete_results.results }}"
+      when: not item.changed
+      loop_control:
+        label: "{{ item.item }}"

@@ -9,6 +9,7 @@ from sccfm_core.services.object_management import (
     NetworkGroupResponse,
     NetworkGroupService,
     NetworkObjectListResponse,
+    NetworkObjectResponse,
     NetworkObjectService,
 )
 
@@ -22,5 +23,6 @@ __all__ = [
     "NetworkGroupResponse",
     "NetworkGroupService",
     "NetworkObjectListResponse",
+    "NetworkObjectResponse",
     "NetworkObjectService",
 ]
