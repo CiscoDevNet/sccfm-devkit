@@ -17,7 +17,6 @@ from sccfm_core.services.object_management.network_object_service import (
     NetworkObjectService,
 )
 
-
 SAMPLE_API_RESPONSE: dict[str, Any] = {
     "uid": "grp-abc-123",
     "name": "my-network-group",
