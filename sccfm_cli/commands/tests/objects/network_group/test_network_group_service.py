@@ -103,8 +103,8 @@ class TestNetworkGroupResponseFromDict:
         assert result.literals == []
         assert result.referenced_object_uids == []
 
-    def test_skips_literals_without_literal_key(self) -> None:
-        """Literals missing the 'literal' key should be excluded."""
+    def test_skips_literals_without_recognised_key(self) -> None:
+        """Literals missing both 'literal' and 'url' keys should be excluded."""
         data: dict[str, Any] = {
             "uid": "grp-4",
             "name": "partial",
@@ -123,6 +123,44 @@ class TestNetworkGroupResponseFromDict:
         result = NetworkGroupResponse.from_dict(data)
 
         assert result.literals == ["10.0.0.0/8", "192.168.0.0/16"]
+
+    def test_parses_url_literals(self) -> None:
+        """URL content items should be extracted via the 'url' key."""
+        data: dict[str, Any] = {
+            "uid": "grp-5",
+            "name": "url-group",
+            "value": {
+                "objectType": "NETWORK_GROUP",
+                "defaultContent": {
+                    "literals": [
+                        {"url": "https://example.com"},
+                        {"url": "https://acme.dev"},
+                    ],
+                },
+            },
+        }
+        result = NetworkGroupResponse.from_dict(data)
+
+        assert result.literals == ["https://example.com", "https://acme.dev"]
+
+    def test_parses_mixed_network_and_url_literals(self) -> None:
+        """Both network and URL literal types should be extracted."""
+        data: dict[str, Any] = {
+            "uid": "grp-6",
+            "name": "mixed-group",
+            "value": {
+                "objectType": "NETWORK_GROUP",
+                "defaultContent": {
+                    "literals": [
+                        {"literal": "10.0.0.0/8"},
+                        {"url": "https://example.com"},
+                    ],
+                },
+            },
+        }
+        result = NetworkGroupResponse.from_dict(data)
+
+        assert result.literals == ["10.0.0.0/8", "https://example.com"]
 
 
 class TestNetworkGroupResponseToDict:

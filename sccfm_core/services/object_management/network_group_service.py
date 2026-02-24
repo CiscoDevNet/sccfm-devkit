@@ -46,7 +46,11 @@ class NetworkGroupResponse:
         raw_literals: list[dict[str, Any]] = default_content.get("literals") or []
         raw_refs: list[str] = default_content.get("referencedObjectUids") or []
 
-        literals = [str(item.get("literal") or "") for item in raw_literals if item.get("literal")]
+        literals = [
+            str(item.get("literal") or item.get("url") or "")
+            for item in raw_literals
+            if item.get("literal") or item.get("url")
+        ]
 
         return cls(
             uid=str(data.get("uid") or ""),

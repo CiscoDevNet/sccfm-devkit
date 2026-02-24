@@ -206,7 +206,7 @@ def test_should_create_with_only_literals(
     default_config: Config,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Create command should work with only network literal values (no members)."""
+    """Create command should work with only network literal values (no referenced objects)."""
     captured: dict[str, Any] = {}
 
     def fake_create(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
