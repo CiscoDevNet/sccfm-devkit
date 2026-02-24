@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
-from scc_firewall_manager_sdk.api.object_management_api import ObjectManagementApi
-from scc_firewall_manager_sdk.exceptions import ApiException
 from scc_firewall_manager_sdk.models.create_request import CreateRequest
 from scc_firewall_manager_sdk.models.network_object_content import NetworkObjectContent
 from scc_firewall_manager_sdk.models.object_content import ObjectContent
@@ -13,7 +10,7 @@ from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValu
 from scc_firewall_manager_sdk.models.update_request import UpdateRequest
 
 from sccfm_core.errors import NotFoundError
-from sccfm_core.factories import ApiClientFactory
+from sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 from sccfm_core.types import ConfigLike
 
 
@@ -101,8 +98,8 @@ class NetworkObjectService:
     NETWORK_TYPE_FILTER = "objectType:*NETWORK*"
 
     def __init__(self, config: ConfigLike) -> None:
-        api_client = ApiClientFactory().build(config)
-        self._object_api = ObjectManagementApi(api_client)
+        self._helper = ObjectApiHelper(config)
+        self._object_api = self._helper.api
 
     def create_network_object(
         self,
@@ -136,7 +133,7 @@ class NetworkObjectService:
         response = self._object_api.create_object_without_preload_content(
             create_request=create_request
         )
-        data = self._read_raw_response(response)
+        data = self._helper.read_raw_response(response)
         return NetworkObjectResponse.from_dict(data)
 
     def get_network_object(self, uid: str) -> NetworkObjectResponse | None:
@@ -154,7 +151,7 @@ class NetworkObjectService:
         response = self._object_api.get_object_without_preload_content(uid=uid)
         if response.status == 404:
             return None
-        data = self._read_raw_response(response)
+        data = self._helper.read_raw_response(response)
         return NetworkObjectResponse.from_dict(data)
 
     def get_network_object_by_name(self, name: str) -> NetworkObjectResponse | None:
@@ -172,7 +169,7 @@ class NetworkObjectService:
         # Use Lucene query syntax to search by name
         query = f'name:"{name}"'
         response = self._object_api.get_objects_without_preload_content(q=query, limit="1")
-        data = self._read_raw_response(response)
+        data = self._helper.read_raw_response(response)
 
         # Check if we found any results
         items = data.get("items", [])
@@ -198,7 +195,7 @@ class NetworkObjectService:
         """
         resolved_uid = self._resolve_uid(uid=uid, name=name)
         response = self._object_api.delete_object_without_preload_content(uid=resolved_uid)
-        self._check_raw_response(response)
+        self._helper.check_raw_response(response)
         return resolved_uid
 
     def update_network_object(
@@ -244,7 +241,7 @@ class NetworkObjectService:
             uid=resolved_uid,
             update_request=update_request,
         )
-        data = self._read_raw_response(response)
+        data = self._helper.read_raw_response(response)
         return NetworkObjectResponse.from_dict(data)
 
     def list_network_objects(
@@ -269,7 +266,7 @@ class NetworkObjectService:
             offset=str(offset),
             q=self._build_query(query),
         )
-        data = self._read_raw_response(response)
+        data = self._helper.read_raw_response(response)
         return NetworkObjectListResponse.from_dict(data)
 
     @classmethod
@@ -331,25 +328,3 @@ class NetworkObjectService:
             defaultContent=object_content,
             objectType=self.OBJECT_TYPE,
         )
-
-    @staticmethod
-    def _read_raw_response(response: Any) -> dict[str, Any]:
-        """Read and validate a raw HTTP response, returning parsed JSON."""
-        raw_data = response.read()
-        body = raw_data.decode("utf-8")
-        _raise_for_status(response.status, body)
-        return dict(json.loads(body))
-
-    @staticmethod
-    def _check_raw_response(response: Any) -> None:
-        """Read and validate a raw HTTP response that may have an empty body."""
-        raw_data = response.read()
-        body = raw_data.decode("utf-8")
-        _raise_for_status(response.status, body)
-
-
-def _raise_for_status(status: int, body: str) -> None:
-    """Raise an ApiException if the HTTP status indicates an error."""
-    if 200 <= status < 300:
-        return
-    raise ApiException(status=status, body=body)

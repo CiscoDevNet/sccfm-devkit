@@ -14,6 +14,7 @@ from sccfm_cli.models import Config
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkObjectService
 from sccfm_core.services.object_management import NetworkObjectResponse
+from sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 
 SAMPLE_OBJECT = NetworkObjectResponse(
     uid="obj-123",
@@ -242,6 +243,7 @@ class TestNetworkObjectServiceDelete:
         mock_api.delete_object_without_preload_content.return_value = delete_response
 
         service = NetworkObjectService.__new__(NetworkObjectService)
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
         service._object_api = mock_api
 
         result = service.delete_network_object(uid="test-uid")
@@ -262,6 +264,7 @@ class TestNetworkObjectServiceDelete:
             return SAMPLE_OBJECT
 
         service = NetworkObjectService.__new__(NetworkObjectService)
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
         service._object_api = mock_api
         monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
 

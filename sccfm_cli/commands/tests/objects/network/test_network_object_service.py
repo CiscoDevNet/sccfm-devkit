@@ -9,8 +9,8 @@ from sccfm_core.services.object_management.network_object_service import (
     NetworkObjectListResponse,
     NetworkObjectResponse,
     NetworkObjectService,
-    _raise_for_status,
 )
+from sccfm_core.services.object_management.object_api_helper import raise_for_status
 
 SAMPLE_API_RESPONSE: dict[str, Any] = {
     "uid": "abc-123",
@@ -82,22 +82,22 @@ class TestNetworkObjectResponseToDict:
 
 
 class TestRaiseForStatus:
-    """Tests for _raise_for_status module-level helper."""
+    """Tests for raise_for_status helper."""
 
     def test_2xx_does_not_raise(self) -> None:
-        _raise_for_status(200, "{}")
-        _raise_for_status(201, "{}")
+        raise_for_status(200, "{}")
+        raise_for_status(201, "{}")
 
     def test_4xx_raises_api_exception(self) -> None:
         body = '{"errorMsg":"Duplicate","errorCode":"CONFLICT","details":{}}'
         with pytest.raises(ApiException) as exc_info:
-            _raise_for_status(409, body)
+            raise_for_status(409, body)
         assert exc_info.value.status == 409
         assert exc_info.value.body == body
 
     def test_5xx_raises_api_exception(self) -> None:
         with pytest.raises(ApiException) as exc_info:
-            _raise_for_status(500, "error")
+            raise_for_status(500, "error")
         assert exc_info.value.status == 500
 
 
