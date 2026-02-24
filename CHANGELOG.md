@@ -1,3 +1,9 @@
+## v0.13.0 (2026-02-24)
+
+### Feat
+
+- **LH-104302**: add delete network group cli command (#19)
+
 ## v0.12.0 (2026-02-20)
 
 ### Feat
