@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Sequence, cast
 import click
 from rich.console import Console
 from rich.table import Table
-from scc_firewall_manager_sdk import AsaCompatibleVersion, Device, DevicePage
+from scc_firewall_manager_sdk import (
+    AsaCompatibleVersion,
+    Device,
+    DevicePage,
+    EntityType,
+)
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import (
@@ -248,7 +253,7 @@ class AsaUpgradeCompatibleVersionsCommand(BaseCommand):
             page: DevicePage = inventory_service.get_devices(
                 limit=limit,
                 offset=offset,
-                query=f"{query} AND deviceType:ASA",
+                query=f"({query}) AND deviceType:{EntityType.ASA.value}",
             )
             return cast(List[Device], page.items)
 

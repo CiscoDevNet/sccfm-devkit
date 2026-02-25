@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, AsaCompatibleVersion, DevicePage
+from scc_firewall_manager_sdk import (
+    ApiException,
+    AsaCompatibleVersion,
+    DevicePage,
+    EntityType,
+)
 
 from sccfm_core import InventoryService, SccApiError
 from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
@@ -171,7 +176,7 @@ def resolve_device_uids_from_query(
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"{query} AND deviceType:ASA",
+        query=f"({query}) AND deviceType:{EntityType.ASA.value}",
     )
     return [device.uid for device in (page.items or [])]
 

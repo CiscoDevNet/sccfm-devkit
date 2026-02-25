@@ -372,7 +372,7 @@ def test_should_filter_devices_by_query(
     )
 
     assert result.exit_code == 0
-    assert captured_params["query"] == f"{query} AND deviceType:ASA"
+    assert captured_params["query"] == f"({query}) AND deviceType:ASA"
     assert captured_params["limit"] == 10
     assert captured_params["offset"] == 5
 
