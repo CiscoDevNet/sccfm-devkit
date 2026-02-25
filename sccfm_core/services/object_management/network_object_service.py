@@ -95,7 +95,7 @@ class NetworkObjectService:
     """Service for managing network objects via the SCC Firewall Manager API."""
 
     OBJECT_TYPE = "NETWORK_OBJECT"
-    NETWORK_TYPE_FILTER = "objectType:*NETWORK*"
+    NETWORK_TYPE_FILTER = f"objectType:{OBJECT_TYPE}"
 
     def __init__(self, config: ConfigLike) -> None:
         self._helper = ObjectApiHelper(config)

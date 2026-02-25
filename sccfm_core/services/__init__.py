@@ -6,6 +6,7 @@ from sccfm_core.services.inventory import (
     InventoryService,
 )
 from sccfm_core.services.object_management import (
+    NetworkGroupListResponse,
     NetworkGroupResponse,
     NetworkGroupService,
     NetworkObjectListResponse,
@@ -20,6 +21,7 @@ __all__ = [
     "HealthService",
     "HealthStatus",
     "InventoryService",
+    "NetworkGroupListResponse",
     "NetworkGroupResponse",
     "NetworkGroupService",
     "NetworkObjectListResponse",

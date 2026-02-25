@@ -1,0 +1,69 @@
+---
+# List network groups in SCC Firewall Manager
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/list_network_groups.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+
+- name: List network groups in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # ============================================================
+    # List all network groups (first page)
+    # ============================================================
+    - name: List all network groups
+      cisco.sccfm.list_network_groups:
+        limit: 50
+      register: all_groups
+
+    - name: Display network group summary
+      ansible.builtin.debug:
+        msg: "Found {{ all_groups.count }} network groups (showing {{ all_groups.network_groups | length }})"
+
+    - name: Display each network group
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.name }}
+          (type={{ item.object_type }},
+          literals={{ item.literals | length }},
+          refs={{ item.referenced_object_uids | length }})
+      loop: "{{ all_groups.network_groups }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ============================================================
+    # Search for specific network groups by name
+    # ============================================================
+    - name: Search for web-related network groups
+      cisco.sccfm.list_network_groups:
+        query: "name:web*"
+        limit: 10
+      register: web_groups
+
+    - name: Display web groups found
+      ansible.builtin.debug:
+        msg: "Found {{ web_groups.count }} web-related network groups"
+
+    # ============================================================
+    # Pagination example
+    # ============================================================
+    - name: Get second page of network groups
+      cisco.sccfm.list_network_groups:
+        limit: 10
+        offset: 10
+      register: page_two
+
+    - name: Display second page results
+      ansible.builtin.debug:
+        msg: "Page 2: {{ page_two.network_groups | map(attribute='name') | list }}"

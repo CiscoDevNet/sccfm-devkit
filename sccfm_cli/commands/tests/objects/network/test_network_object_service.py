@@ -204,12 +204,12 @@ class TestBuildQuery:
 
     def test_appends_filter_to_user_query(self) -> None:
         result = NetworkObjectService._build_query("name:*network-obj*")
-        assert result == "name:*network-obj* AND objectType:*NETWORK*"
+        assert result == "name:*network-obj* AND objectType:NETWORK_OBJECT"
 
     def test_returns_filter_when_query_is_none(self) -> None:
         result = NetworkObjectService._build_query(None)
-        assert result == "objectType:*NETWORK*"
+        assert result == "objectType:NETWORK_OBJECT"
 
     def test_returns_filter_when_query_is_empty(self) -> None:
         result = NetworkObjectService._build_query("")
-        assert result == "objectType:*NETWORK*"
+        assert result == "objectType:NETWORK_OBJECT"

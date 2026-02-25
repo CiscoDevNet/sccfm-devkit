@@ -78,11 +78,43 @@ class NetworkGroupResponse:
         }
 
 
+@dataclass
+class NetworkGroupListResponse:
+    """Paginated response for listing network groups.
+
+    Mirrors the SDK's ListObjectResponse but uses our own
+    NetworkGroupResponse items to avoid oneOf deserialization issues.
+    """
+
+    count: int
+    items: list[NetworkGroupResponse]
+    limit: int
+    offset: int
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> NetworkGroupListResponse:
+        raw_items: list[dict[str, Any]] = data.get("items") or []
+        return cls(
+            count=int(data.get("count") or 0),
+            items=[NetworkGroupResponse.from_dict(item) for item in raw_items],
+            limit=int(data.get("limit") or 0),
+            offset=int(data.get("offset") or 0),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "count": self.count,
+            "items": [item.to_dict() for item in self.items],
+            "limit": self.limit,
+            "offset": self.offset,
+        }
+
+
 class NetworkGroupService:
     """Service for managing network groups via the SCC Firewall Manager API."""
 
     OBJECT_TYPE = "NETWORK_GROUP"
-    GROUP_TYPE_FILTER = "objectType:NETWORK_GROUP"
+    GROUP_TYPE_FILTER = f"objectType:{OBJECT_TYPE}"
 
     def __init__(self, config: ConfigLike) -> None:
         self._helper = ObjectApiHelper(config)
@@ -151,6 +183,41 @@ class NetworkGroupService:
         response = self._object_api.delete_object_without_preload_content(uid=resolved_uid)
         self._helper.check_raw_response(response)
         return resolved_uid
+
+    def list_network_groups(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        query: str | None = None,
+    ) -> NetworkGroupListResponse:
+        """List network groups with optional filtering.
+
+        Args:
+            limit: Maximum number of results to return.
+            offset: Pagination offset.
+            query: Optional Lucene query string (searchable fields: name, content).
+
+        Returns:
+            A paginated NetworkGroupListResponse.
+        """
+        response = self._object_api.get_objects_without_preload_content(
+            limit=str(limit),
+            offset=str(offset),
+            q=self._build_query(query),
+        )
+        data = self._helper.read_raw_response(response)
+        return NetworkGroupListResponse.from_dict(data)
+
+    @classmethod
+    def _build_query(cls, query: str | None) -> str:
+        """Append the network group type filter to the user's query.
+
+        Ensures only NETWORK_GROUP types are returned.
+        """
+        if query:
+            return f"{query} AND {cls.GROUP_TYPE_FILTER}"
+        return cls.GROUP_TYPE_FILTER
 
     def _resolve_uid(self, *, uid: str | None, name: str | None) -> str:
         """Resolve a network group identifier to a UID.

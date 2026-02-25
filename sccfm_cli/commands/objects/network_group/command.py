@@ -8,6 +8,7 @@ from rich.console import Console
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.network_group.create import CreateNetworkGroupCommand
 from sccfm_cli.commands.objects.network_group.delete import DeleteNetworkGroupCommand
+from sccfm_cli.commands.objects.network_group.list import ListNetworkGroupCommand
 
 
 class NetworkGroupCommand(BaseCommand):
@@ -17,6 +18,7 @@ class NetworkGroupCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             CreateNetworkGroupCommand(console),
+            ListNetworkGroupCommand(console),
             DeleteNetworkGroupCommand(console),
         ]
 
