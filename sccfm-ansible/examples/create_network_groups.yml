@@ -72,11 +72,7 @@
 
     - name: Display created network groups
       ansible.builtin.debug:
-        msg: >-
-          Created '{{ item.network_group.name }}'
-          (uid={{ item.network_group.uid }},
-          literals={{ item.network_group.literals }},
-          refs={{ item.network_group.referenced_object_uids }})
+        msg: "{{ item.msg }}"
       loop: "{{ create_results.results }}"
       when: item.network_group is defined
       loop_control:
