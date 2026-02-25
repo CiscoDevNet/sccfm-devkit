@@ -132,7 +132,9 @@ class AsaDeviceTargetCommand(BaseCommand):
             return cast(list[Device], page.items)
 
         uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids or ()])
-        page = inventory_service.get_devices(limit=filters.limit, offset=filters.offset, query=uid_query)
+        page = inventory_service.get_devices(
+            limit=filters.limit, offset=filters.offset, query=uid_query
+        )
         return cast(list[Device], page.items)
 
     def resolve_asa_targets_from_kwargs(

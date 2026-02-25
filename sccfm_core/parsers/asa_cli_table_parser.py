@@ -45,7 +45,5 @@ def parse_cli_table(
 
 def rows_to_dicts(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> list[dict[str, str]]:
     """Convert parsed table rows into JSON-friendly dict rows."""
-    normalized_keys = [
-        header.lower().replace("-", "_").replace(" ", "_") for header in headers
-    ]
+    normalized_keys = [header.lower().replace("-", "_").replace(" ", "_") for header in headers]
     return [dict(zip(normalized_keys, row)) for row in rows]

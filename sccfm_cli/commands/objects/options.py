@@ -77,8 +77,6 @@ def tags_option() -> click.Option:
     )
 
 
-
-
 def query_option(*, required: bool = False) -> click.Option:
     """Reusable --query option for Lucene filtering.
 

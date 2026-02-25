@@ -99,4 +99,3 @@ class CreateNetworkGroupCommand(BaseCommand):
             "\n".join(response.referenced_object_uids) if response.referenced_object_uids else "-",
         )
         self.console.print(table)
-

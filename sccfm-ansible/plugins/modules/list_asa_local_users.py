@@ -108,6 +108,7 @@ asa_local_users_json:
   type: str
 """
 
+
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "query": {"type": "str", "required": False},
