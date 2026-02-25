@@ -1,3 +1,9 @@
+## v0.14.1 (2026-02-25)
+
+### Fix
+
+- **tests**: include all test directories and fix mock usage (#25)
+
 ## v0.14.0 (2026-02-25)
 
 ### Feat
