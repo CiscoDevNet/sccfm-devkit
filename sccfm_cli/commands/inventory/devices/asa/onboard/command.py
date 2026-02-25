@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Any, Sequence, cast
 
 import click
@@ -7,6 +6,7 @@ from rich.console import Console
 from scc_firewall_manager_sdk import AsaCreateOrUpdateInput, ConnectorType, Device, Labels
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
 from sccfm_core import InventoryService
 from sccfm_core.services.inventory import AsaOnboardService
@@ -83,21 +83,8 @@ class AsaOnboardCommand(BaseCommand):
                 multiple=True,
                 help="Free-form labels to assign to the device (can be specified multiple times).",
             ),
-            click.Option(
-                ["--config-path"],
-                type=click.Path(path_type=Path, resolve_path=True),
-                default=None,
-                envvar="SCCFM_CONFIG",
-                show_default=False,
-                help="Path to the configuration file (defaults to ~/.sccfm-cli/config.json).",
-            ),
-            click.Option(
-                ["--format"],
-                type=click.Choice(["table", "json"], case_sensitive=False),
-                default="table",
-                show_default=True,
-                help="Output format",
-            ),
+            config_path_option(),
+            format_option(),
         ]
 
     @with_spinner("Onboarding ASA device...")

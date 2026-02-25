@@ -9,6 +9,11 @@ from rich.table import Table
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import group_update_params, parse_tags
 from sccfm_cli.commands.objects.utils import validate_has_updates, validate_identifier
+from sccfm_cli.commands.objects.options import (
+    format_tags,
+    group_update_params,
+    parse_tags,
+)
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
@@ -102,7 +107,7 @@ class UpdateNetworkGroupCommand(BaseCommand):
         )
         table.add_row(
             "Tags",
-            self._format_tags(response.tags) if response.tags else "-",
+            format_tags(response.tags) if response.tags else "-",
         )
         table.add_row(
             "Literals",
@@ -114,7 +119,3 @@ class UpdateNetworkGroupCommand(BaseCommand):
         )
         self.console.print(table)
 
-    @staticmethod
-    def _format_tags(tags: dict[str, list[str]]) -> str:
-        """Format tags dict as readable key=value lines."""
-        return "\n".join(f"{key}={','.join(values)}" for key, values in tags.items())
