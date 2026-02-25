@@ -107,7 +107,7 @@ class NetworkGroupService:
         data = self._helper.read_raw_response(response)
         return NetworkGroupResponse.from_dict(data)
 
-    def _get_network_group_by_name(self, name: str) -> NetworkGroupResponse | None:
+    def get_network_group_by_name(self, name: str) -> NetworkGroupResponse | None:
         """Search for a network group object by name.
 
         Uses an objectType filter so that plain network objects with the
@@ -175,7 +175,7 @@ class NetworkGroupService:
             raise ValueError("Only one of 'uid' or 'name' should be provided, not both.")
 
         if name:
-            obj = self._get_network_group_by_name(name)
+            obj = self.get_network_group_by_name(name)
             if not obj:
                 raise NotFoundError(f"Network group with name '{name}' not found.")
             return obj.uid
