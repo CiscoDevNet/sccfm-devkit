@@ -11,6 +11,7 @@ from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command impor
 )
 from sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
 from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
+from sccfm_cli.commands.inventory.devices.asa.upgrade import AsaUpgradeCommand
 from sccfm_cli.commands.inventory.devices.asa.user import AsaUserCommand
 
 
@@ -23,6 +24,7 @@ class AsaCommand(BaseCommand):
             SmartlicenseCommand(console),
             AsaOnboardCommand(console),
             AsaListLocalUsersCommand(console),
+            AsaUpgradeCommand(console),
             AsaUserCommand(console),
         ]
 

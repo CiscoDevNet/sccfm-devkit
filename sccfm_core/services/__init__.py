@@ -2,6 +2,7 @@ from sccfm_core.services.health_service import HealthService, HealthStatus
 from sccfm_core.services.inventory import (
     AsaCommandLineService,
     AsaDiskFileService,
+    AsaUpgradeVersionService,
     AsaUserPasswordService,
     InventoryService,
 )
@@ -17,6 +18,7 @@ from sccfm_core.services.object_management import (
 __all__ = [
     "AsaCommandLineService",
     "AsaDiskFileService",
+    "AsaUpgradeVersionService",
     "AsaUserPasswordService",
     "HealthService",
     "HealthStatus",
