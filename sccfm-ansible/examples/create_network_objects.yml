@@ -35,6 +35,16 @@
           environment:
             - production
 
+      - name: app-server-01
+        value: "10.0.3.100"
+        description: "Application web server"
+        labels:
+          - production
+          - web-tier
+        tags:
+          environment:
+            - production
+
       - name: app-server-subnet
         value: "10.0.2.0/24"
         description: "Application server subnet"

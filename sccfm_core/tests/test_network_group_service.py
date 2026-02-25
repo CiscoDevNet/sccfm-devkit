@@ -8,6 +8,7 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management import NetworkGroupService, NetworkObjectResponse
+from sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 
 SAMPLE_GROUP = NetworkObjectResponse(
     uid="grp-123",
@@ -40,6 +41,7 @@ class TestNetworkGroupServiceDelete:
 
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._object_api = mock_api
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
 
         result = service.delete_network_group(uid="test-uid")
 
@@ -62,7 +64,7 @@ class TestNetworkGroupServiceDelete:
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._object_api = mock_api
         service._helper = mock_helper
-        monkeypatch.setattr(NetworkGroupService, "_get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
 
         result = service.delete_network_group(name="test-network-group")
 
@@ -78,7 +80,7 @@ class TestNetworkGroupServiceDelete:
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._object_api = Mock()
         service._helper = Mock()
-        monkeypatch.setattr(NetworkGroupService, "_get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
 
         with pytest.raises(NotFoundError, match="not found"):
             service.delete_network_group(name="missing")

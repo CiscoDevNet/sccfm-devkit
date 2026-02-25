@@ -1,0 +1,79 @@
+---
+# Create network groups in SCC Firewall Manager
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/create_network_groups.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+#   - Run the create network_objects.yml playbook first to create any referenced network objects
+
+
+- name: Create network groups in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    network_groups:
+      - name: web-servers
+        # network_literals can be IP addresses or CIDR subnets
+        network_literals:
+          - "10.0.1.100"
+          - "10.0.1.101"
+        description: "Production web servers"
+        labels:
+          - production
+          - web-tier
+        tags:
+          environment:
+            - production
+
+      - name: app-tier
+      # referenced_objects can include network objects created separately by uid or by name
+        referenced_objects:
+          - web-server-01
+          - app-server-01
+        description: "Application tier group"
+        labels:
+          - production
+          - app-tier
+        tags:
+          environment:
+            - production
+
+#      - name: trusted-urls
+#        url_literals:
+#          - "https://example.com"
+#          - "https://api.example.com"
+#        description: "Trusted URL group"
+
+  tasks:
+    # ============================================================
+    # Create each network group from the list
+    # ============================================================
+    - name: Create network groups
+      cisco.sccfm.create_network_group:
+        name: "{{ item.name }}"
+        network_literals: "{{ item.network_literals | default(omit) }}"
+        url_literals: "{{ item.url_literals | default(omit) }}"
+        referenced_objects: "{{ item.referenced_objects | default(omit) }}"
+        description: "{{ item.description | default(omit) }}"
+        labels: "{{ item.labels | default(omit) }}"
+        tags: "{{ item.tags | default(omit) }}"
+      loop: "{{ network_groups }}"
+      register: create_results
+
+    - name: Display created network groups
+      ansible.builtin.debug:
+        msg: "{{ item.msg }}"
+      loop: "{{ create_results.results }}"
+      when: item.network_group is defined
+      loop_control:
+        label: "{{ item.network_group.name | default('unknown') }}"
