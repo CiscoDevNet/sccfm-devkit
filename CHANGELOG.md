@@ -1,3 +1,9 @@
+## v0.15.0 (2026-02-25)
+
+### Feat
+
+- **LH-102402**: add compatible upgrade versions for ASA devices (#21)
+
 ## v0.14.1 (2026-02-25)
 
 ### Fix
