@@ -106,7 +106,7 @@ def _make_raw_api_response(
     network_literals: list[str] | None = None,
     url_literals: list[str] | None = None,
     referenced_object_uids: list[str] | None = None,
-) -> dict:
+) -> dict[str, object]:
     """Build a raw API response dict for a network group."""
     literals = []
     for lit in network_literals or []:
@@ -130,7 +130,7 @@ def _make_raw_api_response(
     }
 
 
-def _mock_api_response(data: dict) -> Mock:
+def _mock_api_response(data: dict[str, object]) -> Mock:
     """Create a mock HTTP response returning given data."""
     resp = Mock()
     resp.status = 200
