@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from unittest.mock import Mock
 
 import pytest
@@ -8,7 +7,6 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management import NetworkGroupService, NetworkObjectResponse
-from sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 
 SAMPLE_GROUP = NetworkObjectResponse(
     uid="grp-123",
@@ -28,10 +26,11 @@ class TestNetworkGroupServiceDelete:
     def test_delete_by_uid_calls_api(self, monkeypatch: MonkeyPatch) -> None:
         """Service should call API with correct uid parameter."""
         mock_api = Mock()
+        mock_helper = Mock()
 
         get_response = Mock()
         get_response.status = 200
-        get_response.read.return_value = json.dumps(SAMPLE_GROUP.to_dict()).encode("utf-8")
+        mock_helper.read_raw_response.return_value = SAMPLE_GROUP.to_dict()
         mock_api.get_object_without_preload_content.return_value = get_response
 
         delete_response = Mock()
@@ -41,7 +40,7 @@ class TestNetworkGroupServiceDelete:
 
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._object_api = mock_api
-        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._helper = mock_helper
 
         result = service.delete_network_group(uid="test-uid")
 

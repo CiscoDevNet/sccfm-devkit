@@ -85,7 +85,7 @@ show_missing = true
 skip_covered = true
 
 [tool.pytest.ini_options]
-testpaths = ["sccfm_cli"]
+testpaths = ["sccfm_cli", "sccfm_core", "sccfm-ansible"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
