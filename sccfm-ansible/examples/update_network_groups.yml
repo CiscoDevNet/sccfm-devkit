@@ -7,6 +7,8 @@
 # PREREQUISITES:
 #   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
 #   - Region and API token in group_vars/all/vars.yml
+#   - Run create_network_objects.yml first to create the referenced network objects
+#   - Run create_network_groups.yml first to create the groups to update
 #
 # NOTE:
 #   This module is idempotent. Running the same playbook twice will
