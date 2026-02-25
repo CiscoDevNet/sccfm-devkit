@@ -35,6 +35,26 @@
           environment:
             - production
 
+      - name: web-server-02
+        value: "10.0.1.101"
+        description: "Production web server 2"
+        labels:
+          - production
+          - web-tier
+        tags:
+          environment:
+            - production
+
+      - name: web-server-03
+        value: "10.0.1.102"
+        description: "Production web server 3"
+        labels:
+          - production
+          - web-tier
+        tags:
+          environment:
+            - production
+
       - name: app-server-01
         value: "10.0.3.100"
         description: "Application web server"

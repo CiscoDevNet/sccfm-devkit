@@ -301,3 +301,18 @@ def group_create_params() -> List[click.Parameter]:
         format_option(),
         config_path_option(),
     ]
+
+
+def group_update_params() -> List[click.Parameter]:
+    """Complete set of options for network group update command."""
+    return [
+        uid_option(),
+        object_name_option(),
+        new_name_option(),
+        referenced_object_option(),
+        description_option(),
+        labels_option(),
+        tags_option(),
+        format_option(),
+        config_path_option(),
+    ]

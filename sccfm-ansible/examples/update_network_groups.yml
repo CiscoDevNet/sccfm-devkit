@@ -1,0 +1,85 @@
+---
+# Update network groups in SCC Firewall Manager
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/update_network_groups.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+#   - Run create_network_objects.yml first to create the referenced network objects
+#   - Run create_network_groups.yml first to create the groups to update
+#
+# NOTE:
+#   This module is idempotent. Running the same playbook twice will
+#   report changed=false on the second run if nothing differs.
+
+- name: Update network groups in SCC Firewall Manager
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # ============================================================
+    # Update referenced objects in a group
+    # ============================================================
+    - name: Update web-servers group members
+      cisco.sccfm.update_network_group:
+        name: web-servers
+        referenced_objects:
+          - web-server-01
+          - web-server-02
+          - web-server-03
+        description: "Updated web server group"
+      register: update_result
+
+    - name: Show update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Updated' if update_result.changed else 'No change for' }}
+          '{{ update_result.network_group.name }}'
+          (uid={{ update_result.network_group.uid }},
+          refs={{ update_result.network_group.referenced_object_uids }})
+
+    # ============================================================
+    # Update labels and tags
+    # ============================================================
+    - name: Update labels and tags on app-tier group
+      cisco.sccfm.update_network_group:
+        name: app-tier
+        labels:
+          - production
+          - app-tier
+          - monitored
+        tags:
+          environment:
+            - production
+          team:
+            - platform
+      register: tags_result
+
+    - name: Show tags update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'Updated' if tags_result.changed else 'No change for' }}
+          '{{ tags_result.network_group.name }}'
+
+    # ============================================================
+    # Rename a network group
+    # ============================================================
+#    - name: Rename a network group
+#      cisco.sccfm.update_network_group:
+#        name: old-group-name
+#        new_name: new-group-name
+#      register: rename_result
+#
+#    - name: Show rename result
+#      ansible.builtin.debug:
+#        msg: >-
+#          {{ 'Renamed' if rename_result.changed else 'No change for' }}
+#          '{{ rename_result.network_group.name }}'

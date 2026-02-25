@@ -118,7 +118,7 @@ def test_should_display_table_output(
     )
 
     assert result.exit_code == 0
-    assert "Network Group" in result.output
+    assert "created" in result.output.lower()
     assert "grp-abc-123" in result.output
     assert "my-network-group" in result.output
     assert "NETWORK_GROUP" in result.output

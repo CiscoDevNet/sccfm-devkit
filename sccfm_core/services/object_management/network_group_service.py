@@ -13,6 +13,7 @@ from scc_firewall_manager_sdk.models.network_object_content import NetworkObject
 from scc_firewall_manager_sdk.models.object_content import ObjectContent
 from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValue
 from scc_firewall_manager_sdk.models.single_content import SingleContent
+from scc_firewall_manager_sdk.models.update_request import UpdateRequest
 from scc_firewall_manager_sdk.models.url_object_content import UrlObjectContent
 
 from sccfm_core.errors import NotFoundError
@@ -138,6 +139,28 @@ class NetworkGroupService:
             return None
         data = self._helper.read_raw_response(response)
         return NetworkGroupResponse.from_dict(data)
+
+    def _get_raw_group_content(self, uid: str) -> dict[str, Any]:
+        """Fetch the raw defaultContent dict for a network group.
+
+        Used during updates to preserve the existing literals or referenced
+        objects that are not being changed.
+
+        Args:
+            uid: The unique identifier of the network group.
+
+        Returns:
+            The raw defaultContent dict from the API response.
+
+        Raises:
+            NotFoundError: If the group is not found.
+        """
+        response = self._object_api.get_object_without_preload_content(uid=uid)
+        if response.status == 404:
+            raise NotFoundError(f"Network group with UID '{uid}' not found.")
+        data = self._helper.read_raw_response(response)
+        value: dict[str, Any] = data.get("value") or {}
+        return value.get("defaultContent") or {}
 
     def get_network_group_by_name(self, name: str) -> NetworkGroupResponse | None:
         """Search for a network group object by name.
@@ -326,6 +349,71 @@ class NetworkGroupService:
         data = self._helper.read_raw_response(response)
         return NetworkGroupResponse.from_dict(data)
 
+    def update_network_group(
+        self,
+        *,
+        uid: str | None = None,
+        name: str | None = None,
+        new_name: str | None = None,
+        referenced_objects: list[str] | None = None,
+        description: str | None = None,
+        labels: list[str] | None = None,
+        tags: dict[str, list[str]] | None = None,
+    ) -> NetworkGroupResponse:
+        """Update a network group by UID or name.
+
+        Args:
+            uid: The unique identifier of the network group to update.
+            name: The name of the network group to update (resolved to UID).
+            new_name: Optional new name for the group.
+            referenced_objects: UIDs or names of existing network objects to
+                reference. Replaces all existing referenced objects but
+                preserves any existing literals.
+            description: Optional new description.
+            labels: Optional new labels.
+            tags: Optional new tags.
+
+        Returns:
+            The updated NetworkGroupResponse from the API.
+
+        Raises:
+            ValueError: If neither uid nor name is provided, or both are provided.
+            ValueError: If any referenced object value is empty or blank.
+            NotFoundError: If the group or a referenced object is not found.
+        """
+        resolved_uid = self._resolve_uid(uid=uid, name=name)
+
+        shared_value: SharedObjectValue | None = None
+        if referenced_objects is not None:
+            self._validate_referenced_objects(referenced_objects)
+            resolved_uids = self._resolve_referenced_object_uids(referenced_objects)
+            current_content = self._get_raw_group_content(resolved_uid)
+            existing_literals = self._rebuild_literal_contents(current_content)
+            shared_value = self._build_shared_value(
+                single_contents=existing_literals,
+                referenced_object_uids=resolved_uids,
+            )
+
+        update_request = UpdateRequest(
+            name=new_name,
+            value=shared_value,
+            description=description,
+            labels=labels,
+            tags=tags,
+        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Pydantic serializer warnings",
+                category=UserWarning,
+            )
+            response = self._object_api.modify_object_without_preload_content(
+                uid=resolved_uid,
+                update_request=update_request,
+            )
+        data = self._helper.read_raw_response(response)
+        return NetworkGroupResponse.from_dict(data)
+
     def _build_shared_value(
         self,
         *,
@@ -371,6 +459,37 @@ class NetworkGroupService:
             contents.append(SingleContent(actual_instance=NetworkObjectContent(literal=lit)))
         for url in url_literals:
             contents.append(SingleContent(actual_instance=UrlObjectContent(url=url)))
+        return contents
+
+    @staticmethod
+    def _rebuild_literal_contents(
+        raw_content: dict[str, Any],
+    ) -> list[SingleContent]:
+        """Reconstruct SingleContent objects from raw API content.
+
+        Inspects each literal dict to determine whether it is a network
+        literal (has ``literal`` key) or a URL literal (has ``url`` key)
+        and wraps it in the appropriate SDK model.
+
+        Args:
+            raw_content: The raw ``defaultContent`` dict from the API.
+
+        Returns:
+            A list of SingleContent preserving the original literal types.
+        """
+        raw_literals: list[dict[str, Any]] = raw_content.get("literals") or []
+        contents: list[SingleContent] = []
+        for item in raw_literals:
+            if item.get("url"):
+                contents.append(
+                    SingleContent(actual_instance=UrlObjectContent(url=item["url"])),
+                )
+            elif item.get("literal"):
+                contents.append(
+                    SingleContent(
+                        actual_instance=NetworkObjectContent(literal=item["literal"]),
+                    ),
+                )
         return contents
 
     def _resolve_referenced_object_uids(self, referenced_objects: list[str]) -> list[str]:

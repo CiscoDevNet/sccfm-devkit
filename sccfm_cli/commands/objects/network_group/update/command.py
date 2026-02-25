@@ -7,47 +7,34 @@ import click
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.objects.options import group_create_params, parse_tags
+from sccfm_cli.commands.objects.options import group_update_params, parse_tags
 from sccfm_cli.utils import with_spinner
+from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
 from sccfm_core.services.object_management import NetworkGroupResponse
 
 
-class CreateNetworkGroupCommand(BaseCommand):
-    """Create a network group in SCC Firewall Manager."""
+class UpdateNetworkGroupCommand(BaseCommand):
+    """Update a network group in SCC Firewall Manager."""
 
     @property
     def name(self) -> str:
-        return "create"
+        return "update"
 
     @property
     def help_text(self) -> str:
-        return "Create a network group."
+        return "Update a network group."
 
     def build_params(self) -> Sequence[click.Parameter]:
-        return group_create_params()
+        return group_update_params()
 
-    @with_spinner("Creating network group...")
+    @with_spinner("Updating network group...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        name = cast(str, kwargs.get("name"))
+        uid = cast(str | None, kwargs.get("uid"))
+        name = cast(str | None, kwargs.get("name"))
+        new_name = cast(str | None, kwargs.get("new_name"))
         ref_objects_tuple = kwargs.get("referenced_object")
         referenced_objects = list(ref_objects_tuple) if ref_objects_tuple else None
-        network_literals_tuple = kwargs.get("network_literal")
-        network_literals = list(network_literals_tuple) if network_literals_tuple else None
-        url_literals_tuple = kwargs.get("url_literal")
-        url_literals = list(url_literals_tuple) if url_literals_tuple else None
-
-        if network_literals and url_literals:
-            ctx.fail(
-                "Only one literal type is allowed per group. "
-                "Use --network-literal or --url-literal, not both."
-            )
-
-        if not referenced_objects and not network_literals and not url_literals:
-            ctx.fail(
-                "At least one --referenced-object, --network-literal, or "
-                "--url-literal is required to create a network group."
-            )
         description = cast(str | None, kwargs.get("description"))
         labels_tuple = kwargs.get("labels")
         labels = list(labels_tuple) if labels_tuple else None
@@ -55,26 +42,73 @@ class CreateNetworkGroupCommand(BaseCommand):
         tags = parse_tags(tags_tuple)
         output_format = cast(str, kwargs.get("format"))
 
-        config = self.get_profile(ctx=ctx, **kwargs)
-        service = NetworkGroupService(config)
-        response: NetworkGroupResponse = service.create_network_group(
-            name=name,
-            network_literals=network_literals,
-            url_literals=url_literals,
+        self._validate_identifier(ctx, uid=uid, name=name)
+        self._validate_has_updates(
+            ctx,
+            new_name=new_name,
             referenced_objects=referenced_objects,
             description=description,
             labels=labels,
             tags=tags,
         )
 
-        self._render_response(response, output_format)
+        config = self.get_profile(ctx=ctx, **kwargs)
+        service = NetworkGroupService(config)
 
-    def _render_response(self, response: NetworkGroupResponse, output_format: str) -> None:
+        try:
+            response: NetworkGroupResponse = service.update_network_group(
+                uid=uid,
+                name=name,
+                new_name=new_name,
+                referenced_objects=referenced_objects,
+                description=description,
+                labels=labels,
+                tags=tags,
+            )
+            self._render_response(response, output_format)
+        except NotFoundError as e:
+            ctx.fail(str(e))
+
+    @staticmethod
+    def _validate_identifier(
+        ctx: click.Context,
+        *,
+        uid: str | None,
+        name: str | None,
+    ) -> None:
+        """Ensure exactly one of --uid or --name is provided."""
+        if not uid and not name:
+            ctx.fail("Either --uid or --name must be provided.")
+        if uid and name:
+            ctx.fail("Only one of --uid or --name should be provided, not both.")
+
+    @staticmethod
+    def _validate_has_updates(
+        ctx: click.Context,
+        *,
+        new_name: str | None,
+        referenced_objects: list[str] | None,
+        description: str | None,
+        labels: list[str] | None,
+        tags: dict[str, list[str]] | None,
+    ) -> None:
+        """Ensure at least one updatable field is provided."""
+        if not any([new_name, referenced_objects, description, labels, tags]):
+            ctx.fail(
+                "At least one update field must be provided: "
+                "--new-name, --referenced-object, --description, --labels, or --tags."
+            )
+
+    def _render_response(
+        self,
+        response: NetworkGroupResponse,
+        output_format: str,
+    ) -> None:
         if output_format == "json":
             self.console.print(json.dumps(response.to_dict(), indent=2, default=str))
             return
 
-        self.console.print("[green]\u2713[/green] Network group created")
+        self.console.print("[green]✓[/green] Network group updated")
         table = Table(show_header=False, width=80, padding=(0, 1))
         table.add_column("Field", style="bold", width=20)
         table.add_column("Value")
