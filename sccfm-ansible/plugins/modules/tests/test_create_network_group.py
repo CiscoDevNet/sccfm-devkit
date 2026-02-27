@@ -46,6 +46,7 @@ def mock_module_instance(base_module_params: dict[str, Any]) -> MagicMock:
     """Creates a mock module instance with exit_json/fail_json that raise SystemExit."""
     mock_module = MagicMock()
     mock_module.params = base_module_params.copy()
+    mock_module.check_mode = False
     mock_module.exit_json.side_effect = SystemExit(0)
     mock_module.fail_json.side_effect = SystemExit(1)
     return mock_module
@@ -260,6 +261,33 @@ def test_should_create_group_with_url_literals(
         tags=None,
     )
     mock_module_instance.exit_json.assert_called_once()
+
+
+@patch("plugins.modules.create_network_group.Config")
+@patch("plugins.modules.create_network_group.NetworkGroupService")
+@patch("plugins.modules.create_network_group.AnsibleModule")
+def test_should_support_check_mode(
+    mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module should return changed=True in check mode without creating."""
+    mock_module_instance.check_mode = True
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_service = MagicMock()
+    mock_service.get_network_group_by_name.return_value = None
+    mock_service_class.return_value = mock_service
+
+    with pytest.raises(SystemExit):
+        create_network_group.run_module()
+
+    mock_module_instance.exit_json.assert_called_once()
+    call_kwargs = mock_module_instance.exit_json.call_args[1]
+    assert call_kwargs["changed"] is True
+    assert "Would create" in call_kwargs["msg"]
+    mock_service.create_network_group.assert_not_called()
 
 
 @patch("plugins.modules.create_network_group.Config")
