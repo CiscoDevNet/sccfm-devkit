@@ -6,7 +6,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from sccfm_core.services.object_management import NetworkObjectService
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -142,8 +142,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "description": {"type": "str", "required": False},
         "labels": {"type": "list", "elements": "str", "required": False},
         "tags": {"type": "dict", "required": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -153,13 +152,7 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
+    config = create_config(module)
 
     params = module.params
     name = params["name"]

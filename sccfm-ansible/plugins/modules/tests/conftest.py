@@ -51,8 +51,27 @@ module_utils_module.__path__ = [str(module_utils_path)]
 module_utils_module.__package__ = "plugins.module_utils"
 sys.modules["plugins.module_utils"] = module_utils_module
 
-# Add config as a submodule
+# Add config as a submodule with all exports
 config_submodule = ModuleType("plugins.module_utils.config")
 config_submodule.Config = config_module.Config
+config_submodule.base_argument_spec = config_module.base_argument_spec
+config_submodule.identifier_argument_spec = config_module.identifier_argument_spec
+config_submodule.create_config = config_module.create_config
 config_submodule.__package__ = "plugins.module_utils"
 sys.modules["plugins.module_utils.config"] = config_submodule
+
+# Load operations module directly
+operations_path = module_utils_path / "operations.py"
+ops_spec = importlib.util.spec_from_file_location("operations", operations_path)
+assert ops_spec is not None and ops_spec.loader is not None
+operations_module = importlib.util.module_from_spec(ops_spec)
+sys.modules["operations"] = operations_module
+ops_spec.loader.exec_module(operations_module)
+
+# Add operations as a submodule
+operations_submodule = ModuleType("plugins.module_utils.operations")
+operations_submodule.fetch_object_by_identifier = operations_module.fetch_object_by_identifier
+operations_submodule.run_delete_with_idempotency = operations_module.run_delete_with_idempotency
+operations_submodule.fields_need_update = operations_module.fields_need_update
+operations_submodule.__package__ = "plugins.module_utils"
+sys.modules["plugins.module_utils.operations"] = operations_submodule

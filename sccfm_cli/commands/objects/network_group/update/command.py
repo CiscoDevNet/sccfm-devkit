@@ -8,6 +8,7 @@ from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import group_update_params, parse_tags
+from sccfm_cli.commands.objects.utils import validate_has_updates, validate_identifier
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
@@ -42,14 +43,23 @@ class UpdateNetworkGroupCommand(BaseCommand):
         tags = parse_tags(tags_tuple)
         output_format = cast(str, kwargs.get("format"))
 
-        self._validate_identifier(ctx, uid=uid, name=name)
-        self._validate_has_updates(
+        validate_identifier(ctx, uid=uid, name=name)
+        validate_has_updates(
             ctx,
-            new_name=new_name,
-            referenced_objects=referenced_objects,
-            description=description,
-            labels=labels,
-            tags=tags,
+            fields={
+                "new_name": new_name,
+                "referenced_objects": referenced_objects,
+                "description": description,
+                "labels": labels,
+                "tags": tags,
+            },
+            field_names=[
+                "--new-name",
+                "--referenced-object",
+                "--description",
+                "--labels",
+                "--tags",
+            ],
         )
 
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -68,36 +78,6 @@ class UpdateNetworkGroupCommand(BaseCommand):
             self._render_response(response, output_format)
         except NotFoundError as e:
             ctx.fail(str(e))
-
-    @staticmethod
-    def _validate_identifier(
-        ctx: click.Context,
-        *,
-        uid: str | None,
-        name: str | None,
-    ) -> None:
-        """Ensure exactly one of --uid or --name is provided."""
-        if not uid and not name:
-            ctx.fail("Either --uid or --name must be provided.")
-        if uid and name:
-            ctx.fail("Only one of --uid or --name should be provided, not both.")
-
-    @staticmethod
-    def _validate_has_updates(
-        ctx: click.Context,
-        *,
-        new_name: str | None,
-        referenced_objects: list[str] | None,
-        description: str | None,
-        labels: list[str] | None,
-        tags: dict[str, list[str]] | None,
-    ) -> None:
-        """Ensure at least one updatable field is provided."""
-        if not any([new_name, referenced_objects, description, labels, tags]):
-            ctx.fail(
-                "At least one update field must be provided: "
-                "--new-name, --referenced-object, --description, --labels, or --tags."
-            )
 
     def _render_response(
         self,

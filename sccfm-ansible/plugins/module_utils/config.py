@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ansible.module_utils.basic import AnsibleModule
 
 ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in")
 
@@ -44,3 +48,49 @@ class Config:
         if self.region not in ALLOWED_REGIONS:
             allowed = ", ".join(ALLOWED_REGIONS)
             raise ValueError(f"SCCFM region must be one of: {allowed}")
+
+
+def base_argument_spec() -> dict[str, dict[str, Any]]:
+    """Return common argument spec for region and api_token.
+
+    Returns:
+        Dictionary suitable for merging into build_argument_spec().
+    """
+    return {
+        "region": {"type": "str", "required": False},
+        "api_token": {"type": "str", "required": False, "no_log": True},
+    }
+
+
+def identifier_argument_spec() -> dict[str, dict[str, Any]]:
+    """Return argument spec for uid/name identifier fields.
+
+    Returns:
+        Dictionary suitable for merging into build_argument_spec().
+    """
+    return {
+        "uid": {"type": "str", "required": False},
+        "name": {"type": "str", "required": False},
+    }
+
+
+def create_config(module: "AnsibleModule") -> Config:
+    """Create a Config from module params, with error handling.
+
+    Args:
+        module: The AnsibleModule instance.
+
+    Returns:
+        A validated Config instance.
+
+    Note:
+        On validation error, calls module.fail_json() and does not return.
+    """
+    try:
+        return Config(
+            region=module.params.get("region") or "",
+            api_token=module.params.get("api_token") or "",
+        )
+    except ValueError as e:
+        module.fail_json(msg=str(e))
+        raise

@@ -199,17 +199,23 @@ class TestNetworkObjectListResponseFromDict:
         assert "URL_GROUP" in types
 
 
-class TestBuildQuery:
-    """Tests for NetworkObjectService._build_query."""
+class TestBuildFilteredQuery:
+    """Tests for build_filtered_query utility."""
 
     def test_appends_filter_to_user_query(self) -> None:
-        result = NetworkObjectService._build_query("name:*network-obj*")
+        from sccfm_core.services.object_management.utils import build_filtered_query
+
+        result = build_filtered_query("name:*network-obj*", "objectType:NETWORK_OBJECT")
         assert result == "name:*network-obj* AND objectType:NETWORK_OBJECT"
 
     def test_returns_filter_when_query_is_none(self) -> None:
-        result = NetworkObjectService._build_query(None)
+        from sccfm_core.services.object_management.utils import build_filtered_query
+
+        result = build_filtered_query(None, "objectType:NETWORK_OBJECT")
         assert result == "objectType:NETWORK_OBJECT"
 
     def test_returns_filter_when_query_is_empty(self) -> None:
-        result = NetworkObjectService._build_query("")
+        from sccfm_core.services.object_management.utils import build_filtered_query
+
+        result = build_filtered_query("", "objectType:NETWORK_OBJECT")
         assert result == "objectType:NETWORK_OBJECT"

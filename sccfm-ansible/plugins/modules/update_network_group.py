@@ -7,7 +7,8 @@ from ansible.module_utils.basic import AnsibleModule
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management import NetworkGroupResponse, NetworkGroupService
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config, identifier_argument_spec
+from ..module_utils.operations import fetch_object_by_identifier, fields_need_update
 
 DOCUMENTATION = r"""
 ---
@@ -153,8 +154,7 @@ network_group:
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
-        "uid": {"type": "str", "required": False, "default": None},
-        "name": {"type": "str", "required": False, "default": None},
+        **identifier_argument_spec(),
         "new_name": {"type": "str", "required": False, "default": None},
         "referenced_objects": {
             "type": "list",
@@ -165,8 +165,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "description": {"type": "str", "required": False, "default": None},
         "labels": {"type": "list", "elements": "str", "required": False, "default": None},
         "tags": {"type": "dict", "required": False, "default": None},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -176,25 +175,14 @@ def _fetch_current_group(
     uid: str | None,
     name: str | None,
 ) -> NetworkGroupResponse:
-    """Fetch the current network group by UID or name.
-
-    Raises:
-        NotFoundError: If the group cannot be found.
-        ValueError: If neither uid nor name is provided.
-    """
-    if uid:
-        result = service.list_network_groups(query=f'uid:"{uid}"', limit=1)
-        if not result.items:
-            raise NotFoundError(f"Network group with UID '{uid}' not found.")
-        return result.items[0]
-
-    if name:
-        obj = service.get_network_group_by_name(name)
-        if not obj:
-            raise NotFoundError(f"Network group with name '{name}' not found.")
-        return obj
-
-    raise ValueError("Either 'uid' or 'name' must be provided.")
+    """Fetch the current network group by UID or name."""
+    return fetch_object_by_identifier(
+        uid=uid,
+        name=name,
+        list_fn=lambda q, limit: service.list_network_groups(query=q, limit=limit),
+        get_by_name_fn=service.get_network_group_by_name,
+        entity_name="Network group",
+    )
 
 
 def _needs_update(
@@ -207,19 +195,22 @@ def _needs_update(
     tags: dict[str, list[str]] | None,
 ) -> bool:
     """Compare desired state against current group to determine if an update is needed."""
-    if new_name is not None and new_name != current.name:
-        return True
-    if description is not None and description != current.description:
-        return True
-    if labels is not None and sorted(labels) != sorted(current.labels):
-        return True
-    if tags is not None and tags != current.tags:
-        return True
-    if referenced_objects is not None and sorted(referenced_objects) != sorted(
-        current.referenced_object_uids
-    ):
-        return True
-    return False
+    return fields_need_update(
+        current={
+            "name": current.name,
+            "referenced_object_uids": current.referenced_object_uids,
+            "description": current.description,
+            "labels": current.labels,
+            "tags": current.tags,
+        },
+        desired={
+            "name": new_name,
+            "referenced_object_uids": referenced_objects,
+            "description": description,
+            "labels": labels,
+            "tags": tags,
+        },
+    )
 
 
 def run_module() -> None:
@@ -230,13 +221,7 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
+    config = create_config(module)
 
     params = module.params
     uid: str | None = params.get("uid")

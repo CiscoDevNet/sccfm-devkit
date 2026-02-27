@@ -19,6 +19,7 @@ from scc_firewall_manager_sdk.models.url_object_content import UrlObjectContent
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management.network_object_service import NetworkObjectService
 from sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
+from sccfm_core.services.object_management.utils import build_filtered_query, resolve_uid
 from sccfm_core.types import ConfigLike
 
 
@@ -227,54 +228,20 @@ class NetworkGroupService:
         response = self._object_api.get_objects_without_preload_content(
             limit=str(limit),
             offset=str(offset),
-            q=self._build_query(query),
+            q=build_filtered_query(query, self.GROUP_TYPE_FILTER),
         )
         data = self._helper.read_raw_response(response)
         return NetworkGroupListResponse.from_dict(data)
 
-    @classmethod
-    def _build_query(cls, query: str | None) -> str:
-        """Append the network group type filter to the user's query.
-
-        Ensures only NETWORK_GROUP types are returned.
-        """
-        if query:
-            return f"{query} AND {cls.GROUP_TYPE_FILTER}"
-        return cls.GROUP_TYPE_FILTER
-
     def _resolve_uid(self, *, uid: str | None, name: str | None) -> str:
-        """Resolve a network group identifier to a UID.
-
-        Validates that exactly one of uid or name is provided. If name is
-        given, queries the API with an objectType filter to find the UID.
-
-        Args:
-            uid: The unique identifier of the network group.
-            name: The name of the network group (resolved to UID via API lookup).
-
-        Returns:
-            The resolved UID string.
-
-        Raises:
-            ValueError: If neither or both identifiers are provided.
-            NotFoundError: If the network group is not found.
-        """
-        if not uid and not name:
-            raise ValueError("Either 'uid' or 'name' must be provided.")
-        if uid and name:
-            raise ValueError("Only one of 'uid' or 'name' should be provided, not both.")
-
-        if name:
-            obj = self.get_network_group_by_name(name)
-            if not obj:
-                raise NotFoundError(f"Network group with name '{name}' not found.")
-            return obj.uid
-
-        assert uid is not None
-        obj = self._get_network_group(uid)
-        if not obj:
-            raise NotFoundError(f"Network group with UID '{uid}' not found.")
-        return uid
+        """Resolve a network group identifier to a UID."""
+        return resolve_uid(
+            uid=uid,
+            name=name,
+            get_by_name_fn=self.get_network_group_by_name,
+            get_by_uid_fn=self._get_network_group,
+            entity_name="Network group",
+        )
 
     def create_network_group(
         self,
