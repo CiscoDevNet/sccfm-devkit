@@ -113,7 +113,16 @@ ansible-galaxy collection list | grep cisco.sccfm
 
 ### Try out examples
 
-See the [Trying out examples](sccfm-ansible/README.md#trying-out-examples) section in the Ansible collection README for step-by-step instructions on:
-- Setting up Ansible Vault for secure credential management
-- Configuring your SCCFM region and API token
-- Running example playbooks to list devices and onboard ASAs
+The fastest way to get going is to use the interactive devkit menu:
+
+```bash\npoetry run devkit\n# select "setup-tokens" from the menu\n```
+
+Or run the token setup directly:
+
+```bash
+poetry run setup-tokens
+```
+
+This will prompt for your region, API token, and vault password, then create all the required files (.env, vars.yml, vault.yml).
+
+See the [Trying out examples](sccfm-ansible/README.md#trying-out-examples) section in the Ansible collection README for the full walkthrough including how to run playbooks.
