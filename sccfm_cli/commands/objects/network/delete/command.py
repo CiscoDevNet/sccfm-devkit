@@ -6,6 +6,7 @@ import click
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import object_delete_params
+from sccfm_cli.commands.objects.utils import format_delete_success, validate_identifier
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkObjectService
@@ -30,11 +31,7 @@ class DeleteNetworkObjectCommand(BaseCommand):
         uid = cast(str | None, kwargs.get("uid"))
         name = cast(str | None, kwargs.get("name"))
 
-        # Validate that exactly one of uid or name is provided
-        if not uid and not name:
-            ctx.fail("Either --uid or --name must be provided.")
-        if uid and name:
-            ctx.fail("Only one of --uid or --name should be provided, not both.")
+        validate_identifier(ctx, uid=uid, name=name)
 
         config = self.get_profile(ctx=ctx, **kwargs)
         service = NetworkObjectService(config)
@@ -42,9 +39,6 @@ class DeleteNetworkObjectCommand(BaseCommand):
         try:
             deleted_uid = service.delete_network_object(uid=uid, name=name)
             identifier = name if name else uid
-            self.console.print(
-                f"[green]\u2713[/green] Network object '{identifier}' "
-                f"deleted successfully (UID: {deleted_uid})"
-            )
+            self.console.print(format_delete_success("Network object", identifier, deleted_uid))
         except NotFoundError as e:
             ctx.fail(str(e))

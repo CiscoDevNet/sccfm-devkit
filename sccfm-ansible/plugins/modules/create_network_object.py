@@ -4,10 +4,9 @@ from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
 
-from sccfm_core.services.object_management import NetworkObjectResponse, NetworkObjectService
-from sccfm_core.types import ConfigLike
+from sccfm_core.services.object_management import NetworkObjectService
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -16,6 +15,8 @@ short_description: Create a network object in SCC Firewall Manager
 description:
   - Create a network object in your SCC Firewall Manager tenant.
   - Supports host IPs, CIDR subnets, and IP ranges as the object value.
+  - Idempotent — if a network object with the same name already exists,
+    the module returns C(ok) (changed=False) with the existing object.
 options:
   name:
     description: Name of the network object.
@@ -105,7 +106,7 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_object:
-  description: The created network object.
+  description: The created network object, or the existing object if already present.
   returned: success
   type: dict
   contains:
@@ -143,59 +144,51 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "description": {"type": "str", "required": False},
         "labels": {"type": "list", "elements": "str", "required": False},
         "tags": {"type": "dict", "required": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
-
-
-def create_network_object(
-    config: ConfigLike,
-    *,
-    name: str,
-    value: str,
-    description: str | None,
-    labels: list[str] | None,
-    tags: dict[str, list[str]] | None,
-) -> NetworkObjectResponse:
-    """Create a network object via the service layer."""
-    service = NetworkObjectService(config=config)
-    return service.create_network_object(
-        name=name,
-        value=value,
-        description=description,
-        labels=labels,
-        tags=tags,
-    )
 
 
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
+    config: Config = create_config(module)
 
     params = module.params
+    name = params["name"]
+    value = params["value"]
 
     try:
-        result = create_network_object(
-            config,
-            name=params["name"],
-            value=params["value"],
+        service = NetworkObjectService(config=config)
+
+        existing = service.get_network_object_by_name(name)
+
+        if existing:
+            module.exit_json(
+                changed=False,
+                msg=f"Network object '{name}' already exists",
+                network_object=existing.to_dict(),
+            )
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg=f"Would create network object '{name}'",
+                network_object={},
+            )
+
+        result = service.create_network_object(
+            name=name,
+            value=value,
             description=params.get("description"),
             labels=params.get("labels"),
             tags=params.get("tags"),
         )
         module.exit_json(
             changed=True,
-            msg=f"Successfully created network object '{params['name']}'",
+            msg=f"Successfully created network object '{name}'",
             network_object=result.to_dict(),
         )
     except Exception as e:

@@ -7,9 +7,7 @@ from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
 from sccfm_core import InventoryService, SccApiError
 from sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
-from sccfm_core.services.inventory.asa_user_password_service import (
-    AsaUserPasswordService,
-)
+from sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
 from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config

@@ -6,7 +6,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from sccfm_core.services.object_management import NetworkGroupService
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -166,8 +166,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "description": {"type": "str", "required": False},
         "labels": {"type": "list", "elements": "str", "required": False},
         "tags": {"type": "dict", "required": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -175,16 +174,10 @@ def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
         mutually_exclusive=[("network_literals", "url_literals")],
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
+    config: Config = create_config(module)
 
     params = module.params
 
@@ -196,6 +189,13 @@ def run_module() -> None:
                 changed=False,
                 msg=f"Network group '{params['name']}' already exists",
                 network_group=existing.to_dict(),
+            )
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg=f"Would create network group '{params['name']}'",
+                network_group={},
             )
 
         result = service.create_network_group(

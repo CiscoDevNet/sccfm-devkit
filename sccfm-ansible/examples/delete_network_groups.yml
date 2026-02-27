@@ -25,8 +25,8 @@
   vars:
     # Define network groups to delete by name
     network_groups:
-      - web-server-group
-      - web-subnet-group
+      - web-servers
+      - app-tier
       # - test-group
 
   tasks:

@@ -96,12 +96,10 @@
       loop: "{{ network_objects }}"
       register: create_results
 
-    - name: Display created network objects
+    - name: Display network object results
       ansible.builtin.debug:
         msg: >-
-          Created '{{ item.network_object.name }}'
-          (uid={{ item.network_object.uid }},
-          value={{ item.network_object.literal }})
+          {{ item.msg }}
       loop: "{{ create_results.results }}"
       when: item.network_object is defined
       loop_control:

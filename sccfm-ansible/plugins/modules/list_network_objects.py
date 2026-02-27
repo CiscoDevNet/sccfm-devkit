@@ -5,9 +5,8 @@ from typing import Any
 from ansible.module_utils.basic import AnsibleModule
 
 from sccfm_core.services.object_management import NetworkObjectListResponse, NetworkObjectService
-from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -143,20 +142,18 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "query": {"type": "str", "required": False, "default": None},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
 def list_network_objects(
-    config: ConfigLike,
+    service: NetworkObjectService,
     *,
     query: str | None,
     limit: int,
     offset: int,
 ) -> NetworkObjectListResponse:
     """List network objects via the service layer."""
-    service = NetworkObjectService(config=config)
     return service.list_network_objects(
         limit=limit,
         offset=offset,
@@ -173,19 +170,14 @@ def run_module() -> None:
     if module.check_mode:
         module.exit_json(changed=False, network_objects=[], count=0, limit=0, offset=0)
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
+    config: Config = create_config(module)
 
     params = module.params
 
     try:
+        service = NetworkObjectService(config=config)
         result = list_network_objects(
-            config,
+            service,
             query=params.get("query"),
             limit=params["limit"],
             offset=params["offset"],

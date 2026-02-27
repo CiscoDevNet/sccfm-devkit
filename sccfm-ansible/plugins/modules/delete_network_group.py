@@ -4,11 +4,15 @@ from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
 
-from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management import NetworkGroupService
-from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import (
+    Config,
+    base_argument_spec,
+    create_config,
+    identifier_argument_spec,
+)
+from ..module_utils.operations import run_delete_with_idempotency
 
 DOCUMENTATION = r"""
 ---
@@ -96,22 +100,9 @@ deleted_uid:
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
-        "uid": {"type": "str", "required": False},
-        "name": {"type": "str", "required": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **identifier_argument_spec(),
+        **base_argument_spec(),
     }
-
-
-def delete_network_group(
-    config: ConfigLike,
-    *,
-    uid: str | None,
-    name: str | None,
-) -> str:
-    """Delete a network group via the service layer."""
-    service = NetworkGroupService(config=config)
-    return service.delete_network_group(uid=uid, name=name)
 
 
 def run_module() -> None:
@@ -122,39 +113,16 @@ def run_module() -> None:
         mutually_exclusive=[("uid", "name")],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
+    config = create_config(module)
+    service = NetworkGroupService(config=config)
 
-    params = module.params
-    identifier = params.get("uid") or params.get("name")
-    identifier_type = "UID" if params.get("uid") else "name"
-
-    try:
-        deleted_uid = delete_network_group(
-            config,
-            uid=params.get("uid"),
-            name=params.get("name"),
-        )
-        module.exit_json(
-            changed=True,
-            msg=f"Successfully deleted network group '{identifier}' ({identifier_type})",
-            deleted_uid=deleted_uid,
-        )
-    except NotFoundError:
-        module.exit_json(
-            changed=False,
-            msg=f"Network group '{identifier}' not found — already absent.",
-            deleted_uid=None,
-        )
-    except ValueError as e:
-        module.fail_json(msg=f"Invalid parameters: {str(e)}")
-    except Exception as e:
-        module.fail_json(msg=f"Failed to delete network group: {str(e)}")
+    run_delete_with_idempotency(
+        module,
+        delete_fn=service.delete_network_group,
+        uid=module.params.get("uid"),
+        name=module.params.get("name"),
+        entity_name="Network group",
+    )
 
 
 def main() -> None:
