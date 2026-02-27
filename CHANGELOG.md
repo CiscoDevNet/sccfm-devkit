@@ -1,3 +1,9 @@
+## v0.15.1 (2026-02-27)
+
+### Fix
+
+- **lh-104598**: create network object idempotency (#27)
+
 ## v0.15.0 (2026-02-25)
 
 ### Feat
