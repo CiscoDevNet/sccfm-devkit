@@ -177,7 +177,7 @@ def run_module() -> None:
         supports_check_mode=False,
     )
 
-    config = create_config(module)
+    config: Config = create_config(module)
 
     params = module.params
 

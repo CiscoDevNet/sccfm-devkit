@@ -39,8 +39,6 @@ class DeleteNetworkObjectCommand(BaseCommand):
         try:
             deleted_uid = service.delete_network_object(uid=uid, name=name)
             identifier = name if name else uid
-            self.console.print(
-                format_delete_success("Network object", identifier, deleted_uid)
-            )
+            self.console.print(format_delete_success("Network object", identifier, deleted_uid))
         except NotFoundError as e:
             ctx.fail(str(e))

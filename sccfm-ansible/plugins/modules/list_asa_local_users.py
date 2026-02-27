@@ -5,12 +5,7 @@ import re
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    CdoCliResult,
-    CdoTransaction,
-    DevicePage,
-)
+from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
 from sccfm_core import AsaCommandLineService, InventoryService, SccApiError
 from sccfm_core.types import ConfigLike
@@ -214,7 +209,7 @@ def run_module() -> None:
     )
 
     try:
-        config = Config(
+        config: Config = Config(
             region=module.params.get("region") or "", api_token=module.params.get("api_token") or ""
         )
     except ValueError as e:

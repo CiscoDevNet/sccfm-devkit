@@ -15,6 +15,8 @@ short_description: Create a network object in SCC Firewall Manager
 description:
   - Create a network object in your SCC Firewall Manager tenant.
   - Supports host IPs, CIDR subnets, and IP ranges as the object value.
+  - Idempotent — if a network object with the same name already exists,
+    the module returns C(ok) (changed=False) with the existing object.
 options:
   name:
     description: Name of the network object.
@@ -104,7 +106,7 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_object:
-  description: The created network object.
+  description: The created network object, or the existing object if already present.
   returned: success
   type: dict
   contains:
@@ -152,7 +154,7 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    config = create_config(module)
+    config: Config = create_config(module)
 
     params = module.params
     name = params["name"]

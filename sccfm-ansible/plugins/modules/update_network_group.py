@@ -7,7 +7,13 @@ from ansible.module_utils.basic import AnsibleModule
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management import NetworkGroupResponse, NetworkGroupService
 
-from ..module_utils.config import Config, base_argument_spec, create_config, identifier_argument_spec
+from ..module_utils.config import (
+    Config,
+    base_argument_spec,
+    create_config,
+    identifier_argument_spec,
+)
+
 from ..module_utils.operations import fetch_object_by_identifier, fields_need_update
 
 DOCUMENTATION = r"""
@@ -221,7 +227,7 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    config = create_config(module)
+    config: Config = create_config(module)
 
     params = module.params
     uid: str | None = params.get("uid")
