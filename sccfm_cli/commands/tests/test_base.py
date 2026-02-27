@@ -16,7 +16,6 @@ from scc_firewall_manager_sdk import (
 
 from sccfm_cli.commands.base import BaseCommand
 
-
 # ── Concrete stub so we can instantiate BaseCommand ──────────────
 
 
