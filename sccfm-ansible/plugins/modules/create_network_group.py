@@ -174,7 +174,7 @@ def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
         mutually_exclusive=[("network_literals", "url_literals")],
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
     config: Config = create_config(module)
@@ -189,6 +189,13 @@ def run_module() -> None:
                 changed=False,
                 msg=f"Network group '{params['name']}' already exists",
                 network_group=existing.to_dict(),
+            )
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg=f"Would create network group '{params['name']}'",
+                network_group={},
             )
 
         result = service.create_network_group(
