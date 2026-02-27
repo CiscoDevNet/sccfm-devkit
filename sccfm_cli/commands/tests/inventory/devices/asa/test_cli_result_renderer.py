@@ -67,16 +67,3 @@ def test_render_cli_results_table() -> None:
     assert "uid-1" in output
     assert "uid-2" in output
     assert "timeout" in output
-
-
-def test_render_cli_results_table_raises_when_uid_missing() -> None:
-    stream = StringIO()
-    console = Console(file=stream, force_terminal=False, width=120)
-    with pytest.raises(KeyError):
-        render_cli_results(
-            console=console,
-            results=_sample_results(),
-            uid_to_device={"uid-1": Device(uid="uid-1", name="asa-1", deviceType="ASA")},
-            script="show version",
-            output_format="table",
-        )

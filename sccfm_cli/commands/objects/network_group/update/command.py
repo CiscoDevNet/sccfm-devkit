@@ -7,13 +7,12 @@ import click
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.objects.options import group_update_params, parse_tags
-from sccfm_cli.commands.objects.utils import validate_has_updates, validate_identifier
 from sccfm_cli.commands.objects.options import (
     format_tags,
     group_update_params,
     parse_tags,
 )
+from sccfm_cli.commands.objects.utils import validate_has_updates, validate_identifier
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
