@@ -161,20 +161,21 @@ def _prompt_region() -> str:
     console.print()
     console.print(table)
 
-    valid_inputs = [*region_keys, *[str(i) for i in range(1, len(region_keys) + 1)]]
-
     while True:
-        choice: str = click.prompt(
-            "\nSelect region (name or #)",
-            type=click.Choice(valid_inputs, case_sensitive=False),
-            default="us",
-        )
+        choice: str = click.prompt("\nSelect region (name or #)", default="us")
+        choice = choice.strip().lower()
+
+        # Accept by number
         if choice.isdigit():
             idx = int(choice)
             if 1 <= idx <= len(region_keys):
                 return region_keys[idx - 1]
-        else:
-            return choice.lower()
+
+        # Accept by name
+        if choice in region_keys:
+            return choice
+
+        console.print(f"[red]Invalid choice '{choice}'. Enter a region name or number.[/red]")
 
 
 def _prompt_token() -> str:
