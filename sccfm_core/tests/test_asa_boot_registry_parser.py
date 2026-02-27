@@ -201,3 +201,9 @@ class TestParseBootRegistry:
     def test_result_is_frozen_dataclass(self) -> None:
         result = parse_boot_registry(SHOW_VERSION_FPR, SHOW_RUN_BOOT_EMPTY)
         assert isinstance(result, AsaBootRegistry)
+        # Verify frozen — assignment must raise.
+        try:
+            result.system_image_file = "changed"
+            raise AssertionError("Expected FrozenInstanceError")
+        except AttributeError:
+            pass

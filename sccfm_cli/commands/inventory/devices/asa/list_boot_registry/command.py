@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.console import Console
@@ -82,8 +82,8 @@ class AsaListBootRegistryCommand(BaseCommand):
             offset=offset,
         )
         devices = self.filter_online_devices(devices)
-        uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
-        device_uids: List[str] = [device.uid for device in devices]
+        uid_to_device: dict[str, Device] = {device.uid: device for device in devices}
+        device_uids: list[str] = [device.uid for device in devices]
 
         service = AsaBootRegistryService(config=config)
         results = service.list_boot_registry(device_uids=device_uids)
@@ -99,7 +99,7 @@ class AsaListBootRegistryCommand(BaseCommand):
     def _render_results(
         self,
         results: dict[str, AsaBootRegistry] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -114,7 +114,7 @@ class AsaListBootRegistryCommand(BaseCommand):
     def _render_json(
         self,
         results: dict[str, AsaBootRegistry],
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         output: list[dict[str, Any]] = []
         for device_uid, boot in results.items():
@@ -134,7 +134,7 @@ class AsaListBootRegistryCommand(BaseCommand):
     def _render_table(
         self,
         results: dict[str, AsaBootRegistry],
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         table = Table(show_lines=True)
         table.add_column("Device Name")
@@ -168,7 +168,7 @@ class AsaListBootRegistryCommand(BaseCommand):
         device_uids: tuple[str, ...],
         limit: int,
         offset: int,
-    ) -> List[Device]:
+    ) -> list[Device]:
         inventory_service = InventoryService(config=config)
 
         if query:
@@ -177,7 +177,7 @@ class AsaListBootRegistryCommand(BaseCommand):
                 offset=offset,
                 query=f"{query} AND deviceType:ASA",
             )
-            return cast(List[Device], page.items)
+            return cast(list[Device], page.items)
 
         # Build a combined query from names and/or UIDs.
         clauses: list[str] = []
@@ -189,7 +189,7 @@ class AsaListBootRegistryCommand(BaseCommand):
             offset=offset,
             query=f"({combined}) AND deviceType:ASA",
         )
-        return cast(List[Device], page.items)
+        return cast(list[Device], page.items)
 
     def _validate_filters(
         self,
