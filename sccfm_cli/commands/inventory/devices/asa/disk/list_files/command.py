@@ -80,6 +80,7 @@ class AsaDiskListFilesCommand(BaseCommand):
             limit=limit,
             offset=offset,
         )
+        devices = self.filter_online_devices(devices)
         uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uids: List[str] = [device.uid for device in devices]
 

@@ -9,6 +9,9 @@ from sccfm_cli.commands.inventory.devices.asa.disk import AsaDiskCommand
 from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command import (
     AsaListLocalUsersCommand,
 )
+from sccfm_cli.commands.inventory.devices.asa.list_boot_registry import (
+    AsaListBootRegistryCommand,
+)
 from sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
 from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
 from sccfm_cli.commands.inventory.devices.asa.upgrade import AsaUpgradeCommand
@@ -21,6 +24,7 @@ class AsaCommand(BaseCommand):
         self._subcommands: List[BaseCommand] = [
             AsaCliCommand(console),
             AsaDiskCommand(console),
+            AsaListBootRegistryCommand(console),
             SmartlicenseCommand(console),
             AsaOnboardCommand(console),
             AsaListLocalUsersCommand(console),

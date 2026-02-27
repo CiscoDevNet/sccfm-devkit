@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Sequence, cast
 
 import click
 from rich.console import Console
 from rich.table import Table
-from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device, DevicePage
+from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import (
@@ -16,21 +17,23 @@ from sccfm_cli.commands.inventory.options import (
     query_option,
 )
 from sccfm_cli.utils import with_spinner
-from sccfm_core import AsaCommandLineService, InventoryService
+from sccfm_core.models.asa_boot_registry import AsaBootRegistry
+from sccfm_core.services.inventory.asa_boot_registry_service import AsaBootRegistryService
+from sccfm_core.services.inventory.inventory_service import InventoryService
 from sccfm_core.types import ConfigLike
 
 
-class AsaExecuteCliCommand(BaseCommand):
+class AsaListBootRegistryCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
 
     @property
     def name(self) -> str:
-        return "execute"
+        return "list-boot-registry"
 
     @property
     def help_text(self) -> str:
-        return "Execute CLI commands on ASA devices."
+        return "Show boot registry info (system image, config register, boot entries) for ASAs."
 
     def build_params(self) -> Sequence[click.Parameter]:
         return [
@@ -38,40 +41,26 @@ class AsaExecuteCliCommand(BaseCommand):
                 ["-n", "--device-name"],
                 help="Device name to search for (supports wildcards like 'branch-*').",
             ),
-            query_option(help_text="Filter devices to execute the CLI on by a Lucene query."),
+            query_option(help_text="Filter devices by a Lucene query."),
             limit_option(),
             offset_option(),
             click.Option(
                 ["-u", "--device-uids"],
-                help="List of device UIDs to execute the CLI on.",
+                help="List of device UIDs to query.",
                 multiple=True,
                 type=str,
-            ),
-            click.Option(
-                ["-s", "--script"],
-                help="ASA commands to execute, with each command separated by \\n.",
-            ),
-            click.Option(
-                ["-f", "--script-file"],
-                type=click.Path(path_type=Path, resolve_path=True),
-                help=(
-                    "Path to a file containing ASA commands to execute, with each command "
-                    "separated by a newline."
-                ),
             ),
             format_option(),
             config_path_option(),
         ]
 
-    @with_spinner("Executing CLI commands...")
+    @with_spinner("Fetching boot registry info...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         device_name = cast(str | None, kwargs.get("device_name"))
         query = cast(str | None, kwargs.get("query"))
         device_uids_param = cast(tuple[str, ...] | None, kwargs.get("device_uids"))
         limit = cast(int, kwargs.get("limit"))
         offset = cast(int, kwargs.get("offset"))
-        script = cast(str | None, kwargs.get("script"))
-        script_file = cast(Path | None, kwargs.get("script_file"))
         response_format = cast(str, kwargs.get("format"))
 
         self._validate_filters(
@@ -79,17 +68,13 @@ class AsaExecuteCliCommand(BaseCommand):
             device_name=device_name,
             query=query,
             device_uids=device_uids_param,
-            script=script,
-            script_file=script_file,
         )
 
-        # Convert device_name to query if provided
         if device_name:
             query = f"name:{device_name}"
-        if script_file is not None:
-            script = script_file.read_text()
+
         config = self.get_profile(ctx=ctx, **kwargs)
-        devices: List[Device] = self._get_devices(
+        devices = self._get_devices(
             config=config,
             query=query,
             device_uids=device_uids_param,
@@ -99,23 +84,22 @@ class AsaExecuteCliCommand(BaseCommand):
         devices = self.filter_online_devices(devices)
         uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uids: List[str] = [device.uid for device in devices]
-        asa_cli_service = AsaCommandLineService(config=config)
-        results: CdoTransaction | List[CdoCliResult] = asa_cli_service.execute_cli(
-            device_uids=device_uids,
-            asa_commands=script.split("\n"),  # type: ignore[union-attr]
-        )
+
+        service = AsaBootRegistryService(config=config)
+        results = service.list_boot_registry(device_uids=device_uids)
+
         self._render_results(
             results=results,
             uid_to_device=uid_to_device,
-            script=script,
             format=response_format,
         )
 
+    # ── Rendering ────────────────────────────────────────────────
+
     def _render_results(
         self,
-        results: List[CdoCliResult] | CdoTransaction,
+        results: dict[str, AsaBootRegistry] | CdoTransaction,
         uid_to_device: Dict[str, Device],
-        script: str,
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -123,34 +107,58 @@ class AsaExecuteCliCommand(BaseCommand):
             return
 
         if format == "json":
-            self._render_json(results=results)
+            self._render_json(results=results, uid_to_device=uid_to_device)
         else:
-            self._render_table(results=results, uid_to_device=uid_to_device, script=script)
+            self._render_table(results=results, uid_to_device=uid_to_device)
 
-    def _render_json(self, results: List[CdoCliResult]) -> None:
-        results_data = [item.model_dump(mode="json") for item in results]
-        json_output = json.dumps(results_data, indent=2, ensure_ascii=False)
-        # Use print() instead of console.print() to avoid Rich processing escape sequences
-        print(json_output)
+    def _render_json(
+        self,
+        results: dict[str, AsaBootRegistry],
+        uid_to_device: Dict[str, Device],
+    ) -> None:
+        output: list[dict[str, Any]] = []
+        for device_uid, boot in results.items():
+            output.append(
+                {
+                    "device_name": uid_to_device[device_uid].name,
+                    "device_uid": device_uid,
+                    "system_image_file": boot.system_image_file,
+                    "compiled_date": boot.compiled_date,
+                    "config_register": boot.config_register,
+                    "config_modified": boot.config_modified,
+                    "boot_system_entries": boot.boot_system_entries,
+                }
+            )
+        print(json.dumps(output, indent=2, ensure_ascii=False))
 
     def _render_table(
-        self, results: List[CdoCliResult], uid_to_device: Dict[str, Device], script: str
+        self,
+        results: dict[str, AsaBootRegistry],
+        uid_to_device: Dict[str, Device],
     ) -> None:
-        self.console.print(f"Executed script: {script}")
         table = Table(show_lines=True)
-        table.add_column("Name")
-        table.add_column("UID")
-        table.add_column("Result")
-        table.add_column("Error Message")
-        for item in results:
-            table.add_row(
-                uid_to_device[item.device_uid].name,
-                item.device_uid,
-                item.result,
-                item.error_msg or "-",
-            )
+        table.add_column("Device Name")
+        table.add_column("Device UID")
+        table.add_column("System Image")
+        table.add_column("Compiled")
+        table.add_column("Config Register")
+        table.add_column("Config Modified")
+        table.add_column("Boot System Entries")
 
+        for device_uid, boot in results.items():
+            device_name = uid_to_device[device_uid].name
+            table.add_row(
+                device_name,
+                device_uid,
+                boot.system_image_file,
+                boot.compiled_date,
+                boot.config_register,
+                "Yes" if boot.config_modified else "No",
+                "\n".join(boot.boot_system_entries) if boot.boot_system_entries else "(none)",
+            )
         self.console.print(table)
+
+    # ── Device resolution ────────────────────────────────────────
 
     def _get_devices(
         self,
@@ -180,8 +188,6 @@ class AsaExecuteCliCommand(BaseCommand):
         device_name: str | None,
         query: str | None,
         device_uids: tuple[str, ...] | None,
-        script: str | None,
-        script_file: Path | None,
     ) -> None:
         has_device_name = bool(device_name)
         has_query = bool(query)
@@ -192,8 +198,3 @@ class AsaExecuteCliCommand(BaseCommand):
             ctx.fail("Provide one of: --device-name, --query, or --device-uids.")
         if filter_count > 1:
             ctx.fail("Provide only one of: --device-name, --query, or --device-uids.")
-
-        has_script = bool(script)
-        has_script_file = bool(script_file)
-        if has_script == has_script_file:
-            ctx.fail("Provide exactly one of --script or --script-file.")

@@ -120,6 +120,7 @@ class AsaListLocalUsersCommand(BaseCommand):
             self.console.print("No devices matched the given filter.")
             return
 
+        devices = self.filter_online_devices(devices)
         uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uid_list: List[str] = [device.uid for device in devices]
 

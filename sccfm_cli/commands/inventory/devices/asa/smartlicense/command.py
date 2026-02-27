@@ -62,6 +62,7 @@ class SmartlicenseCommand(BaseCommand):
             must_be_virtual=throughput_level is not None,
         )
 
+        devices = self.filter_online_devices(devices)
         script_commands = self._build_script(feature_tier, throughput_level, token)
         uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
         device_uids: List[str] = [device.uid for device in devices]
