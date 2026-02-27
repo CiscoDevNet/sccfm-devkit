@@ -83,8 +83,7 @@ def _verify_ansible_vault() -> None:
         )
     except FileNotFoundError:
         raise click.ClickException(
-            "ansible-vault not found. Install ansible-core:\n"
-            "  poetry install --with dev"
+            "ansible-vault not found. Install ansible-core:\n" "  poetry install --with dev"
         )
 
 

@@ -119,10 +119,7 @@ _TASKS: list[tuple[str, str, Callable[[], None]]] = [
 
 def _build_choices() -> list[questionary.Choice]:
     """Build the questionary choice list from registered tasks."""
-    return [
-        questionary.Choice(title=f"{name:<20} {desc}", value=name)
-        for name, desc, _ in _TASKS
-    ]
+    return [questionary.Choice(title=f"{name:<20} {desc}", value=name) for name, desc, _ in _TASKS]
 
 
 def _dispatch(name: str) -> None:
@@ -141,8 +138,7 @@ def _interactive_menu() -> None:
     """Show an interactive menu and run the selected task."""
     console.print(
         Panel(
-            "[bold]SCCFM Developer Toolkit[/bold]\n"
-            "Select a task to run.",
+            "[bold]SCCFM Developer Toolkit[/bold]\n" "Select a task to run.",
             border_style="cyan",
         )
     )
