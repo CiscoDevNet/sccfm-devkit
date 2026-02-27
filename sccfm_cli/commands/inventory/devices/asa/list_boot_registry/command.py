@@ -39,14 +39,16 @@ class AsaListBootRegistryCommand(BaseCommand):
         return [
             click.Option(
                 ["-n", "--device-name"],
-                help="Device name to search for (supports wildcards like 'branch-*').",
+                help="Device name(s) to search for (supports wildcards like 'branch-*').",
+                multiple=True,
+                type=str,
             ),
             query_option(help_text="Filter devices by a Lucene query."),
             limit_option(),
             offset_option(),
             click.Option(
-                ["-u", "--device-uids"],
-                help="List of device UIDs to query.",
+                ["-u", "--device-uid"],
+                help="Device UID(s) to query.",
                 multiple=True,
                 type=str,
             ),
@@ -56,27 +58,25 @@ class AsaListBootRegistryCommand(BaseCommand):
 
     @with_spinner("Fetching boot registry info...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        device_name = cast(str | None, kwargs.get("device_name"))
+        device_names = cast(tuple[str, ...], kwargs.get("device_name", ()))
         query = cast(str | None, kwargs.get("query"))
-        device_uids_param = cast(tuple[str, ...] | None, kwargs.get("device_uids"))
+        device_uids_param = cast(tuple[str, ...], kwargs.get("device_uid", ()))
         limit = cast(int, kwargs.get("limit"))
         offset = cast(int, kwargs.get("offset"))
         response_format = cast(str, kwargs.get("format"))
 
         self._validate_filters(
             ctx,
-            device_name=device_name,
+            device_names=device_names,
             query=query,
             device_uids=device_uids_param,
         )
-
-        if device_name:
-            query = f"name:{device_name}"
 
         config = self.get_profile(ctx=ctx, **kwargs)
         devices = self._get_devices(
             config=config,
             query=query,
+            device_names=device_names,
             device_uids=device_uids_param,
             limit=limit,
             offset=offset,
@@ -164,11 +164,13 @@ class AsaListBootRegistryCommand(BaseCommand):
         self,
         config: ConfigLike,
         query: str | None,
-        device_uids: tuple[str, ...] | None,
+        device_names: tuple[str, ...],
+        device_uids: tuple[str, ...],
         limit: int,
         offset: int,
     ) -> List[Device]:
         inventory_service = InventoryService(config=config)
+
         if query:
             page: DevicePage = inventory_service.get_devices(
                 limit=limit,
@@ -177,24 +179,32 @@ class AsaListBootRegistryCommand(BaseCommand):
             )
             return cast(List[Device], page.items)
 
-        query = " OR ".join([f"uid:{uid}" for uid in cast(tuple[str, ...], device_uids)])
-        page = inventory_service.get_devices(limit=limit, offset=offset, query=query)
+        # Build a combined query from names and/or UIDs.
+        clauses: list[str] = []
+        clauses.extend(f"name:{name}" for name in device_names)
+        clauses.extend(f"uid:{uid}" for uid in device_uids)
+        combined = " OR ".join(clauses)
+        page = inventory_service.get_devices(
+            limit=limit,
+            offset=offset,
+            query=f"({combined}) AND deviceType:ASA",
+        )
         return cast(List[Device], page.items)
 
     def _validate_filters(
         self,
         ctx: click.Context,
         *,
-        device_name: str | None,
+        device_names: tuple[str, ...],
         query: str | None,
-        device_uids: tuple[str, ...] | None,
+        device_uids: tuple[str, ...],
     ) -> None:
-        has_device_name = bool(device_name)
-        has_query = bool(query)
+        has_names = bool(device_names)
         has_uids = bool(device_uids)
-        filter_count = sum([has_device_name, has_query, has_uids])
+        has_query = bool(query)
+        has_selectors = has_names or has_uids
 
-        if filter_count == 0:
-            ctx.fail("Provide one of: --device-name, --query, or --device-uids.")
-        if filter_count > 1:
-            ctx.fail("Provide only one of: --device-name, --query, or --device-uids.")
+        if not has_selectors and not has_query:
+            ctx.fail("Provide at least one of: --device-name, --device-uid, or --query.")
+        if has_query and has_selectors:
+            ctx.fail("--query cannot be combined with --device-name or --device-uid.")
