@@ -13,7 +13,6 @@ from ..module_utils.config import (
     create_config,
     identifier_argument_spec,
 )
-
 from ..module_utils.operations import fetch_object_by_identifier, fields_need_update
 
 DOCUMENTATION = r"""
