@@ -173,7 +173,7 @@ def run_module() -> None:
     if module.check_mode:
         module.exit_json(changed=False, network_groups=[], count=0, limit=0, offset=0)
 
-    config = create_config(module)
+    config: Config = create_config(module)
 
     params = module.params
 
