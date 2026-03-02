@@ -53,18 +53,53 @@ See instructions in the [INSTALL.md](INSTALL.md) file.
 
 **Build and install (recommended):**
 ```bash
-cd sccfm-ansible
-./build.sh
+poetry run devkit
+# then select "build-collection" from the menu
 ```
 
-This script will:
+Or directly:
+```bash
+poetry run build-ansible-collection
+```
+
+This will:
 1. Initialize the poetry virtual environment (if needed)
 2. Install Python dependencies (`sccfm_core`, `sccfm_cli`, etc.)
 3. Install the Ansible collection
 
 ## Trying out examples
 
-### 1. Set Up Ansible Vault
+### 1. Set Up Tokens (Recommended — interactive)
+
+The fastest way to configure your tokens, `.env`, vault, and region is with the devkit CLI:
+
+```bash
+poetry run devkit
+# then select "setup-tokens" from the menu
+```
+
+Or run the token setup directly:
+```bash
+poetry run setup-tokens
+```
+
+This will interactively:
+1. Let you pick a previously saved token or create a new one
+2. Ask which SCCFM region you're connecting to (for new tokens)
+3. Prompt you to paste your API token
+4. Save the token for future reuse
+5. Create the `.env` file with `SCCFM_REGION` and `SCCFM_API_TOKEN`
+6. Create the `.vault_pass` password file (if it doesn't exist)
+7. Write and encrypt `group_vars/all/vault.yml`
+8. Update `group_vars/all/vars.yml` with the selected region
+
+You can also point the standalone command at a custom examples directory:
+```bash
+poetry run setup-tokens --path /path/to/examples
+```
+
+<details>
+<summary><strong>Manual setup (alternative)</strong></summary>
 
 Create a vault password file (do NOT commit this!):
 
@@ -75,29 +110,18 @@ echo "YourSecureVaultPassword" > .vault_pass
 chmod 600 .vault_pass
 ```
 
-### 2. Edit playbook
-
-Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to match your devices.
-
-### 2. Create Encrypted Secrets
+Copy and edit the example vault file:
 
 ```bash
-# Copy the example vault file
 cp group_vars/all/vault.yml.example group_vars/all/vault.yml.temp
-
-# Edit with your actual secrets
 vim group_vars/all/vault.yml.temp
 ```
 
 Add your secrets:
 ```yaml
 ---
-# SCC Firewall Manager API token
 sccfm_api_token: "your-actual-api-token-here"
-
-# Password for each ASA device
 vault_asa_branch_office_01_password: "ActualPassword1"
-# and so on for each ASA device
 ```
 
 Encrypt the vault file:
@@ -109,13 +133,17 @@ ansible-vault encrypt group_vars/all/vault.yml.temp \
 rm group_vars/all/vault.yml.temp
 ```
 
-### 3. Configure Plain Variables
-
 Edit `group_vars/all/vars.yml`:
 
 ```yaml
 sccfm_region: us  # Change to your region (us, eu, apj, aus, uae, in, or int)
 ```
+
+</details>
+
+### 2. Edit playbook
+
+Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to match your devices.
 
 ### 4. Run Examples
 
