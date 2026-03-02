@@ -21,7 +21,8 @@ Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcomin
 ```bash
 scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
 source scripts/activate.sh     # activates the project virtualenv
-sccfm-cli --help
+sccfm-cli --help               # the main SCCFM CLI
+poetry run devkit              # interactive developer toolkit menu
 ```
 
 `setup_environment.sh` keeps everything local to the repository: pyenv provides Python 3.12.4, `.venv/` hosts the runtime, and Poetry installs the project plus dev dependencies.
@@ -39,7 +40,8 @@ Every command lives in `sccfm_cli/commands/` as a concrete implementation of the
 ## Ansible collection
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
-- Install the collection locally from the collection root (`sccfm-ansible/`) with `ansible-galaxy collection install ./sccfm-ansible`.
+- Build and install the collection locally: `poetry run devkit build-collection`.
+- Set up tokens interactively: `poetry run devkit` and select **setup-tokens** (saves your API token, creates `.env`, `.vault_pass`, encrypts `group_vars/all/vault.yml`, and sets the region).
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
 - Configure SCCFM region (`int`, `us`, `eu`, `apj`, `aus`, `uae`, or `in`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
@@ -47,8 +49,29 @@ Every command lives in `sccfm_cli/commands/` as a concrete implementation of the
 
 ## Development
 
+All common development tasks are available through the interactive `devkit` menu:
+
 ```bash
 source scripts/activate.sh
+devkit
+```
+
+This presents an interactive selector with the following tasks:
+
+| Task | Description |
+|------|-------------|
+| **setup-tokens** | Set up SCCFM API tokens, .env, and Ansible Vault |
+| **build-collection** | Build the cisco.sccfm Ansible collection tarball |
+| **setup-env** | Bootstrap environment (pyenv, venv, Poetry deps) |
+| **test** | Run the test suite (pytest), with optional filter & verbose |
+| **lint** | Run mypy + flake8 |
+| **format** | Auto-format code with black + isort |
+
+After a task completes you're returned to the menu — select **Exit** when done.
+
+The underlying tools are still available directly if needed:
+
+```bash
 poetry run pytest
 poetry run mypy sccfm_cli
 poetry run black .

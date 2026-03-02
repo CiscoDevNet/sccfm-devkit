@@ -16,10 +16,13 @@ click = ">=8.0.0,<9"
 rich = "^14.2.0"
 click-option-group = "^0.5.9"
 scc-firewall-manager-sdk = "^1.17.27"
+questionary = "^2.1.1"
 
 [tool.poetry.scripts]
 sccfm-cli = "sccfm_cli.cli:cli"
+devkit = "scripts.devkit_cli:main"
 build-ansible-collection = "scripts.build_ansible_collection:main"
+setup-tokens = "scripts.setup_tokens:main"
 
 [tool.poetry.group.dev.dependencies]
 ansible-core = "^2.17.0"
@@ -72,6 +75,8 @@ module = [
   "scc_firewall_manager_sdk.*",
   "_pytest.*",
   "pytest",
+  "questionary",
+  "questionary.*",
   "yaml",
 ]
 ignore_missing_imports = true
