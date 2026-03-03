@@ -293,18 +293,14 @@ def _ensure_vault_pass(examples_path: Path) -> Path:
     return vault_pass_path
 
 
-def _ensure_vault_pass_headless(
-    examples_path: Path, vault_password: str | None
-) -> Path:
+def _ensure_vault_pass_headless(examples_path: Path, vault_password: str | None) -> Path:
     """Return the vault password file, creating it from *vault_password*
     if it does not already exist.  No interactive prompts.
     """
     vault_pass_path = examples_path / ".vault_pass"
 
     if vault_pass_path.exists():
-        console.print(
-            f"[dim]Using existing vault password file: {vault_pass_path}[/dim]"
-        )
+        console.print(f"[dim]Using existing vault password file: {vault_pass_path}[/dim]")
         return vault_pass_path
 
     if not vault_password:
@@ -314,15 +310,11 @@ def _ensure_vault_pass_headless(
 
     vault_pass_path.write_text(vault_password.strip() + "\n")
     vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
-    console.print(
-        f"[green]Created vault password file:[/green] {vault_pass_path}"
-    )
+    console.print(f"[green]Created vault password file:[/green] {vault_pass_path}")
     return vault_pass_path
 
 
-def _merge_token(
-    store: VaultTokenStore, token: SavedToken
-) -> list[SavedToken]:
+def _merge_token(store: VaultTokenStore, token: SavedToken) -> list[SavedToken]:
     """Merge *token* into the existing saved list, replacing by name."""
     existing = store.list_tokens()
     merged = [t for t in existing if t.name != token.name]
@@ -399,9 +391,7 @@ def _run_headless(
     _update_cli_config(region, api_token, profile=profile)
 
     # ── Summary ──────────────────────────────────────────────────
-    summary = Table(
-        title="Setup Complete", show_header=False, border_style="green"
-    )
+    summary = Table(title="Setup Complete", show_header=False, border_style="green")
     summary.add_column("Key", style="bold")
     summary.add_column("Value")
     summary.add_row("Token", name)
@@ -477,9 +467,7 @@ def main(
 
     if headless:
         if not region or not api_token:
-            raise click.UsageError(
-                "Headless mode requires both --region and --api-token."
-            )
+            raise click.UsageError("Headless mode requires both --region and --api-token.")
         _run_headless(
             region=region,
             api_token=api_token,

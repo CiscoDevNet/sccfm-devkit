@@ -4,11 +4,11 @@ import json
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Sequence, cast
+from typing import Any, List, Sequence, cast
 
 import click
 from rich.console import Console
-from scc_firewall_manager_sdk import ApiException, CdoTransaction
+from scc_firewall_manager_sdk import ApiException, CdoTransaction, ConnectivityState, Device
 
 from sccfm_cli.services import ConfigService
 from sccfm_core import SccApiError
@@ -94,6 +94,35 @@ class BaseCommand(ABC):
     @property
     def console(self) -> Console:
         return self._console
+
+    def filter_online_devices(self, devices: List[Device]) -> List[Device]:
+        """Return only devices with ``ONLINE`` connectivity state.
+
+        Prints a warning for each skipped device so the operator knows
+        which devices were excluded.  Raises :class:`click.ClickException`
+        if *no* devices are online.
+        """
+        online: List[Device] = []
+        offline: List[Device] = []
+        for device in devices:
+            if device.connectivity_state == ConnectivityState.ONLINE:
+                online.append(device)
+            else:
+                offline.append(device)
+
+        for device in offline:
+            self.console.print(
+                f"[yellow]Skipping '{device.name}' "
+                f"(state: {device.connectivity_state}) "
+                f"— CLI commands require ONLINE devices.[/yellow]"
+            )
+
+        if not online:
+            raise click.ClickException(
+                "No online devices found. CLI commands can only be "
+                "executed on devices with connectivity state ONLINE."
+            )
+        return online
 
     def print_failed_transaction_details(
         self, cdo_transaction: CdoTransaction, format: str = "table"
