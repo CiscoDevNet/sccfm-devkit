@@ -11,15 +11,9 @@ import re
 import sys
 
 # Same regexes as asa_boot_registry_parser.py
-SYSTEM_IMAGE_RE = re.compile(
-    r'System image file is\s+"([^"]+)"', re.IGNORECASE
-)
-COMPILED_RE = re.compile(
-    r"Compiled on\s+(.+?)(?:\s+by\s+\S+)?\s*$", re.IGNORECASE | re.MULTILINE
-)
-CONFIG_REGISTER_RE = re.compile(
-    r"Configuration register is\s+(0x[\da-fA-F]+)", re.IGNORECASE
-)
+SYSTEM_IMAGE_RE = re.compile(r'System image file is\s+"([^"]+)"', re.IGNORECASE)
+COMPILED_RE = re.compile(r"Compiled on\s+(.+?)(?:\s+by\s+\S+)?\s*$", re.IGNORECASE | re.MULTILINE)
+CONFIG_REGISTER_RE = re.compile(r"Configuration register is\s+(0x[\da-fA-F]+)", re.IGNORECASE)
 CONFIG_NOT_MODIFIED_RE = re.compile(
     r"Configuration has not been modified since last system restart",
     re.IGNORECASE,

@@ -231,9 +231,7 @@ class TestCRLFLineEndings:
         assert result.config_modified is False
 
     def test_boot_entries_with_crlf(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_CRLF, self.SHOW_RUN_BOOT_CRLF
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_CRLF, self.SHOW_RUN_BOOT_CRLF)
         assert len(result.boot_system_entries) == 3
         assert result.boot_system_entries[0] == "disk0:/asa9-16-4-42-smp-k8.bin"
 
@@ -278,9 +276,7 @@ class TestBootImagePrefix:
     )
 
     def test_boot_prefix_image_captured(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_BOOT_PREFIX, SHOW_RUN_BOOT_EMPTY
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_BOOT_PREFIX, SHOW_RUN_BOOT_EMPTY)
         assert result.system_image_file == "boot:/asa9231-smp-k8.bin"
 
 
@@ -296,16 +292,12 @@ class TestCompiledDateVariants:
         )
 
     def test_compiled_with_pdt_timezone(self) -> None:
-        text = self._make_show_version(
-            "Compiled on Mon 23-Sep-19 09:38 PDT by builders"
-        )
+        text = self._make_show_version("Compiled on Mon 23-Sep-19 09:38 PDT by builders")
         result = parse_boot_registry(text, SHOW_RUN_BOOT_EMPTY)
         assert result.compiled_date == "Mon 23-Sep-19 09:38 PDT"
 
     def test_compiled_with_utc_timezone(self) -> None:
-        text = self._make_show_version(
-            "Compiled on Thu 08-Jun-23 15:20 UTC by builders"
-        )
+        text = self._make_show_version("Compiled on Thu 08-Jun-23 15:20 UTC by builders")
         result = parse_boot_registry(text, SHOW_RUN_BOOT_EMPTY)
         assert result.compiled_date == "Thu 08-Jun-23 15:20 UTC"
 
@@ -316,9 +308,7 @@ class TestCompiledDateVariants:
         assert result.compiled_date == "Thu 08-Jun-23 15:20 UTC"
 
     def test_compiled_with_trailing_whitespace(self) -> None:
-        text = self._make_show_version(
-            "Compiled on Fri 22-Sep-23 03:23 GMT by builders   "
-        )
+        text = self._make_show_version("Compiled on Fri 22-Sep-23 03:23 GMT by builders   ")
         result = parse_boot_registry(text, SHOW_RUN_BOOT_EMPTY)
         assert result.compiled_date == "Fri 22-Sep-23 03:23 GMT"
 
@@ -346,9 +336,7 @@ class TestBootSystemEntryVariants:
     def test_boot_entry_with_spa_suffix(self) -> None:
         text = "boot system disk0:/cisco-asa-fp1k.9.20.2.10.SPA"
         result = parse_boot_registry(SHOW_VERSION_FPR, text)
-        assert result.boot_system_entries == [
-            "disk0:/cisco-asa-fp1k.9.20.2.10.SPA"
-        ]
+        assert result.boot_system_entries == ["disk0:/cisco-asa-fp1k.9.20.2.10.SPA"]
 
     def test_boot_entries_with_blank_lines(self) -> None:
         """Blank lines between entries should not produce extra entries."""
@@ -457,34 +445,24 @@ class TestOldAsaVersion:
     )
 
     def test_old_asa_system_image(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913)
         assert result.system_image_file == "disk0:/asa9-13-1-smp-k8.bin"
 
     def test_old_asa_compiled_pdt(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913)
         assert result.compiled_date == "Mon 23-Sep-19 09:38 PDT"
 
     def test_old_asa_no_config_register(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913)
         assert result.config_register == "unknown"
 
     def test_old_asa_config_modified(self) -> None:
         """No 'Configuration has not been modified' line -> modified."""
-        result = parse_boot_registry(
-            self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913)
         assert result.config_modified is True
 
     def test_old_asa_three_boot_entries(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_ASA_913, self.SHOW_RUN_BOOT_913)
         assert result.boot_system_entries == [
             "disk0:/asa9-13-1-smp-k8.bin",
             "disk0:/asa9-12-3-9-smp-k8.bin",
@@ -514,29 +492,19 @@ class TestFPR1010RealOutput:
     SHOW_RUN_BOOT_FPR1010 = "boot system disk0:/cisco-asa-fp1k.9.20.2.10.SPA"
 
     def test_fpr1010_deep_path_image(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010)
         assert result.system_image_file == (
             "disk0:/installables/switch/fxos-k8-fp1k-lfbff.2.14.1.145.SPA"
         )
 
     def test_fpr1010_config_register(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010)
         assert result.config_register == "0x1"
 
     def test_fpr1010_not_modified(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010
-        )
+        result = parse_boot_registry(self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010)
         assert result.config_modified is False
 
     def test_fpr1010_boot_entry_spa_suffix(self) -> None:
-        result = parse_boot_registry(
-            self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010
-        )
-        assert result.boot_system_entries == [
-            "disk0:/cisco-asa-fp1k.9.20.2.10.SPA"
-        ]
+        result = parse_boot_registry(self.SHOW_VERSION_FPR1010, self.SHOW_RUN_BOOT_FPR1010)
+        assert result.boot_system_entries == ["disk0:/cisco-asa-fp1k.9.20.2.10.SPA"]
