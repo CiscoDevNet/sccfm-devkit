@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Interactive setup for SCCFM API tokens, .env, and Ansible Vault.
+"""Setup for SCCFM API tokens, .env, and Ansible Vault.
+
+Runs **interactively** by default (prompts for region, token, etc.).
+Supply ``--region`` and ``--api-token`` to run **headless** — suitable
+for CI pipelines and scripted workflows.
 
 Manages a local token store so tokens can be reused across setups.
 Creates / updates:
@@ -7,6 +11,21 @@ Creates / updates:
   - .vault_pass       (vault password file)
   - group_vars/all/vars.yml   (sccfm_region)
   - group_vars/all/vault.yml  (encrypted sccfm_api_token)
+  - ~/.sccfm-cli/config.json  (CLI profile)
+
+Examples::
+
+    # Interactive (default)
+    python scripts/setup_tokens.py
+
+    # Headless — minimal
+    python scripts/setup_tokens.py --region us --api-token eyJ…
+
+    # Headless — all options
+    python scripts/setup_tokens.py \\
+        --region int --api-token eyJ… \\
+        --name staging --profile staging \\
+        --vault-password s3cret
 """
 
 from __future__ import annotations
@@ -252,7 +271,7 @@ def _update_cli_config(region: str, api_token: str, profile: str = "default") ->
 
 
 def _ensure_vault_pass(examples_path: Path) -> Path:
-    """Return the vault password file, creating it if needed."""
+    """Return the vault password file, creating it interactively if needed."""
     vault_pass_path = examples_path / ".vault_pass"
 
     if vault_pass_path.exists():
@@ -272,6 +291,43 @@ def _ensure_vault_pass(examples_path: Path) -> Path:
     vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
     console.print(f"[green]Created vault password file:[/green] {vault_pass_path}")
     return vault_pass_path
+
+
+def _ensure_vault_pass_headless(
+    examples_path: Path, vault_password: str | None
+) -> Path:
+    """Return the vault password file, creating it from *vault_password*
+    if it does not already exist.  No interactive prompts.
+    """
+    vault_pass_path = examples_path / ".vault_pass"
+
+    if vault_pass_path.exists():
+        console.print(
+            f"[dim]Using existing vault password file: {vault_pass_path}[/dim]"
+        )
+        return vault_pass_path
+
+    if not vault_password:
+        raise click.ClickException(
+            "No vault password file found and --vault-password was not supplied."
+        )
+
+    vault_pass_path.write_text(vault_password.strip() + "\n")
+    vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
+    console.print(
+        f"[green]Created vault password file:[/green] {vault_pass_path}"
+    )
+    return vault_pass_path
+
+
+def _merge_token(
+    store: VaultTokenStore, token: SavedToken
+) -> list[SavedToken]:
+    """Merge *token* into the existing saved list, replacing by name."""
+    existing = store.list_tokens()
+    merged = [t for t in existing if t.name != token.name]
+    merged.append(token)
+    return merged
 
 
 # ── vars.yml management ─────────────────────────────────────────
@@ -307,22 +363,136 @@ def _update_vars_region(examples_path: Path, region: str) -> None:
     console.print(f"[green]Set region to '{region}' in:[/green] {vars_path}")
 
 
+# ── Headless logic ───────────────────────────────────────────────
+
+
+def _run_headless(
+    region: str,
+    api_token: str,
+    name: str,
+    profile: str,
+    vault_password: str | None,
+    path: str | None,
+) -> None:
+    """Execute the full setup without any interactive prompts."""
+    root = _project_root()
+    examples_path = _resolve_examples_path(path)
+    console.print(f"[dim]Examples directory: {examples_path}[/dim]")
+
+    _verify_ansible_vault()
+
+    # ── Vault password ───────────────────────────────────────────
+    vault_pass_path = _ensure_vault_pass_headless(examples_path, vault_password)
+
+    # ── Build token ──────────────────────────────────────────────
+    selected = SavedToken(name=name, region=region, token=api_token)
+
+    # ── Merge with existing saved tokens ─────────────────────────
+    store = VaultTokenStore(examples_path)
+    all_tokens = _merge_token(store, selected)
+
+    # ── Write files ──────────────────────────────────────────────
+    env_path = _write_env_file(root, region, api_token)
+    _update_vars_region(examples_path, region)
+    vault_path = store.save_active_and_tokens(selected, all_tokens)
+    console.print(f"[green]Encrypted vault file updated:[/green] {vault_path}")
+    _update_cli_config(region, api_token, profile=profile)
+
+    # ── Summary ──────────────────────────────────────────────────
+    summary = Table(
+        title="Setup Complete", show_header=False, border_style="green"
+    )
+    summary.add_column("Key", style="bold")
+    summary.add_column("Value")
+    summary.add_row("Token", name)
+    summary.add_row("Region", region)
+    summary.add_row("CLI Profile", profile)
+    summary.add_row(".env file", str(env_path))
+    summary.add_row("Vault file", str(vault_path))
+    summary.add_row("Vault password", str(vault_pass_path))
+    summary.add_row("CLI config", "~/.sccfm-cli/config.json")
+
+    console.print()
+    console.print(summary)
+
+
 # ── CLI entry point ──────────────────────────────────────────────
 
+_VALID_REGIONS = tuple(_REGIONS.keys())
 
-@click.command(help="Interactive setup for SCCFM API tokens, .env, and Ansible Vault.")
+
+@click.command(
+    help="Setup SCCFM API tokens, .env, and Ansible Vault.\n\n"
+    "Runs interactively by default.  Supply --region and --api-token "
+    "to run in headless mode (no prompts).",
+)
+@click.option(
+    "--region",
+    "-r",
+    default=None,
+    type=click.Choice(_VALID_REGIONS, case_sensitive=False),
+    help="SCCFM region.  Enables headless mode when combined with --api-token.",
+)
+@click.option(
+    "--api-token",
+    "-t",
+    default=None,
+    help="SCCFM API token.  Enables headless mode when combined with --region.",
+)
+@click.option(
+    "--name",
+    "-n",
+    default="default",
+    show_default=True,
+    help="Label for this token in the vault store (headless only).",
+)
+@click.option(
+    "--profile",
+    "-p",
+    default="default",
+    show_default=True,
+    help="CLI config profile name to update (headless only).",
+)
+@click.option(
+    "--vault-password",
+    default=None,
+    help="Vault password — used only when .vault_pass doesn't exist yet (headless only).",
+)
 @click.option(
     "--path",
     default=None,
     type=click.Path(resolve_path=True),
     help=f"Path to the ansible examples directory (default: {_DEFAULT_EXAMPLES_PATH}).",
 )
-def main(path: str | None) -> None:
-    """Walk through token selection, .env creation, and vault setup."""
-    try:
-        _run_setup(path)
-    except (KeyboardInterrupt, click.Abort):
-        console.print("\n[dim]Cancelled.[/dim]")
+def main(
+    region: str | None,
+    api_token: str | None,
+    name: str,
+    profile: str,
+    vault_password: str | None,
+    path: str | None,
+) -> None:
+    """Setup tokens — auto-detects interactive vs headless mode."""
+    headless = region is not None or api_token is not None
+
+    if headless:
+        if not region or not api_token:
+            raise click.UsageError(
+                "Headless mode requires both --region and --api-token."
+            )
+        _run_headless(
+            region=region,
+            api_token=api_token,
+            name=name,
+            profile=profile,
+            vault_password=vault_password,
+            path=path,
+        )
+    else:
+        try:
+            _run_setup(path)
+        except (KeyboardInterrupt, click.Abort):
+            console.print("\n[dim]Cancelled.[/dim]")
 
 
 def _run_setup(path: str | None) -> None:
