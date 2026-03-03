@@ -4,11 +4,10 @@ import json
 from typing import Any, Sequence, cast
 
 import click
-from rich.console import Console
 from rich.table import Table
-from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
+from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage, EntityType
 
-from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.asa.shared import AsaDeviceTargetCommand
 from sccfm_cli.commands.inventory.options import (
     config_path_option,
     format_option,
@@ -17,15 +16,13 @@ from sccfm_cli.commands.inventory.options import (
     query_option,
 )
 from sccfm_cli.utils import with_spinner
+from sccfm_core import InventoryService
 from sccfm_core.models.asa_boot_registry import AsaBootRegistry
 from sccfm_core.services.inventory.asa_boot_registry_service import AsaBootRegistryService
-from sccfm_core.services.inventory.inventory_service import InventoryService
 from sccfm_core.types import ConfigLike
 
 
-class AsaListBootRegistryCommand(BaseCommand):
-    def __init__(self, console: Console) -> None:
-        super().__init__(console)
+class AsaListBootRegistryCommand(AsaDeviceTargetCommand):
 
     @property
     def name(self) -> str:

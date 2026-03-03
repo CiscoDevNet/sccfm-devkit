@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
 from sccfm_core import AsaCommandLineService, InventoryService, SccApiError
+from sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
 from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config
@@ -107,43 +107,6 @@ asa_local_users_json:
   returned: success
   type: str
 """
-
-
-def _normalize_output(result_text: str) -> list[str]:
-    """Convert raw CLI text into a list of non-empty, stripped lines."""
-    if not result_text:
-        return []
-    output = result_text.replace("\\t", "\t")
-    return [ln.rstrip() for ln in output.splitlines() if ln.strip()]
-
-
-def _split_columns(text: str) -> list[str]:
-    """Split a line on tabs or two-or-more consecutive spaces."""
-    return re.split(r"\t+|\s{2,}", text.strip())
-
-
-def _parse_users(lines: list[str]) -> list[dict[str, str]]:
-    """Parse the ``show aaa local user`` table into a list of user dicts.
-
-    First non-empty line is the header row; remaining lines are data rows.
-    Columns are split on tabs or two-or-more spaces.
-    """
-    if not lines:
-        return []
-
-    headers = [
-        h.strip().lower().replace("-", "_").replace(" ", "_") for h in _split_columns(lines[0])
-    ]
-    users: list[dict[str, str]] = []
-    for data_line in lines[1:]:
-        cols = [c.strip() for c in _split_columns(data_line)]
-        # Pad / merge to match header count
-        if len(cols) < len(headers):
-            cols += [""] * (len(headers) - len(cols))
-        elif len(cols) > len(headers):
-            cols = cols[: len(headers) - 1] + [" ".join(cols[len(headers) - 1 :])]
-        users.append(dict(zip(headers, cols[: len(headers)])))
-    return users
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
@@ -251,7 +214,8 @@ def run_module() -> None:
             raw = getattr(result, "result", "") or ""
             uid = getattr(result, "device_uid", "")
             key = device_names.get(uid, "") or uid
-            asa_local_users[key] = _parse_users(_normalize_output(raw))
+            headers, rows = parse_cli_table(normalize_cli_output(raw), max_columns=None)
+            asa_local_users[key] = rows_to_dicts(headers, rows)
 
         module.exit_json(
             changed=False,
