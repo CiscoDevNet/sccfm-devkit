@@ -9,7 +9,7 @@ from sccfm_core.parsers.asa_disk_file_parser import parse_disk_file_listing
 from sccfm_core.parsers.asa_local_user_parser import parse_local_user
 
 __all__ = [
-    "normalize_cli_output",
+    "normalize_cli_output"
     "parse_boot_registry",
     "parse_cli_table",
     "parse_disk_file_listing",
