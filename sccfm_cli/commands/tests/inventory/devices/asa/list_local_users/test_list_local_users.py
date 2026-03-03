@@ -16,73 +16,8 @@ from scc_firewall_manager_sdk import (
 )
 
 from sccfm_cli.cli import cli
-from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command import (
-    _normalize_output,
-    _parse_cli_table,
-    _rows_to_dicts,
-)
 from sccfm_cli.models import Config
 from sccfm_core.services import AsaCommandLineService, InventoryService
-
-# ---------------------------------------------------------------------------
-# Unit tests for pure helper functions
-# ---------------------------------------------------------------------------
-
-
-class TestNormalizeOutput:
-    def test_returns_empty_for_none(self) -> None:
-        assert _normalize_output(None) == []
-
-    def test_returns_empty_for_empty_string(self) -> None:
-        assert _normalize_output("") == []
-
-    def test_strips_blank_lines_and_whitespace(self) -> None:
-        raw = "  hello  \n\n  world  \n"
-        assert _normalize_output(raw) == ["  hello", "  world"]
-
-    def test_converts_escaped_tabs(self) -> None:
-        raw = "col1\\tcol2"
-        result = _normalize_output(raw)
-        assert result == ["col1\tcol2"]
-
-
-class TestParseCliTable:
-    def test_returns_empty_for_no_lines(self) -> None:
-        assert _parse_cli_table([]) == ([], [])
-
-    def test_parses_header_and_single_row(self) -> None:
-        lines = [
-            "User  Locked  Expired",
-            "cisco  N       N",
-        ]
-        headers, rows = _parse_cli_table(lines)
-        assert headers == ["User", "Locked", "Expired"]
-        assert rows == [["cisco", "N", "N"]]
-
-    def test_pads_short_rows(self) -> None:
-        lines = ["A  B  C", "x"]
-        _, rows = _parse_cli_table(lines)
-        assert rows == [["x", "", ""]]
-
-    def test_merges_extra_columns(self) -> None:
-        lines = ["A  B", "x  y  z  w"]
-        _, rows = _parse_cli_table(lines, max_columns=2)
-        assert rows == [["x", "y z w"]]
-
-
-class TestRowsToDicts:
-    def test_basic_conversion(self) -> None:
-        headers = ["User", "Locked"]
-        rows = [["cisco", "N"], ["admin", "Y"]]
-        result = _rows_to_dicts(headers, rows)
-        assert result == [{"user": "cisco", "locked": "N"}, {"user": "admin", "locked": "Y"}]
-
-    def test_normalises_header_names(self) -> None:
-        headers = ["Lock-time", "Failed-attempts", "New User"]
-        rows = [["10", "3", "N"]]
-        result = _rows_to_dicts(headers, rows)
-        assert result == [{"lock_time": "10", "failed_attempts": "3", "new_user": "N"}]
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures & stubs for integration tests

@@ -1,18 +1,21 @@
-import json
-from pathlib import Path
-from typing import Any, Dict, Final, List, Sequence, cast
+from typing import Any, Final, Sequence, cast
 
 import click
-from rich.table import Table
-from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device, DevicePage
+from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device
 
-from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.asa.cli_result_renderer import (
+    render_cli_results,
+)
+from sccfm_cli.commands.inventory.devices.asa.shared import (
+    AsaDeviceTargetCommand,
+    asa_device_filter_params,
+)
+from sccfm_cli.commands.inventory.options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
-from sccfm_core import AsaCommandLineService, InventoryService
-from sccfm_core.types import ConfigLike
+from sccfm_core import AsaCommandLineService
 
 
-class SmartlicenseCommand(BaseCommand):
+class SmartlicenseCommand(AsaDeviceTargetCommand):
     _ASAV_SMART_LICENSE_SCRIPT: Final[str] = (
         "license smart\n"
         "feature tier {feature_tier}\n"
@@ -40,38 +43,36 @@ class SmartlicenseCommand(BaseCommand):
 
     @with_spinner("Applying Smart Licenses...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        query = cast(str | None, kwargs.get("query"))
-        device_uids_param = cast(tuple[str, ...] | None, kwargs.get("device_uids"))
-        limit = cast(int, kwargs.get("limit"))
-        offset = cast(int, kwargs.get("offset"))
         token = cast(str, kwargs.get("token"))
         feature_tier = cast(str, kwargs.get("feature_tier"))
         throughput_level = cast(str | None, kwargs.get("throughput_level"))
         response_format = cast(str, kwargs.get("format"))
 
-        self._validate_filters(ctx, query=query, device_uids=device_uids_param)
-
         config = self.get_profile(ctx=ctx, **kwargs)
-        devices = self._get_devices(
+        targets = self.resolve_asa_targets_from_kwargs(
             ctx=ctx,
+            kwargs=kwargs,
             config=config,
-            query=query,
-            device_uids=device_uids_param,
-            limit=limit,
-            offset=offset,
+            include_device_name=False,
+            require_exactly_one_filter=True,
+        )
+        self._validate_virtual_devices(
+            ctx=ctx,
+            devices=targets.devices,
             must_be_virtual=throughput_level is not None,
         )
 
         script_commands = self._build_script(feature_tier, throughput_level, token)
-        uid_to_device: Dict[str, Device] = {device.uid: device for device in devices}
-        device_uids: List[str] = [device.uid for device in devices]
 
         asa_cli_service = AsaCommandLineService(config=config)
-        results = asa_cli_service.execute_cli(device_uids=device_uids, asa_commands=script_commands)
+        results = asa_cli_service.execute_cli(
+            device_uids=targets.device_uids,
+            asa_commands=script_commands,
+        )
 
         self._render_results(
             results=results,
-            uid_to_device=uid_to_device,
+            uid_to_device=targets.uid_to_device,
             script_text="\n".join(script_commands),
             format=response_format,
         )
@@ -100,57 +101,21 @@ class SmartlicenseCommand(BaseCommand):
             self.print_failed_transaction_details(cdo_transaction=results, format="table")
             return
 
-        if format == "json":
-            self._render_json(results=results)
-        else:
-            self._render_table(results=results, uid_to_device=uid_to_device, script=script_text)
+        render_cli_results(
+            console=self.console,
+            results=results,
+            uid_to_device=uid_to_device,
+            script=script_text,
+            output_format=format,
+        )
 
-    def _render_json(self, results: list[CdoCliResult]) -> None:
-        results_data = [item.model_dump(mode="json") for item in results]
-        json_output = json.dumps(results_data, indent=2, ensure_ascii=False)
-        # Use print() instead of console.print() to avoid Rich processing escape sequences
-        print(json_output)
-
-    def _render_table(
-        self, results: list[CdoCliResult], uid_to_device: dict[str, Device], script: str
-    ) -> None:
-        self.console.print(f"Executed script: {script}")
-        table = Table(show_lines=True)
-        table.add_column("Name")
-        table.add_column("UID")
-        table.add_column("Result")
-        table.add_column("Error Message")
-        for item in results:
-            table.add_row(
-                uid_to_device[item.device_uid].name,
-                item.device_uid,
-                item.result,
-                item.error_msg or "-",
-            )
-
-        self.console.print(table)
-
-    def _get_devices(
+    def _validate_virtual_devices(
         self,
         ctx: click.Context,
-        config: ConfigLike,
-        query: str | None,
-        device_uids: tuple[str, ...] | None,
-        limit: int,
-        offset: int,
-        must_be_virtual: bool = False,
-    ) -> list[Device]:
-        inventory_service = InventoryService(config=config)
-        if query:
-            page: DevicePage = inventory_service.get_devices(
-                limit=limit, offset=offset, query=f"{query} AND deviceType:ASA"
-            )
-            devices = cast(list[Device], page.items)
-        else:
-            query = " OR ".join([f"uid:{uid}" for uid in cast(tuple[str, ...], device_uids)])
-            page = inventory_service.get_devices(limit=limit, offset=offset, query=query)
-            devices = cast(list[Device], page.items)
-
+        *,
+        devices: list[Device],
+        must_be_virtual: bool,
+    ) -> None:
         if must_be_virtual:
             non_virtual = [
                 device
@@ -165,61 +130,15 @@ class SmartlicenseCommand(BaseCommand):
                     " ASA devices."
                 )
 
-        return devices
-
-    def _validate_filters(
-        self,
-        ctx: click.Context,
-        *,
-        query: str | None,
-        device_uids: tuple[str, ...] | None,
-    ) -> None:
-        has_query = bool(query)
-        has_uids = bool(device_uids)
-        if has_query == has_uids:
-            ctx.fail("Provide exactly one of --query or --device-uids.")
-
     def build_params(self) -> Sequence[click.Parameter]:
         return [
-            click.Option(
-                ["-q", "--query"],
-                help="Filter devices to smart license  by a Lucene query.",
+            *asa_device_filter_params(
+                include_device_name=False,
+                query_help_text="Filter devices to smart license  by a Lucene query.",
+                device_uids_help_text="List of device UIDs to apply smart license to.",
             ),
-            click.Option(
-                ["-l", "--limit"],
-                default=50,
-                show_default=True,
-                type=click.IntRange(min=1, max=200),
-                help="Maximum records to return (ignored if --query is not used)",
-            ),
-            click.Option(
-                ["-o", "--offset"],
-                default=0,
-                show_default=True,
-                type=click.IntRange(min=0),
-                help="Pagination offset (ignored if --query is not used)",
-            ),
-            click.Option(
-                ["-u", "--device-uids"],
-                help="List of device UIDs to apply smart license to.",
-                multiple=True,
-                type=str,
-            ),
-            click.Option(
-                ["--format"],
-                type=click.Choice(["table", "json"], case_sensitive=False),
-                default="table",
-                show_default=True,
-                help="Output format",
-            ),
-            click.Option(
-                ["--config-path"],
-                type=click.Path(path_type=Path, resolve_path=True),
-                default=None,
-                envvar="SCCFM_CONFIG",
-                show_default=False,
-                help="Path to the configuration file (defaults to ~/.sccfm-cli/config.json).",
-            ),
+            format_option(),
+            config_path_option(),
             click.Option(
                 ["--token", "-t"],
                 type=str,
