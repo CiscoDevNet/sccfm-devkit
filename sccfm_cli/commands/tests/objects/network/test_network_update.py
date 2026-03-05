@@ -417,9 +417,21 @@ class TestNetworkObjectServiceUpdate:
     def test_update_by_uid_calls_api(self, monkeypatch: MonkeyPatch) -> None:
         mock_api = Mock()
 
+        raw_api_response = {
+            "uid": "obj-123",
+            "name": "test-network",
+            "description": "Test object",
+            "elements": ["10.0.0.0/24"],
+            "labels": ["test"],
+            "tags": {"env": ["test"]},
+            "value": {
+                "objectType": "NETWORK_OBJECT",
+                "defaultContent": {"literal": "10.0.0.0/24"},
+            },
+        }
         get_response = Mock()
         get_response.status = 200
-        get_response.read.return_value = json.dumps(SAMPLE_OBJECT.to_dict()).encode("utf-8")
+        get_response.read.return_value = json.dumps(raw_api_response).encode("utf-8")
         mock_api.get_object_without_preload_content.return_value = get_response
 
         modify_response = Mock()
@@ -516,3 +528,97 @@ class TestNetworkObjectServiceUpdate:
                 name="name-123",
                 value="10.0.0.1",
             )
+
+
+class TestCheck:
+    """Tests for the --check flag on the update command."""
+
+    def test_should_report_existing_object_by_uid(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object exists (by UID)."""
+        called: dict[str, bool] = {"update": False}
+
+        def fake_get(self: NetworkObjectService, uid: str) -> NetworkObjectResponse:
+            return SAMPLE_OBJECT
+
+        def fake_update(self: NetworkObjectService, **kwargs: Any) -> NetworkObjectResponse:
+            called["update"] = True
+            return UPDATED_OBJECT
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object", fake_get)
+        monkeypatch.setattr(NetworkObjectService, "update_network_object", fake_update)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "update", "--check", "--uid", "obj-123"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "update can proceed" in result.output
+        assert not called["update"]
+
+    def test_should_report_existing_object_by_name(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object exists (by name)."""
+        called: dict[str, bool] = {"update": False}
+
+        def fake_get_by_name(self: NetworkObjectService, name: str) -> NetworkObjectResponse:
+            return SAMPLE_OBJECT
+
+        def fake_update(self: NetworkObjectService, **kwargs: Any) -> NetworkObjectResponse:
+            called["update"] = True
+            return UPDATED_OBJECT
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkObjectService, "update_network_object", fake_update)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "update", "--check", "--name", "test-network"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "update can proceed" in result.output
+        assert not called["update"]
+
+    def test_should_report_missing_object(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object is not found."""
+        called: dict[str, bool] = {"update": False}
+
+        def fake_get_by_name(self: NetworkObjectService, name: str) -> NetworkObjectResponse | None:
+            return None
+
+        def fake_update(self: NetworkObjectService, **kwargs: Any) -> NetworkObjectResponse:
+            called["update"] = True
+            return UPDATED_OBJECT
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkObjectService, "update_network_object", fake_update)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "update", "--check", "--name", "missing-object"],
+        )
+
+        assert result.exit_code == 0
+        assert "not found" in result.output
+        assert "update would fail" in result.output
+        assert not called["update"]

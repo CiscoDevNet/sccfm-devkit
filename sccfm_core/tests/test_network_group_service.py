@@ -7,7 +7,11 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from sccfm_core.errors import NotFoundError
-from sccfm_core.services.object_management import NetworkGroupService, NetworkObjectResponse
+from sccfm_core.services.object_management import (
+    NetworkGroupService,
+    NetworkObjectResponse,
+    NetworkObjectService,
+)
 from sccfm_core.services.object_management.network_group_service import (
     NetworkGroupResponse as GroupResponse,
 )
@@ -32,9 +36,21 @@ class TestNetworkGroupServiceDelete:
         """Service should call API with correct uid parameter."""
         mock_api = Mock()
 
+        raw_api_response = {
+            "uid": "grp-123",
+            "name": "test-network-group",
+            "description": "Test group",
+            "elements": ["10.0.0.0/24"],
+            "labels": ["test"],
+            "tags": {"env": ["test"]},
+            "value": {
+                "objectType": "NETWORK_GROUP",
+                "defaultContent": {},
+            },
+        }
         get_response = Mock()
         get_response.status = 200
-        get_response.read.return_value = json.dumps(SAMPLE_GROUP.to_dict()).encode("utf-8")
+        get_response.read.return_value = json.dumps(raw_api_response).encode("utf-8")
         mock_api.get_object_without_preload_content.return_value = get_response
 
         delete_response = Mock()
@@ -138,6 +154,22 @@ def _mock_api_response(data: dict[str, object]) -> Mock:
     return resp
 
 
+def _mock_network_object_service_for_uid(uid: str) -> Mock:
+    """Build a mock NetworkObjectService that resolves a single UID."""
+    mock_obj_service = Mock(spec=NetworkObjectService)
+    mock_obj_service.get_network_object.return_value = NetworkObjectResponse(
+        uid=uid,
+        name="ref-obj",
+        description=None,
+        elements=[],
+        labels=[],
+        tags={},
+        object_type="NETWORK_OBJECT",
+        literal="10.0.0.1",
+    )
+    return mock_obj_service
+
+
 class TestNetworkGroupServiceUpdate:
     """Tests for NetworkGroupService.update_network_group method."""
 
@@ -155,14 +187,13 @@ class TestNetworkGroupServiceUpdate:
         )
 
         mock_api = Mock()
-        # First call: _resolve_uid → _get_network_group
-        # Second call: _get_raw_group_content
         mock_api.get_object_without_preload_content.return_value = _mock_api_response(existing)
         mock_api.modify_object_without_preload_content.return_value = _mock_api_response(updated)
 
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._object_api = mock_api
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._network_object_service = _mock_network_object_service_for_uid(new_ref)
 
         result = service.update_network_group(
             uid="00000000-0000-0000-0000-000000000001",
@@ -172,7 +203,6 @@ class TestNetworkGroupServiceUpdate:
         assert result.referenced_object_uids == [new_ref]
         assert result.literals == ["10.0.0.0/24", "192.168.1.0/24"]
 
-        # Verify the update request includes both literals and new refs
         call_kwargs = mock_api.modify_object_without_preload_content.call_args
         update_req = call_kwargs.kwargs["update_request"]
         content = update_req.value.default_content.actual_instance
@@ -199,6 +229,7 @@ class TestNetworkGroupServiceUpdate:
         service = NetworkGroupService.__new__(NetworkGroupService)
         service._object_api = mock_api
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._network_object_service = _mock_network_object_service_for_uid(new_ref)
 
         result = service.update_network_group(
             uid="00000000-0000-0000-0000-000000000001",

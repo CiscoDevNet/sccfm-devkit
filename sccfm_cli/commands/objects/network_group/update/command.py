@@ -12,7 +12,11 @@ from sccfm_cli.commands.objects.options import (
     group_update_params,
     parse_tags,
 )
-from sccfm_cli.commands.objects.utils import validate_has_updates, validate_identifier
+from sccfm_cli.commands.objects.utils import (
+    check_object_exists,
+    validate_has_updates,
+    validate_identifier,
+)
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
@@ -37,6 +41,27 @@ class UpdateNetworkGroupCommand(BaseCommand):
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         uid = cast(str | None, kwargs.get("uid"))
         name = cast(str | None, kwargs.get("name"))
+        check = cast(bool, kwargs.get("check", False))
+        output_format = cast(str, kwargs.get("format"))
+
+        validate_identifier(ctx, uid=uid, name=name)
+
+        config = self.get_profile(ctx=ctx, **kwargs)
+        service = NetworkGroupService(config)
+
+        if check:
+            check_object_exists(
+                console=self.console,
+                uid=uid,
+                name=name,
+                get_by_uid_fn=service.get_network_group,
+                get_by_name_fn=service.get_network_group_by_name,
+                object_name="Network group",
+                output_format=output_format,
+                operation="update",
+            )
+            return
+
         new_name = cast(str | None, kwargs.get("new_name"))
         ref_objects_tuple = kwargs.get("referenced_object")
         referenced_objects = list(ref_objects_tuple) if ref_objects_tuple else None
@@ -45,9 +70,7 @@ class UpdateNetworkGroupCommand(BaseCommand):
         labels = list(labels_tuple) if labels_tuple else None
         tags_tuple = cast(tuple[str, ...] | None, kwargs.get("tags"))
         tags = parse_tags(tags_tuple)
-        output_format = cast(str, kwargs.get("format"))
 
-        validate_identifier(ctx, uid=uid, name=name)
         validate_has_updates(
             ctx,
             fields={
@@ -65,9 +88,6 @@ class UpdateNetworkGroupCommand(BaseCommand):
                 "--tags",
             ],
         )
-
-        config = self.get_profile(ctx=ctx, **kwargs)
-        service = NetworkGroupService(config)
 
         try:
             response: NetworkGroupResponse = service.update_network_group(

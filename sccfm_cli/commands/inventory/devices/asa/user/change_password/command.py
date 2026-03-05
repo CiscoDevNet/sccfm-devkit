@@ -9,6 +9,7 @@ from scc_firewall_manager_sdk import CdoTransaction, Device
 
 from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
+    asa_check_option,
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
@@ -42,18 +43,19 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
             ),
             click.Option(
                 ["--password"],
-                prompt=True,
+                required=False,
+                default=None,
                 hide_input=True,
                 help="The new password to set.",
             ),
+            asa_check_option(),
             format_option(),
             config_path_option(),
         ]
 
     @with_spinner("Changing password...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        username = cast(str, kwargs["username"])
-        new_password = cast(str, kwargs["password"])
+        check = cast(bool, kwargs.get("check", False))
         response_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -63,6 +65,19 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
             config=config,
             include_device_name=True,
         )
+
+        if check:
+            self.report_check_targets(
+                targets,
+                output_format=response_format,
+                operation="password change",
+            )
+            return
+
+        username = cast(str, kwargs["username"])
+        new_password = cast(str | None, kwargs.get("password"))
+        if not new_password:
+            new_password = click.prompt("Password", hide_input=True)
 
         password_service = AsaUserPasswordService(config=config)
         results = password_service.change_password(

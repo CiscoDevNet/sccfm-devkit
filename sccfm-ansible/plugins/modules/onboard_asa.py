@@ -207,6 +207,14 @@ def run_module() -> None:
                 msg="ASA device already exists",
                 device=existing_device_opt.to_dict(),
             )
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                msg=f"Would onboard ASA device '{asa_create_or_update_input.name}'",
+                device={},
+            )
+
         asa_device = _onboard_asa(config, asa_create_or_update_input)
         module.exit_json(changed=True, msg="Onboarded successfulyl", device=asa_device.to_dict())
     except ApiException as e:

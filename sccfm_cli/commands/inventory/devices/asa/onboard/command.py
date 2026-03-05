@@ -3,7 +3,13 @@ from typing import Any, Sequence, cast
 
 import click
 from rich.console import Console
-from scc_firewall_manager_sdk import AsaCreateOrUpdateInput, ConnectorType, Device, Labels
+from scc_firewall_manager_sdk import (
+    AsaCreateOrUpdateInput,
+    ConnectorType,
+    Device,
+    EntityType,
+    Labels,
+)
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
@@ -33,25 +39,28 @@ class AsaOnboardCommand(BaseCommand):
             ),
             click.Option(
                 ["--device-address"],
-                required=True,
+                required=False,
+                default=None,
                 callback=self._validate_device_address,
                 help="Device address in the form host:port.",
             ),
             click.Option(
                 ["--username"],
-                required=True,
+                required=False,
+                default=None,
                 help="Username used to authenticate with the device.",
             ),
             click.Option(
                 ["--password"],
-                required=True,
+                required=False,
+                default=None,
                 hide_input=True,
-                prompt=True,
                 help="Password used to authenticate with the device.",
             ),
             click.Option(
                 ["--connector-type"],
-                required=True,
+                required=False,
+                default=None,
                 type=click.Choice([ct.value for ct in ConnectorType], case_sensitive=True),
                 help="Connector type used to communicate with the device.",
             ),
@@ -83,30 +92,103 @@ class AsaOnboardCommand(BaseCommand):
                 multiple=True,
                 help="Free-form labels to assign to the device (can be specified multiple times).",
             ),
+            click.Option(
+                ["--check"],
+                is_flag=True,
+                default=False,
+                help="Run a preflight check without onboarding.",
+            ),
             config_path_option(),
             format_option(),
         ]
 
     @with_spinner("Onboarding ASA device...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        config = self.get_profile(ctx=ctx, **kwargs)
-        asa_input = self._build_asa_input(ctx, **kwargs)
-        format = str(ctx.params.get("format"))
+        check = cast(bool, kwargs.get("check", False))
+        name = cast(str, kwargs.get("name"))
+        output_format = cast(str, kwargs.get("format"))
 
+        config = self.get_profile(ctx=ctx, **kwargs)
         inventory_service = InventoryService(config=config)
+
+        if check:
+            self._handle_check(inventory_service, name, output_format)
+            return
+
+        for required_field in ("device_address", "username", "connector_type"):
+            if not kwargs.get(required_field):
+                ctx.fail(
+                    f"--{required_field.replace('_', '-')} is required when not using --check."
+                )
+
+        password = cast(str | None, kwargs.get("password"))
+        if not password:
+            password = click.prompt("Password", hide_input=True)
+            kwargs = {**kwargs, "password": password}
+
+        asa_input = self._build_asa_input(ctx, **kwargs)
+
         device_page = inventory_service.get_devices(
-            limit=1, offset=0, query=f"name:{asa_input.name}"
+            limit=1,
+            offset=0,
+            query=self._asa_name_query(asa_input.name),
         )
         if device_page.count is not None and device_page.count > 0:
             ctx.fail(f"ASA device with name {asa_input.name} already exists.")
         asa_onboard_service = AsaOnboardService(config=config)
         device: Device = asa_onboard_service.onboard_asa(asa_create_or_update_input=asa_input)
 
-        if format == "json":
+        if output_format == "json":
             self.console.print(json.dumps(device.to_dict(), indent=2))
         else:
-            self.console.print(f"[green]✓[/green] Successfully onboarded ASA: {device.name}")
+            self.console.print(f"[green]\u2713[/green] Successfully onboarded ASA: {device.name}")
             self.console.print(f"  UID: {device.uid}")
+
+    def _handle_check(
+        self,
+        inventory_service: InventoryService,
+        name: str,
+        output_format: str,
+    ) -> None:
+        """Check if a device with the given name exists."""
+        device_page = inventory_service.get_devices(
+            limit=1,
+            offset=0,
+            query=self._asa_name_query(name),
+        )
+        exists = device_page.count is not None and device_page.count > 0
+        can_proceed = not exists
+        reason = "not_found" if can_proceed else "already_exists"
+
+        if output_format == "json":
+            device_data = None
+            if exists and device_page.items:
+                device_data = device_page.items[0].to_dict()
+            self.console.print(
+                json.dumps(
+                    {
+                        "entity_type": "ASA device",
+                        "identifier": name,
+                        "operation": "onboard",
+                        "exists": exists,
+                        "can_proceed": can_proceed,
+                        "reason": reason,
+                        "device": device_data,
+                    },
+                    indent=2,
+                    default=str,
+                )
+            )
+            return
+
+        if can_proceed:
+            self.console.print(
+                f"[green]\u2713[/green] ASA device '{name}' not found; onboard can proceed."
+            )
+        else:
+            self.console.print(
+                f"[yellow]![/yellow] ASA device '{name}' already exists; onboard would fail."
+            )
 
     def _build_asa_input(self, ctx: click.Context, **kwargs: Any) -> AsaCreateOrUpdateInput:
         """Build AsaCreateOrUpdateInput from command parameters."""
@@ -146,6 +228,11 @@ class AsaOnboardCommand(BaseCommand):
             ignoreCertificate=ignore_certificate,
             labels=labels,
         )
+
+    @staticmethod
+    def _asa_name_query(name: str) -> str:
+        """Build the inventory query for a named ASA device."""
+        return f"deviceType:{EntityType.ASA.value} AND name:{name}"
 
     @staticmethod
     def _validate_device_address(

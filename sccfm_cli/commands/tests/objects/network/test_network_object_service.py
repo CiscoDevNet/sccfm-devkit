@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from scc_firewall_manager_sdk.exceptions import ApiException
@@ -197,6 +198,43 @@ class TestNetworkObjectListResponseFromDict:
         assert len(response.items) == 3
         types = {item.object_type for item in response.items}
         assert "URL_GROUP" in types
+
+
+class TestNetworkObjectTypeValidation:
+    """Tests for type-safety checks in NetworkObjectService."""
+
+    def test_get_network_object_returns_none_for_wrong_type(self) -> None:
+        """get_network_object returns None when the UID resolves to a different objectType."""
+        service = NetworkObjectService.__new__(NetworkObjectService)
+        mock_response = MagicMock()
+        mock_response.status = 200
+        service._object_api = MagicMock()
+        service._object_api.get_object_without_preload_content.return_value = mock_response
+        service._helper = MagicMock()
+        service._helper.read_raw_response.return_value = {
+            "uid": "abc-123",
+            "name": "some-group",
+            "value": {
+                "objectType": "NETWORK_GROUP",
+                "defaultContent": {"literals": []},
+            },
+        }
+
+        result = service.get_network_object("abc-123")
+
+        assert result is None
+
+    def test_get_network_object_by_name_uses_type_filter(self) -> None:
+        """get_network_object_by_name includes objectType:NETWORK_OBJECT in its query."""
+        service = NetworkObjectService.__new__(NetworkObjectService)
+        service._object_api = MagicMock()
+        service._helper = MagicMock()
+        service._helper.read_raw_response.return_value = {"items": []}
+
+        service.get_network_object_by_name("test-obj")
+
+        call_kwargs = service._object_api.get_objects_without_preload_content.call_args.kwargs
+        assert "objectType:NETWORK_OBJECT" in call_kwargs["q"]
 
 
 class TestBuildFilteredQuery:

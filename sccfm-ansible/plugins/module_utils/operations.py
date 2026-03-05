@@ -12,10 +12,23 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+class HasUid(Protocol):
+    """Protocol for objects with a uid attribute."""
+
+    @property
+    def uid(self) -> str: ...
+
+
 class DeleteFunction(Protocol):
     """Protocol for delete functions that accept uid/name kwargs."""
 
     def __call__(self, *, uid: str | None, name: str | None) -> str: ...
+
+
+class ResolveFunction(Protocol):
+    """Protocol for functions that check existence (returns object or None)."""
+
+    def __call__(self, uid: str) -> HasUid | None: ...
 
 
 def fetch_object_by_identifier(
@@ -64,8 +77,13 @@ def run_delete_with_idempotency(
     uid: str | None,
     name: str | None,
     entity_name: str,
+    get_by_uid_fn: Callable[[str], HasUid | None] | None = None,
+    get_by_name_fn: Callable[[str], HasUid | None] | None = None,
 ) -> None:
-    """Run a delete operation with idempotency handling.
+    """Run a delete operation with idempotency and check_mode handling.
+
+    In check_mode the function performs an existence check without
+    deleting, using *get_by_uid_fn* / *get_by_name_fn* when provided.
 
     If the object doesn't exist, returns changed=False.
     On success, returns changed=True with the deleted UID.
@@ -77,9 +95,23 @@ def run_delete_with_idempotency(
         uid: The object UID.
         name: The object name.
         entity_name: Human-readable entity name for messages.
+        get_by_uid_fn: Optional lookup function for check_mode by UID.
+        get_by_name_fn: Optional lookup function for check_mode by name.
     """
     identifier = uid or name
     identifier_type = "UID" if uid else "name"
+
+    if module.check_mode:
+        _handle_delete_check_mode(
+            module,
+            uid=uid,
+            name=name,
+            entity_name=entity_name,
+            identifier=identifier,
+            get_by_uid_fn=get_by_uid_fn,
+            get_by_name_fn=get_by_name_fn,
+        )
+        return
 
     try:
         deleted_uid = delete_fn(uid=uid, name=name)
@@ -98,6 +130,46 @@ def run_delete_with_idempotency(
         module.fail_json(msg=f"Invalid parameters: {str(e)}")
     except Exception as e:
         module.fail_json(msg=f"Failed to delete {entity_name.lower()}: {str(e)}")
+
+
+def _handle_delete_check_mode(
+    module: "AnsibleModule",
+    *,
+    uid: str | None,
+    name: str | None,
+    entity_name: str,
+    identifier: str | None,
+    get_by_uid_fn: Callable[[str], HasUid | None] | None,
+    get_by_name_fn: Callable[[str], HasUid | None] | None,
+) -> None:
+    """Report what a delete would do without performing it."""
+    entity: HasUid | None = None
+    try:
+        if uid and get_by_uid_fn:
+            entity = get_by_uid_fn(uid)
+        elif name and get_by_name_fn:
+            entity = get_by_name_fn(name)
+    except NotFoundError:
+        entity = None
+    except Exception as e:
+        module.fail_json(
+            msg=f"Failed to check {entity_name.lower()} existence: {str(e)}",
+            deleted_uid=None,
+        )
+        return
+
+    if entity:
+        module.exit_json(
+            changed=True,
+            msg=f"Would delete {entity_name} '{identifier}'.",
+            deleted_uid=entity.uid,
+        )
+    else:
+        module.exit_json(
+            changed=False,
+            msg=f"{entity_name} '{identifier}' not found — already absent.",
+            deleted_uid=None,
+        )
 
 
 def fields_need_update(

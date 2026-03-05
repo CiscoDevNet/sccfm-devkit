@@ -5,7 +5,7 @@ from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import CdoCliResult, Device, DevicePage
+from scc_firewall_manager_sdk import CdoCliResult, Device, DevicePage, EntityType
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
@@ -418,3 +418,61 @@ def test_should_display_usage_on_validation_error(
     assert "Usage:" in result.output
     assert "inventory devices asa smartlicense" in result.output
     assert "Provide exactly one of --query or --device-uids." in result.output
+
+
+def test_check_mode_should_report_targets_without_requiring_token_or_executing(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """smartlicense --check should only resolve targets and skip CLI execution."""
+    captured_params: dict[str, Any] = {}
+    execute_called = {"called": False}
+    asa_device = Device(uid="uid-asa-1", name="edge-asa", device_type=EntityType.ASA)
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        captured_params["query"] = query
+        return DevicePage(count=1, items=[asa_device])
+
+    def fake_execute_cli(
+        self: AsaCommandLineService, *, device_uids: list[str], asa_commands: list[str]
+    ) -> list[CdoCliResult]:
+        execute_called["called"] = True
+        return []
+
+    def stub_asa_cli_init(self: AsaCommandLineService, config: Any) -> None:
+        return None
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaCommandLineService, "execute_cli", fake_execute_cli)
+    monkeypatch.setattr(AsaCommandLineService, "__init__", stub_asa_cli_init)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "smartlicense",
+            "--query",
+            "name:edge-*",
+            "--check",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    assert captured_params["query"] == "name:edge-* AND deviceType:ASA"
+    assert execute_called["called"] is False
+
+    payload = json.loads(result.output)
+    assert payload["operation"] == "smartlicense"
+    assert payload["can_proceed"] is True
+    assert payload["reason"] == "targets_found"
+    assert payload["matched_devices"] == 1
+    assert payload["devices"][0]["uid"] == "uid-asa-1"
+    assert payload["devices"][0]["device_type"] == "ASA"

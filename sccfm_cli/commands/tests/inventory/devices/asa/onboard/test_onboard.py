@@ -318,3 +318,58 @@ def test_should_onboard_asa_with_sdc_connector(
     asa_input = captured_params["input"]
     assert str(asa_input.connector_type.value) == "SDC"
     assert asa_input.connector_name == "my-sdc-connector"
+
+
+def test_check_mode_should_report_existing_asa_without_onboarding(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """onboard --check should resolve by ASA name and skip onboarding."""
+    captured_params: dict[str, Any] = {}
+    onboard_called = {"called": False}
+    existing_device = Device(
+        uid="existing-uid",
+        name="test-asa",
+        device_type=EntityType.ASA,
+    )
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        captured_params["query"] = query
+        return DevicePage(count=1, items=[existing_device], limit=limit, offset=offset)
+
+    def fake_onboard(self: AsaOnboardService, asa_create_or_update_input: Any) -> Device:
+        onboard_called["called"] = True
+        return existing_device
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaOnboardService, "onboard_asa", fake_onboard)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "onboard",
+            "--name",
+            "test-asa",
+            "--check",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    assert captured_params["query"] == "deviceType:ASA AND name:test-asa"
+    assert onboard_called["called"] is False
+
+    payload = json.loads(result.output)
+    assert payload["exists"] is True
+    assert payload["operation"] == "onboard"
+    assert payload["can_proceed"] is False
+    assert payload["reason"] == "already_exists"
+    assert payload["device"]["uid"] == "existing-uid"

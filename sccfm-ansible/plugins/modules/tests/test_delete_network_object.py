@@ -36,6 +36,7 @@ def mock_module_instance(base_module_params_with_uid: dict[str, Any]) -> MagicMo
     """Creates a mock module instance with exit_json/fail_json that raise SystemExit."""
     mock_module = MagicMock()
     mock_module.params = base_module_params_with_uid.copy()
+    mock_module.check_mode = False
     mock_module.exit_json.side_effect = SystemExit(0)
     mock_module.fail_json.side_effect = SystemExit(1)
     return mock_module
@@ -263,3 +264,90 @@ def test_build_argument_spec() -> None:
     assert "api_token" in spec
     assert spec["api_token"]["required"] is False
     assert spec["api_token"]["no_log"] is True
+
+
+@patch("plugins.modules.delete_network_object.Config")
+@patch("plugins.modules.delete_network_object.NetworkObjectService")
+@patch("plugins.modules.delete_network_object.AnsibleModule")
+def test_check_mode_should_report_would_delete_when_object_exists(
+    mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module in check_mode should report changed without deleting when object exists."""
+    mock_module_instance.check_mode = True
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    existing_obj = MagicMock()
+    existing_obj.uid = "net-obj-uid-123"
+
+    mock_service = MagicMock()
+    mock_service.get_network_object.return_value = existing_obj
+    mock_service.get_network_object_by_name.return_value = existing_obj
+    mock_service_class.return_value = mock_service
+
+    with pytest.raises(SystemExit):
+        delete_network_object.run_module()
+
+    mock_module_instance.exit_json.assert_called_once()
+    call_kwargs = mock_module_instance.exit_json.call_args[1]
+    assert call_kwargs["changed"] is True
+    assert "Would delete" in call_kwargs["msg"]
+    assert call_kwargs["deleted_uid"] == "net-obj-uid-123"
+    mock_service.delete_network_object.assert_not_called()
+
+
+@patch("plugins.modules.delete_network_object.Config")
+@patch("plugins.modules.delete_network_object.NetworkObjectService")
+@patch("plugins.modules.delete_network_object.AnsibleModule")
+def test_check_mode_should_report_no_change_when_object_not_found(
+    mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module in check_mode should report changed=False when object does not exist."""
+    mock_module_instance.check_mode = True
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_service = MagicMock()
+    mock_service.get_network_object.return_value = None
+    mock_service.get_network_object_by_name.return_value = None
+    mock_service_class.return_value = mock_service
+
+    with pytest.raises(SystemExit):
+        delete_network_object.run_module()
+
+    mock_module_instance.exit_json.assert_called_once()
+    call_kwargs = mock_module_instance.exit_json.call_args[1]
+    assert call_kwargs["changed"] is False
+    assert "not found" in call_kwargs["msg"]
+    mock_service.delete_network_object.assert_not_called()
+
+
+@patch("plugins.modules.delete_network_object.Config")
+@patch("plugins.modules.delete_network_object.NetworkObjectService")
+@patch("plugins.modules.delete_network_object.AnsibleModule")
+def test_check_mode_should_fail_when_lookup_errors(
+    mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module in check_mode should fail on lookup/API errors."""
+    mock_module_instance.check_mode = True
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_service = MagicMock()
+    mock_service.get_network_object.side_effect = Exception("API unavailable")
+    mock_service_class.return_value = mock_service
+
+    with pytest.raises(SystemExit):
+        delete_network_object.run_module()
+
+    mock_module_instance.fail_json.assert_called_once()
+    call_kwargs = mock_module_instance.fail_json.call_args[1]
+    assert "Failed to check network object existence" in call_kwargs["msg"]
+    assert "API unavailable" in call_kwargs["msg"]
+    mock_service.delete_network_object.assert_not_called()

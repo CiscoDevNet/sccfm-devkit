@@ -232,9 +232,21 @@ class TestNetworkObjectServiceDelete:
         """Service should call API with correct uid parameter."""
         mock_api = Mock()
 
+        raw_api_response = {
+            "uid": "obj-123",
+            "name": "test-network",
+            "description": "Test object",
+            "elements": ["10.0.0.0/24"],
+            "labels": ["test"],
+            "tags": {"env": ["test"]},
+            "value": {
+                "objectType": "NETWORK_OBJECT",
+                "defaultContent": {"literal": "10.0.0.0/24"},
+            },
+        }
         get_response = Mock()
         get_response.status = 200
-        get_response.read.return_value = json.dumps(SAMPLE_OBJECT.to_dict()).encode("utf-8")
+        get_response.read.return_value = json.dumps(raw_api_response).encode("utf-8")
         mock_api.get_object_without_preload_content.return_value = get_response
 
         delete_response = Mock()
@@ -295,3 +307,109 @@ class TestNetworkObjectServiceDelete:
 
         with pytest.raises(ValueError, match="Only one"):
             service.delete_network_object(uid="uid-123", name="name-123")
+
+
+class TestCheck:
+    """Tests for the --check flag on the delete command."""
+
+    def test_should_report_existing_object_by_uid(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object exists (by UID)."""
+        called: dict[str, bool] = {"delete": False}
+
+        def fake_get(self: NetworkObjectService, uid: str) -> NetworkObjectResponse:
+            return SAMPLE_OBJECT
+
+        def fake_delete(
+            self: NetworkObjectService,
+            uid: str | None = None,
+            name: str | None = None,
+        ) -> str:
+            called["delete"] = True
+            return uid or ""
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object", fake_get)
+        monkeypatch.setattr(NetworkObjectService, "delete_network_object", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "delete", "--check", "--uid", "obj-123"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "delete can proceed" in result.output
+        assert not called["delete"]
+
+    def test_should_report_existing_object_by_name(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object exists (by name)."""
+        called: dict[str, bool] = {"delete": False}
+
+        def fake_get_by_name(self: NetworkObjectService, name: str) -> NetworkObjectResponse:
+            return SAMPLE_OBJECT
+
+        def fake_delete(
+            self: NetworkObjectService,
+            uid: str | None = None,
+            name: str | None = None,
+        ) -> str:
+            called["delete"] = True
+            return uid or ""
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkObjectService, "delete_network_object", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "delete", "--check", "--name", "test-network"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "delete can proceed" in result.output
+        assert not called["delete"]
+
+    def test_should_report_missing_object(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object is not found."""
+        called: dict[str, bool] = {"delete": False}
+
+        def fake_get_by_name(self: NetworkObjectService, name: str) -> NetworkObjectResponse | None:
+            return None
+
+        def fake_delete(
+            self: NetworkObjectService,
+            uid: str | None = None,
+            name: str | None = None,
+        ) -> str:
+            called["delete"] = True
+            return uid or ""
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkObjectService, "delete_network_object", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "delete", "--check", "--name", "missing-object"],
+        )
+
+        assert result.exit_code == 0
+        assert "not found" in result.output
+        assert "delete would fail" in result.output
+        assert not called["delete"]

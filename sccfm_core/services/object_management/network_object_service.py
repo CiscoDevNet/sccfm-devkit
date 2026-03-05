@@ -140,11 +140,14 @@ class NetworkObjectService:
     def get_network_object(self, uid: str) -> NetworkObjectResponse | None:
         """Fetch a network object by UID.
 
+        Returns ``None`` when the UID does not exist **or** when it
+        resolves to a different object type (e.g. a network group).
+
         Args:
             uid: The unique identifier of the network object.
 
         Returns:
-            The NetworkObjectResponse if found, None if a 404 is returned.
+            The NetworkObjectResponse if found and type-correct, None otherwise.
 
         Raises:
             ApiException: If the API call fails with a non-404 error.
@@ -153,10 +156,16 @@ class NetworkObjectService:
         if response.status == 404:
             return None
         data = self._helper.read_raw_response(response)
-        return NetworkObjectResponse.from_dict(data)
+        parsed = NetworkObjectResponse.from_dict(data)
+        if parsed.object_type != self.OBJECT_TYPE:
+            return None
+        return parsed
 
     def get_network_object_by_name(self, name: str) -> NetworkObjectResponse | None:
         """Search for a network object by name.
+
+        Uses an objectType filter so that network groups with the same
+        name are not matched.
 
         Args:
             name: The name of the network object to find.
@@ -167,8 +176,7 @@ class NetworkObjectService:
         Raises:
             ApiException: If the API call fails.
         """
-        # Use Lucene query syntax to search by name
-        query = f'name:"{name}"'
+        query = f'name:"{name}" AND {self.NETWORK_TYPE_FILTER}'
         response = self._object_api.get_objects_without_preload_content(q=query, limit="1")
         data = self._helper.read_raw_response(response)
 

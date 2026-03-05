@@ -174,3 +174,67 @@ def test_should_display_api_error(
     assert result.exit_code != 0
     assert "Object already exists" in result.output
     assert "CONFLICT" in result.output
+
+
+class TestCheck:
+    """Tests for the --check flag on the create command."""
+
+    def test_should_report_existing_object(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object already exists."""
+        called: dict[str, bool] = {"create": False}
+
+        def fake_get_by_name(self: NetworkObjectService, name: str) -> NetworkObjectResponse:
+            return SAMPLE_RESPONSE
+
+        def fake_create(self: NetworkObjectService, **kwargs: Any) -> NetworkObjectResponse:
+            called["create"] = True
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkObjectService, "create_network_object", fake_create)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "create", "--check", "--name", "my-network"],
+        )
+
+        assert result.exit_code == 0
+        assert "already exists" in result.output
+        assert "create would fail" in result.output
+        assert not called["create"]
+
+    def test_should_report_missing_object(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network object does not exist."""
+        called: dict[str, bool] = {"create": False}
+
+        def fake_get_by_name(self: NetworkObjectService, name: str) -> NetworkObjectResponse | None:
+            return None
+
+        def fake_create(self: NetworkObjectService, **kwargs: Any) -> NetworkObjectResponse:
+            called["create"] = True
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkObjectService, "get_network_object_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkObjectService, "create_network_object", fake_create)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network", "create", "--check", "--name", "no-such-object"],
+        )
+
+        assert result.exit_code == 0
+        assert "not found" in result.output
+        assert "create can proceed" in result.output
+        assert not called["create"]

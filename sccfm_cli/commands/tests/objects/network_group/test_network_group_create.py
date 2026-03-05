@@ -357,3 +357,67 @@ def test_should_create_with_url_literals(
     assert captured["name"] == "url-group"
     assert captured["url_literals"] == ["https://example.com"]
     assert captured["network_literals"] is None
+
+
+class TestCheck:
+    """Tests for the --check flag on the create command."""
+
+    def test_should_report_existing_group(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group already exists."""
+        called: dict[str, bool] = {"create": False}
+
+        def fake_get_by_name(self: NetworkGroupService, name: str) -> NetworkGroupResponse:
+            return SAMPLE_RESPONSE
+
+        def fake_create(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
+            called["create"] = True
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "create_network_group", fake_create)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "create", "--check", "--name", "my-network-group"],
+        )
+
+        assert result.exit_code == 0
+        assert "already exists" in result.output
+        assert "create would fail" in result.output
+        assert not called["create"]
+
+    def test_should_report_missing_group(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group does not exist."""
+        called: dict[str, bool] = {"create": False}
+
+        def fake_get_by_name(self: NetworkGroupService, name: str) -> NetworkGroupResponse | None:
+            return None
+
+        def fake_create(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
+            called["create"] = True
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "create_network_group", fake_create)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "create", "--check", "--name", "no-such-group"],
+        )
+
+        assert result.exit_code == 0
+        assert "not found" in result.output
+        assert "create can proceed" in result.output
+        assert not called["create"]

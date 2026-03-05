@@ -8,6 +8,7 @@ from sccfm_cli.commands.inventory.devices.asa.cli_result_renderer import (
 )
 from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
+    asa_check_option,
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
@@ -43,9 +44,7 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
 
     @with_spinner("Applying Smart Licenses...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        token = cast(str, kwargs.get("token"))
-        feature_tier = cast(str, kwargs.get("feature_tier"))
-        throughput_level = cast(str | None, kwargs.get("throughput_level"))
+        check = cast(bool, kwargs.get("check", False))
         response_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -56,6 +55,24 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
             include_device_name=False,
             require_exactly_one_filter=True,
         )
+
+        if check:
+            self.report_check_targets(
+                targets,
+                output_format=response_format,
+                operation="smartlicense",
+            )
+            return
+
+        token = cast(str, kwargs.get("token"))
+        feature_tier = cast(str, kwargs.get("feature_tier"))
+        throughput_level = cast(str | None, kwargs.get("throughput_level"))
+
+        if not token:
+            ctx.fail("--token is required when not using --check.")
+        if not feature_tier:
+            ctx.fail("--feature-tier is required when not using --check.")
+
         self._validate_virtual_devices(
             ctx=ctx,
             devices=targets.devices,
@@ -134,15 +151,17 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
         return [
             *asa_device_filter_params(
                 include_device_name=False,
-                query_help_text="Filter devices to smart license  by a Lucene query.",
+                query_help_text="Filter devices to smart license by a Lucene query.",
                 device_uids_help_text="List of device UIDs to apply smart license to.",
             ),
+            asa_check_option(),
             format_option(),
             config_path_option(),
             click.Option(
                 ["--token", "-t"],
                 type=str,
-                required=True,
+                required=False,
+                default=None,
                 help="The smart license token for your virtual account, generated on "
                 "https://software.cisco.com/clc",
             ),
@@ -155,7 +174,8 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
             click.Option(
                 ["--feature-tier"],
                 type=click.Choice(["standard"], case_sensitive=True),
-                required=True,
+                required=False,
+                default=None,
                 help="The feature tier of your ASA",
             ),
         ]

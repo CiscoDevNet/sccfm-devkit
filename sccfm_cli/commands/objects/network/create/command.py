@@ -8,6 +8,7 @@ from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import object_create_params, parse_tags
+from sccfm_cli.commands.objects.utils import check_object_exists
 from sccfm_cli.utils import with_spinner
 from sccfm_core.services import NetworkObjectService
 from sccfm_core.services.object_management import NetworkObjectResponse
@@ -30,16 +31,35 @@ class CreateNetworkObjectCommand(BaseCommand):
     @with_spinner("Creating network object...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         name = cast(str, kwargs.get("name"))
+        check = cast(bool, kwargs.get("check", False))
+        output_format = cast(str, kwargs.get("format"))
+
+        config = self.get_profile(ctx=ctx, **kwargs)
+        service = NetworkObjectService(config)
+
+        if check:
+            check_object_exists(
+                console=self.console,
+                uid=None,
+                name=name,
+                get_by_uid_fn=None,
+                get_by_name_fn=service.get_network_object_by_name,
+                object_name="Network object",
+                output_format=output_format,
+                operation="create",
+            )
+            return
+
         value = cast(str, kwargs.get("value"))
+        if not value:
+            ctx.fail("--value is required when not using --check.")
+
         description = cast(str | None, kwargs.get("description"))
         labels_tuple = kwargs.get("labels")
         labels = list(labels_tuple) if labels_tuple else None
         tags_tuple = cast(tuple[str, ...] | None, kwargs.get("tags"))
         tags = parse_tags(tags_tuple)
-        output_format = cast(str, kwargs.get("format"))
 
-        config = self.get_profile(ctx=ctx, **kwargs)
-        service = NetworkObjectService(config)
         response: NetworkObjectResponse = service.create_network_object(
             name=name,
             value=value,

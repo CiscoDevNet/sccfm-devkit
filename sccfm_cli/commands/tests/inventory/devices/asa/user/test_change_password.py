@@ -5,7 +5,7 @@ from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
+from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage, EntityType
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
@@ -214,6 +214,68 @@ def test_should_filter_devices_by_query(
 
     assert result.exit_code == 0
     assert captured_params["query"] == f"{user_query} AND deviceType:ASA"
+
+
+def test_check_mode_should_report_targets_without_changing_password(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """change-password --check should resolve targets and skip mutation."""
+    captured_params: dict[str, Any] = {}
+    password_called = {"called": False}
+    asa_device = Device(uid="uid-asa-1", name="branch-asa", device_type=EntityType.ASA)
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        captured_params["query"] = query
+        return DevicePage(count=1, items=[asa_device])
+
+    def fake_change_password(
+        self: AsaUserPasswordService,
+        *,
+        device_uids: list[str],
+        username: str,
+        new_password: str,
+    ) -> dict[str, AsaPasswordChangeResult]:
+        password_called["called"] = True
+        return {}
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaUserPasswordService, "change_password", fake_change_password)
+    _stub_password_service(monkeypatch)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "user",
+            "change-password",
+            "--query",
+            "name:branch-*",
+            "--username",
+            "admin",
+            "--check",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    assert captured_params["query"] == "name:branch-* AND deviceType:ASA"
+    assert password_called["called"] is False
+
+    payload = json.loads(result.output)
+    assert payload["operation"] == "password change"
+    assert payload["can_proceed"] is True
+    assert payload["reason"] == "targets_found"
+    assert payload["matched_devices"] == 1
+    assert payload["devices"][0]["uid"] == "uid-asa-1"
+    assert payload["devices"][0]["device_type"] == "ASA"
 
 
 def test_should_fail_without_device_filter(
