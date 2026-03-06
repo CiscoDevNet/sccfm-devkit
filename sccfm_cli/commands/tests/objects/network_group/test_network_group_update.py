@@ -370,3 +370,97 @@ class TestNetworkGroupUpdateOutput:
         assert payload["uid"] == "grp-123"
         assert payload["name"] == "renamed-group"
         assert payload["referenced_object_uids"] == ["ref-uid-001", "ref-uid-002"]
+
+
+class TestCheck:
+    """Tests for the --check flag on the update command."""
+
+    def test_should_report_existing_group_by_uid(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group exists (by UID)."""
+        called: dict[str, bool] = {"update": False}
+
+        def fake_get(self: NetworkGroupService, uid: str) -> NetworkGroupResponse:
+            return SAMPLE_GROUP
+
+        def fake_update(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
+            called["update"] = True
+            return UPDATED_GROUP
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group", fake_get)
+        monkeypatch.setattr(NetworkGroupService, "update_network_group", fake_update)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "update", "--check", "--uid", "grp-123"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "update can proceed" in result.output
+        assert not called["update"]
+
+    def test_should_report_existing_group_by_name(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group exists (by name)."""
+        called: dict[str, bool] = {"update": False}
+
+        def fake_get_by_name(self: NetworkGroupService, name: str) -> NetworkGroupResponse:
+            return SAMPLE_GROUP
+
+        def fake_update(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
+            called["update"] = True
+            return UPDATED_GROUP
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "update_network_group", fake_update)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "update", "--check", "--name", "test-network-group"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "update can proceed" in result.output
+        assert not called["update"]
+
+    def test_should_report_missing_group(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group is not found."""
+        called: dict[str, bool] = {"update": False}
+
+        def fake_get_by_name(self: NetworkGroupService, name: str) -> NetworkGroupResponse | None:
+            return None
+
+        def fake_update(self: NetworkGroupService, **kwargs: Any) -> NetworkGroupResponse:
+            called["update"] = True
+            return UPDATED_GROUP
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "update_network_group", fake_update)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "update", "--check", "--name", "missing-group"],
+        )
+
+        assert result.exit_code == 0
+        assert "not found" in result.output
+        assert "update would fail" in result.output
+        assert not called["update"]

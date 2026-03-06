@@ -227,3 +227,109 @@ class TestNetworkGroupDeleteValidation:
 
         assert result.exit_code != 0
         assert "Only one of --uid or --name should be provided" in result.output
+
+
+class TestCheck:
+    """Tests for the --check flag on the delete command."""
+
+    def test_should_report_existing_group_by_uid(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group exists (by UID)."""
+        called: dict[str, bool] = {"delete": False}
+
+        def fake_get(self: NetworkGroupService, uid: str) -> NetworkObjectResponse:
+            return SAMPLE_GROUP
+
+        def fake_delete(
+            self: NetworkGroupService,
+            uid: str | None = None,
+            name: str | None = None,
+        ) -> str:
+            called["delete"] = True
+            return uid or ""
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group", fake_get)
+        monkeypatch.setattr(NetworkGroupService, "delete_network_group", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "delete", "--check", "--uid", "grp-123"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "delete can proceed" in result.output
+        assert not called["delete"]
+
+    def test_should_report_existing_group_by_name(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group exists (by name)."""
+        called: dict[str, bool] = {"delete": False}
+
+        def fake_get_by_name(self: NetworkGroupService, name: str) -> NetworkObjectResponse:
+            return SAMPLE_GROUP
+
+        def fake_delete(
+            self: NetworkGroupService,
+            uid: str | None = None,
+            name: str | None = None,
+        ) -> str:
+            called["delete"] = True
+            return uid or ""
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "delete_network_group", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "delete", "--check", "--name", "test-network-group"],
+        )
+
+        assert result.exit_code == 0
+        assert "exists" in result.output
+        assert "delete can proceed" in result.output
+        assert not called["delete"]
+
+    def test_should_report_missing_group(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Check flag should report when a network group is not found."""
+        called: dict[str, bool] = {"delete": False}
+
+        def fake_get_by_name(self: NetworkGroupService, name: str) -> NetworkObjectResponse | None:
+            return None
+
+        def fake_delete(
+            self: NetworkGroupService,
+            uid: str | None = None,
+            name: str | None = None,
+        ) -> str:
+            called["delete"] = True
+            return uid or ""
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(NetworkGroupService, "get_network_group_by_name", fake_get_by_name)
+        monkeypatch.setattr(NetworkGroupService, "delete_network_group", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            ["objects", "network-group", "delete", "--check", "--name", "missing-group"],
+        )
+
+        assert result.exit_code == 0
+        assert "not found" in result.output
+        assert "delete would fail" in result.output
+        assert not called["delete"]

@@ -286,13 +286,17 @@ class TestReferencedObjectNameResolution:
         assert NetworkGroupService._is_uuid("") is False
 
     def test_resolve_passes_uuids_through(self) -> None:
-        """UIDs should be passed through without any API call."""
+        """UIDs should be validated via get_network_object and resolved to the returned UID."""
         service = NetworkGroupService.__new__(NetworkGroupService)
+        mock_obj = MagicMock(spec=NetworkObjectResponse)
+        mock_obj.uid = self.VALID_UUID
         service._network_object_service = MagicMock(spec=NetworkObjectService)
+        service._network_object_service.get_network_object.return_value = mock_obj
 
         result = service._resolve_referenced_object_uids([self.VALID_UUID])
 
         assert result == [self.VALID_UUID]
+        service._network_object_service.get_network_object.assert_called_once_with(self.VALID_UUID)
         service._network_object_service.get_network_object_by_name.assert_not_called()
 
     def test_resolve_looks_up_names(self) -> None:
@@ -313,10 +317,13 @@ class TestReferencedObjectNameResolution:
     def test_resolve_mixed_uids_and_names(self) -> None:
         """Should handle a mix of UIDs and names in a single call."""
         service = NetworkGroupService.__new__(NetworkGroupService)
-        mock_obj = MagicMock(spec=NetworkObjectResponse)
-        mock_obj.uid = "resolved-uid-xyz"
+        uid_obj = MagicMock(spec=NetworkObjectResponse)
+        uid_obj.uid = self.VALID_UUID
+        name_obj = MagicMock(spec=NetworkObjectResponse)
+        name_obj.uid = "resolved-uid-xyz"
         service._network_object_service = MagicMock(spec=NetworkObjectService)
-        service._network_object_service.get_network_object_by_name.return_value = mock_obj
+        service._network_object_service.get_network_object.return_value = uid_obj
+        service._network_object_service.get_network_object_by_name.return_value = name_obj
 
         result = service._resolve_referenced_object_uids([self.VALID_UUID, "my-object"])
 
@@ -330,3 +337,41 @@ class TestReferencedObjectNameResolution:
 
         with pytest.raises(NotFoundError, match="Network object with name 'missing' not found"):
             service._resolve_referenced_object_uids(["missing"])
+
+
+class TestNetworkGroupTypeValidation:
+    """Tests for type-safety checks in NetworkGroupService."""
+
+    def test_get_network_group_returns_none_for_wrong_type(self) -> None:
+        """get_network_group returns None when the UID resolves to a different objectType."""
+        service = NetworkGroupService.__new__(NetworkGroupService)
+        mock_response = MagicMock()
+        mock_response.status = 200
+        service._object_api = MagicMock()
+        service._object_api.get_object_without_preload_content.return_value = mock_response
+        service._helper = MagicMock()
+        service._helper.read_raw_response.return_value = {
+            "uid": "obj-123",
+            "name": "some-network-object",
+            "value": {
+                "objectType": "NETWORK_OBJECT",
+                "defaultContent": {"literal": "10.0.0.0/8"},
+            },
+        }
+
+        result = service.get_network_group("obj-123")
+
+        assert result is None
+
+    def test_resolve_referenced_object_uids_validates_uuid_existence(self) -> None:
+        """Raises NotFoundError for a valid UUID that doesn't exist as a network object."""
+        service = NetworkGroupService.__new__(NetworkGroupService)
+        service._network_object_service = MagicMock(spec=NetworkObjectService)
+        service._network_object_service.get_network_object.return_value = None
+
+        valid_uuid = "12345678-1234-5678-1234-567812345678"
+
+        with pytest.raises(
+            NotFoundError, match=f"Network object with UID '{valid_uuid}' not found"
+        ):
+            service._resolve_referenced_object_uids([valid_uuid])

@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from typing import Any, Callable, Literal, Protocol
 
 import click
+from rich.console import Console
+
+
+class _HasUid(Protocol):
+    @property
+    def uid(self) -> str: ...
+
+    @property
+    def name(self) -> str: ...
+
+
+CheckOperation = Literal["create", "update", "delete"]
 
 
 def validate_identifier(
@@ -69,3 +82,79 @@ def format_delete_success(
         f"[green]✓[/green] {entity_type} '{identifier}' "
         f"deleted successfully (UID: {deleted_uid})"
     )
+
+
+def check_object_exists(
+    *,
+    console: Console,
+    uid: str | None,
+    name: str | None,
+    get_by_uid_fn: Callable[[str], _HasUid | None] | None,
+    get_by_name_fn: Callable[[str], _HasUid | None],
+    object_name: str,
+    output_format: str = "table",
+    operation: CheckOperation = "update",
+) -> None:
+    """Check whether an object exists and print the result.
+
+    Always exits with success (exit code 0).  When the entity is not
+    found, an informational message is printed rather than a failure.
+
+    Args:
+        console: Rich console for output.
+        uid: UID to look up (mutually exclusive with *name*).
+        name: Name to look up (mutually exclusive with *uid*).
+        get_by_uid_fn: Optional callable to look up by UID.
+        get_by_name_fn: Callable to look up by name.
+        object_name: Human-readable object label (e.g. "Network object").
+        output_format: ``"table"`` for Rich output, ``"json"`` for JSON.
+        operation: Intended mutation operation being preflight-checked.
+    """
+    identifier = uid or name
+    entity: _HasUid | None = None
+
+    if uid and get_by_uid_fn:
+        entity = get_by_uid_fn(uid)
+    elif name:
+        entity = get_by_name_fn(name)
+
+    exists = entity is not None
+    found_uid = entity.uid if entity else None
+    found_name = entity.name if entity else None
+
+    if operation == "create":
+        can_proceed = not exists
+        reason = "not_found" if can_proceed else "already_exists"
+    else:
+        can_proceed = exists
+        reason = "exists" if can_proceed else "not_found"
+
+    state = "not found" if operation == "create" else "exists"
+    blocked_state = "already exists" if operation == "create" else "not found"
+    if can_proceed:
+        summary = f"{object_name} '{identifier}' {state}; {operation} can proceed."
+    else:
+        summary = f"{object_name} '{identifier}' {blocked_state}; {operation} would fail."
+
+    if output_format == "json":
+        console.print(
+            json.dumps(
+                {
+                    "entity_type": object_name,
+                    "identifier": identifier,
+                    "operation": operation,
+                    "exists": exists,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "uid": found_uid,
+                    "name": found_name,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if can_proceed:
+        console.print(f"[green]✓[/green] {summary}")
+    else:
+        console.print(f"[yellow]![/yellow] {summary}")

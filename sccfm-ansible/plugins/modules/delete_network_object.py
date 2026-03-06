@@ -107,7 +107,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        supports_check_mode=False,
+        supports_check_mode=True,
         required_one_of=[("uid", "name")],
         mutually_exclusive=[("uid", "name")],
     )
@@ -121,6 +121,8 @@ def run_module() -> None:
         uid=module.params.get("uid"),
         name=module.params.get("name"),
         entity_name="Network object",
+        get_by_uid_fn=service.get_network_object,
+        get_by_name_fn=service.get_network_object_by_name,
     )
 
 

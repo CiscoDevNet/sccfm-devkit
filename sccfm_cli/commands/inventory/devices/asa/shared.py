@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Mapping, cast
 
@@ -25,6 +26,16 @@ def device_uids_option(help_text: str = _DEFAULT_DEVICE_UIDS_HELP) -> click.Opti
         help=help_text,
         multiple=True,
         type=str,
+    )
+
+
+def asa_check_option() -> click.Option:
+    """Reusable --check flag for ASA mutating commands."""
+    return click.Option(
+        ["--check"],
+        is_flag=True,
+        default=False,
+        help="Run a preflight check without performing the operation.",
     )
 
 
@@ -169,3 +180,49 @@ class AsaDeviceTargetCommand(BaseCommand):
             uid_to_device=uid_to_device,
             device_uids=device_uids,
         )
+
+    def report_check_targets(
+        self,
+        targets: AsaDeviceTargets,
+        output_format: str = "table",
+        operation: str = "operation",
+    ) -> None:
+        """Report matched device targets for ``--check`` mode."""
+        can_proceed = len(targets.devices) > 0
+        reason = "targets_found" if can_proceed else "no_targets_matched"
+
+        if output_format == "json":
+            payload = [
+                {
+                    "name": d.name,
+                    "uid": d.uid,
+                    "device_type": d.device_type.value if d.device_type else None,
+                }
+                for d in targets.devices
+            ]
+            self.console.print(
+                json.dumps(
+                    {
+                        "operation": operation,
+                        "can_proceed": can_proceed,
+                        "reason": reason,
+                        "matched_devices": len(targets.devices),
+                        "devices": payload,
+                    },
+                    indent=2,
+                )
+            )
+            return
+
+        if not targets.devices:
+            self.console.print(
+                f"[yellow]![/yellow] No devices matched the filter; {operation} cannot proceed."
+            )
+            return
+
+        self.console.print(
+            f"[green]\u2713[/green] {len(targets.devices)} device(s) matched; "
+            f"{operation} can proceed:"
+        )
+        for device in targets.devices:
+            self.console.print(f"  - {device.name} (UID: {device.uid})")

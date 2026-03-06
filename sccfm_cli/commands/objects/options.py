@@ -117,14 +117,29 @@ def object_name_option() -> click.Option:
     )
 
 
+def check_option() -> click.Option:
+    """Reusable --check flag for existence checks."""
+    return click.Option(
+        ["--check"],
+        is_flag=True,
+        default=False,
+        help="Run a preflight check without performing the operation.",
+    )
+
+
 def object_create_params() -> List[click.Parameter]:
-    """Complete set of options for network object create command."""
+    """Complete set of options for network object create command.
+
+    ``--value`` is optional at the Click level so that ``--check`` can
+    run without it; the command handler enforces it when not in check mode.
+    """
     return [
         name_option(),
-        value_option(),
+        value_option(required=False),
         description_option(),
         labels_option(),
         tags_option(),
+        check_option(),
         format_option(),
         config_path_option(),
     ]
@@ -186,6 +201,7 @@ def object_delete_params() -> List[click.Parameter]:
     return [
         uid_option(),
         object_name_option(),
+        check_option(),
         config_path_option(),
     ]
 
@@ -244,6 +260,7 @@ def object_update_params() -> List[click.Parameter]:
         description_option(),
         labels_option(),
         tags_option(),
+        check_option(),
         format_option(),
         config_path_option(),
     ]
@@ -259,6 +276,7 @@ def group_create_params() -> List[click.Parameter]:
         description_option(),
         labels_option(),
         tags_option(),
+        check_option(),
         format_option(),
         config_path_option(),
     ]
@@ -274,6 +292,7 @@ def group_update_params() -> List[click.Parameter]:
         description_option(),
         labels_option(),
         tags_option(),
+        check_option(),
         format_option(),
         config_path_option(),
     ]

@@ -8,7 +8,11 @@ from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import object_update_params, parse_tags
-from sccfm_cli.commands.objects.utils import validate_has_updates, validate_identifier
+from sccfm_cli.commands.objects.utils import (
+    check_object_exists,
+    validate_has_updates,
+    validate_identifier,
+)
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkObjectService
@@ -33,6 +37,27 @@ class UpdateNetworkObjectCommand(BaseCommand):
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         uid = cast(str | None, kwargs.get("uid"))
         name = cast(str | None, kwargs.get("name"))
+        check = cast(bool, kwargs.get("check", False))
+        output_format = cast(str, kwargs.get("format"))
+
+        validate_identifier(ctx, uid=uid, name=name)
+
+        config = self.get_profile(ctx=ctx, **kwargs)
+        service = NetworkObjectService(config)
+
+        if check:
+            check_object_exists(
+                console=self.console,
+                uid=uid,
+                name=name,
+                get_by_uid_fn=service.get_network_object,
+                get_by_name_fn=service.get_network_object_by_name,
+                object_name="Network object",
+                output_format=output_format,
+                operation="update",
+            )
+            return
+
         new_name = cast(str | None, kwargs.get("new_name"))
         value = cast(str | None, kwargs.get("value"))
         description = cast(str | None, kwargs.get("description"))
@@ -40,9 +65,7 @@ class UpdateNetworkObjectCommand(BaseCommand):
         labels = list(labels_tuple) if labels_tuple else None
         tags_tuple = cast(tuple[str, ...] | None, kwargs.get("tags"))
         tags = parse_tags(tags_tuple)
-        output_format = cast(str, kwargs.get("format"))
 
-        validate_identifier(ctx, uid=uid, name=name)
         validate_has_updates(
             ctx,
             fields={
@@ -54,9 +77,6 @@ class UpdateNetworkObjectCommand(BaseCommand):
             },
             field_names=["--new-name", "--value", "--description", "--labels", "--tags"],
         )
-
-        config = self.get_profile(ctx=ctx, **kwargs)
-        service = NetworkObjectService(config)
 
         try:
             response: NetworkObjectResponse = service.update_network_object(

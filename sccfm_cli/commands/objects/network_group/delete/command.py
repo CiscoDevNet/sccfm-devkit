@@ -6,7 +6,11 @@ import click
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import object_delete_params
-from sccfm_cli.commands.objects.utils import format_delete_success, validate_identifier
+from sccfm_cli.commands.objects.utils import (
+    check_object_exists,
+    format_delete_success,
+    validate_identifier,
+)
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
@@ -30,11 +34,24 @@ class DeleteNetworkGroupCommand(BaseCommand):
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         uid = cast(str | None, kwargs.get("uid"))
         name = cast(str | None, kwargs.get("name"))
+        check = cast(bool, kwargs.get("check", False))
 
         validate_identifier(ctx, uid=uid, name=name)
 
         config = self.get_profile(ctx=ctx, **kwargs)
         service = NetworkGroupService(config)
+
+        if check:
+            check_object_exists(
+                console=self.console,
+                uid=uid,
+                name=name,
+                get_by_uid_fn=service.get_network_group,
+                get_by_name_fn=service.get_network_group_by_name,
+                object_name="Network group",
+                operation="delete",
+            )
+            return
 
         try:
             deleted_uid = service.delete_network_group(uid=uid, name=name)

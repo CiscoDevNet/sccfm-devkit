@@ -123,14 +123,17 @@ class NetworkGroupService:
         self._object_api = self._helper.api
         self._network_object_service = NetworkObjectService(config)
 
-    def _get_network_group(self, uid: str) -> NetworkGroupResponse | None:
+    def get_network_group(self, uid: str) -> NetworkGroupResponse | None:
         """Fetch a network group by UID.
+
+        Returns ``None`` when the UID does not exist **or** when it
+        resolves to a different object type (e.g. a plain network object).
 
         Args:
             uid: The unique identifier of the network group.
 
         Returns:
-            The NetworkGroupResponse if found, None if a 404 is returned.
+            The NetworkGroupResponse if found and type-correct, None otherwise.
 
         Raises:
             ApiException: If the API call fails with a non-404 error.
@@ -139,7 +142,10 @@ class NetworkGroupService:
         if response.status == 404:
             return None
         data = self._helper.read_raw_response(response)
-        return NetworkGroupResponse.from_dict(data)
+        parsed = NetworkGroupResponse.from_dict(data)
+        if parsed.object_type != self.OBJECT_TYPE:
+            return None
+        return parsed
 
     def _get_raw_group_content(self, uid: str) -> dict[str, Any]:
         """Fetch the raw defaultContent dict for a network group.
@@ -239,7 +245,7 @@ class NetworkGroupService:
             uid=uid,
             name=name,
             get_by_name_fn=self.get_network_group_by_name,
-            get_by_uid_fn=self._get_network_group,
+            get_by_uid_fn=self.get_network_group,
             entity_name="Network group",
         )
 
@@ -462,9 +468,9 @@ class NetworkGroupService:
     def _resolve_referenced_object_uids(self, referenced_objects: list[str]) -> list[str]:
         """Resolve referenced object identifiers to UIDs.
 
-        Each value is checked: if it is a valid UUID, it is used as-is;
-        otherwise it is treated as a name and looked up via the network
-        object API.
+        Each value is checked: if it is a valid UUID, its existence and
+        type are verified via the network object service; otherwise it
+        is treated as a name and looked up.
 
         Args:
             referenced_objects: Values that may be UIDs or object names.
@@ -473,12 +479,16 @@ class NetworkGroupService:
             A list of resolved UID strings.
 
         Raises:
-            NotFoundError: If a referenced object name cannot be found.
+            NotFoundError: If a referenced object cannot be found or is
+                not a network object.
         """
         resolved: list[str] = []
         for ref in referenced_objects:
             if self._is_uuid(ref):
-                resolved.append(ref)
+                obj = self._network_object_service.get_network_object(ref)
+                if not obj:
+                    raise NotFoundError(f"Network object with UID '{ref}' not found.")
+                resolved.append(obj.uid)
             else:
                 obj = self._network_object_service.get_network_object_by_name(ref)
                 if not obj:

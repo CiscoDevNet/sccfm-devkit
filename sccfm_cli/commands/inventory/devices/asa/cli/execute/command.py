@@ -9,6 +9,7 @@ from sccfm_cli.commands.inventory.devices.asa.cli_result_renderer import (
 )
 from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
+    asa_check_option,
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
@@ -44,20 +45,15 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
                     "separated by a newline."
                 ),
             ),
+            asa_check_option(),
             format_option(),
             config_path_option(),
         ]
 
     @with_spinner("Executing CLI commands...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        script = cast(str | None, kwargs.get("script"))
-        script_file = cast(Path | None, kwargs.get("script_file"))
+        check = cast(bool, kwargs.get("check", False))
         response_format = cast(str, kwargs.get("format"))
-
-        self._validate_script_filters(ctx=ctx, script=script, script_file=script_file)
-        if script_file is not None:
-            script = script_file.read_text()
-        assert script is not None
 
         config = self.get_profile(ctx=ctx, **kwargs)
         targets = self.resolve_asa_targets_from_kwargs(
@@ -66,6 +62,22 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
             config=config,
             include_device_name=True,
         )
+
+        if check:
+            self.report_check_targets(
+                targets,
+                output_format=response_format,
+                operation="CLI execution",
+            )
+            return
+
+        script = cast(str | None, kwargs.get("script"))
+        script_file = cast(Path | None, kwargs.get("script_file"))
+
+        self._validate_script_filters(ctx=ctx, script=script, script_file=script_file)
+        if script_file is not None:
+            script = script_file.read_text()
+        assert script is not None
 
         asa_cli_service = AsaCommandLineService(config=config)
         results: CdoTransaction | List[CdoCliResult] = asa_cli_service.execute_cli(

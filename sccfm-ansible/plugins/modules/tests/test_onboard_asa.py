@@ -51,6 +51,7 @@ def mock_module_instance(base_module_params: dict[str, Any]) -> MagicMock:
     """Creates a mock module instance with exit_json/fail_json that raise SystemExit."""
     mock_module = MagicMock()
     mock_module.params = base_module_params.copy()  # Copy to avoid mutation across tests
+    mock_module.check_mode = False
     mock_module.exit_json.side_effect = SystemExit(0)
     mock_module.fail_json.side_effect = SystemExit(1)
     return mock_module
@@ -249,3 +250,35 @@ def test_should_return_structured_error_on_api_exception(
     assert call_kwargs["error_code"] == "VALIDATION_ERROR"
     assert call_kwargs["error_details"] == {"field": "deviceAddress"}
     assert call_kwargs["status_code"] == 400
+
+
+@patch("plugins.modules.onboard_asa.Config")
+@patch("plugins.modules.onboard_asa.AsaOnboardService")
+@patch("plugins.modules.onboard_asa.InventoryService")
+@patch("plugins.modules.onboard_asa.AnsibleModule")
+def test_check_mode_should_report_would_onboard_when_device_does_not_exist(
+    mock_ansible_module_class: MagicMock,
+    mock_inventory_service_class: MagicMock,
+    mock_asa_onboard_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module in check_mode should report changed without onboarding."""
+    mock_module_instance.check_mode = True
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_inventory = MagicMock()
+    mock_inventory.get_devices.return_value = DevicePage(count=0, limit=1, offset=0, items=[])
+    mock_inventory_service_class.return_value = mock_inventory
+
+    mock_onboard = MagicMock()
+    mock_asa_onboard_service_class.return_value = mock_onboard
+
+    with pytest.raises(SystemExit):
+        onboard_asa.run_module()
+
+    mock_module_instance.exit_json.assert_called_once()
+    call_kwargs = mock_module_instance.exit_json.call_args[1]
+    assert call_kwargs["changed"] is True
+    assert "Would onboard" in call_kwargs["msg"]
+    mock_onboard.onboard_asa.assert_not_called()
