@@ -1,3 +1,9 @@
+## v0.16.0 (2026-03-06)
+
+### Feat
+
+- add --check preflight flag to CLI and Ansible check_mode support (#30)
+
 ## v0.15.1 (2026-02-27)
 
 ### Fix
