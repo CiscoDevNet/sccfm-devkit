@@ -125,24 +125,16 @@ def check_object_exists(
     if operation == "create":
         can_proceed = not exists
         reason = "not_found" if can_proceed else "already_exists"
-        if exists:
-            summary = f"{object_name} '{identifier}' already exists; create would fail."
-        else:
-            summary = f"{object_name} '{identifier}' not found; create can proceed."
-    elif operation == "update":
+    else:
         can_proceed = exists
         reason = "exists" if can_proceed else "not_found"
-        if exists:
-            summary = f"{object_name} '{identifier}' exists; update can proceed."
-        else:
-            summary = f"{object_name} '{identifier}' not found; update would fail."
-    else:  # delete
-        can_proceed = exists
-        reason = "exists" if can_proceed else "not_found"
-        if exists:
-            summary = f"{object_name} '{identifier}' exists; delete can proceed."
-        else:
-            summary = f"{object_name} '{identifier}' not found; delete would fail."
+
+    state = "not found" if operation == "create" else "exists"
+    blocked_state = "already exists" if operation == "create" else "not found"
+    if can_proceed:
+        summary = f"{object_name} '{identifier}' {state}; {operation} can proceed."
+    else:
+        summary = f"{object_name} '{identifier}' {blocked_state}; {operation} would fail."
 
     if output_format == "json":
         console.print(
