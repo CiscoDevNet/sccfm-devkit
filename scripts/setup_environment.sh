@@ -101,65 +101,51 @@ function ensure_python() {
     configure_opts="--with-openssl=${openssl_prefix} --with-openssl-rpath=auto"
   fi
 
-  # Explicitly tell CPython's ./configure where liblzma lives.
-  # CPython 3.12+ uses PKG_CHECK_MODULES([LIBLZMA], [liblzma]) in
-  # configure.ac.  When LIBLZMA_CFLAGS / LIBLZMA_LIBS are pre-set in
-  # the environment the autoconf macro uses them directly, bypassing
-  # pkg-config lookup entirely.  This is the most reliable approach
-  # on Linuxbrew where pkg-config discovery can fail silently.
-  local xz_prefix=""
-  xz_prefix="$(brew --prefix xz 2>/dev/null)" || true
-  local lzma_cflags="" lzma_libs=""
-  if [[ -n "${xz_prefix}" && -d "${xz_prefix}/include" ]]; then
-    lzma_cflags="-I${xz_prefix}/include"
-    lzma_libs="-L${xz_prefix}/lib -llzma"
+  # On Linux, Homebrew's pkg-config shadows the system's and produces
+  # flags targeting Homebrew-compiled libraries.  The system compiler
+  # (often old GCC 7.x on Amazon Linux 2) cannot link against them.
+  # Fix: use Homebrew's own GCC as the C compiler.
+  # See: https://github.com/pyenv/pyenv/issues/2823
+  local cc_override=""
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    local gcc_prefix
+    gcc_prefix="$(brew --prefix gcc 2>/dev/null)" || true
+    if [[ -n "${gcc_prefix}" && -d "${gcc_prefix}/bin" ]]; then
+      cc_override="$(find "${gcc_prefix}/bin" -maxdepth 1 -name 'gcc-[0-9]*' -type f 2>/dev/null \
+        | sort -V | tail -1)"
+    fi
+    if [[ -z "${cc_override}" ]]; then
+      echo "WARNING: Homebrew GCC not found; installing..." >&2
+      brew install gcc
+      gcc_prefix="$(brew --prefix gcc 2>/dev/null)" || true
+      cc_override="$(find "${gcc_prefix}/bin" -maxdepth 1 -name 'gcc-[0-9]*' -type f 2>/dev/null \
+        | sort -V | tail -1)"
+    fi
   fi
-
-  # ── Pre-build diagnostics (lzma-focused) ──
-  echo "=== lzma build diagnostics ==="
-  echo "xz_prefix:       ${xz_prefix:-<empty>}"
-  echo "LIBLZMA_CFLAGS:  ${lzma_cflags:-<empty>}"
-  echo "LIBLZMA_LIBS:    ${lzma_libs:-<empty>}"
-  echo "PKG_CONFIG:      ${pkg_config_bin:-<empty>}"
-  if [[ -n "${xz_prefix}" ]]; then
-    echo "lzma.h exists:   $(test -f "${xz_prefix}/include/lzma.h" && echo YES || echo NO)"
-    echo "liblzma.so:      $(find "${xz_prefix}/lib" -maxdepth 1 -name 'liblzma.*' 2>/dev/null | head -3)"
-    echo "liblzma.pc:      $(test -f "${xz_prefix}/lib/pkgconfig/liblzma.pc" && echo YES || echo NO)"
-  fi
-  if [[ -n "${pkg_config_bin}" && -n "${flags_pkg}" ]]; then
-    echo "pkg-config test: $(PKG_CONFIG_PATH="${flags_pkg}" "${pkg_config_bin}" --cflags --libs liblzma 2>&1 || echo FAILED)"
-  fi
-  echo "=== end diagnostics ==="
 
   echo "Installing Python ${PYTHON_VERSION}"
-  PKG_CONFIG="${pkg_config_bin}" \
-  LIBLZMA_CFLAGS="${lzma_cflags}" \
-  LIBLZMA_LIBS="${lzma_libs}" \
-  LDFLAGS="${flags_ld}" \
-  CPPFLAGS="${flags_cpp}" \
-  PKG_CONFIG_PATH="${flags_pkg}" \
-  PYTHON_CONFIGURE_OPTS="${configure_opts}" \
-    pyenv install "${PYTHON_VERSION}" 2>&1 \
-    | { grep -iE 'lzma|_lzma|LIBLZMA|pkg.config|liblzma|error|warning.*lzma|BUILD FAILED|Last 10' || true; }
+  # Build the env-var array; only include non-empty values so that
+  # pyenv / python-build's own defaults are not clobbered by blanks.
+  local -a build_env=()
+  [[ -n "${cc_override}" ]]    && build_env+=(CC="${cc_override}")
+  [[ -n "${pkg_config_bin}" ]] && build_env+=(PKG_CONFIG="${pkg_config_bin}")
+  [[ -n "${flags_ld}" ]]       && build_env+=(LDFLAGS="${flags_ld}")
+  [[ -n "${flags_cpp}" ]]      && build_env+=(CPPFLAGS="${flags_cpp}")
+  [[ -n "${flags_pkg}" ]]      && build_env+=(PKG_CONFIG_PATH="${flags_pkg}")
+  [[ -n "${configure_opts}" ]] && build_env+=(PYTHON_CONFIGURE_OPTS="${configure_opts}")
 
-  # If the build log was saved, extract lzma-specific lines.
-  local build_log
-  build_log="$(ls -t /tmp/python-build.*.log 2>/dev/null | head -1)"
-  if [[ -n "${build_log}" && -f "${build_log}" ]]; then
-    echo "=== lzma lines from build log (${build_log}) ==="
-    grep -iE 'lzma|liblzma' "${build_log}" | head -30 || echo "(none)"
-    echo "=== end build log extract ==="
-  fi
-
-  # Verify the build actually produced a working interpreter.
-  local python_bin
-  python_bin="$(pyenv root)/versions/${PYTHON_VERSION}/bin/python3"
-  if [[ ! -x "${python_bin}" ]]; then
-    echo "Python ${PYTHON_VERSION} failed to build." >&2
+  # Run inside `if !` so set -e does not kill the script before we
+  # can print diagnostics from the build log on failure.
+  if ! env "${build_env[@]}" pyenv install "${PYTHON_VERSION}"; then
+    echo "Python ${PYTHON_VERSION} build failed." >&2
+    local build_log
+    build_log="$(ls -t /tmp/python-build.*.log 2>/dev/null | head -1)"
     if [[ -n "${build_log}" && -f "${build_log}" ]]; then
-      echo "Full build log: ${build_log}" >&2
-      echo "=== last 20 lines ===" >&2
-      tail -20 "${build_log}" >&2
+      echo "=== build log: ${build_log} ===" >&2
+      echo "--- lzma / error lines ---" >&2
+      grep -iE 'lzma|liblzma|_lzma|error|failed to' "${build_log}" | tail -40 >&2 || true
+      echo "--- last 30 lines ---" >&2
+      tail -30 "${build_log}" >&2
     fi
     exit 1
   fi
