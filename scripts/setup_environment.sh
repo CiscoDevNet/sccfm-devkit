@@ -72,8 +72,16 @@ function ensure_python() {
     rm -rf "${versions_dir}"
   fi
 
-  # Build per-package compiler/linker/pkg-config flags as a safety net
-  # on top of the force-linked packages above.
+  # Locate pkg-config binary.  Homebrew ships "pkgconf" which may not
+  # install a "pkg-config" symlink.  CPython's ./configure (via autoconf
+  # PKG_CHECK_MODULES) honours the PKG_CONFIG env-var; without it,
+  # configure searches PATH for "pkg-config" and may miss "pkgconf".
+  local pkg_config_bin=""
+  pkg_config_bin="$(command -v pkg-config 2>/dev/null)" \
+    || pkg_config_bin="$(command -v pkgconf 2>/dev/null)" \
+    || true
+
+  # Build per-package compiler/linker/pkg-config flags.
   local flags_ld="" flags_cpp="" flags_pkg=""
   local pkg prefix
   for pkg in bzip2 libffi openssl@3 readline sqlite3 xz zlib; do
@@ -83,17 +91,34 @@ function ensure_python() {
     [[ -d "${prefix}/lib/pkgconfig" ]]  && flags_pkg="${flags_pkg:+${flags_pkg}:}${prefix}/lib/pkgconfig"
   done
 
-  local openssl_prefix
+  local openssl_prefix=""
   openssl_prefix="$(brew --prefix openssl@3 2>/dev/null)" \
     || openssl_prefix="$(brew --prefix openssl 2>/dev/null)" \
-    || openssl_prefix=""
+    || true
 
   local configure_opts=""
   if [[ -n "${openssl_prefix}" ]]; then
     configure_opts="--with-openssl=${openssl_prefix} --with-openssl-rpath=auto"
   fi
 
+  # Explicitly tell CPython's ./configure where liblzma lives.
+  # CPython 3.12+ uses PKG_CHECK_MODULES([LIBLZMA], [liblzma]) in
+  # configure.ac.  When LIBLZMA_CFLAGS / LIBLZMA_LIBS are pre-set in
+  # the environment the autoconf macro uses them directly, bypassing
+  # pkg-config lookup entirely.  This is the most reliable approach
+  # on Linuxbrew where pkg-config discovery can fail silently.
+  local xz_prefix=""
+  xz_prefix="$(brew --prefix xz 2>/dev/null)" || true
+  local lzma_cflags="" lzma_libs=""
+  if [[ -n "${xz_prefix}" && -d "${xz_prefix}/include" ]]; then
+    lzma_cflags="-I${xz_prefix}/include"
+    lzma_libs="-L${xz_prefix}/lib -llzma"
+  fi
+
   echo "Installing Python ${PYTHON_VERSION}"
+  PKG_CONFIG="${pkg_config_bin}" \
+  LIBLZMA_CFLAGS="${lzma_cflags}" \
+  LIBLZMA_LIBS="${lzma_libs}" \
   LDFLAGS="${flags_ld}" \
   CPPFLAGS="${flags_cpp}" \
   PKG_CONFIG_PATH="${flags_pkg}" \
