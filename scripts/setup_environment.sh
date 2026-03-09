@@ -33,16 +33,31 @@ function ensure_pyenv() {
   brew install pyenv
 }
 
+function ensure_system_build_deps() {
+  # Homebrew's GCC still depends on the system linker (ld) and C runtime
+  # startup files (crt1.o, crti.o from glibc-devel) to create executables.
+  # Without these, even `gcc-15 -o hello hello.c` fails with
+  # "C compiler cannot create executables".
+  # Homebrew's own post-install recommendation: "sudo yum groupinstall 'Development Tools'"
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    return
+  fi
+  if command -v gcc >/dev/null 2>&1 && command -v make >/dev/null 2>&1; then
+    return
+  fi
+  echo "Installing system build dependencies"
+  if command -v yum >/dev/null 2>&1; then
+    sudo yum groupinstall -y 'Development Tools'
+  elif command -v dnf >/dev/null 2>&1; then
+    sudo dnf group install -y 'Development Tools'
+  elif command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -y && sudo apt-get install -y build-essential
+  fi
+}
+
 function ensure_python_build_deps() {
-  # pyenv compiles Python from source.  python-build auto-detects only a
-  # handful of Homebrew packages (readline, ncurses, zlib, tcl-tk,
-  # openssl).  Others — notably xz — are silently missed.
-  #
-  # CPython 3.12+ uses pkg-config (PKG_CHECK_MODULES) to locate
-  # libraries such as liblzma.  Without pkg-config the fallback detection
-  # often fails to set the module-specific compiler/linker flags
-  # (LIBLZMA_CFLAGS / LIBLZMA_LIBS), so the _lzma extension silently
-  # fails to compile even though generic CPPFLAGS/LDFLAGS are present.
+  ensure_system_build_deps
+
   echo "Installing Python build dependencies via Homebrew"
   brew install bzip2 libffi openssl@3 pkg-config readline sqlite3 xz zlib tcl-tk
 
@@ -159,8 +174,8 @@ function ensure_python() {
     local build_dir
     build_dir="$(ls -dt /tmp/python-build.*/Python-*/ 2>/dev/null | head -1)"
     if [[ -n "${build_dir}" && -f "${build_dir}/config.log" ]]; then
-      echo "=== config.log (last 60 lines) ===" >&2
-      tail -60 "${build_dir}/config.log" >&2
+      echo "=== config.log compiler test errors ===" >&2
+      grep -A5 -E 'error:|cannot create|failed program was' "${build_dir}/config.log" | tail -50 >&2 || true
     fi
     exit 1
   fi
