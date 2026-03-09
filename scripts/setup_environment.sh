@@ -34,10 +34,12 @@ function ensure_pyenv() {
 }
 
 function ensure_python_build_deps() {
-  # pyenv (installed via Homebrew) resolves libraries from the Homebrew prefix,
-  # so the build dependencies must also come from Homebrew.
+  # pyenv compiles Python from source. On Linux (Linuxbrew) python-build
+  # auto-detects only a subset of Homebrew packages; xz and openssl are
+  # notably absent.  Install everything through Homebrew so we can point
+  # the compiler at a single consistent prefix.
   echo "Installing Python build dependencies via Homebrew"
-  brew install openssl readline sqlite3 xz zlib tcl-tk
+  brew install bzip2 openssl readline sqlite3 xz zlib tcl-tk
 }
 
 function ensure_python() {
@@ -45,8 +47,36 @@ function ensure_python() {
     return
   fi
   ensure_python_build_deps
+
+  # python-build auto-detects only some Homebrew packages (readline, ncurses,
+  # zlib, tcl-tk).  Libraries like xz and openssl are missed on Linux, causing
+  # _lzma / _ssl to silently fail to compile then crash at install time.
+  # Explicitly tell the compiler and linker where Homebrew keeps its headers
+  # and libraries so ./configure finds everything.
+  local brew_prefix
+  brew_prefix="$(brew --prefix)"
+
+  local openssl_prefix
+  if brew --prefix openssl@3 >/dev/null 2>&1; then
+    openssl_prefix="$(brew --prefix openssl@3)"
+  else
+    openssl_prefix="$(brew --prefix openssl)"
+  fi
+
   echo "Installing Python ${PYTHON_VERSION}"
-  pyenv install -s "${PYTHON_VERSION}"
+  LDFLAGS="-L${brew_prefix}/lib" \
+  CPPFLAGS="-I${brew_prefix}/include" \
+  PKG_CONFIG_PATH="${brew_prefix}/lib/pkgconfig" \
+  PYTHON_CONFIGURE_OPTS="--with-openssl=${openssl_prefix}" \
+    pyenv install -s "${PYTHON_VERSION}"
+
+  # Verify the build actually produced a working interpreter.
+  local python_bin
+  python_bin="$(pyenv root)/versions/${PYTHON_VERSION}/bin/python3"
+  if [[ ! -x "${python_bin}" ]]; then
+    echo "Python ${PYTHON_VERSION} failed to build. Check the pyenv build log above." >&2
+    exit 1
+  fi
 }
 
 function create_venv() {
