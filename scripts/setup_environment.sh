@@ -115,6 +115,22 @@ function ensure_python() {
     lzma_libs="-L${xz_prefix}/lib -llzma"
   fi
 
+  # ── Pre-build diagnostics (lzma-focused) ──
+  echo "=== lzma build diagnostics ==="
+  echo "xz_prefix:       ${xz_prefix:-<empty>}"
+  echo "LIBLZMA_CFLAGS:  ${lzma_cflags:-<empty>}"
+  echo "LIBLZMA_LIBS:    ${lzma_libs:-<empty>}"
+  echo "PKG_CONFIG:      ${pkg_config_bin:-<empty>}"
+  if [[ -n "${xz_prefix}" ]]; then
+    echo "lzma.h exists:   $(test -f "${xz_prefix}/include/lzma.h" && echo YES || echo NO)"
+    echo "liblzma.so:      $(find "${xz_prefix}/lib" -maxdepth 1 -name 'liblzma.*' 2>/dev/null | head -3)"
+    echo "liblzma.pc:      $(test -f "${xz_prefix}/lib/pkgconfig/liblzma.pc" && echo YES || echo NO)"
+  fi
+  if [[ -n "${pkg_config_bin}" && -n "${flags_pkg}" ]]; then
+    echo "pkg-config test: $(PKG_CONFIG_PATH="${flags_pkg}" "${pkg_config_bin}" --cflags --libs liblzma 2>&1 || echo FAILED)"
+  fi
+  echo "=== end diagnostics ==="
+
   echo "Installing Python ${PYTHON_VERSION}"
   PKG_CONFIG="${pkg_config_bin}" \
   LIBLZMA_CFLAGS="${lzma_cflags}" \
@@ -123,13 +139,28 @@ function ensure_python() {
   CPPFLAGS="${flags_cpp}" \
   PKG_CONFIG_PATH="${flags_pkg}" \
   PYTHON_CONFIGURE_OPTS="${configure_opts}" \
-    pyenv install -v "${PYTHON_VERSION}"
+    pyenv install "${PYTHON_VERSION}" 2>&1 \
+    | { grep -iE 'lzma|_lzma|LIBLZMA|pkg.config|liblzma|error|warning.*lzma|BUILD FAILED|Last 10' || true; }
+
+  # If the build log was saved, extract lzma-specific lines.
+  local build_log
+  build_log="$(ls -t /tmp/python-build.*.log 2>/dev/null | head -1)"
+  if [[ -n "${build_log}" && -f "${build_log}" ]]; then
+    echo "=== lzma lines from build log (${build_log}) ==="
+    grep -iE 'lzma|liblzma' "${build_log}" | head -30 || echo "(none)"
+    echo "=== end build log extract ==="
+  fi
 
   # Verify the build actually produced a working interpreter.
   local python_bin
   python_bin="$(pyenv root)/versions/${PYTHON_VERSION}/bin/python3"
   if [[ ! -x "${python_bin}" ]]; then
-    echo "Python ${PYTHON_VERSION} failed to build. Check the pyenv build log above." >&2
+    echo "Python ${PYTHON_VERSION} failed to build." >&2
+    if [[ -n "${build_log}" && -f "${build_log}" ]]; then
+      echo "Full build log: ${build_log}" >&2
+      echo "=== last 20 lines ===" >&2
+      tail -20 "${build_log}" >&2
+    fi
     exit 1
   fi
 }
