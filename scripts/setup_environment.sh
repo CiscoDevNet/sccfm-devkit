@@ -34,12 +34,12 @@ function ensure_pyenv() {
 }
 
 function ensure_python_build_deps() {
-  # pyenv compiles Python from source. On Linux (Linuxbrew) python-build
-  # auto-detects only a subset of Homebrew packages; xz and openssl are
-  # notably absent.  Install everything through Homebrew so we can point
-  # the compiler at a single consistent prefix.
+  # pyenv compiles Python from source.  On Linuxbrew, python-build only
+  # auto-detects a few Homebrew packages (readline, ncurses, zlib,
+  # tcl-tk).  Others — notably xz and openssl — are silently missed,
+  # causing _lzma / _ssl to fail to compile.
   echo "Installing Python build dependencies via Homebrew"
-  brew install bzip2 openssl readline sqlite3 xz zlib tcl-tk
+  brew install bzip2 libffi openssl readline sqlite3 xz zlib tcl-tk
 }
 
 function ensure_python() {
@@ -48,27 +48,38 @@ function ensure_python() {
   fi
   ensure_python_build_deps
 
-  # python-build auto-detects only some Homebrew packages (readline, ncurses,
-  # zlib, tcl-tk).  Libraries like xz and openssl are missed on Linux, causing
-  # _lzma / _ssl to silently fail to compile then crash at install time.
-  # Explicitly tell the compiler and linker where Homebrew keeps its headers
-  # and libraries so ./configure finds everything.
-  local brew_prefix
-  brew_prefix="$(brew --prefix)"
+  # python-build auto-detects only some Homebrew packages (readline,
+  # ncurses, zlib, tcl-tk).  Packages like xz and openssl are missed on
+  # Linuxbrew because they are keg-only / unlinked — their headers live
+  # under $(brew --prefix PKG)/include, NOT $(brew --prefix)/include.
+  #
+  # Build explicit per-package -I / -L / pkg-config flags following the
+  # pattern recommended by the pyenv wiki (Common-build-problems).
+  local flags_ld="" flags_cpp="" flags_pkg=""
+  local pkg prefix
+  for pkg in bzip2 libffi openssl@3 readline sqlite3 xz zlib; do
+    prefix="$(brew --prefix "${pkg}" 2>/dev/null)" || continue
+    [[ -d "${prefix}/lib" ]]            && flags_ld="${flags_ld} -L${prefix}/lib"
+    [[ -d "${prefix}/include" ]]        && flags_cpp="${flags_cpp} -I${prefix}/include"
+    [[ -d "${prefix}/lib/pkgconfig" ]]  && flags_pkg="${flags_pkg:+${flags_pkg}:}${prefix}/lib/pkgconfig"
+  done
 
   local openssl_prefix
-  if brew --prefix openssl@3 >/dev/null 2>&1; then
-    openssl_prefix="$(brew --prefix openssl@3)"
-  else
-    openssl_prefix="$(brew --prefix openssl)"
+  openssl_prefix="$(brew --prefix openssl@3 2>/dev/null)" \
+    || openssl_prefix="$(brew --prefix openssl 2>/dev/null)" \
+    || openssl_prefix=""
+
+  local configure_opts=""
+  if [[ -n "${openssl_prefix}" ]]; then
+    configure_opts="--with-openssl=${openssl_prefix} --with-openssl-rpath=auto"
   fi
 
   echo "Installing Python ${PYTHON_VERSION}"
-  LDFLAGS="-L${brew_prefix}/lib" \
-  CPPFLAGS="-I${brew_prefix}/include" \
-  PKG_CONFIG_PATH="${brew_prefix}/lib/pkgconfig" \
-  PYTHON_CONFIGURE_OPTS="--with-openssl=${openssl_prefix}" \
-    pyenv install -s "${PYTHON_VERSION}"
+  LDFLAGS="${flags_ld}" \
+  CPPFLAGS="${flags_cpp}" \
+  PKG_CONFIG_PATH="${flags_pkg}" \
+  PYTHON_CONFIGURE_OPTS="${configure_opts}" \
+    pyenv install -v "${PYTHON_VERSION}"
 
   # Verify the build actually produced a working interpreter.
   local python_bin
