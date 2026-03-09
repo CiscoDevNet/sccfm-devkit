@@ -34,12 +34,28 @@ function ensure_pyenv() {
 }
 
 function ensure_python_build_deps() {
-  # pyenv compiles Python from source.  On Linuxbrew, python-build only
-  # auto-detects a few Homebrew packages (readline, ncurses, zlib,
-  # tcl-tk).  Others — notably xz and openssl — are silently missed,
-  # causing _lzma / _ssl to fail to compile.
+  # pyenv compiles Python from source.  python-build auto-detects only a
+  # handful of Homebrew packages (readline, ncurses, zlib, tcl-tk,
+  # openssl).  Others — notably xz — are silently missed.
+  #
+  # CPython 3.12+ uses pkg-config (PKG_CHECK_MODULES) to locate
+  # libraries such as liblzma.  Without pkg-config the fallback detection
+  # often fails to set the module-specific compiler/linker flags
+  # (LIBLZMA_CFLAGS / LIBLZMA_LIBS), so the _lzma extension silently
+  # fails to compile even though generic CPPFLAGS/LDFLAGS are present.
   echo "Installing Python build dependencies via Homebrew"
-  brew install bzip2 libffi openssl readline sqlite3 xz zlib tcl-tk
+  brew install bzip2 libffi openssl@3 pkg-config readline sqlite3 xz zlib tcl-tk
+
+  # Many of these formulae are keg-only (bzip2, libffi, openssl@3,
+  # readline, zlib) — they are not symlinked into the main Homebrew
+  # prefix by default, so neither pkg-config nor the compiler can find
+  # them without explicit paths.  Force-linking puts the headers, libs,
+  # and .pc files at $(brew --prefix)/{include,lib,lib/pkgconfig} where
+  # the Linuxbrew compiler toolchain and pkg-config search by default.
+  local pkg
+  for pkg in bzip2 libffi openssl@3 readline sqlite3 xz zlib; do
+    brew link --force "${pkg}" 2>/dev/null || true
+  done
 }
 
 function ensure_python() {
@@ -48,13 +64,16 @@ function ensure_python() {
   fi
   ensure_python_build_deps
 
-  # python-build auto-detects only some Homebrew packages (readline,
-  # ncurses, zlib, tcl-tk).  Packages like xz and openssl are missed on
-  # Linuxbrew because they are keg-only / unlinked — their headers live
-  # under $(brew --prefix PKG)/include, NOT $(brew --prefix)/include.
-  #
-  # Build explicit per-package -I / -L / pkg-config flags following the
-  # pattern recommended by the pyenv wiki (Common-build-problems).
+  # Remove leftovers from a previous failed build so pyenv retries.
+  local versions_dir
+  versions_dir="$(pyenv root)/versions/${PYTHON_VERSION}"
+  if [[ -d "${versions_dir}" ]]; then
+    echo "Cleaning partial install at ${versions_dir}"
+    rm -rf "${versions_dir}"
+  fi
+
+  # Build per-package compiler/linker/pkg-config flags as a safety net
+  # on top of the force-linked packages above.
   local flags_ld="" flags_cpp="" flags_pkg=""
   local pkg prefix
   for pkg in bzip2 libffi openssl@3 readline sqlite3 xz zlib; do
