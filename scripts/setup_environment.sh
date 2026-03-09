@@ -7,8 +7,19 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${PROJECT_ROOT}/.venv"
 
 function ensure_homebrew() {
-  if ! command -v brew >/dev/null 2>&1; then
-    echo "Homebrew is required to install pyenv" >&2
+  if command -v brew >/dev/null 2>&1; then
+    return
+  fi
+  echo "Installing Homebrew"
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  if [[ -x /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [[ -x /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+  elif [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  else
+    echo "Homebrew installation failed" >&2
     exit 1
   fi
 }
@@ -63,6 +74,7 @@ function configure_git_alias() {
   fi
 }
 
+ensure_homebrew
 ensure_pyenv
 ensure_python
 create_venv
