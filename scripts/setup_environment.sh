@@ -59,7 +59,7 @@ function ensure_python_build_deps() {
   ensure_system_build_deps
 
   echo "Installing Python build dependencies via Homebrew"
-  brew install bzip2 libffi openssl@3 pkg-config readline sqlite3 xz zlib tcl-tk
+  brew install bzip2 libffi openssl@3 pkg-config readline sqlite3 xz zlib tcl-tk binutils
 
   # Many of these formulae are keg-only (bzip2, libffi, openssl@3,
   # readline, zlib) — they are not symlinked into the main Homebrew
@@ -148,13 +148,20 @@ function ensure_python() {
   [[ -n "${configure_opts}" ]] && build_env+=(PYTHON_CONFIGURE_OPTS="${configure_opts}")
 
   # On macOS (no cc_override), pass explicit flags for keg-only packages.
-  # On Linux with Homebrew GCC, skip LDFLAGS/CPPFLAGS — the compiler's
-  # built-in search paths already cover $(brew --prefix)/{include,lib}
-  # (populated via brew link --force), and extra flags can interfere
-  # with GCC's internal library resolution during configure tests.
   if [[ -z "${cc_override}" ]]; then
     [[ -n "${flags_ld}" ]]  && build_env+=(LDFLAGS="${flags_ld}")
     [[ -n "${flags_cpp}" ]] && build_env+=(CPPFLAGS="${flags_cpp}")
+  else
+    # Homebrew's GCC 15 ships an LTO plugin compiled against a newer glibc
+    # than Amazon Linux 2 provides (needs 2.33, system has 2.26).  The
+    # system linker (/usr/bin/ld) cannot load it, causing "C compiler
+    # cannot create executables".  The -B flag tells GCC to look in
+    # Homebrew's binutils directory for `ld` first.
+    local binutils_prefix
+    binutils_prefix="$(brew --prefix binutils 2>/dev/null)" || true
+    if [[ -n "${binutils_prefix}" && -d "${binutils_prefix}/bin" ]]; then
+      build_env+=(LDFLAGS="-B${binutils_prefix}/bin")
+    fi
   fi
 
   # Run inside `if !` so set -e does not kill the script before we
