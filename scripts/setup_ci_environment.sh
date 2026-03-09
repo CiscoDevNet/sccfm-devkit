@@ -33,13 +33,13 @@ install_system_packages() {
 
 setup_pyenv() {
   export PYENV_ROOT="${HOME}/.pyenv"
+  export PATH="${PYENV_ROOT}/bin:${PATH}"
 
-  if [[ ! -d "${PYENV_ROOT}" ]]; then
+  if [[ ! -x "${PYENV_ROOT}/bin/pyenv" ]]; then
     echo "Installing pyenv..."
     curl -fsSL https://pyenv.run | bash
   fi
 
-  export PATH="${PYENV_ROOT}/bin:${PATH}"
   eval "$(pyenv init -)"
 }
 
