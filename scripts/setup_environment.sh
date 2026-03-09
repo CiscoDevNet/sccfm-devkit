@@ -152,14 +152,17 @@ function ensure_python() {
     [[ -n "${flags_ld}" ]]  && build_env+=(LDFLAGS="${flags_ld}")
     [[ -n "${flags_cpp}" ]] && build_env+=(CPPFLAGS="${flags_cpp}")
   else
-    # Homebrew's GCC 15 ships an LTO plugin compiled against a newer glibc
-    # than Amazon Linux 2 provides (needs 2.33, system has 2.26).  The
-    # system linker (/usr/bin/ld) cannot load it, causing "C compiler
-    # cannot create executables".  The -B flag tells GCC to look in
-    # Homebrew's binutils directory for `ld` first.
+    # Homebrew's GCC 15 emits assembly using newer directives (.base64)
+    # and links with an LTO plugin compiled against glibc 2.33, but
+    # Amazon Linux 2 ships glibc 2.26.  Both the system assembler (`as`)
+    # and linker (`ld`) are too old to handle these.  The -B flag tells
+    # the GCC driver to search Homebrew's binutils directory for `as`
+    # and `ld` before falling back to /usr/bin.  It must appear in both
+    # CFLAGS (compilation/assembly) and LDFLAGS (linking).
     local binutils_prefix
     binutils_prefix="$(brew --prefix binutils 2>/dev/null)" || true
     if [[ -n "${binutils_prefix}" && -d "${binutils_prefix}/bin" ]]; then
+      build_env+=(CFLAGS="-B${binutils_prefix}/bin")
       build_env+=(LDFLAGS="-B${binutils_prefix}/bin")
     fi
   fi
