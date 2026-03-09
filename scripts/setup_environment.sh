@@ -129,10 +129,18 @@ function ensure_python() {
   local -a build_env=()
   [[ -n "${cc_override}" ]]    && build_env+=(CC="${cc_override}")
   [[ -n "${pkg_config_bin}" ]] && build_env+=(PKG_CONFIG="${pkg_config_bin}")
-  [[ -n "${flags_ld}" ]]       && build_env+=(LDFLAGS="${flags_ld}")
-  [[ -n "${flags_cpp}" ]]      && build_env+=(CPPFLAGS="${flags_cpp}")
   [[ -n "${flags_pkg}" ]]      && build_env+=(PKG_CONFIG_PATH="${flags_pkg}")
   [[ -n "${configure_opts}" ]] && build_env+=(PYTHON_CONFIGURE_OPTS="${configure_opts}")
+
+  # On macOS (no cc_override), pass explicit flags for keg-only packages.
+  # On Linux with Homebrew GCC, skip LDFLAGS/CPPFLAGS — the compiler's
+  # built-in search paths already cover $(brew --prefix)/{include,lib}
+  # (populated via brew link --force), and extra flags can interfere
+  # with GCC's internal library resolution during configure tests.
+  if [[ -z "${cc_override}" ]]; then
+    [[ -n "${flags_ld}" ]]  && build_env+=(LDFLAGS="${flags_ld}")
+    [[ -n "${flags_cpp}" ]] && build_env+=(CPPFLAGS="${flags_cpp}")
+  fi
 
   # Run inside `if !` so set -e does not kill the script before we
   # can print diagnostics from the build log on failure.
@@ -142,10 +150,17 @@ function ensure_python() {
     build_log="$(ls -t /tmp/python-build.*.log 2>/dev/null | head -1)"
     if [[ -n "${build_log}" && -f "${build_log}" ]]; then
       echo "=== build log: ${build_log} ===" >&2
-      echo "--- lzma / error lines ---" >&2
-      grep -iE 'lzma|liblzma|_lzma|error|failed to' "${build_log}" | tail -40 >&2 || true
+      echo "--- error lines ---" >&2
+      grep -iE 'error|failed to|cannot' "${build_log}" | tail -40 >&2 || true
       echo "--- last 30 lines ---" >&2
       tail -30 "${build_log}" >&2
+    fi
+    # If configure failed, config.log has the actual compiler error.
+    local build_dir
+    build_dir="$(ls -dt /tmp/python-build.*/Python-*/ 2>/dev/null | head -1)"
+    if [[ -n "${build_dir}" && -f "${build_dir}/config.log" ]]; then
+      echo "=== config.log (last 60 lines) ===" >&2
+      tail -60 "${build_dir}/config.log" >&2
     fi
     exit 1
   fi
