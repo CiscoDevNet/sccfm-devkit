@@ -33,10 +33,35 @@ function ensure_pyenv() {
   brew install pyenv
 }
 
+function ensure_python_build_deps() {
+  # pyenv compiles Python from source; install headers needed by the build.
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck source=/dev/null
+    source /etc/os-release
+    case "${ID:-}${ID_LIKE:-}" in
+      *rhel*|*fedora*|*amzn*)
+        echo "Installing Python build dependencies (yum)"
+        sudo yum install -y \
+          gcc make zlib-devel bzip2 bzip2-devel readline-devel \
+          sqlite sqlite-devel openssl11-devel tk-devel \
+          libffi-devel xz-devel
+        ;;
+      *debian*|*ubuntu*)
+        echo "Installing Python build dependencies (apt)"
+        sudo apt-get update -y
+        sudo apt-get install -y \
+          build-essential zlib1g-dev libbz2-dev libreadline-dev \
+          libsqlite3-dev libssl-dev tk-dev libffi-dev liblzma-dev
+        ;;
+    esac
+  fi
+}
+
 function ensure_python() {
   if pyenv versions --bare | grep -qx "${PYTHON_VERSION}"; then
     return
   fi
+  ensure_python_build_deps
   echo "Installing Python ${PYTHON_VERSION}"
   pyenv install -s "${PYTHON_VERSION}"
 }
