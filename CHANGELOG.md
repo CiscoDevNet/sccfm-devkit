@@ -1,3 +1,9 @@
+## v0.17.0 (2026-03-10)
+
+### Feat
+
+- **lh-104999**: asa list boot registry ansible (#31)
+
 ## v0.16.0 (2026-03-06)
 
 ### Feat
