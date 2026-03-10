@@ -1,0 +1,86 @@
+---
+# List boot registry info (system image, config register, boot entries) on ASA devices
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.list_asa_boot_registry \
+#     -a 'query="connectivityState:ONLINE" limit=1'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/list_asa_boot_registry.yml
+#
+# Optionally pass a device UID to run UID-specific examples:
+#   ansible-playbook examples/list_asa_boot_registry.yml \
+#     -e device_uid=<your-device-uid>
+#
+# NOTE: Devices must be ONLINE for the CLI commands to succeed.
+
+- name: List boot registry info on ASA devices
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uid: ""
+
+  tasks:
+    # ============================================================
+    # QUICK TEST: List boot registry on first available SYNCED device
+    # ============================================================
+    - name: "Quick test: List boot registry on first available SYNCED ASA"
+      cisco.sccfm.list_asa_boot_registry:
+        query: "connectivityState:ONLINE AND configState:SYNCED"
+        limit: 1
+      register: quick_test_result
+
+    - name: Display boot registry results
+      ansible.builtin.debug:
+        var: quick_test_result.results
+      when: quick_test_result.results is defined
+
+    - name: Set resolved device UID (use provided or auto-discovered)
+      ansible.builtin.set_fact:
+        resolved_uid: "{{ device_uid if device_uid | length > 0 else quick_test_result.results[0].device_uid }}"
+      when: quick_test_result.results is defined and quick_test_result.results | length > 0
+
+    # ============================================================
+    # Example 1: List boot registry on a specific device by UID
+    # ============================================================
+    - name: "UID test: List boot registry on a specific ASA"
+      cisco.sccfm.list_asa_boot_registry:
+        uids:
+          - "{{ resolved_uid }}"
+      register: uid_result
+      when: resolved_uid is defined
+
+    - name: Display boot registry by UID
+      ansible.builtin.debug:
+        var: uid_result.results
+      when: uid_result is defined and uid_result.results is defined
+
+    # ============================================================
+    # Example 2: Show only devices with modified config
+    # ============================================================
+    - name: List boot registry for ONLINE ASAs
+      cisco.sccfm.list_asa_boot_registry:
+        query: "connectivityState:ONLINE"
+        limit: 10
+      register: all_boot_registry
+
+    - name: Show devices with modified configuration
+      ansible.builtin.debug:
+        msg: "{{ all_boot_registry.results | selectattr('config_modified', 'equalto', true) | list }}"
+      when: all_boot_registry.results is defined
+
+    - name: Show boot system entries per device
+      ansible.builtin.debug:
+        msg: >-
+          Device {{ item.device_uid }}:
+          image={{ item.system_image_file }},
+          register={{ item.config_register }},
+          boot_entries={{ item.boot_system_entries }}
+      loop: "{{ all_boot_registry.results }}"
+      when: all_boot_registry.results is defined
