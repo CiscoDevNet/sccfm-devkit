@@ -59,9 +59,7 @@ def _skip_if_dependencies_incomplete(*phases: str) -> None:
         if phase in _phase_failed:
             pytest.skip(f"Skipped because prior phase '{phase}' failed")
         if phase not in _phase_succeeded:
-            pytest.skip(
-                f"Skipped because required phase '{phase}' did not complete successfully"
-            )
+            pytest.skip(f"Skipped because required phase '{phase}' did not complete successfully")
 
 
 def _run_phase(phase: str, playbook: str) -> None:

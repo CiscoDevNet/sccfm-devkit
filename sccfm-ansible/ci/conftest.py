@@ -43,7 +43,9 @@ def run_playbook(name: str) -> subprocess.CompletedProcess[str]:
         str(VAULT_PASS),
     ]
     try:
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300, check=False)
+        result = subprocess.run(
+            cmd, env=env, capture_output=True, text=True, timeout=300, check=False
+        )
     except subprocess.TimeoutExpired as exc:
         raise AssertionError(
             f"Playbook '{name}' timed out after {exc.timeout} seconds:\n"

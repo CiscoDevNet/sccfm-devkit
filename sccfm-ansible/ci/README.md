@@ -20,8 +20,8 @@ This directory contains the tenant-backed integration tests for the Ansible coll
 
 Run the full integration suite with:
 
-```bash
-bash sccfm-ansible/ci/run_ci.sh
+```
+ sccfm-ansible/ci/run_ci.sh
 ```
 
 JUnit output is written to `results/ci-ansible-tests.xml` for Jenkins to ingest.
