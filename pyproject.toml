@@ -91,7 +91,7 @@ skip_covered = true
 
 [tool.pytest.ini_options]
 testpaths = ["sccfm_cli", "sccfm_core", "sccfm-ansible"]
-norecursedirs = ["sccfm-ansible/ci"]
+norecursedirs = ["sccfm-ansible/e2e"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

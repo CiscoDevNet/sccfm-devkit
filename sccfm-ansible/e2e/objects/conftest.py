@@ -1,4 +1,4 @@
-"""Shared fixtures for Ansible CI integration tests."""
+"""Shared fixtures for Ansible e2e object integration tests."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from typing import Generator
 
 import pytest
 
-CI_DIR = Path(__file__).resolve().parent
-PLAYBOOKS_DIR = CI_DIR / "playbooks"
-EXAMPLES_DIR = CI_DIR.parent / "examples"
+OBJECTS_DIR = Path(__file__).resolve().parent
+PLAYBOOKS_DIR = OBJECTS_DIR / "playbooks"
+EXAMPLES_DIR = OBJECTS_DIR.parent.parent / "examples"
 VAULT_PASS = EXAMPLES_DIR / ".vault_pass"
 
 
@@ -64,7 +64,7 @@ def run_playbook(name: str) -> subprocess.CompletedProcess[str]:
 
 @pytest.fixture(scope="session", autouse=True)
 def lifecycle_cleanup() -> Generator[None, None, None]:
-    """Pre-clean before tests, and always clean up after — even on failure."""
+    """Pre-clean before tests, and always clean up after \u2014 even on failure."""
     try:
         run_playbook("cleanup.yml")
     except AssertionError as e:

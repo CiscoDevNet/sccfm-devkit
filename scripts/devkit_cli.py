@@ -105,14 +105,14 @@ def _run_test() -> None:
     subprocess.call(cmd, cwd=_project_root())
 
 
-def _run_ci() -> None:
-    """Run Ansible CI integration tests against a real SCCFM tenant."""
+def _run_e2e() -> None:
+    """Run Ansible e2e integration tests against a real SCCFM tenant."""
     root = _project_root()
-    script = root / "sccfm-ansible" / "ci" / "run_ci.sh"
+    script = root / "sccfm-ansible" / "e2e" / "run_e2e.sh"
     if not script.exists():
         console.print(f"[red]Script not found: {script}[/red]")
         return
-    console.print("[bold]Running Ansible CI integration tests…[/bold]")
+    console.print("[bold]Running Ansible e2e integration tests\u2026[/bold]")
     subprocess.call(["bash", str(script)], cwd=root)
 
 
@@ -123,7 +123,7 @@ _TASKS: list[tuple[str, str, Callable[[], None]]] = [
     ("build-collection", "Build the cisco.sccfm Ansible collection tarball", _run_build_collection),
     ("setup-env", "Bootstrap environment (pyenv, venv, Poetry deps)", _run_setup_env),
     ("test", "Run the test suite (pytest)", _run_test),
-    ("run-ci", "Run Ansible CI integration tests (real tenant)", _run_ci),
+    ("run-e2e", "Run Ansible e2e integration tests (real tenant)", _run_e2e),
     ("lint", "Run linters (mypy + flake8)", _run_lint),
     ("format", "Auto-format code (black + isort)", _run_format),
 ]

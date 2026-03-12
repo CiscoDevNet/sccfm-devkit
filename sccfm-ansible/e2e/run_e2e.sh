@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI runner for SCCFM Ansible collection integration tests.
+# E2E runner for SCCFM Ansible collection integration tests.
 #
 # Runs pytest against playbooks targeting a real SCCFM tenant.
 # Generates JUnit XML for Jenkins test result reporting.
@@ -9,7 +9,7 @@
 #   - Virtualenv active (source scripts/activate.sh)
 #
 # Usage:
-#   bash sccfm-ansible/ci/run_ci.sh
+#   bash sccfm-ansible/e2e/run_e2e.sh
 
 set -euo pipefail
 
@@ -41,7 +41,7 @@ echo "Installing cisco.sccfm collection..."
 poetry run ansible-galaxy collection install "${COLLECTION_DIR}" --force
 
 # ── Run integration tests ─────────────────────────────────────────
-echo "Running network object lifecycle CI tests..."
+echo "Running network object lifecycle e2e tests..."
 mkdir -p "${RESULTS_DIR}"
 poetry run python -m pytest "${SCRIPT_DIR}" \
   -v \

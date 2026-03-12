@@ -4,7 +4,7 @@ Tests run sequentially against a real SCCFM tenant. Each test maps to a
 focused playbook under playbooks/. Dependent tests are skipped when a
 preceding phase fails.
 
-Run via:  bash sccfm-ansible/ci/run_ci.sh
+Run via:  bash sccfm-ansible/e2e/run_e2e.sh
 """
 
 from __future__ import annotations
