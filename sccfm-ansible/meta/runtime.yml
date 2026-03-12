@@ -6,11 +6,14 @@ action_groups:
     - change_asa_local_password
     - create_network_group
     - create_network_object
+    - delete_network_group
     - delete_network_object
     - execute_asa_cli
+    - list_asa_boot_registry
     - list_asa_compatible_versions
-    - list_asa_local_users
     - list_asa_disk_files
+    - list_asa_local_users
+    - list_network_groups
     - list_network_objects
     - onboard_asa
     - update_network_group

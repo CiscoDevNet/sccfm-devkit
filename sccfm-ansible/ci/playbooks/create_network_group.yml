@@ -1,0 +1,34 @@
+---
+# Create a network group with literals.
+
+- name: "CI: Create network group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Create network group with literals
+      cisco.sccfm.create_network_group:
+        name: "{{ test_group.name }}"
+        network_literals: "{{ test_group.network_literals }}"
+        description: "{{ test_group.description }}"
+        labels: "{{ test_group.labels }}"
+        tags: "{{ test_group.tags }}"
+      register: result
+
+    - name: Assert group was created
+      ansible.builtin.assert:
+        that:
+          - result.changed
+          - result.network_group.name == test_group.name
+          - result.network_group.literals | length == (test_group.network_literals | length)
+        fail_msg: "Expected group to be created with 2 literals"

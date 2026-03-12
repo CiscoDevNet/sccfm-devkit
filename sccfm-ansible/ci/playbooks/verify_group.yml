@@ -1,0 +1,32 @@
+---
+# List network groups and verify the test group exists.
+
+- name: "CI: Verify network group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List ci-test network groups
+      cisco.sccfm.list_network_groups:
+        query: "{{ test_query }}"
+        limit: 50
+      register: result
+
+    - name: Assert test group appears in list
+      ansible.builtin.assert:
+        that:
+          - result.count >= 1
+          - test_group_name in names
+        fail_msg: "Expected {{ test_group_name }} in group listing"
+      vars:
+        names: "{{ result.network_groups | map(attribute='name') | list }}"

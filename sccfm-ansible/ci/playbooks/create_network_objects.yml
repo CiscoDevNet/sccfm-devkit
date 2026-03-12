@@ -1,0 +1,38 @@
+---
+# Create test network objects.
+
+- name: "CI: Create network objects"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Create network objects
+      cisco.sccfm.create_network_object:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        description: "{{ item.description }}"
+        labels: "{{ item.labels }}"
+        tags: "{{ item.tags }}"
+      loop: "{{ test_objects }}"
+      register: create_results
+
+    - name: Assert objects were created
+      ansible.builtin.assert:
+        that:
+          - item.changed
+          - item.network_object.name == item.item.name
+          - item.network_object.literal == item.item.value
+        fail_msg: "Expected '{{ item.item.name }}' to be created"
+      loop: "{{ create_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"

@@ -1,0 +1,46 @@
+---
+# List test objects/groups and verify everything is gone.
+
+- name: "CI: Verify deletion"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List ci-test objects after deletion
+      cisco.sccfm.list_network_objects:
+        query: "{{ test_query }}"
+        limit: 50
+      register: obj_result
+
+    - name: Assert no ci-test objects remain
+      ansible.builtin.assert:
+        that:
+          - test_object_names[0] not in names
+          - test_object_names[1] not in names
+        fail_msg: "Expected ci-test objects to be absent after deletion"
+      vars:
+        names: "{{ obj_result.network_objects | map(attribute='name') | list }}"
+
+    - name: List ci-test groups after deletion
+      cisco.sccfm.list_network_groups:
+        query: "{{ test_query }}"
+        limit: 50
+      register: grp_result
+
+    - name: Assert no ci-test groups remain
+      ansible.builtin.assert:
+        that:
+          - test_group_name not in names
+        fail_msg: "Expected {{ test_group_name }} to be absent after deletion"
+      vars:
+        names: "{{ grp_result.network_groups | map(attribute='name') | list }}"

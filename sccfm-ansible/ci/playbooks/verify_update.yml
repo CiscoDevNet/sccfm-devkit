@@ -1,0 +1,30 @@
+---
+# List objects and verify the updated values.
+
+- name: "CI: Verify updates"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List ci-test-host-01
+      cisco.sccfm.list_network_objects:
+        query: "name:{{ test_objects[0].name }}"
+        limit: 1
+      register: result
+
+    - name: Assert host has updated value
+      ansible.builtin.assert:
+        that:
+          - result.count >= 1
+          - result.network_objects[0].literal == updated_host_value
+        fail_msg: "Expected listed host literal to be {{ updated_host_value }}"

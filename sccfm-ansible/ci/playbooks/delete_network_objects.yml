@@ -1,0 +1,33 @@
+---
+# Delete test network objects.
+
+- name: "CI: Delete network objects"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Delete network objects
+      cisco.sccfm.delete_network_object:
+        name: "{{ item }}"
+      loop: "{{ test_object_names }}"
+      register: delete_results
+
+    - name: Assert objects were deleted
+      ansible.builtin.assert:
+        that:
+          - item.changed
+          - item.deleted_uid is defined
+        fail_msg: "Expected '{{ item.item }}' deletion to report changed"
+      loop: "{{ delete_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"

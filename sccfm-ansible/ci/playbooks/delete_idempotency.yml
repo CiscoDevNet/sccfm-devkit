@@ -1,0 +1,43 @@
+---
+# Re-delete all test objects and assert no change (idempotency).
+
+- name: "CI: Delete idempotency check"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Re-delete group
+      cisco.sccfm.delete_network_group:
+        name: "{{ test_group_name }}"
+      register: group_result
+
+    - name: Assert no change on re-delete group
+      ansible.builtin.assert:
+        that:
+          - not group_result.changed
+        fail_msg: "Expected no change re-deleting group"
+
+    - name: Re-delete objects
+      cisco.sccfm.delete_network_object:
+        name: "{{ item }}"
+      loop: "{{ test_object_names }}"
+      register: obj_results
+
+    - name: Assert no change on re-delete objects
+      ansible.builtin.assert:
+        that:
+          - not item.changed
+        fail_msg: "Expected no change re-deleting '{{ item.item }}'"
+      loop: "{{ obj_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
