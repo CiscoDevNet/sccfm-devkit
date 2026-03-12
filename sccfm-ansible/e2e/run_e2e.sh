@@ -9,7 +9,7 @@
 #   - Virtualenv active (source scripts/activate.sh)
 #
 # Usage:
-#   bash sccfm-ansible/e2e/run_e2e.sh
+#    ./sccfm-ansible/e2e/run_e2e.sh
 
 set -euo pipefail
 
