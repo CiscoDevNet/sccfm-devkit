@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Final
 
 import pytest
-
 from conftest import run_playbook
 
 
