@@ -15,6 +15,8 @@ from typing import Final
 import pytest
 from conftest import run_playbook
 
+pytestmark = pytest.mark.ci
+
 
 @dataclass(frozen=True)
 class PhaseCase:

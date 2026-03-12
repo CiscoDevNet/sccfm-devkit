@@ -91,9 +91,13 @@ skip_covered = true
 
 [tool.pytest.ini_options]
 testpaths = ["sccfm_cli", "sccfm_core", "sccfm-ansible"]
+norecursedirs = ["sccfm-ansible/ci"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "ci: CI integration tests that run against a real SCCFM tenant",
+]
 
 [tool.flake8]
 max-line-length = 100
