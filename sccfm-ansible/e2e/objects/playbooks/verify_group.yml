@@ -6,8 +6,8 @@
   gather_facts: false
 
   vars_files:
-    - ../../examples/group_vars/all/vars.yml
-    - ../../examples/group_vars/all/vault.yml
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
     - vars/test_data.yml
 
   module_defaults:
