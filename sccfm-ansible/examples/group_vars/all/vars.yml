@@ -3,7 +3,7 @@
 # These can be committed to version control
 
 # SCCFM connection settings
-sccfm_region: int
+sccfm_region: ci
 
 # Common ASA configuration
 default_asa_username: asavuser

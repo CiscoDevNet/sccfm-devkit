@@ -67,7 +67,7 @@ options:
     type: list
     elements: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, or in).
+    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
     required: false
     type: str
     env:
