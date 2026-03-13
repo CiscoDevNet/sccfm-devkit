@@ -1,0 +1,29 @@
+---
+# Delete the test network group.
+
+- name: "CI: Delete network group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Delete network group
+      cisco.sccfm.delete_network_group:
+        name: "{{ test_group_name }}"
+      register: result
+
+    - name: Assert group was deleted
+      ansible.builtin.assert:
+        that:
+          - result.changed
+          - result.deleted_uid is defined
+        fail_msg: "Expected group deletion to report changed with deleted_uid"

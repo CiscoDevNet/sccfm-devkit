@@ -1,0 +1,32 @@
+---
+# Update the network group to add referenced objects.
+
+- name: "CI: Update network group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Update group to reference test objects
+      cisco.sccfm.update_network_group:
+        name: "{{ test_group_name }}"
+        referenced_objects:
+          - "{{ test_object_names[0] }}"
+          - "{{ test_object_names[1] }}"
+      register: result
+
+    - name: Assert group was updated with references
+      ansible.builtin.assert:
+        that:
+          - result.changed
+          - result.network_group.referenced_object_uids | length == 2
+        fail_msg: "Expected group to have 2 referenced object UIDs"

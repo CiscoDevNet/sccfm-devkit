@@ -1,0 +1,36 @@
+---
+# Re-create the same objects and assert no change (idempotency).
+
+- name: "CI: Create idempotency check"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Re-create same objects
+      cisco.sccfm.create_network_object:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        description: "{{ item.description }}"
+        labels: "{{ item.labels }}"
+        tags: "{{ item.tags }}"
+      loop: "{{ test_objects }}"
+      register: create_results
+
+    - name: Assert no change on re-create
+      ansible.builtin.assert:
+        that:
+          - not item.changed
+        fail_msg: "Expected no change re-creating '{{ item.item.name }}'"
+      loop: "{{ create_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"

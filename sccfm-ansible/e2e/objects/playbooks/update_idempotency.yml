@@ -1,0 +1,42 @@
+---
+# Re-run the same updates and assert no change (idempotency).
+
+- name: "CI: Update idempotency check"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../examples/group_vars/all/vars.yml
+    - ../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Re-update host
+      cisco.sccfm.update_network_object:
+        name: "{{ test_objects[0].name }}"
+        value: "{{ updated_host_value }}"
+        description: "{{ updated_host_description }}"
+      register: update_host
+
+    - name: Assert no change on re-update host
+      ansible.builtin.assert:
+        that:
+          - not update_host.changed
+        fail_msg: "Expected no change re-updating host"
+
+    - name: Re-update subnet
+      cisco.sccfm.update_network_object:
+        name: "{{ test_objects[1].name }}"
+        labels: "{{ updated_subnet_labels }}"
+      register: update_subnet
+
+    - name: Assert no change on re-update subnet
+      ansible.builtin.assert:
+        that:
+          - not update_subnet.changed
+        fail_msg: "Expected no change re-updating subnet"

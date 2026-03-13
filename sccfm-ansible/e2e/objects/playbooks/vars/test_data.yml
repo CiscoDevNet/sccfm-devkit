@@ -1,0 +1,46 @@
+---
+test_object_names:
+  - ci-test-host-01
+  - ci-test-subnet-01
+
+test_objects:
+  - name: ci-test-host-01
+    value: "10.99.1.100"
+    description: "CI test host object"
+    labels:
+      - ci-test
+    tags:
+      ci:
+        - integration
+
+  - name: ci-test-subnet-01
+    value: "10.99.2.0/24"
+    description: "CI test subnet object"
+    labels:
+      - ci-test
+    tags:
+      ci:
+        - integration
+
+test_group_name: ci-test-group-01
+
+test_group:
+  name: ci-test-group-01
+  network_literals:
+    - "10.99.3.1"
+    - "10.99.3.2"
+  description: "CI test network group"
+  labels:
+    - ci-test
+  tags:
+    ci:
+      - integration
+
+updated_host_value: "10.99.1.200"
+updated_host_description: "CI test host object - updated"
+
+updated_subnet_labels:
+  - ci-test
+  - monitored
+
+test_query: "name:ci-test-*"
