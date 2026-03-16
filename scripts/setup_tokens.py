@@ -50,7 +50,8 @@ _REGIONS: dict[str, str] = {
     "au": "Australia",
     "uae": "UAE",
     "in": "India",
-    "int": "Internal (CI/Staging)",
+    "int": "Internal (Staging)",
+    "ci": "CI",
 }
 
 _DEFAULT_EXAMPLES_PATH = "sccfm-ansible/examples"

@@ -43,7 +43,7 @@ Every command lives in `sccfm_cli/commands/` as a concrete implementation of the
 - Build and install the collection locally: `poetry run devkit build-collection`.
 - Set up tokens interactively: `poetry run devkit` and select **setup-tokens** (saves your API token, creates `.env`, `.vault_pass`, encrypts `group_vars/all/vault.yml`, and sets the region).
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
-- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `aus`, `uae`, or `in`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
+- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `aus`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
 

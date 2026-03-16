@@ -26,7 +26,7 @@ options:
     required: true
     choices: ["cisco.sccfm.sccfm"]
   region:
-    description: SCCFM region to target (int, us, eu, apj, aus, uae, or in).
+    description: SCCFM region to target (int, us, eu, apj, aus, uae, in, or ci).
     env:
       - name: SCCFM_REGION
     required: true

@@ -56,7 +56,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, or in).
+    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
     required: false
     type: str
     env:
