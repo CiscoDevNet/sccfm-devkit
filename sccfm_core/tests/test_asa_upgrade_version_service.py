@@ -5,9 +5,10 @@ from __future__ import annotations
 from scc_firewall_manager_sdk import AsaCompatibleVersion
 
 from sccfm_core.services.inventory.asa_upgrade_version_service import (
-    _cisco_version_sort_key,
     _compute_intersection,
+    _version_sort_key,
     get_asdm_compatibility_info,
+    is_version_downgrade,
 )
 
 
@@ -141,19 +142,35 @@ class TestGetAsdmCompatibilityInfo:
 
 
 class TestCiscoVersionSortKey:
-    """Tests for _cisco_version_sort_key()."""
+    """Tests for _version_sort_key()."""
 
     def test_should_sort_major_minor_correctly(self) -> None:
         versions = ["7.18(1)", "7.6(1)", "7.24(1)", "7.9(2)"]
-        result = sorted(versions, key=_cisco_version_sort_key)
+        result = sorted(versions, key=_version_sort_key)
         assert result == ["7.6(1)", "7.9(2)", "7.18(1)", "7.24(1)"]
 
     def test_should_sort_openjre_after_plain(self) -> None:
         versions = ["7.6(1).openjre", "7.6(1)"]
-        result = sorted(versions, key=_cisco_version_sort_key)
+        result = sorted(versions, key=_version_sort_key)
         assert result == ["7.6(1)", "7.6(1).openjre"]
 
     def test_should_sort_subversions_correctly(self) -> None:
         versions = ["7.18(1.152)", "7.18(1.150)", "7.18(1)"]
-        result = sorted(versions, key=_cisco_version_sort_key)
+        result = sorted(versions, key=_version_sort_key)
         assert result == ["7.18(1)", "7.18(1.150)", "7.18(1.152)"]
+
+
+class TestIsCiscoVersionDowngrade:
+    """Tests for is_version_downgrade()."""
+
+    def test_should_detect_downgrade(self) -> None:
+        assert is_version_downgrade("7.5(2)", "7.20(2)") is True
+
+    def test_should_not_flag_upgrade(self) -> None:
+        assert is_version_downgrade("7.24(1)", "7.20(2)") is False
+
+    def test_should_not_flag_same_version(self) -> None:
+        assert is_version_downgrade("7.20(2)", "7.20(2)") is False
+
+    def test_should_detect_subversion_downgrade(self) -> None:
+        assert is_version_downgrade("7.18(1.150)", "7.18(1.152)") is True

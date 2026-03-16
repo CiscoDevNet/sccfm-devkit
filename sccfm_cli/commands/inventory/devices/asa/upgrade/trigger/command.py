@@ -4,7 +4,7 @@ import json
 from typing import Any, Sequence, cast
 
 import click
-from scc_firewall_manager_sdk import CdoTransaction
+from scc_firewall_manager_sdk.models.cdo_transaction import CdoTransaction
 
 from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
@@ -18,6 +18,7 @@ from sccfm_core.services.inventory import (
     AsaUpgradeService,
     AsaUpgradeVersionService,
     get_asdm_compatibility_info,
+    is_version_downgrade,
 )
 
 
@@ -115,6 +116,13 @@ class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
         upgrade_name = cast(str | None, kwargs.get("upgrade_name"))
 
         if software_version:
+            self._validate_no_downgrade(
+                ctx=ctx,
+                targets=targets,
+                target_version=software_version,
+                current_version_attr="software_version",
+                label="Software",
+            )
             self._validate_asdm_compatibility(
                 ctx=ctx,
                 config=config,
@@ -122,6 +130,22 @@ class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
                 software_version=software_version,
                 asdm_version=asdm_version,
             )
+
+        if asdm_version:
+            self._validate_no_downgrade(
+                ctx=ctx,
+                targets=targets,
+                target_version=asdm_version,
+                current_version_attr="asdm_version",
+                label="ASDM",
+            )
+            if not software_version:
+                self._validate_asdm_compatibility_with_current_software(
+                    ctx=ctx,
+                    config=config,
+                    targets=targets,
+                    asdm_version=asdm_version,
+                )
 
         upgrade_service = AsaUpgradeService(config=config)
         transaction = self._trigger_upgrade(
@@ -182,6 +206,55 @@ class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
                 f"Add --asdm-version=<version> to include the ASDM upgrade. "
                 f"Run 'compatible-versions' to see available ASDM options."
             )
+
+    @staticmethod
+    def _validate_no_downgrade(
+        *,
+        ctx: click.Context,
+        targets: AsaDeviceTargets,
+        target_version: str,
+        current_version_attr: str,
+        label: str,
+    ) -> None:
+        downgraded = [
+            d
+            for d in targets.devices
+            if getattr(d, current_version_attr)
+            and is_version_downgrade(target_version, getattr(d, current_version_attr))
+        ]
+        if downgraded:
+            current = getattr(downgraded[0], current_version_attr)
+            ctx.fail(
+                f"{label} version {target_version} is lower than the current "
+                f"device {label} version {current}. Downgrades are not supported."
+            )
+
+    def _validate_asdm_compatibility_with_current_software(
+        self,
+        *,
+        ctx: click.Context,
+        config: Any,
+        targets: AsaDeviceTargets,
+        asdm_version: str,
+    ) -> None:
+        """Validate ASDM version against each device's current software version."""
+        version_service = AsaUpgradeVersionService(config=config)
+        compat = version_service.get_compatible_versions(device_uids=targets.device_uids)
+
+        for device in targets.devices:
+            software = device.software_version
+            if not software:
+                continue
+            info = get_asdm_compatibility_info(compat.common_versions, software)
+            if info is None:
+                continue
+            if asdm_version not in info.compatible_asdm_versions:
+                ctx.fail(
+                    f"ASDM version {asdm_version} is not compatible with "
+                    f"device software version {software}. "
+                    f"Minimum required ASDM version is {info.minimum_asdm_version}."
+                )
+                return
 
     @staticmethod
     def _validate_version_specified(ctx: click.Context, kwargs: Any) -> None:

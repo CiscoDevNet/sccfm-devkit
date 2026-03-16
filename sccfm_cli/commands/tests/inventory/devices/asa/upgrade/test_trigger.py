@@ -12,6 +12,7 @@ from scc_firewall_manager_sdk import (
     CdoTransaction,
     Device,
     DevicePage,
+    EntityType,
 )
 
 from sccfm_cli.cli import cli
@@ -28,23 +29,33 @@ def _fake_transaction(uid: str = "txn-1") -> CdoTransaction:
     )
 
 
-def _single_device(asdm_version: str | None = None) -> Device:
-    return Device(uid="uid-1", name="branch-asa-01", deviceType="ASA", asdmVersion=asdm_version)
+def _single_device(asdm_version: str | None = None, software_version: str | None = None) -> Device:
+    return Device(
+        uid="uid-1",
+        name="branch-asa-01",
+        deviceType=EntityType.ASA,
+        asdmVersion=asdm_version,
+        softwareVersion=software_version,
+    )
 
 
-def _two_devices(asdm_version: str | None = None) -> list[Device]:
+def _two_devices(
+    asdm_version: str | None = None, software_version: str | None = None
+) -> list[Device]:
     return [
         Device(
             uid="uid-1",
             name="branch-asa-01",
-            deviceType="ASA",
+            deviceType=EntityType.ASA,
             asdmVersion=asdm_version,
+            softwareVersion=software_version,
         ),
         Device(
             uid="uid-2",
             name="branch-asa-02",
-            deviceType="ASA",
+            deviceType=EntityType.ASA,
             asdmVersion=asdm_version,
+            softwareVersion=software_version,
         ),
     ]
 
@@ -355,9 +366,10 @@ class TestValidation:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        device = _single_device()
+        device = _single_device(asdm_version="7.5(2)", software_version="9.4(2)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.4(2)", "7.18(1.152)")])
 
         def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
             return _fake_transaction()
@@ -731,11 +743,14 @@ class TestAsdmCompatibilityValidation:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        """No ASDM compat check needed when --software-version is absent."""
-        device = _single_device(asdm_version="7.5(2)")
+        """ASDM-only upgrade validates against device's current Software version."""
+        device = _single_device(asdm_version="7.5(2)", software_version="9.4(2)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
-        # Do NOT mock AsaUpgradeVersionService — it should not be called.
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.4(2)", "7.5(2)"), _cv("9.4(2)", "7.18(1.152)")],
+        )
 
         def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
             return _fake_transaction()
@@ -786,6 +801,241 @@ class TestAsdmCompatibilityValidation:
                 "--software-version",
                 "9.4(3)",
                 "--check",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+
+
+# ── ASDM downgrade validation tests ───────────────────────────
+
+
+class TestAsdmDowngradeValidation:
+    """Tests for ASDM downgrade prevention."""
+
+    def test_should_fail_when_asdm_is_a_downgrade(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.20(2)", software_version="9.4(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--asdm-version",
+                "7.5(2)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "lower than the current" in result.output
+        assert "Downgrades are not supported" in result.output
+
+    def test_should_fail_when_asdm_downgrade_with_software_version(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Downgrade check applies even when --software-version is given."""
+        device = _single_device(asdm_version="7.20(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.18(4)", "7.18(1.152)")],
+        )
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--asdm-version",
+                "7.18(1.152)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "lower than the current" in result.output
+        assert "Downgrades are not supported" in result.output
+
+
+# ── Software downgrade validation tests ────────────────────────
+
+
+class TestSoftwareDowngradeValidation:
+    """Tests for software version downgrade prevention."""
+
+    def test_should_fail_when_software_version_is_a_downgrade(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)", software_version="9.18(4)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.4(3)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "lower than the current" in result.output
+        assert "Downgrades are not supported" in result.output
+
+    def test_should_not_flag_software_upgrade(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)", software_version="9.4(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.18(4)", "7.18(1.152)")],
+        )
+
+        def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
+            return _fake_transaction()
+
+        monkeypatch.setattr(AsaUpgradeService, "upgrade_single", fake_upgrade_single)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+
+
+class TestAsdmOnlyCompatibilityValidation:
+    """Tests for ASDM compat checks when only --asdm-version is given."""
+
+    def test_should_fail_when_asdm_not_compatible_with_current_sw(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.5(2)", software_version="9.4(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.4(2)", "7.5(2)"), _cv("9.4(2)", "7.6(1)")],
+        )
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--asdm-version",
+                "7.24(1)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "7.24(1) is not compatible" in result.output
+        assert "9.4(2)" in result.output
+
+    def test_should_pass_when_asdm_compatible_with_current_sw(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.5(2)", software_version="9.4(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.4(2)", "7.5(2)"), _cv("9.4(2)", "7.6(1)")],
+        )
+
+        def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
+            return _fake_transaction()
+
+        monkeypatch.setattr(AsaUpgradeService, "upgrade_single", fake_upgrade_single)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--asdm-version",
+                "7.6(1)",
                 "--format",
                 "json",
             ],

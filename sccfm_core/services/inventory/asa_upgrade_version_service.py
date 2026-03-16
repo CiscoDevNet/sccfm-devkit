@@ -83,14 +83,14 @@ def get_asdm_compatibility_info(
     if not asdm_set:
         return None
 
-    minimum = min(asdm_set, key=_cisco_version_sort_key)
+    minimum = min(asdm_set, key=_version_sort_key)
     return AsdmCompatibilityInfo(
         compatible_asdm_versions=asdm_set,
         minimum_asdm_version=minimum,
     )
 
 
-def _cisco_version_sort_key(version: str) -> tuple[tuple[int, ...], str]:
+def _version_sort_key(version: str) -> tuple[tuple[int, ...], str]:
     """Sort key for Cisco version strings like ``7.6(1)`` or ``7.18(1.152).openjre``.
 
     Returns a tuple of (numeric_parts, suffix) so that ``7.6(1)`` sorts
@@ -102,3 +102,8 @@ def _cisco_version_sort_key(version: str) -> tuple[tuple[int, ...], str]:
     # Strip all numeric/separator chars to get the trailing suffix (e.g. ".openjre")
     suffix = re.sub(r"[\d.()]+", "", version)
     return (nums, suffix)
+
+
+def is_version_downgrade(target: str, current: str) -> bool:
+    """Return ``True`` if *target* is strictly lower than *current*."""
+    return _version_sort_key(target) < _version_sort_key(current)

@@ -9,6 +9,7 @@ from sccfm_core.services.inventory.asa_upgrade_version_service import (
     AsaUpgradeVersionService,
     AsdmCompatibilityInfo,
     get_asdm_compatibility_info,
+    is_version_downgrade,
 )
 from sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
@@ -26,4 +27,5 @@ __all__ = [
     "AsaUserPasswordService",
     "InventoryService",
     "get_asdm_compatibility_info",
+    "is_version_downgrade",
 ]
