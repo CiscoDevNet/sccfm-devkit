@@ -5,7 +5,9 @@ from __future__ import annotations
 from scc_firewall_manager_sdk import AsaCompatibleVersion
 
 from sccfm_core.services.inventory.asa_upgrade_version_service import (
+    _cisco_version_sort_key,
     _compute_intersection,
+    get_asdm_compatibility_info,
 )
 
 
@@ -72,3 +74,86 @@ class TestComputeIntersection:
         result = _compute_intersection(per_device)
         assert len(result) == 1
         assert result[0].software_version == "9.18.4"
+
+
+class TestGetAsdmCompatibilityInfo:
+    """Tests for get_asdm_compatibility_info()."""
+
+    def test_should_return_none_when_sw_version_not_found(self) -> None:
+        versions = [_v("9.18.4", "7.18"), _v("9.16.4", "7.16")]
+        assert get_asdm_compatibility_info(versions, "9.14.4") is None
+
+    def test_should_return_none_for_empty_list(self) -> None:
+        assert get_asdm_compatibility_info([], "9.18.4") is None
+
+    def test_should_collect_all_asdm_versions_for_sw_version(self) -> None:
+        versions = [
+            _v("9.4(3)", "7.6(1)"),
+            _v("9.4(3)", "7.7(1)"),
+            _v("9.4(3)", "7.8(2)"),
+            _v("9.4(2)", "7.5(2)"),
+        ]
+        info = get_asdm_compatibility_info(versions, "9.4(3)")
+        assert info is not None
+        assert info.compatible_asdm_versions == {"7.6(1)", "7.7(1)", "7.8(2)"}
+
+    def test_should_compute_minimum_asdm_version(self) -> None:
+        versions = [
+            _v("9.4(3)", "7.18(1.152)"),
+            _v("9.4(3)", "7.6(1)"),
+            _v("9.4(3)", "7.24(1)"),
+            _v("9.4(3)", "7.9(2)"),
+        ]
+        info = get_asdm_compatibility_info(versions, "9.4(3)")
+        assert info is not None
+        assert info.minimum_asdm_version == "7.6(1)"
+
+    def test_should_prefer_non_openjre_as_minimum(self) -> None:
+        versions = [
+            _v("9.4(3)", "7.6(1)"),
+            _v("9.4(3)", "7.6(1).openjre"),
+        ]
+        info = get_asdm_compatibility_info(versions, "9.4(3)")
+        assert info is not None
+        assert info.minimum_asdm_version == "7.6(1)"
+
+    def test_should_include_openjre_in_compatible_set(self) -> None:
+        versions = [
+            _v("9.4(3)", "7.6(1)"),
+            _v("9.4(3)", "7.6(1).openjre"),
+        ]
+        info = get_asdm_compatibility_info(versions, "9.4(3)")
+        assert info is not None
+        assert "7.6(1).openjre" in info.compatible_asdm_versions
+
+    def test_should_skip_entries_with_none_asdm(self) -> None:
+        versions = [
+            _v("9.4(3)", "7.6(1)"),
+            AsaCompatibleVersion(softwareVersion="9.4(3)"),
+        ]
+        info = get_asdm_compatibility_info(versions, "9.4(3)")
+        assert info is not None
+        assert info.compatible_asdm_versions == {"7.6(1)"}
+
+    def test_should_match_exact_version_string(self) -> None:
+        versions = [_v("9.4(2)", "7.5(2)"), _v("9.4(3)", "7.6(1)")]
+        assert get_asdm_compatibility_info(versions, "9.4") is None
+
+
+class TestCiscoVersionSortKey:
+    """Tests for _cisco_version_sort_key()."""
+
+    def test_should_sort_major_minor_correctly(self) -> None:
+        versions = ["7.18(1)", "7.6(1)", "7.24(1)", "7.9(2)"]
+        result = sorted(versions, key=_cisco_version_sort_key)
+        assert result == ["7.6(1)", "7.9(2)", "7.18(1)", "7.24(1)"]
+
+    def test_should_sort_openjre_after_plain(self) -> None:
+        versions = ["7.6(1).openjre", "7.6(1)"]
+        result = sorted(versions, key=_cisco_version_sort_key)
+        assert result == ["7.6(1)", "7.6(1).openjre"]
+
+    def test_should_sort_subversions_correctly(self) -> None:
+        versions = ["7.18(1.152)", "7.18(1.150)", "7.18(1)"]
+        result = sorted(versions, key=_cisco_version_sort_key)
+        assert result == ["7.18(1)", "7.18(1.150)", "7.18(1.152)"]

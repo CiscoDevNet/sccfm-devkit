@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import reduce
 
 from scc_firewall_manager_sdk import AsaCompatibleVersion, DeviceUpgradesApi
@@ -49,3 +50,55 @@ def _compute_intersection(
 
     first_device_versions = next(iter(per_device.values()))
     return [v for v in first_device_versions if v.software_version in common_sw_versions]
+
+
+@dataclass(frozen=True)
+class AsdmCompatibilityInfo:
+    """ASDM versions compatible with a specific ASA software version.
+
+    ``compatible_asdm_versions`` is the full set of ASDM versions that
+    can be paired with the target software version.
+    ``minimum_asdm_version`` is the lowest version string
+    (lexicographic sort after normalising Cisco version tuples).
+    """
+
+    compatible_asdm_versions: set[str]
+    minimum_asdm_version: str
+
+
+def get_asdm_compatibility_info(
+    compatible_versions: list[AsaCompatibleVersion],
+    software_version: str,
+) -> AsdmCompatibilityInfo | None:
+    """Return ASDM compatibility info for *software_version*, or ``None``.
+
+    Collects every ``asdm_version`` paired with *software_version* in
+    the compatible-versions list and determines the minimum.
+    """
+    asdm_set: set[str] = set()
+    for v in compatible_versions:
+        if v.software_version == software_version and v.asdm_version:
+            asdm_set.add(v.asdm_version)
+
+    if not asdm_set:
+        return None
+
+    minimum = min(asdm_set, key=_cisco_version_sort_key)
+    return AsdmCompatibilityInfo(
+        compatible_asdm_versions=asdm_set,
+        minimum_asdm_version=minimum,
+    )
+
+
+def _cisco_version_sort_key(version: str) -> tuple[tuple[int, ...], str]:
+    """Sort key for Cisco version strings like ``7.6(1)`` or ``7.18(1.152).openjre``.
+
+    Returns a tuple of (numeric_parts, suffix) so that ``7.6(1)`` sorts
+    before ``7.18(1.152)`` and plain versions sort before suffixed ones.
+    """
+    import re
+
+    nums = tuple(int(n) for n in re.findall(r"\d+", version))
+    # Strip all numeric/separator chars to get the trailing suffix (e.g. ".openjre")
+    suffix = re.sub(r"[\d.()]+", "", version)
+    return (nums, suffix)

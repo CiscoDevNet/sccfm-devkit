@@ -7,6 +7,8 @@ from sccfm_core.services.inventory.asa_onboard_service import AsaOnboardService
 from sccfm_core.services.inventory.asa_upgrade_service import AsaUpgradeService
 from sccfm_core.services.inventory.asa_upgrade_version_service import (
     AsaUpgradeVersionService,
+    AsdmCompatibilityInfo,
+    get_asdm_compatibility_info,
 )
 from sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
@@ -14,6 +16,7 @@ from sccfm_core.services.inventory.asa_user_password_service import (
 from sccfm_core.services.inventory.inventory_service import InventoryService
 
 __all__ = [
+    "AsdmCompatibilityInfo",
     "AsaBootRegistryService",
     "AsaCommandLineService",
     "AsaDiskFileService",
@@ -22,4 +25,5 @@ __all__ = [
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
     "InventoryService",
+    "get_asdm_compatibility_info",
 ]

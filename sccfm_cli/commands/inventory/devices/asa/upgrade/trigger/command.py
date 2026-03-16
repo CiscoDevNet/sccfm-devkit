@@ -8,12 +8,17 @@ from scc_firewall_manager_sdk import CdoTransaction
 
 from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
+    AsaDeviceTargets,
     asa_check_option,
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
-from sccfm_core.services.inventory import AsaUpgradeService
+from sccfm_core.services.inventory import (
+    AsaUpgradeService,
+    AsaUpgradeVersionService,
+    get_asdm_compatibility_info,
+)
 
 
 class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
@@ -109,6 +114,15 @@ class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
         ignore_maintenance_window = cast(bool, kwargs.get("ignore_maintenance_window", False))
         upgrade_name = cast(str | None, kwargs.get("upgrade_name"))
 
+        if software_version:
+            self._validate_asdm_compatibility(
+                ctx=ctx,
+                config=config,
+                targets=targets,
+                software_version=software_version,
+                asdm_version=asdm_version,
+            )
+
         upgrade_service = AsaUpgradeService(config=config)
         transaction = self._trigger_upgrade(
             upgrade_service=upgrade_service,
@@ -127,6 +141,47 @@ class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
             stage_upgrade=stage_upgrade,
             output_format=output_format,
         )
+
+    def _validate_asdm_compatibility(
+        self,
+        *,
+        ctx: click.Context,
+        config: Any,
+        targets: AsaDeviceTargets,
+        software_version: str,
+        asdm_version: str | None,
+    ) -> None:
+        version_service = AsaUpgradeVersionService(config=config)
+        compat = version_service.get_compatible_versions(device_uids=targets.device_uids)
+        info = get_asdm_compatibility_info(compat.common_versions, software_version)
+
+        if info is None:
+            ctx.fail(
+                f"Software version {software_version} is not compatible "
+                f"with the selected device(s)."
+            )
+            return
+
+        if asdm_version is not None:
+            if asdm_version not in info.compatible_asdm_versions:
+                ctx.fail(
+                    f"ASDM version {asdm_version} is not compatible with "
+                    f"software version {software_version}. "
+                    f"Minimum required ASDM version is {info.minimum_asdm_version}."
+                )
+            return
+
+        mismatched = [
+            d for d in targets.devices if d.asdm_version not in info.compatible_asdm_versions
+        ]
+        if mismatched:
+            ctx.fail(
+                f"Software version {software_version} requires "
+                f"ASDM >= {info.minimum_asdm_version}. "
+                f"{len(mismatched)} device(s) currently run an incompatible ASDM version. "
+                f"Add --asdm-version=<version> to include the ASDM upgrade. "
+                f"Run 'compatible-versions' to see available ASDM options."
+            )
 
     @staticmethod
     def _validate_version_specified(ctx: click.Context, kwargs: Any) -> None:

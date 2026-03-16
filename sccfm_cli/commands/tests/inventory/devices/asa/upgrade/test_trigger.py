@@ -7,12 +7,18 @@ from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
+from scc_firewall_manager_sdk import (
+    AsaCompatibleVersion,
+    CdoTransaction,
+    Device,
+    DevicePage,
+)
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
+from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
 from sccfm_core.services import InventoryService
-from sccfm_core.services.inventory import AsaUpgradeService
+from sccfm_core.services.inventory import AsaUpgradeService, AsaUpgradeVersionService
 
 
 def _fake_transaction(uid: str = "txn-1") -> CdoTransaction:
@@ -22,15 +28,29 @@ def _fake_transaction(uid: str = "txn-1") -> CdoTransaction:
     )
 
 
-def _single_device() -> Device:
-    return Device(uid="uid-1", name="branch-asa-01", deviceType="ASA")
+def _single_device(asdm_version: str | None = None) -> Device:
+    return Device(uid="uid-1", name="branch-asa-01", deviceType="ASA", asdmVersion=asdm_version)
 
 
-def _two_devices() -> list[Device]:
+def _two_devices(asdm_version: str | None = None) -> list[Device]:
     return [
-        Device(uid="uid-1", name="branch-asa-01", deviceType="ASA"),
-        Device(uid="uid-2", name="branch-asa-02", deviceType="ASA"),
+        Device(
+            uid="uid-1",
+            name="branch-asa-01",
+            deviceType="ASA",
+            asdmVersion=asdm_version,
+        ),
+        Device(
+            uid="uid-2",
+            name="branch-asa-02",
+            deviceType="ASA",
+            asdmVersion=asdm_version,
+        ),
     ]
+
+
+def _cv(sw: str, asdm: str) -> AsaCompatibleVersion:
+    return AsaCompatibleVersion(softwareVersion=sw, asdmVersion=asdm)
 
 
 # ── Helpers ─────────────────────────────────────────────────────
@@ -38,6 +58,25 @@ def _two_devices() -> list[Device]:
 
 def _stub_upgrade_init(self: AsaUpgradeService, config: Any) -> None:
     return None
+
+
+def _stub_version_init(self: AsaUpgradeVersionService, config: Any) -> None:
+    return None
+
+
+def _patch_compatible_versions(
+    monkeypatch: MonkeyPatch,
+    common_versions: list[AsaCompatibleVersion],
+) -> None:
+    monkeypatch.setattr(AsaUpgradeVersionService, "__init__", _stub_version_init)
+
+    def fake_get(
+        self: AsaUpgradeVersionService, device_uids: list[str]
+    ) -> AsaGroupCompatibleVersions:
+        per_device = {uid: list(common_versions) for uid in device_uids}
+        return AsaGroupCompatibleVersions(per_device=per_device, common_versions=common_versions)
+
+    monkeypatch.setattr(AsaUpgradeVersionService, "get_compatible_versions", fake_get)
 
 
 def _patch_inventory(monkeypatch: MonkeyPatch, devices: list[Device]) -> None:
@@ -60,9 +99,10 @@ class TestSingleDeviceTrigger:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        device = _single_device()
+        device = _single_device(asdm_version="7.18(1.152)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
 
         captured: dict[str, Any] = {}
 
@@ -107,9 +147,10 @@ class TestSingleDeviceTrigger:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        device = _single_device()
+        device = _single_device(asdm_version="7.18(1.152)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
 
         captured: dict[str, Any] = {}
 
@@ -148,9 +189,10 @@ class TestSingleDeviceTrigger:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        device = _single_device()
+        device = _single_device(asdm_version="7.18(1.152)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
 
         def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
             return _fake_transaction("txn-table")
@@ -190,9 +232,10 @@ class TestMultipleDeviceTrigger:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        devices = _two_devices()
+        devices = _two_devices(asdm_version="7.18(1.152)")
         _patch_inventory(monkeypatch, devices)
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
 
         captured: dict[str, Any] = {}
 
@@ -235,9 +278,10 @@ class TestMultipleDeviceTrigger:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        devices = _two_devices()
+        devices = _two_devices(asdm_version="7.18(1.152)")
         _patch_inventory(monkeypatch, devices)
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
 
         captured: dict[str, Any] = {}
 
@@ -416,9 +460,10 @@ class TestUpgradeName:
         mock_inventory_service: None,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        device = _single_device()
+        device = _single_device(asdm_version="7.18(1.152)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
 
         captured: dict[str, Any] = {}
 
@@ -449,3 +494,301 @@ class TestUpgradeName:
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
         assert captured["name"] == "Production ASA Upgrade - January 2025"
+
+
+# ── ASDM compatibility validation tests ────────────────────────
+
+
+class TestAsdmCompatibilityValidation:
+    """Tests for ASDM compatibility checks when --software-version is given."""
+
+    def test_should_fail_when_software_version_not_compatible(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.4(2)", "7.5(2)")])
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.4(3)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "not compatible" in result.output
+
+    def test_should_fail_when_explicit_asdm_does_not_match_required(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.4(3)", "7.6(1)")])
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.4(3)",
+                "--asdm-version",
+                "7.5(2)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "7.5(2) is not compatible" in result.output
+        assert "Minimum required ASDM version is 7.6(1)" in result.output
+
+    def test_should_pass_when_explicit_asdm_is_in_compatible_set(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.4(3)", "7.6(1)"), _cv("9.4(3)", "7.7(1)")],
+        )
+
+        def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
+            return _fake_transaction()
+
+        monkeypatch.setattr(AsaUpgradeService, "upgrade_single", fake_upgrade_single)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.4(3)",
+                "--asdm-version",
+                "7.6(1)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+
+    def test_should_fail_when_devices_have_wrong_asdm_and_no_asdm_flag(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        devices = _two_devices(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, devices)
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.4(3)", "7.6(1)")])
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "-u",
+                "uid-2",
+                "--software-version",
+                "9.4(3)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "ASDM >= 7.6(1)" in result.output
+        assert "2 device(s)" in result.output
+        assert "--asdm-version=" in result.output
+
+    def test_should_pass_when_devices_already_have_matching_asdm(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        devices = _two_devices(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, devices)
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(monkeypatch, [_cv("9.4(2)", "7.5(2)")])
+
+        def fake_upgrade_multiple(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
+            return _fake_transaction()
+
+        monkeypatch.setattr(AsaUpgradeService, "upgrade_multiple", fake_upgrade_multiple)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "-u",
+                "uid-2",
+                "--software-version",
+                "9.4(2)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+
+    def test_should_pass_when_device_asdm_in_compatible_set_without_flag(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Device already has a compatible ASDM — no --asdm-version needed."""
+        device = _single_device(asdm_version="7.7(1)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.4(3)", "7.6(1)"), _cv("9.4(3)", "7.7(1)"), _cv("9.4(3)", "7.8(2)")],
+        )
+
+        def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
+            return _fake_transaction()
+
+        monkeypatch.setattr(AsaUpgradeService, "upgrade_single", fake_upgrade_single)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.4(3)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+
+    def test_should_skip_asdm_check_when_only_asdm_version_specified(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """No ASDM compat check needed when --software-version is absent."""
+        device = _single_device(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, [device])
+        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        # Do NOT mock AsaUpgradeVersionService — it should not be called.
+
+        def fake_upgrade_single(self: AsaUpgradeService, **kwargs: Any) -> CdoTransaction:
+            return _fake_transaction()
+
+        monkeypatch.setattr(AsaUpgradeService, "upgrade_single", fake_upgrade_single)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--asdm-version",
+                "7.18(1.152)",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+
+    def test_should_skip_asdm_check_in_check_mode(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """--check mode should not trigger ASDM compat validation."""
+        device = _single_device(asdm_version="7.5(2)")
+        _patch_inventory(monkeypatch, [device])
+        # Do NOT mock AsaUpgradeVersionService — it should not be called.
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.4(3)",
+                "--check",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
