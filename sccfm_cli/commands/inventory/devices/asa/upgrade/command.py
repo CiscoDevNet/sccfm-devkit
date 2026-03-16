@@ -7,6 +7,9 @@ from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.asa.upgrade.compatible_versions import (
     AsaUpgradeCompatibleVersionsCommand,
 )
+from sccfm_cli.commands.inventory.devices.asa.upgrade.trigger import (
+    AsaUpgradeTriggerCommand,
+)
 
 
 class AsaUpgradeCommand(BaseCommand):
@@ -14,6 +17,7 @@ class AsaUpgradeCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             AsaUpgradeCompatibleVersionsCommand(console),
+            AsaUpgradeTriggerCommand(console),
         ]
 
     @property
