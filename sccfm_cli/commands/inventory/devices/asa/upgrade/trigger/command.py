@@ -132,13 +132,6 @@ class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
             )
 
         if asdm_version:
-            self._validate_no_downgrade(
-                ctx=ctx,
-                targets=targets,
-                target_version=asdm_version,
-                current_version_attr="asdm_version",
-                label="ASDM",
-            )
             if not software_version:
                 self._validate_asdm_compatibility_with_current_software(
                     ctx=ctx,

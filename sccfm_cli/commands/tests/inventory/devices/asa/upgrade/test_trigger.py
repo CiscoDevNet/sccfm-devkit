@@ -812,10 +812,10 @@ class TestAsdmCompatibilityValidation:
 # ── ASDM downgrade validation tests ───────────────────────────
 
 
-class TestAsdmDowngradeValidation:
-    """Tests for ASDM downgrade prevention."""
+class TestAsdmDowngradeAllowed:
+    """Tests that ASDM downgrade is allowed."""
 
-    def test_should_fail_when_asdm_is_a_downgrade(
+    def test_should_allow_asdm_downgrade(
         self,
         cli_runner: CliRunner,
         default_config: Config,
@@ -825,6 +825,15 @@ class TestAsdmDowngradeValidation:
         device = _single_device(asdm_version="7.20(2)", software_version="9.4(2)")
         _patch_inventory(monkeypatch, [device])
         monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+        _patch_compatible_versions(
+            monkeypatch,
+            [_cv("9.4(2)", "7.5(2)")],
+        )
+        monkeypatch.setattr(
+            AsaUpgradeService,
+            "upgrade_single",
+            lambda self, **kw: _fake_transaction(),
+        )
 
         result = cli_runner.invoke(
             cli,
@@ -843,48 +852,7 @@ class TestAsdmDowngradeValidation:
             ],
         )
 
-        assert result.exit_code != 0
-        assert "lower than the current" in result.output
-        assert "Downgrades are not supported" in result.output
-
-    def test_should_fail_when_asdm_downgrade_with_software_version(
-        self,
-        cli_runner: CliRunner,
-        default_config: Config,
-        mock_inventory_service: None,
-        monkeypatch: MonkeyPatch,
-    ) -> None:
-        """Downgrade check applies even when --software-version is given."""
-        device = _single_device(asdm_version="7.20(2)")
-        _patch_inventory(monkeypatch, [device])
-        monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
-        _patch_compatible_versions(
-            monkeypatch,
-            [_cv("9.18(4)", "7.18(1.152)")],
-        )
-
-        result = cli_runner.invoke(
-            cli,
-            [
-                "inventory",
-                "devices",
-                "asa",
-                "upgrade",
-                "trigger",
-                "-u",
-                "uid-1",
-                "--software-version",
-                "9.18(4)",
-                "--asdm-version",
-                "7.18(1.152)",
-                "--format",
-                "json",
-            ],
-        )
-
-        assert result.exit_code != 0
-        assert "lower than the current" in result.output
-        assert "Downgrades are not supported" in result.output
+        assert result.exit_code == 0
 
 
 # ── Software downgrade validation tests ────────────────────────

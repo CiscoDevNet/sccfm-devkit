@@ -30,9 +30,9 @@ description:
     managed by SCC Firewall Manager.
   - Idempotent — if every target device already runs the requested
     version(s), the module returns C(ok) (changed=False).
-  - Validates that the upgrade is not a downgrade and that the target
-    ASDM version is compatible with the target (or current) software
-    version.
+  - Validates that the software upgrade is not a downgrade and that the
+    target ASDM version is compatible with the target (or current) software
+    version. ASDM downgrades are allowed.
   - Supports staging (download + readiness check only) via C(stage_upgrade).
 options:
   query:
@@ -211,9 +211,8 @@ def _validate_no_downgrade(
     config: ConfigLike,
     device_uids: list[str],
     software_version: str | None,
-    asdm_version: str | None,
 ) -> str | None:
-    """Return an error message if a downgrade would occur, else None."""
+    """Return an error message if a software downgrade would occur, else None."""
     inventory_service = InventoryService(config=config)
     for uid in device_uids:
         page: DevicePage = inventory_service.get_devices(limit=1, offset=0, query=f'uid:"{uid}"')
@@ -228,16 +227,6 @@ def _validate_no_downgrade(
             return (
                 f"Software version {software_version} is lower than "
                 f"the current device software version {device.software_version}. "
-                f"Downgrades are not supported."
-            )
-        if (
-            asdm_version
-            and device.asdm_version
-            and is_version_downgrade(asdm_version, device.asdm_version)
-        ):
-            return (
-                f"ASDM version {asdm_version} is lower than "
-                f"the current device ASDM version {device.asdm_version}. "
                 f"Downgrades are not supported."
             )
     return None
@@ -406,8 +395,8 @@ def run_module() -> None:
                 device_count=len(device_uids),
             )
 
-        # Downgrade validation
-        downgrade_err = _validate_no_downgrade(config, device_uids, software_version, asdm_version)
+        # Downgrade validation (software only — ASDM downgrades are allowed)
+        downgrade_err = _validate_no_downgrade(config, device_uids, software_version)
         if downgrade_err:
             module.fail_json(msg=downgrade_err)
 

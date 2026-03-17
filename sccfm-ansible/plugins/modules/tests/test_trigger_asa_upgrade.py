@@ -223,15 +223,19 @@ def test_should_fail_on_software_downgrade(
 
 
 @patch("plugins.modules.trigger_asa_upgrade.Config")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeVersionService")
 @patch("plugins.modules.trigger_asa_upgrade.InventoryService")
 @patch("plugins.modules.trigger_asa_upgrade.AnsibleModule")
-def test_should_fail_on_asdm_downgrade(
+def test_should_allow_asdm_downgrade(
     mock_ansible_cls: MagicMock,
     mock_inv_cls: MagicMock,
+    mock_ver_cls: MagicMock,
+    mock_upg_cls: MagicMock,
     _mock_cfg: MagicMock,
     mock_module: MagicMock,
 ) -> None:
-    """Fail when asdm_version is lower than current."""
+    """ASDM downgrade should be allowed."""
     mock_module.params["software_version"] = None
     mock_module.params["asdm_version"] = "7.10(1)"
     mock_ansible_cls.return_value = mock_module
@@ -241,12 +245,28 @@ def test_should_fail_on_asdm_downgrade(
     mock_inv.get_devices.return_value = _device_page(device)
     mock_inv_cls.return_value = mock_inv
 
+    compat_versions = AsaGroupCompatibleVersions(
+        per_device={"uid-1": [
+            AsaCompatibleVersion(softwareVersion="9.16(1)", asdmVersion="7.10(1)"),
+        ]},
+        common_versions=[
+            AsaCompatibleVersion(softwareVersion="9.16(1)", asdmVersion="7.10(1)"),
+        ],
+    )
+    mock_ver = MagicMock()
+    mock_ver.get_compatible_versions.return_value = compat_versions
+    mock_ver_cls.return_value = mock_ver
+
+    mock_upg = MagicMock()
+    mock_upg.upgrade_single.return_value = SAMPLE_TRANSACTION
+    mock_upg_cls.return_value = mock_upg
+
     with pytest.raises(SystemExit):
         trigger_asa_upgrade.run_module()
 
-    mock_module.fail_json.assert_called_once()
-    kw = mock_module.fail_json.call_args[1]
-    assert "Downgrades are not supported" in kw["msg"]
+    mock_module.exit_json.assert_called_once()
+    kw = mock_module.exit_json.call_args[1]
+    assert kw["changed"] is True
 
 
 # ---------- Version required ----------
