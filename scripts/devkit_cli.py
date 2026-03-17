@@ -257,6 +257,64 @@ def _run_ansible_examples() -> None:
 # ── Manage tokens ─────────────────────────────────────────────────
 
 
+def _update_token() -> None:
+    """Prompt for a new API token for an existing named token."""
+    from scripts.setup_tokens import _resolve_examples_path
+    from scripts.token_store import SavedToken, VaultTokenStore
+
+    try:
+        examples_path = _resolve_examples_path(None)
+    except Exception as exc:
+        console.print(f"[red]{exc}[/red]")
+        return
+
+    store = VaultTokenStore(examples_path)
+    tokens = store.list_tokens()
+
+    if not tokens:
+        console.print("[yellow]No saved tokens found in vault.[/yellow]")
+        return
+
+    token_choices: list[questionary.Choice | str] = [
+        questionary.Choice(
+            title=f"{t.name}  ({t.region})  …{t.token[-6:]}",
+            value=t.name,
+        )
+        for t in tokens
+    ]
+    token_choices.append("back")
+
+    answer = _ask(token_choices, "Select a token to update:")
+    if answer is None or answer == "back":
+        return
+
+    token_to_update = next((t for t in tokens if t.name == answer), None)
+    if token_to_update is None:
+        console.print("[red]Token not found.[/red]")
+        return
+
+    new_token_value = questionary.text(
+        f"Paste new API token for '{token_to_update.name}':"
+    ).ask()
+    if new_token_value is None:
+        console.print("[dim]Cancelled.[/dim]")
+        return
+    new_token_value = new_token_value.strip()
+    if not new_token_value:
+        console.print("[red]Token cannot be empty.[/red]")
+        return
+
+    updated = SavedToken(
+        name=token_to_update.name,
+        region=token_to_update.region,
+        token=new_token_value,
+    )
+    all_tokens = [updated if t.name == updated.name else t for t in tokens]
+    vault_path = store.save_active_and_tokens(updated, all_tokens)
+    console.print(f"[green]Updated token '{updated.name}'.[/green]")
+    console.print(f"[dim]Vault updated: {vault_path}[/dim]")
+
+
 def _remove_token() -> None:
     """Remove a saved token from the Ansible vault store."""
     from scripts.setup_tokens import _resolve_examples_path
@@ -323,7 +381,7 @@ def _manage_tokens() -> None:
         return
 
     if answer == "update":
-        _run_change_tokens()
+        _update_token()
     elif answer == "remove":
         _remove_token()
 
