@@ -38,11 +38,10 @@ def _fake_transaction(uid: str = "txn-1") -> CdoTransaction:
 
 class TestUpgradeSingle:
     def test_should_call_upgrade_asa_device_with_correct_params(
-        self, upgrade_service: AsaUpgradeService
+        self, upgrade_service: AsaUpgradeService, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        upgrade_service._upgrades_api.upgrade_asa_device = MagicMock(
-            return_value=_fake_transaction("txn-single")
-        )
+        mock_upgrade = MagicMock(return_value=_fake_transaction("txn-single"))
+        monkeypatch.setattr(upgrade_service._upgrades_api, "upgrade_asa_device", mock_upgrade)
 
         result = upgrade_service.upgrade_single(
             device_uid="a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
@@ -55,7 +54,7 @@ class TestUpgradeSingle:
         )
 
         assert result.transaction_uid == "txn-single"
-        call_kwargs = upgrade_service._upgrades_api.upgrade_asa_device.call_args
+        call_kwargs = mock_upgrade.call_args
         assert call_kwargs.kwargs["device_uid"] == "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
         input_obj: UpgradeAsaDeviceInput = call_kwargs.kwargs["upgrade_asa_device_input"]
         assert input_obj.software_version == "9.18(4)"
@@ -72,17 +71,18 @@ class TestUpgradeSingle:
                 software_version="9.18(4)",
             )
 
-    def test_should_pass_defaults(self, upgrade_service: AsaUpgradeService) -> None:
-        upgrade_service._upgrades_api.upgrade_asa_device = MagicMock(
-            return_value=_fake_transaction()
-        )
+    def test_should_pass_defaults(
+        self, upgrade_service: AsaUpgradeService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mock_upgrade = MagicMock(return_value=_fake_transaction())
+        monkeypatch.setattr(upgrade_service._upgrades_api, "upgrade_asa_device", mock_upgrade)
 
         upgrade_service.upgrade_single(
             device_uid="a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
             software_version="9.16(4)",
         )
 
-        call_kwargs = upgrade_service._upgrades_api.upgrade_asa_device.call_args
+        call_kwargs = mock_upgrade.call_args
         input_obj: UpgradeAsaDeviceInput = call_kwargs.kwargs["upgrade_asa_device_input"]
         assert input_obj.stage_upgrade is False
         assert input_obj.force_upgrade is False
@@ -93,11 +93,10 @@ class TestUpgradeSingle:
 
 class TestUpgradeMultiple:
     def test_should_call_upgrade_asa_devices_with_correct_params(
-        self, upgrade_service: AsaUpgradeService
+        self, upgrade_service: AsaUpgradeService, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        upgrade_service._upgrades_api.upgrade_asa_devices = MagicMock(
-            return_value=_fake_transaction("txn-multi")
-        )
+        mock_upgrade = MagicMock(return_value=_fake_transaction("txn-multi"))
+        monkeypatch.setattr(upgrade_service._upgrades_api, "upgrade_asa_devices", mock_upgrade)
         uids = [
             "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
             "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
@@ -114,7 +113,7 @@ class TestUpgradeMultiple:
         )
 
         assert result.transaction_uid == "txn-multi"
-        call_kwargs = upgrade_service._upgrades_api.upgrade_asa_devices.call_args
+        call_kwargs = mock_upgrade.call_args
         input_obj: UpgradeAsaDevicesInput = call_kwargs.kwargs["upgrade_asa_devices_input"]
         assert input_obj.device_uids == uids
         assert input_obj.software_version == "9.18(4)"
@@ -131,10 +130,11 @@ class TestUpgradeMultiple:
                 software_version="9.18(4)",
             )
 
-    def test_should_pass_defaults(self, upgrade_service: AsaUpgradeService) -> None:
-        upgrade_service._upgrades_api.upgrade_asa_devices = MagicMock(
-            return_value=_fake_transaction()
-        )
+    def test_should_pass_defaults(
+        self, upgrade_service: AsaUpgradeService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mock_upgrade = MagicMock(return_value=_fake_transaction())
+        monkeypatch.setattr(upgrade_service._upgrades_api, "upgrade_asa_devices", mock_upgrade)
         uids = ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"]
 
         upgrade_service.upgrade_multiple(
@@ -142,7 +142,7 @@ class TestUpgradeMultiple:
             software_version="9.16(4)",
         )
 
-        call_kwargs = upgrade_service._upgrades_api.upgrade_asa_devices.call_args
+        call_kwargs = mock_upgrade.call_args
         input_obj: UpgradeAsaDevicesInput = call_kwargs.kwargs["upgrade_asa_devices_input"]
         assert input_obj.stage_upgrade is False
         assert input_obj.force_upgrade is False
