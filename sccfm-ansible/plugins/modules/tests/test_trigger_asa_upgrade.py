@@ -246,9 +246,11 @@ def test_should_allow_asdm_downgrade(
     mock_inv_cls.return_value = mock_inv
 
     compat_versions = AsaGroupCompatibleVersions(
-        per_device={"uid-1": [
-            AsaCompatibleVersion(softwareVersion="9.16(1)", asdmVersion="7.10(1)"),
-        ]},
+        per_device={
+            "uid-1": [
+                AsaCompatibleVersion(softwareVersion="9.16(1)", asdmVersion="7.10(1)"),
+            ]
+        },
         common_versions=[
             AsaCompatibleVersion(softwareVersion="9.16(1)", asdmVersion="7.10(1)"),
         ],
