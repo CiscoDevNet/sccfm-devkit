@@ -64,16 +64,16 @@ class ShowShunCommand(AsaDeviceTargetCommand):
         service = AsaShunService(config=config)
 
         if statistics:
-            results = service.view_shun_statistics(device_uids=device_uids)
+            stat_results = service.view_shun_statistics(device_uids=device_uids)
             self._render_statistics(
-                results=results,
+                results=stat_results,
                 uid_to_device=targets.uid_to_device,
                 format=response_format,
             )
         else:
-            results = service.view_shun(device_uids=device_uids)
+            entry_results = service.view_shun(device_uids=device_uids)
             self._render_entries(
-                results=results,
+                results=entry_results,
                 uid_to_device=targets.uid_to_device,
                 format=response_format,
             )
