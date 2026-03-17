@@ -22,7 +22,7 @@ questionary = "^2.1.1"
 sccfm-cli = "sccfm_cli.cli:cli"
 devkit = "scripts.devkit_cli:main"
 build-ansible-collection = "scripts.build_ansible_collection:main"
-setup-tokens = "scripts.setup_tokens:main"
+change-tokens = "scripts.setup_tokens:main"
 
 [tool.poetry.group.dev.dependencies]
 ansible-core = "^2.17.0"
