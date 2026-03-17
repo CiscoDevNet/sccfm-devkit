@@ -293,9 +293,7 @@ def _update_token() -> None:
         console.print("[red]Token not found.[/red]")
         return
 
-    new_token_value = questionary.text(
-        f"Paste new API token for '{token_to_update.name}':"
-    ).ask()
+    new_token_value = questionary.text(f"Paste new API token for '{token_to_update.name}':").ask()
     if new_token_value is None:
         console.print("[dim]Cancelled.[/dim]")
         return
