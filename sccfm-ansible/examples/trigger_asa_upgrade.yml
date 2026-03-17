@@ -1,0 +1,80 @@
+---
+# Trigger an ASA firmware/ASDM upgrade via SCCFM
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/trigger_asa_upgrade.yml \
+#     -e '{"device_uids":["uid-1","uid-2"]}' \
+#     -e software_version="9.18(4)" \
+#     -e asdm_version="7.18(1.152)"
+#
+# Stage-only (download + readiness checks, no reboot):
+#   ansible-playbook examples/trigger_asa_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e software_version="9.18(4)" \
+#     -e stage_upgrade=true
+#
+# ASDM-only upgrade:
+#   ansible-playbook examples/trigger_asa_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e asdm_version="7.18(1.152)"
+#
+# Dry-run (check mode):
+#   ansible-playbook examples/trigger_asa_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e software_version="9.18(4)" \
+#     --check
+
+- name: Trigger ASA firmware/ASDM upgrade
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uids: []
+    software_version: ""
+    asdm_version: ""
+    stage_upgrade: false
+    force_upgrade: false
+    ignore_maintenance_window: false
+    upgrade_name: ""
+
+  tasks:
+    - name: Validate that device UIDs are provided
+      ansible.builtin.fail:
+        msg: >-
+          device_uids is required. Pass it with
+          -e '{"device_uids":["uid-1","uid-2"]}'
+      when: device_uids | length == 0
+
+    - name: Validate that at least one version is provided
+      ansible.builtin.fail:
+        msg: >-
+          At least one of software_version or asdm_version is required.
+      when: software_version | length == 0 and asdm_version | length == 0
+
+    - name: Trigger ASA upgrade
+      cisco.sccfm.trigger_asa_upgrade:
+        uids: "{{ device_uids }}"
+        software_version: "{{ software_version if software_version | length > 0 else omit }}"
+        asdm_version: "{{ asdm_version if asdm_version | length > 0 else omit }}"
+        stage_upgrade: "{{ stage_upgrade }}"
+        force_upgrade: "{{ force_upgrade }}"
+        ignore_maintenance_window: "{{ ignore_maintenance_window }}"
+        upgrade_name: "{{ upgrade_name if upgrade_name | length > 0 else omit }}"
+      register: upgrade_result
+
+    - name: Display upgrade result
+      ansible.builtin.debug:
+        msg: >-
+          changed={{ upgrade_result.changed }},
+          msg={{ upgrade_result.msg }},
+          device_count={{ upgrade_result.device_count }}
+
+    - name: Display transaction details
+      ansible.builtin.debug:
+        var: upgrade_result.transaction
+      when: upgrade_result.changed
