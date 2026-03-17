@@ -1,0 +1,72 @@
+---
+# Shun management example for an ASA device
+#
+# RUN:
+#   ansible-playbook examples/manage_asa_shun.yml \
+#     -e device_uid=<your-device-uid>
+
+- name: "Manage shun entries on ASA firewall"
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ region }}"
+      api_token: "{{ api_token }}"
+
+  vars:
+    device_uid: ""
+
+  tasks:
+    - name: Fail if no device UID provided
+      ansible.builtin.fail:
+        msg: "Pass -e device_uid=<uid> to specify the target ASA."
+      when: device_uid | length == 0
+
+    # ── 1. Add shun entries ──────────────────────────────────────
+    - name: "1. Add shun entries"
+      cisco.sccfm.add_asa_shun:
+        uids: ["{{ device_uid }}"]
+        source_ip: "{{ item }}"
+      loop:
+        - "203.0.113.10"
+        - "203.0.113.20"
+        - "203.0.113.30"
+
+    # ── 2. Show all shuns ────────────────────────────────────────
+    - name: "2. Show all shun entries"
+      cisco.sccfm.show_asa_shun:
+        uids: ["{{ device_uid }}"]
+      register: after_add
+
+    - ansible.builtin.debug:
+        var: after_add.results
+
+    # ── 3. Remove one shun ───────────────────────────────────────
+    - name: "3. Remove shun for 203.0.113.20"
+      cisco.sccfm.remove_asa_shun:
+        uids: ["{{ device_uid }}"]
+        source_ip: "203.0.113.20"
+
+    # ── 4. Show shuns after removal ──────────────────────────────
+    - name: "4. Show shun entries after removal"
+      cisco.sccfm.show_asa_shun:
+        uids: ["{{ device_uid }}"]
+      register: after_remove
+
+    - ansible.builtin.debug:
+        var: after_remove.results
+
+    # ── 5. Clear all shuns ───────────────────────────────────────
+    - name: "5. Clear all shun entries"
+      cisco.sccfm.clear_asa_shun:
+        uids: ["{{ device_uid }}"]
+
+    # ── 6. Show shuns are gone ───────────────────────────────────
+    - name: "6. Verify shun list is empty"
+      cisco.sccfm.show_asa_shun:
+        uids: ["{{ device_uid }}"]
+      register: after_clear
+
+    - ansible.builtin.debug:
+        var: after_clear.results
