@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
 
-ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in")
+ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")
 
 
 @dataclass(frozen=True)
