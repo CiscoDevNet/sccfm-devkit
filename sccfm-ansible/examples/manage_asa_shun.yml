@@ -18,11 +18,6 @@
     device_uid: ""
 
   tasks:
-    - name: Fail if no device UID provided
-      ansible.builtin.fail:
-        msg: "Pass -e device_uid=<uid> to specify the target ASA."
-      when: device_uid | length == 0
-
     # ── 1. Add shun entries ──────────────────────────────────────
     - name: "1. Add shun entries"
       cisco.sccfm.add_asa_shun:

@@ -7,9 +7,8 @@ from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
 from sccfm_core import AsaShunService, InventoryService, SccApiError
 from sccfm_core.models.asa_shun_entry import AsaShunEntry, AsaShunInterfaceStats
-from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -162,30 +161,13 @@ results:
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
+        **base_argument_spec(),
         "query": {"type": "str", "required": False},
         "uids": {"type": "list", "elements": "str", "required": False},
         "statistics": {"type": "bool", "required": False, "default": False},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
     }
-
-
-def resolve_device_uids_from_query(
-    config: ConfigLike,
-    query: str,
-    limit: int,
-    offset: int,
-) -> list[str]:
-    """Resolve device UIDs from a query. Returns empty list if no devices match."""
-    inventory_service = InventoryService(config=config)
-    page: DevicePage = inventory_service.get_devices(
-        limit=limit,
-        offset=offset,
-        query=f"{query} AND deviceType:ASA",
-    )
-    return [device.uid for device in (page.items or [])]
 
 
 def _serialize_entries(
@@ -234,32 +216,11 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
-    query: str | None = module.params.get("query")
-    uids: list[str] | None = module.params.get("uids")
+    config = create_config(module)
     statistics: bool = module.params["statistics"]
-    limit: int = module.params["limit"]
-    offset: int = module.params["offset"]
 
     try:
-        if uids:
-            device_uids = uids
-        else:
-            device_uids = resolve_device_uids_from_query(
-                config=config,
-                query=cast(str, query),
-                limit=limit,
-                offset=offset,
-            )
-            if not device_uids:
-                module.fail_json(msg="No devices found matching the specified query.")
+        device_uids = _resolve_device_uids(module)
 
         service = AsaShunService(config=config)
 
@@ -297,6 +258,25 @@ def run_module() -> None:
         module.fail_json(**error.to_dict())
     except Exception as e:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
+
+
+def _resolve_device_uids(module: AnsibleModule) -> list[str]:
+    uids: list[str] | None = module.params.get("uids")
+    if uids:
+        return uids
+
+    config = create_config(module)
+    query = cast(str, module.params.get("query"))
+    inventory_service = InventoryService(config=config)
+    page: DevicePage = inventory_service.get_devices(
+        limit=module.params["limit"],
+        offset=module.params["offset"],
+        query=f"({query}) AND deviceType:ASA",
+    )
+    device_uids = [device.uid for device in (page.items or [])]
+    if not device_uids:
+        module.fail_json(msg="No devices found matching the specified query.")
+    return device_uids
 
 
 def main() -> None:

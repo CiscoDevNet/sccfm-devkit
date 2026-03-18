@@ -6,9 +6,8 @@ from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
 from sccfm_core import AsaShunService, InventoryService, SccApiError
-from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -161,6 +160,7 @@ results:
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
+        **base_argument_spec(),
         "query": {"type": "str", "required": False},
         "uids": {"type": "list", "elements": "str", "required": False},
         "source_ip": {"type": "str", "required": True},
@@ -170,25 +170,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "protocol": {"type": "str", "required": False, "choices": ["tcp", "udp"]},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
     }
-
-
-def resolve_device_uids_from_query(
-    config: ConfigLike,
-    query: str,
-    limit: int,
-    offset: int,
-) -> list[str]:
-    """Resolve device UIDs from a query. Returns empty list if no devices match."""
-    inventory_service = InventoryService(config=config)
-    page: DevicePage = inventory_service.get_devices(
-        limit=limit,
-        offset=offset,
-        query=f"{query} AND deviceType:ASA",
-    )
-    return [device.uid for device in (page.items or [])]
 
 
 def run_module() -> None:
@@ -198,23 +180,12 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
-    query: str | None = module.params.get("query")
-    uids: list[str] | None = module.params.get("uids")
+    config = create_config(module)
     source_ip: str = module.params["source_ip"]
     dest_ip: str | None = module.params.get("dest_ip")
     source_port: int | None = module.params.get("source_port")
     dest_port: int | None = module.params.get("dest_port")
     protocol: str | None = module.params.get("protocol")
-    limit: int = module.params["limit"]
-    offset: int = module.params["offset"]
 
     # Validate connection tuple parameters
     has_conn_params = any(p is not None for p in (source_port, dest_port, protocol))
@@ -224,17 +195,7 @@ def run_module() -> None:
         )
 
     try:
-        if uids:
-            device_uids = uids
-        else:
-            device_uids = resolve_device_uids_from_query(
-                config=config,
-                query=cast(str, query),
-                limit=limit,
-                offset=offset,
-            )
-            if not device_uids:
-                module.fail_json(msg="No devices found matching the specified query.")
+        device_uids = _resolve_device_uids(module)
 
         service = AsaShunService(config=config)
         results: CdoTransaction | list[CdoCliResult] = service.add_shun(
@@ -266,6 +227,25 @@ def run_module() -> None:
         module.fail_json(**error.to_dict())
     except Exception as e:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
+
+
+def _resolve_device_uids(module: AnsibleModule) -> list[str]:
+    uids: list[str] | None = module.params.get("uids")
+    if uids:
+        return uids
+
+    config = create_config(module)
+    query = cast(str, module.params.get("query"))
+    inventory_service = InventoryService(config=config)
+    page: DevicePage = inventory_service.get_devices(
+        limit=module.params["limit"],
+        offset=module.params["offset"],
+        query=f"({query}) AND deviceType:ASA",
+    )
+    device_uids = [device.uid for device in (page.items or [])]
+    if not device_uids:
+        module.fail_json(msg="No devices found matching the specified query.")
+    return device_uids
 
 
 def main() -> None:
