@@ -1,3 +1,9 @@
+## v0.18.0 (2026-03-18)
+
+### Feat
+
+- **LH-102405**: implement shun commands for ASA devices (#37)
+
 ## v0.17.0 (2026-03-10)
 
 ### Feat
