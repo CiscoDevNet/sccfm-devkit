@@ -81,8 +81,10 @@ class AsaChangeBootImageCommand(AsaDeviceTargetCommand):
                 _device_attr(device, "connectivity_state", "connectivityState")
             )
             config_state = _state_text(_device_attr(device, "config_state", "configState"))
-            not_ready_results[device.uid] = AsaBootImageChangeResult(
-                device_uid=device.uid,
+            device_uid = device.uid
+            assert device_uid is not None
+            not_ready_results[device_uid] = AsaBootImageChangeResult(
+                device_uid=device_uid,
                 requested_image_path=image_path,
                 status="device_not_ready",
                 message=(
