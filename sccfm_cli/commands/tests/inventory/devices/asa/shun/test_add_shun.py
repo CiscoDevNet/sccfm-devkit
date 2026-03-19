@@ -71,8 +71,20 @@ def test_should_add_shun_single_source_ip(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1", "-u", "uid-1", "--wait", "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1",
+            "-u",
+            "uid-1",
+            "--wait",
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -95,13 +107,28 @@ def test_should_add_shun_with_connection_tuple_flags(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1",
-         "--dest-ip", "10.2.2.2",
-         "--source-port", "555",
-         "--dest-port", "443",
-         "--protocol", "tcp",
-         "-u", "uid-1", "--wait", "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1",
+            "--dest-ip",
+            "10.2.2.2",
+            "--source-port",
+            "555",
+            "--dest-port",
+            "443",
+            "--protocol",
+            "tcp",
+            "-u",
+            "uid-1",
+            "--wait",
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -126,9 +153,20 @@ def test_should_add_shun_with_inline_tuple(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1 10.2.2.2 555 443 tcp",
-         "-u", "uid-1", "--wait", "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1 10.2.2.2 555 443 tcp",
+            "-u",
+            "uid-1",
+            "--wait",
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -153,11 +191,24 @@ def test_should_add_multiple_shun_entries(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1",
-         "--source-ip", "20.2.2.2 10.3.3.3 555 443 tcp",
-         "--source-ip", "30.3.3.3",
-         "-u", "uid-1", "--wait", "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1",
+            "--source-ip",
+            "20.2.2.2 10.3.3.3 555 443 tcp",
+            "--source-ip",
+            "30.3.3.3",
+            "-u",
+            "uid-1",
+            "--wait",
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -188,11 +239,22 @@ def test_should_reject_separate_flags_with_multiple_source_ips(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1",
-         "--source-ip", "10.2.2.2",
-         "--dest-ip", "10.3.3.3",
-         "-u", "uid-1", "--wait"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1",
+            "--source-ip",
+            "10.2.2.2",
+            "--dest-ip",
+            "10.3.3.3",
+            "-u",
+            "uid-1",
+            "--wait",
+        ],
     )
 
     assert result.exit_code != 0
@@ -211,10 +273,20 @@ def test_should_reject_separate_flags_with_inline_tuple(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1 10.2.2.2 555 443 tcp",
-         "--dest-ip", "10.3.3.3",
-         "-u", "uid-1", "--wait"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1 10.2.2.2 555 443 tcp",
+            "--dest-ip",
+            "10.3.3.3",
+            "-u",
+            "uid-1",
+            "--wait",
+        ],
     )
 
     assert result.exit_code != 0
@@ -233,10 +305,20 @@ def test_should_reject_missing_dest_ip_with_port_flags(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1",
-         "--dest-port", "443",
-         "-u", "uid-1", "--wait"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1",
+            "--dest-port",
+            "443",
+            "-u",
+            "uid-1",
+            "--wait",
+        ],
     )
 
     assert result.exit_code != 0
@@ -255,9 +337,18 @@ def test_should_reject_invalid_inline_port(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1 10.2.2.2 notaport 443 tcp",
-         "-u", "uid-1", "--wait"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1 10.2.2.2 notaport 443 tcp",
+            "-u",
+            "uid-1",
+            "--wait",
+        ],
     )
 
     assert result.exit_code != 0
@@ -276,9 +367,18 @@ def test_should_reject_invalid_inline_protocol(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "shun", "add",
-         "--source-ip", "10.1.1.1 10.2.2.2 555 443 icmp",
-         "-u", "uid-1", "--wait"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "add",
+            "--source-ip",
+            "10.1.1.1 10.2.2.2 555 443 icmp",
+            "-u",
+            "uid-1",
+            "--wait",
+        ],
     )
 
     assert result.exit_code != 0
