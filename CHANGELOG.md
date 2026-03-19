@@ -1,3 +1,9 @@
+## Unreleased
+
+### Feat
+
+- add ASA boot image change workflow for CLI and Ansible
+
 ## v0.18.0 (2026-03-18)
 
 ### Feat

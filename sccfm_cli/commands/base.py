@@ -128,7 +128,7 @@ class BaseCommand(ABC):
         self, cdo_transaction: CdoTransaction, format: str = "table"
     ) -> None:
         if format == "json":
-            self.console.print(json.dumps(cdo_transaction.to_dict(), indent=2))
+            self.console.print(json.dumps(cdo_transaction.to_dict(), indent=2, default=str))
         else:
             self.console.print("[yellow]The execution failed. Transaction Details:[/yellow]")
             self.console.print(

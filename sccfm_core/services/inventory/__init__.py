@@ -1,3 +1,4 @@
+from sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageService
 from sccfm_core.services.inventory.asa_boot_registry_service import (
     AsaBootRegistryService,
 )
@@ -19,6 +20,7 @@ from sccfm_core.services.inventory.inventory_service import InventoryService
 
 __all__ = [
     "AsdmCompatibilityInfo",
+    "AsaBootImageService",
     "AsaBootRegistryService",
     "AsaCommandLineService",
     "AsaDiskFileService",
