@@ -3,7 +3,8 @@
 #
 # RUN:
 #   ansible-playbook examples/manage_asa_shun.yml \
-#     -e device_uid=<your-device-uid>
+#     -e device_uid=<your-device-uid> \
+#     -e sccfm_api_token=<your-api-token>
 
 - name: "Manage shun entries on ASA firewall"
   hosts: localhost
@@ -18,15 +19,18 @@
     device_uid: ""
 
   tasks:
-    # ── 1. Add shun entries ──────────────────────────────────────
+    # ── 1. Add multiple shun entries in one transaction ──────────
     - name: "1. Add shun entries"
       cisco.sccfm.add_asa_shun:
         uids: ["{{ device_uid }}"]
-        source_ip: "{{ item }}"
-      loop:
-        - "203.0.113.10"
-        - "203.0.113.20"
-        - "203.0.113.30"
+        entries:
+          - source_ip: "203.0.113.40"
+          - source_ip: "203.0.113.50"
+            dest_ip: "10.1.1.1"
+            source_port: 555
+            dest_port: 443
+            protocol: tcp
+          - source_ip: "203.0.113.60"
 
     # ── 2. Show all shuns ────────────────────────────────────────
     - name: "2. Show all shun entries"
@@ -37,11 +41,13 @@
     - ansible.builtin.debug:
         var: after_add.results
 
-    # ── 3. Remove one shun ───────────────────────────────────────
-    - name: "3. Remove shun for 203.0.113.20"
+    # ── 3. Remove multiple shuns in one transaction ───────────────
+    - name: "3. Remove shuns for 203.0.113.40 and 203.0.113.50"
       cisco.sccfm.remove_asa_shun:
         uids: ["{{ device_uid }}"]
-        source_ip: "203.0.113.20"
+        source_ips:
+          - "203.0.113.40"
+          - "203.0.113.50"
 
     # ── 4. Show shuns after removal ──────────────────────────────
     - name: "4. Show shun entries after removal"

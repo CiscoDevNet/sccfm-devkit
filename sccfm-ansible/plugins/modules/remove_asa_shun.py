@@ -12,11 +12,14 @@ from ..module_utils.config import base_argument_spec, create_config
 DOCUMENTATION = r"""
 ---
 module: remove_asa_shun
-short_description: Remove a shun entry from ASA devices
+short_description: Remove one or more shun entries from ASA devices
 description:
-  - Removes a shun entry for a specific source IP address from one or more
+  - Removes shun entries for specific source IP addresses from one or more
     ASA devices managed by SCC Firewall Manager.
-  - Executes C(no shun <source_ip>) on the target devices.
+  - Use C(source_ip) for a single removal, or C(source_ips) to remove
+    multiple IPs in a single API call (more efficient than looping).
+  - Executes C(no shun <source_ip>) on the target devices for each IP.
+  - C(source_ip) and C(source_ips) are mutually exclusive.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
   - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/)
     for API documentation.
@@ -38,8 +41,17 @@ options:
   source_ip:
     description:
       - The source IP address to remove from the shun list.
-    required: true
+      - Mutually exclusive with C(source_ips).
+    required: false
     type: str
+  source_ips:
+    description:
+      - A list of source IP addresses to remove from the shun list.
+      - All removals are sent in a single transaction.
+      - Mutually exclusive with C(source_ip).
+    required: false
+    type: list
+    elements: str
   limit:
     description:
       - Maximum number of devices to return when using C(query).
@@ -72,7 +84,7 @@ author:
 """
 
 EXAMPLES = r"""
-# Example 1: Remove a shun on devices matching a query
+# Example 1: Remove a single shun on devices matching a query
 - name: Remove shun for attacker IP on production ASAs
   cisco.sccfm.remove_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
@@ -80,14 +92,25 @@ EXAMPLES = r"""
     region: "{{ sccfm_region }}"
     api_token: "{{ sccfm_api_token }}"
 
-# Example 2: Remove a shun on specific devices by UID
+# Example 2: Remove multiple shuns in a single transaction
+- name: Remove multiple attacker IPs in one call
+  cisco.sccfm.remove_asa_shun:
+    query: "connectivityState:ONLINE"
+    source_ips:
+      - "203.0.113.40"
+      - "203.0.113.50"
+      - "203.0.113.60"
+    region: "{{ sccfm_region }}"
+    api_token: "{{ sccfm_api_token }}"
+
+# Example 3: Remove a shun on specific devices by UID
 - name: Remove shun on specific ASA
   cisco.sccfm.remove_asa_shun:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
     source_ip: "10.99.99.99"
 
-# Example 3: Using module_defaults (recommended)
+# Example 4: Using module_defaults (recommended)
 - name: Remove shun entries
   hosts: localhost
   gather_facts: false
@@ -129,7 +152,8 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         **base_argument_spec(),
         "query": {"type": "str", "required": False},
         "uids": {"type": "list", "elements": "str", "required": False},
-        "source_ip": {"type": "str", "required": True},
+        "source_ip": {"type": "str", "required": False},
+        "source_ips": {"type": "list", "elements": "str", "required": False},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
     }
@@ -138,20 +162,30 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        mutually_exclusive=[["query", "uids"]],
-        required_one_of=[["query", "uids"]],
+        mutually_exclusive=[["query", "uids"], ["source_ip", "source_ips"]],
+        required_one_of=[["query", "uids"], ["source_ip", "source_ips"]],
     )
 
     config = create_config(module)
-    source_ip: str = module.params["source_ip"]
+    source_ip: str | None = module.params.get("source_ip")
+    source_ips_param: list[str] | None = module.params.get("source_ips")
+
+    if source_ip is not None:
+        ips_to_remove = [source_ip]
+        display_subject = source_ip
+    else:
+        ips_to_remove = source_ips_param or []
+        if not ips_to_remove:
+            module.fail_json(msg="source_ips must contain at least one IP address.")
+        display_subject = f"{len(ips_to_remove)} IPs"
 
     try:
         device_uids = _resolve_device_uids(module)
 
         service = AsaShunService(config=config)
-        results: CdoTransaction | list[CdoCliResult] = service.remove_shun(
+        results: CdoTransaction | list[CdoCliResult] = service.remove_shun_entries(
             device_uids=device_uids,
-            source_ip=source_ip,
+            source_ips=ips_to_remove,
         )
 
         if isinstance(results, CdoTransaction):
@@ -165,7 +199,7 @@ def run_module() -> None:
         results_data = [result.model_dump(mode="json") for result in results]
         module.exit_json(
             changed=True,
-            msg=f"Successfully removed shun for {source_ip} on {len(device_uids)} device(s)",
+            msg=f"Successfully removed shun for {display_subject} on {len(device_uids)} device(s)",
             results=results_data,
         )
 
