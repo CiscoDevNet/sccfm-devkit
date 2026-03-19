@@ -24,11 +24,11 @@ __all__ = [
     "AsaDiskFileService",
     "AsaOnboardService",
     "AsaShunService",
-    "ShunEntrySpec",
     "AsaUpgradeService",
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
     "InventoryService",
+    "ShunEntrySpec",
     "get_asdm_compatibility_info",
     "is_version_downgrade",
 ]

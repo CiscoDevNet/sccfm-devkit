@@ -7,10 +7,10 @@ from sccfm_core.services.inventory import (
     AsaDiskFileService,
     AsaShunService,
     AsaUpgradeService,
-    ShunEntrySpec,
     AsaUpgradeVersionService,
     AsaUserPasswordService,
     InventoryService,
+    ShunEntrySpec,
 )
 
 __all__ = [
@@ -20,11 +20,11 @@ __all__ = [
     "AsaDiskFileService",
     "AsaShunService",
     "AsaUpgradeService",
-    "ShunEntrySpec",
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
     "HealthService",
     "HealthStatus",
     "InventoryService",
     "SccApiError",
+    "ShunEntrySpec",
 ]
