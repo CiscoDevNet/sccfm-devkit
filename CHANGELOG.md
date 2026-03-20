@@ -1,3 +1,9 @@
+## v0.19.0 (2026-03-20)
+
+### Feat
+
+- **LH-105684**: ASA shun add wait flag and improve bulk inside a single transaction (#39)
+
 ## v0.18.0 (2026-03-18)
 
 ### Feat
