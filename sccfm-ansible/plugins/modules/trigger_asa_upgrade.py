@@ -509,7 +509,7 @@ def run_module() -> None:
         error = SccApiError.from_exception(e)
         module.fail_json(**error.to_dict())
     except TimeoutError as e:
-      module.fail_json(msg=str(e))
+        module.fail_json(msg=str(e))
     except Exception as e:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
 
