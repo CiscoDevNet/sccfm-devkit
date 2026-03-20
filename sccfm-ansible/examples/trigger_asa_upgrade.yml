@@ -23,6 +23,13 @@
 #     -e '{"device_uids":["uid-1"]}' \
 #     -e software_version="9.18(4)" \
 #     --check
+#
+# Wait for transaction completion:
+#   ansible-playbook examples/trigger_asa_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e software_version="9.18(4)" \
+#     -e wait_for_completion=true \
+#     -e wait_timeout=900
 
 - name: Trigger ASA firmware/ASDM upgrade
   hosts: localhost
@@ -41,6 +48,8 @@
     force_upgrade: false
     ignore_maintenance_window: false
     upgrade_name: ""
+    wait_for_completion: false
+    wait_timeout: 300
 
   tasks:
     - name: Validate that device UIDs are provided
@@ -65,6 +74,8 @@
         force_upgrade: "{{ force_upgrade }}"
         ignore_maintenance_window: "{{ ignore_maintenance_window }}"
         upgrade_name: "{{ upgrade_name if upgrade_name | length > 0 else omit }}"
+        wait: "{{ wait_for_completion }}"
+        timeout: "{{ wait_timeout }}"
       register: upgrade_result
 
     - name: Display upgrade result
