@@ -11,6 +11,7 @@ from sccfm_core.services.inventory import (
     AsaUpgradeVersionService,
     AsaUserPasswordService,
     InventoryService,
+    ShunEntrySpec,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "HealthStatus",
     "InventoryService",
     "SccApiError",
+    "ShunEntrySpec",
 ]

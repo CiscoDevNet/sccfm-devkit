@@ -10,6 +10,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
     asa_check_option,
     asa_device_filter_params,
+    asa_wait_option,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
@@ -35,6 +36,7 @@ class ClearShunCommand(AsaDeviceTargetCommand):
                 device_uids_help_text="List of device UIDs to clear shuns on.",
             ),
             asa_check_option(),
+            asa_wait_option(),
             format_option(),
             config_path_option(),
         ]
@@ -42,6 +44,7 @@ class ClearShunCommand(AsaDeviceTargetCommand):
     @with_spinner("Clearing shun entries...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         check = cast(bool, kwargs.get("check", False))
+        wait = cast(bool, kwargs.get("wait", False))
         response_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -66,10 +69,16 @@ class ClearShunCommand(AsaDeviceTargetCommand):
         service = AsaShunService(config=config)
         results: CdoTransaction | List[CdoCliResult] = service.clear_shun(
             device_uids=device_uids,
+            wait=wait,
         )
 
         if isinstance(results, CdoTransaction):
-            self.print_failed_transaction_details(cdo_transaction=results, format=response_format)
+            if not wait:
+                self.print_submitted_transaction(results, format=response_format)
+            else:
+                self.print_failed_transaction_details(
+                    cdo_transaction=results, format=response_format
+                )
             return
 
         render_cli_results(

@@ -7,7 +7,7 @@ from typing import Any, List
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import CdoCliResult, Device, DevicePage
+from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device, DevicePage
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
@@ -45,6 +45,8 @@ def _patch_services(
     def fake_clear_shun(
         self: AsaShunService,
         device_uids: List[str],
+        *,
+        wait: bool = True,
     ) -> list[CdoCliResult]:
         if captured is not None:
             captured["device_uids"] = device_uids
@@ -84,6 +86,7 @@ def test_should_clear_shun_and_return_json(
             "uid-1",
             "-u",
             "uid-2",
+            "--wait",
             "--format",
             "json",
         ],
@@ -120,11 +123,62 @@ def test_should_display_clear_result_as_table(
             "clear",
             "-u",
             "uid-1",
+            "--wait",
         ],
     )
 
     assert result.exit_code == 0
     assert "clear shun" in result.output
+
+
+# ── Default no-wait ──────────────────────────────────────────────
+
+
+def test_default_should_submit_transaction_without_waiting(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+) -> None:
+    """shun clear (default, no --wait) returns the submitted transaction."""
+    txn = CdoTransaction(transaction_uid="txn-clr-789", cdo_transaction_status="PENDING")
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        return DevicePage(count=len(sample_devices), items=sample_devices)
+
+    def fake_clear_shun(
+        self: AsaShunService, device_uids: list[str], **kwargs: Any
+    ) -> CdoTransaction:
+        return txn
+
+    def stub_init(self: AsaShunService, config: Any) -> None:
+        return None
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaShunService, "clear_shun", fake_clear_shun)
+    monkeypatch.setattr(AsaShunService, "__init__", stub_init)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "shun",
+            "clear",
+            "-u",
+            "uid-1",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    payload = json.loads(result.output)
+    assert payload["transactionUid"] == "txn-clr-789"
 
 
 # ── Check mode ───────────────────────────────────────────────────
@@ -204,6 +258,7 @@ def test_should_filter_devices_by_query(
             "clear",
             "--query",
             "name:branch-*",
+            "--wait",
             "--format",
             "json",
         ],

@@ -6,20 +6,24 @@ from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
 from sccfm_core import AsaShunService, InventoryService, SccApiError
+from sccfm_core.services.inventory.asa_shun_service import ShunEntrySpec
 
 from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
 module: add_asa_shun
-short_description: Add a shun entry on ASA devices
+short_description: Add one or more shun entries on ASA devices
 description:
-  - Adds a shun entry on one or more ASA devices managed by
+  - Adds shun entries on one or more ASA devices managed by
     SCC Firewall Manager.
+  - Use C(source_ip) for a single entry, or C(entries) to add multiple
+    entries in a single API call (more efficient than looping).
   - Executes C(shun <source_ip>) to block all future connections from that host.
   - Optionally specify a connection tuple (C(dest_ip), C(source_port),
     C(dest_port), C(protocol)) to additionally drop an existing connection
     immediately.
+  - C(source_ip) and C(entries) are mutually exclusive.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
   - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/)
     for API documentation.
@@ -41,35 +45,73 @@ options:
   source_ip:
     description:
       - The source IP address of the attacking host to block.
-    required: true
+      - Mutually exclusive with C(entries).
+    required: false
     type: str
   dest_ip:
     description:
       - Destination IP of a specific connection to drop immediately.
       - Required when specifying C(source_port), C(dest_port), or C(protocol).
+      - Only valid when using C(source_ip) (not C(entries)).
     required: false
     type: str
   source_port:
     description:
       - Source port of the connection to drop.
       - Requires C(dest_ip).
+      - Only valid when using C(source_ip) (not C(entries)).
     required: false
     type: int
   dest_port:
     description:
       - Destination port of the connection to drop.
       - Requires C(dest_ip).
+      - Only valid when using C(source_ip) (not C(entries)).
     required: false
     type: int
   protocol:
     description:
       - Protocol of the connection to drop (tcp or udp).
       - Requires C(dest_ip).
+      - Only valid when using C(source_ip) (not C(entries)).
     required: false
     type: str
     choices:
       - tcp
       - udp
+  entries:
+    description:
+      - List of shun entries to add in a single transaction.
+      - Mutually exclusive with C(source_ip).
+      - Each entry must have C(source_ip) and may optionally include
+        C(dest_ip), C(source_port), C(dest_port), and C(protocol).
+    required: false
+    type: list
+    elements: dict
+    suboptions:
+      source_ip:
+        description: The source IP address to block.
+        required: true
+        type: str
+      dest_ip:
+        description: Destination IP of a specific connection to drop immediately.
+        required: false
+        type: str
+      source_port:
+        description: Source port of the connection to drop (requires dest_ip).
+        required: false
+        type: int
+      dest_port:
+        description: Destination port of the connection to drop (requires dest_ip).
+        required: false
+        type: int
+      protocol:
+        description: Protocol of the connection to drop — tcp or udp (requires dest_ip).
+        required: false
+        type: str
+        choices:
+          - tcp
+          - udp
   limit:
     description:
       - Maximum number of devices to return when using C(query).
@@ -102,7 +144,7 @@ author:
 """
 
 EXAMPLES = r"""
-# Example 1: Shun a source IP on devices matching a query
+# Example 1: Shun a single source IP on devices matching a query
 - name: Block attacker on production ASAs
   cisco.sccfm.add_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
@@ -121,7 +163,22 @@ EXAMPLES = r"""
     dest_port: 666
     protocol: tcp
 
-# Example 3: Using module_defaults (recommended)
+# Example 3: Shun multiple IPs in a single transaction (recommended for bulk)
+- name: Block multiple attackers in one API call
+  cisco.sccfm.add_asa_shun:
+    query: "connectivityState:ONLINE"
+    entries:
+      - source_ip: "203.0.113.40"
+      - source_ip: "203.0.113.50"
+        dest_ip: "10.1.1.1"
+        source_port: 555
+        dest_port: 443
+        protocol: tcp
+      - source_ip: "203.0.113.60"
+    region: "{{ sccfm_region }}"
+    api_token: "{{ sccfm_api_token }}"
+
+# Example 4: Using module_defaults (recommended)
 - name: Add shun entries
   hosts: localhost
   gather_facts: false
@@ -163,11 +220,12 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         **base_argument_spec(),
         "query": {"type": "str", "required": False},
         "uids": {"type": "list", "elements": "str", "required": False},
-        "source_ip": {"type": "str", "required": True},
+        "source_ip": {"type": "str", "required": False},
         "dest_ip": {"type": "str", "required": False},
         "source_port": {"type": "int", "required": False},
         "dest_port": {"type": "int", "required": False},
         "protocol": {"type": "str", "required": False, "choices": ["tcp", "udp"]},
+        "entries": {"type": "list", "elements": "dict", "required": False},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
     }
@@ -176,35 +234,46 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        mutually_exclusive=[["query", "uids"]],
-        required_one_of=[["query", "uids"]],
+        mutually_exclusive=[["query", "uids"], ["source_ip", "entries"]],
+        required_one_of=[["query", "uids"], ["source_ip", "entries"]],
     )
 
     config = create_config(module)
-    source_ip: str = module.params["source_ip"]
-    dest_ip: str | None = module.params.get("dest_ip")
-    source_port: int | None = module.params.get("source_port")
-    dest_port: int | None = module.params.get("dest_port")
-    protocol: str | None = module.params.get("protocol")
+    source_ip: str | None = module.params.get("source_ip")
+    entries_raw: list[dict[str, Any]] | None = module.params.get("entries")
 
-    # Validate connection tuple parameters
-    has_conn_params = any(p is not None for p in (source_port, dest_port, protocol))
-    if has_conn_params and dest_ip is None:
-        module.fail_json(
-            msg="dest_ip is required when specifying source_port, dest_port, or protocol."
-        )
+    if source_ip is not None:
+        dest_ip: str | None = module.params.get("dest_ip")
+        source_port: int | None = module.params.get("source_port")
+        dest_port: int | None = module.params.get("dest_port")
+        protocol: str | None = module.params.get("protocol")
+
+        has_conn_params = any(p is not None for p in (source_port, dest_port, protocol))
+        if has_conn_params and dest_ip is None:
+            module.fail_json(
+                msg="dest_ip is required when specifying source_port, dest_port, or protocol."
+            )
+        entries = [
+            ShunEntrySpec(
+                source_ip=source_ip,
+                dest_ip=dest_ip,
+                source_port=source_port,
+                dest_port=dest_port,
+                protocol=protocol,
+            )
+        ]
+        display_subject = source_ip
+    else:
+        entries = _parse_entries(module, entries_raw or [])
+        display_subject = f"{len(entries)} entries"
 
     try:
         device_uids = _resolve_device_uids(module)
 
         service = AsaShunService(config=config)
-        results: CdoTransaction | list[CdoCliResult] = service.add_shun(
+        results: CdoTransaction | list[CdoCliResult] = service.add_shun_entries(
             device_uids=device_uids,
-            source_ip=source_ip,
-            dest_ip=dest_ip,
-            source_port=source_port,
-            dest_port=dest_port,
-            protocol=protocol,
+            entries=entries,
         )
 
         if isinstance(results, CdoTransaction):
@@ -218,7 +287,7 @@ def run_module() -> None:
         results_data = [result.model_dump(mode="json") for result in results]
         module.exit_json(
             changed=True,
-            msg=f"Successfully added shun for {source_ip} on {len(device_uids)} device(s)",
+            msg=f"Successfully added shun for {display_subject} on {len(device_uids)} device(s)",
             results=results_data,
         )
 
@@ -227,6 +296,39 @@ def run_module() -> None:
         module.fail_json(**error.to_dict())
     except Exception as e:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
+
+
+def _parse_entries(module: AnsibleModule, raw: list[dict[str, Any]]) -> list[ShunEntrySpec]:
+    """Validate and convert the raw ``entries`` list into :class:`ShunEntrySpec` objects."""
+    if not raw:
+        module.fail_json(msg="entries must contain at least one item.")
+    specs: list[ShunEntrySpec] = []
+    for i, item in enumerate(raw):
+        src = item.get("source_ip")
+        if not src:
+            module.fail_json(msg=f"entries[{i}]: source_ip is required.")
+        dest_ip = item.get("dest_ip")
+        source_port = item.get("source_port")
+        dest_port = item.get("dest_port")
+        protocol = item.get("protocol")
+        has_conn_params = any(p is not None for p in (source_port, dest_port, protocol))
+        if has_conn_params and dest_ip is None:
+            module.fail_json(
+                msg=(
+                    f"entries[{i}]: dest_ip is required when specifying "
+                    "source_port, dest_port, or protocol."
+                )
+            )
+        specs.append(
+            ShunEntrySpec(
+                source_ip=src,
+                dest_ip=dest_ip,
+                source_port=source_port,
+                dest_port=dest_port,
+                protocol=protocol,
+            )
+        )
+    return specs
 
 
 def _resolve_device_uids(module: AnsibleModule) -> list[str]:

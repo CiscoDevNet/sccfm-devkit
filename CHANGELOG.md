@@ -1,8 +1,9 @@
-## Unreleased
+## v0.19.0 (2026-03-20)
 
 ### Feat
 
-- add ASA boot image change workflow for CLI and Ansible
+- **LH-105684**: ASA shun add wait flag and improve bulk inside a single transaction (#39)
+- **LH-102401**: add ASA boot image change workflow for CLI and Ansible (#40)
 
 ## v0.18.0 (2026-03-18)
 
