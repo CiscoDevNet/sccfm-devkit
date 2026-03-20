@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import List
 
 from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction
@@ -12,6 +13,17 @@ from sccfm_core.types import ConfigLike
 _SHOW_SHUN = "show shun"
 _SHOW_SHUN_STATISTICS = "show shun statistics"
 _CLEAR_SHUN = "clear shun"
+
+
+@dataclass
+class ShunEntrySpec:
+    """Specification for a single shun entry."""
+
+    source_ip: str
+    dest_ip: str | None = field(default=None)
+    source_port: int | None = field(default=None)
+    dest_port: int | None = field(default=None)
+    protocol: str | None = field(default=None)
 
 
 class AsaShunService:
@@ -61,6 +73,8 @@ class AsaShunService:
         source_port: int | None = None,
         dest_port: int | None = None,
         protocol: str | None = None,
+        *,
+        wait: bool = True,
     ) -> CdoTransaction | List[CdoCliResult]:
         """Execute a ``shun`` command on the given devices.
 
@@ -68,32 +82,86 @@ class AsaShunService:
         that host are blocked.  The optional connection-tuple parameters
         additionally drop an existing connection immediately.
         """
-        cmd = _build_shun_command(
-            source_ip=source_ip,
-            dest_ip=dest_ip,
-            source_port=source_port,
-            dest_port=dest_port,
-            protocol=protocol,
+        return self.add_shun_entries(
+            device_uids=device_uids,
+            entries=[
+                ShunEntrySpec(
+                    source_ip=source_ip,
+                    dest_ip=dest_ip,
+                    source_port=source_port,
+                    dest_port=dest_port,
+                    protocol=protocol,
+                )
+            ],
+            wait=wait,
         )
+
+    def add_shun_entries(
+        self,
+        device_uids: List[str],
+        entries: List[ShunEntrySpec],
+        *,
+        wait: bool = True,
+    ) -> CdoTransaction | List[CdoCliResult]:
+        """Execute one or more ``shun`` commands in a single transaction.
+
+        All entries are sent together as a multi-line script, which
+        is more efficient than calling :meth:`add_shun` in a loop and
+        avoids overlapping-transaction errors on the device.
+        """
+        cmds = [
+            _build_shun_command(
+                source_ip=e.source_ip,
+                dest_ip=e.dest_ip,
+                source_port=e.source_port,
+                dest_port=e.dest_port,
+                protocol=e.protocol,
+            )
+            for e in entries
+        ]
         return self._cli_service.execute_cli(
             device_uids=device_uids,
-            asa_commands=[cmd],
+            asa_commands=cmds,
+            wait=wait,
         )
 
     def remove_shun(
-        self, device_uids: List[str], source_ip: str
+        self, device_uids: List[str], source_ip: str, *, wait: bool = True
     ) -> CdoTransaction | List[CdoCliResult]:
         """Execute ``no shun <source_ip>`` on the given devices."""
-        return self._cli_service.execute_cli(
+        return self.remove_shun_entries(
             device_uids=device_uids,
-            asa_commands=[f"no shun {source_ip}"],
+            source_ips=[source_ip],
+            wait=wait,
         )
 
-    def clear_shun(self, device_uids: List[str]) -> CdoTransaction | List[CdoCliResult]:
+    def remove_shun_entries(
+        self,
+        device_uids: List[str],
+        source_ips: List[str],
+        *,
+        wait: bool = True,
+    ) -> CdoTransaction | List[CdoCliResult]:
+        """Execute ``no shun`` for each IP in a single transaction.
+
+        All removals are sent together as a multi-line script, which
+        avoids overlapping-transaction errors when removing many entries.
+        """
+        cmds = [f"no shun {ip}" for ip in source_ips]
+        return self._cli_service.execute_cli(
+            device_uids=device_uids,
+            asa_commands=cmds,
+            wait=wait,
+        )
+
+    def clear_shun(
+        self, device_uids: List[str], *, wait: bool = True
+    ) -> CdoTransaction | List[CdoCliResult]:
         """Execute ``clear shun`` on the given devices."""
         return self._cli_service.execute_cli(
             device_uids=device_uids,
             asa_commands=[_CLEAR_SHUN],
+            wait=wait,
         )
 
 

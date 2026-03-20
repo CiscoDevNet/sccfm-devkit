@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from scc_firewall_manager_sdk import CdoCliResult
 
 from sccfm_core.services.inventory.asa_shun_service import (
+    AsaShunService,
+    ShunEntrySpec,
     _build_shun_command,
     _parse_shun_entries,
     _parse_shun_stats,
@@ -134,3 +138,132 @@ class TestBuildShunCommand:
             protocol=None,
         )
         assert cmd == "shun 10.1.1.27 10.2.2.89 0 0"
+
+
+class TestShunEntrySpec:
+    """Tests for the ShunEntrySpec dataclass."""
+
+    def test_source_ip_only(self) -> None:
+        spec = ShunEntrySpec(source_ip="10.1.1.1")
+        assert spec.source_ip == "10.1.1.1"
+        assert spec.dest_ip is None
+        assert spec.source_port is None
+        assert spec.dest_port is None
+        assert spec.protocol is None
+
+    def test_full_spec(self) -> None:
+        spec = ShunEntrySpec(
+            source_ip="10.1.1.1",
+            dest_ip="10.2.2.2",
+            source_port=555,
+            dest_port=443,
+            protocol="tcp",
+        )
+        assert spec.dest_ip == "10.2.2.2"
+        assert spec.source_port == 555
+        assert spec.dest_port == 443
+        assert spec.protocol == "tcp"
+
+
+class TestAddShunEntries:
+    """Tests for AsaShunService.add_shun_entries."""
+
+    def test_single_entry_delegates_to_cli(self) -> None:
+        service = AsaShunService.__new__(AsaShunService)
+        service._cli_service = MagicMock()
+        service._cli_service.execute_cli.return_value = []
+
+        service.add_shun_entries(
+            device_uids=["dev-1"],
+            entries=[ShunEntrySpec(source_ip="10.1.1.1")],
+        )
+
+        service._cli_service.execute_cli.assert_called_once_with(
+            device_uids=["dev-1"],
+            asa_commands=["shun 10.1.1.1"],
+            wait=True,
+        )
+
+    def test_multiple_entries_sent_as_one_call(self) -> None:
+        service = AsaShunService.__new__(AsaShunService)
+        service._cli_service = MagicMock()
+        service._cli_service.execute_cli.return_value = []
+
+        service.add_shun_entries(
+            device_uids=["dev-1"],
+            entries=[
+                ShunEntrySpec(source_ip="10.1.1.1"),
+                ShunEntrySpec(
+                    source_ip="20.2.2.2",
+                    dest_ip="10.3.3.3",
+                    source_port=555,
+                    dest_port=443,
+                    protocol="tcp",
+                ),
+            ],
+        )
+
+        service._cli_service.execute_cli.assert_called_once_with(
+            device_uids=["dev-1"],
+            asa_commands=["shun 10.1.1.1", "shun 20.2.2.2 10.3.3.3 555 443 tcp"],
+            wait=True,
+        )
+
+    def test_add_shun_delegates_to_add_shun_entries(self) -> None:
+        service = AsaShunService.__new__(AsaShunService)
+        service._cli_service = MagicMock()
+        service._cli_service.execute_cli.return_value = []
+
+        service.add_shun(device_uids=["dev-1"], source_ip="10.1.1.1")
+
+        service._cli_service.execute_cli.assert_called_once_with(
+            device_uids=["dev-1"],
+            asa_commands=["shun 10.1.1.1"],
+            wait=True,
+        )
+
+
+class TestRemoveShunEntries:
+    """Tests for AsaShunService.remove_shun_entries."""
+
+    def test_single_ip_delegates_to_cli(self) -> None:
+        service = AsaShunService.__new__(AsaShunService)
+        service._cli_service = MagicMock()
+        service._cli_service.execute_cli.return_value = []
+
+        service.remove_shun_entries(device_uids=["dev-1"], source_ips=["10.1.1.1"])
+
+        service._cli_service.execute_cli.assert_called_once_with(
+            device_uids=["dev-1"],
+            asa_commands=["no shun 10.1.1.1"],
+            wait=True,
+        )
+
+    def test_multiple_ips_sent_as_one_call(self) -> None:
+        service = AsaShunService.__new__(AsaShunService)
+        service._cli_service = MagicMock()
+        service._cli_service.execute_cli.return_value = []
+
+        service.remove_shun_entries(
+            device_uids=["dev-1"],
+            source_ips=["10.1.1.1", "10.2.2.2", "10.3.3.3"],
+        )
+
+        service._cli_service.execute_cli.assert_called_once_with(
+            device_uids=["dev-1"],
+            asa_commands=["no shun 10.1.1.1", "no shun 10.2.2.2", "no shun 10.3.3.3"],
+            wait=True,
+        )
+
+    def test_remove_shun_delegates_to_remove_shun_entries(self) -> None:
+        service = AsaShunService.__new__(AsaShunService)
+        service._cli_service = MagicMock()
+        service._cli_service.execute_cli.return_value = []
+
+        service.remove_shun(device_uids=["dev-1"], source_ip="10.1.1.1")
+
+        service._cli_service.execute_cli.assert_called_once_with(
+            device_uids=["dev-1"],
+            asa_commands=["no shun 10.1.1.1"],
+            wait=True,
+        )

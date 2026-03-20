@@ -8,6 +8,7 @@ from sccfm_core.services.inventory import (
     AsaUpgradeVersionService,
     AsaUserPasswordService,
     InventoryService,
+    ShunEntrySpec,
 )
 from sccfm_core.services.object_management import (
     NetworkGroupListResponse,
@@ -22,8 +23,8 @@ __all__ = [
     "AsaBootRegistryService",
     "AsaCommandLineService",
     "AsaDiskFileService",
-    "AsaUpgradeService",
     "AsaShunService",
+    "AsaUpgradeService",
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
     "HealthService",
@@ -35,4 +36,5 @@ __all__ = [
     "NetworkObjectListResponse",
     "NetworkObjectResponse",
     "NetworkObjectService",
+    "ShunEntrySpec",
 ]

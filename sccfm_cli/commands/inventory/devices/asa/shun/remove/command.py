@@ -10,6 +10,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
     asa_check_option,
     asa_device_filter_params,
+    asa_wait_option,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
@@ -25,7 +26,10 @@ class RemoveShunCommand(AsaDeviceTargetCommand):
 
     @property
     def help_text(self) -> str:
-        return "Remove a shun entry for a source IP address from ASA devices."
+        return (
+            "Remove one or more shun entries from ASA devices. "
+            "Repeat --source-ip to remove multiple IPs in a single transaction."
+        )
 
     def build_params(self) -> Sequence[click.Parameter]:
         return [
@@ -37,18 +41,24 @@ class RemoveShunCommand(AsaDeviceTargetCommand):
             click.Option(
                 ["--source-ip"],
                 required=True,
+                multiple=True,
                 type=str,
-                help="The source IP address to remove from the shun list.",
+                help=(
+                    "Source IP to remove from the shun list. "
+                    "Repeat to remove multiple IPs in one transaction."
+                ),
             ),
             asa_check_option(),
+            asa_wait_option(),
             format_option(),
             config_path_option(),
         ]
 
-    @with_spinner("Removing shun entry...")
+    @with_spinner("Removing shun entries...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
-        source_ip = cast(str, kwargs["source_ip"])
+        source_ips = cast(tuple[str, ...], kwargs["source_ip"])
         check = cast(bool, kwargs.get("check", False))
+        wait = cast(bool, kwargs.get("wait", False))
         response_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -71,19 +81,27 @@ class RemoveShunCommand(AsaDeviceTargetCommand):
         device_uids = [d.uid for d in devices]
 
         service = AsaShunService(config=config)
-        results: CdoTransaction | List[CdoCliResult] = service.remove_shun(
+        results: CdoTransaction | List[CdoCliResult] = service.remove_shun_entries(
             device_uids=device_uids,
-            source_ip=source_ip,
+            source_ips=list(source_ips),
+            wait=wait,
         )
 
+        script = "\n".join(f"no shun {ip}" for ip in source_ips)
+
         if isinstance(results, CdoTransaction):
-            self.print_failed_transaction_details(cdo_transaction=results, format=response_format)
+            if not wait:
+                self.print_submitted_transaction(results, format=response_format)
+            else:
+                self.print_failed_transaction_details(
+                    cdo_transaction=results, format=response_format
+                )
             return
 
         render_cli_results(
             console=self.console,
             results=results,
             uid_to_device=targets.uid_to_device,
-            script=f"no shun {source_ip}",
+            script=script,
             output_format=response_format,
         )

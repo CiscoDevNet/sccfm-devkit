@@ -145,3 +145,14 @@ class BaseCommand(ABC):
                 f"{json.dumps(cdo_transaction.transaction_details)}"
             )
         sys.exit(-1)
+
+    def print_submitted_transaction(
+        self, cdo_transaction: CdoTransaction, format: str = "table"
+    ) -> None:
+        """Render a submitted (not-yet-completed) transaction."""
+        if format == "json":
+            print(json.dumps(cdo_transaction.to_dict(), indent=2))
+        else:
+            self.console.print("[green]✓[/green] Transaction submitted.")
+            self.console.print(f"[bold]Transaction UID:[/bold] {cdo_transaction.transaction_uid}")
+            self.console.print(f"[bold]Status:[/bold] {cdo_transaction.cdo_transaction_status}")
