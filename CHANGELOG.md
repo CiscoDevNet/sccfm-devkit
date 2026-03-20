@@ -1,3 +1,15 @@
+## v0.19.0 (2026-03-20)
+
+### Feat
+
+- **LH-105684**: ASA shun add wait flag and improve bulk inside a single transaction (#39)
+
+## v0.18.0 (2026-03-18)
+
+### Feat
+
+- **LH-102405**: implement shun commands for ASA devices (#37)
+
 ## v0.17.0 (2026-03-10)
 
 ### Feat

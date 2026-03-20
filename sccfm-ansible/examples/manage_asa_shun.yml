@@ -1,0 +1,73 @@
+---
+# Shun management example for an ASA device
+#
+# RUN:
+#   ansible-playbook examples/manage_asa_shun.yml \
+#     -e device_uid=<your-device-uid> \
+#     -e sccfm_api_token=<your-api-token>
+
+- name: "Manage shun entries on ASA firewall"
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ region }}"
+      api_token: "{{ api_token }}"
+
+  vars:
+    device_uid: ""
+
+  tasks:
+    # ── 1. Add multiple shun entries in one transaction ──────────
+    - name: "1. Add shun entries"
+      cisco.sccfm.add_asa_shun:
+        uids: ["{{ device_uid }}"]
+        entries:
+          - source_ip: "203.0.113.40"
+          - source_ip: "203.0.113.50"
+            dest_ip: "10.1.1.1"
+            source_port: 555
+            dest_port: 443
+            protocol: tcp
+          - source_ip: "203.0.113.60"
+
+    # ── 2. Show all shuns ────────────────────────────────────────
+    - name: "2. Show all shun entries"
+      cisco.sccfm.show_asa_shun:
+        uids: ["{{ device_uid }}"]
+      register: after_add
+
+    - ansible.builtin.debug:
+        var: after_add.results
+
+    # ── 3. Remove multiple shuns in one transaction ───────────────
+    - name: "3. Remove shuns for 203.0.113.40 and 203.0.113.50"
+      cisco.sccfm.remove_asa_shun:
+        uids: ["{{ device_uid }}"]
+        source_ips:
+          - "203.0.113.40"
+          - "203.0.113.50"
+
+    # ── 4. Show shuns after removal ──────────────────────────────
+    - name: "4. Show shun entries after removal"
+      cisco.sccfm.show_asa_shun:
+        uids: ["{{ device_uid }}"]
+      register: after_remove
+
+    - ansible.builtin.debug:
+        var: after_remove.results
+
+    # ── 5. Clear all shuns ───────────────────────────────────────
+    - name: "5. Clear all shun entries"
+      cisco.sccfm.clear_asa_shun:
+        uids: ["{{ device_uid }}"]
+
+    # ── 6. Show shuns are gone ───────────────────────────────────
+    - name: "6. Verify shun list is empty"
+      cisco.sccfm.show_asa_shun:
+        uids: ["{{ device_uid }}"]
+      register: after_clear
+
+    - ansible.builtin.debug:
+        var: after_clear.results

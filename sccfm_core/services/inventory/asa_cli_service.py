@@ -22,7 +22,11 @@ class AsaCommandLineService:
         self.transaction_service = TransactionService(config=config)
 
     def execute_cli(
-        self, device_uids: List[str], asa_commands: List[str]
+        self,
+        device_uids: List[str],
+        asa_commands: List[str],
+        *,
+        wait: bool = True,
     ) -> CdoTransaction | List[CdoCliResult]:
         validate_uids(device_uids)
         script = "\n".join(asa_commands)
@@ -31,6 +35,8 @@ class AsaCommandLineService:
         )
         if transaction.transaction_uid is None:
             raise ValueError("Transaction UID missing from response.")
+        if not wait:
+            return transaction
         completed_transaction: CdoTransaction = (
             self.transaction_service.wait_for_transaction_to_finish(
                 transaction_uid=transaction.transaction_uid, polling_interval_sec=3
