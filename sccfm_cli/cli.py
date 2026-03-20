@@ -8,12 +8,14 @@ from sccfm_cli.commands.configure import ConfigureCommand
 from sccfm_cli.commands.inventory import InventoryCommand
 from sccfm_cli.commands.objects import ObjectsCommand
 from sccfm_cli.commands.status import StatusCommand
+from sccfm_cli.commands.transaction import TransactionCommand
 
 
 def _build_commands(console: Console) -> list[BaseCommand]:
     return [
         ConfigureCommand(console=console),
         StatusCommand(console=console),
+        TransactionCommand(console=console),
         InventoryCommand(console=console),
         ObjectsCommand(console=console),
     ]

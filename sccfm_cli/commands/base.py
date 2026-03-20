@@ -8,10 +8,14 @@ from typing import Any, List, Sequence, cast
 
 import click
 from rich.console import Console
+from rich.live import Live
+from rich.spinner import Spinner
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, ConnectivityState, Device
 
 from sccfm_cli.services import ConfigService
 from sccfm_core import SccApiError
+from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
+from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
 
 
@@ -123,6 +127,77 @@ class BaseCommand(ABC):
                 "executed on devices with connectivity state ONLINE."
             )
         return online
+
+    def wait_for_transaction(
+        self,
+        *,
+        config: ConfigLike,
+        transaction: CdoTransaction,
+        polling_interval_sec: int = 10,
+        spinner_text: str | None = None,
+        **kwargs: Any,
+    ) -> CdoTransaction:
+        """Poll a transaction until it reaches a terminal state, printing status on each poll.
+
+        Reads ``wait`` (default False) and ``timeout`` (default 3600) from
+        *kwargs* so callers can forward CLI kwargs directly.
+        Returns the original transaction unchanged when ``wait`` is False.
+
+        When *spinner_text* is provided, a checkmark line is printed
+        (e.g. ``\u2713 Triggering ASA upgrade\u2026``) and a live spinner
+        shows the latest transaction status in-place.  All human-facing
+        output is written to *stderr* so that stdout remains clean for
+        machine-parseable formats like JSON.
+        """
+        wait = cast(bool, kwargs.get("wait", False))
+        if not wait:
+            return transaction
+        if transaction.transaction_uid is None:
+            raise click.ClickException("Transaction UID missing \u2014 cannot poll for status.")
+
+        ctx = click.get_current_context()
+        silent = (ctx.obj or {}).get("silent", False)
+
+        stderr_console = Console(stderr=True)
+
+        if spinner_text and not silent:
+            stderr_console.print(f"[green]\u2713[/green] {spinner_text}")
+            stderr_console.print(f"  [bold]Transaction UID:[/bold] {transaction.transaction_uid}")
+            if transaction.transaction_polling_url:
+                stderr_console.print(
+                    f"  [bold]Polling URL:[/bold] {transaction.transaction_polling_url}"
+                )
+
+        timeout_sec = cast(int, kwargs.get("timeout", 3600))
+        service = TransactionService(config=config)
+
+        if silent:
+            return service.wait_for_transaction_to_finish(
+                transaction_uid=transaction.transaction_uid,
+                timeout_sec=timeout_sec,
+                polling_interval_sec=polling_interval_sec,
+            )
+
+        spinner = Spinner("dots", text="Polling transaction status...")
+
+        def _update_status(t: CdoTransaction) -> None:
+            spinner.text = f"Status: {t.cdo_transaction_status}"
+
+        with Live(spinner, console=stderr_console, refresh_per_second=10, transient=True):
+            return service.wait_for_transaction_to_finish(
+                transaction_uid=transaction.transaction_uid,
+                timeout_sec=timeout_sec,
+                polling_interval_sec=polling_interval_sec,
+                on_poll=_update_status,
+            )
+
+    @staticmethod
+    def is_failed_transaction(transaction: CdoTransaction) -> bool:
+        """Return True if the transaction reached a terminal failure state."""
+        return transaction.cdo_transaction_status in (
+            CdoTransactionStatus.ERROR,
+            CdoTransactionStatus.CANCELLED,
+        )
 
     def print_failed_transaction_details(
         self, cdo_transaction: CdoTransaction, format: str = "table"

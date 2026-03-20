@@ -9,6 +9,8 @@ from sccfm_cli.commands.shared_options import (
     format_option,
     limit_option,
     offset_option,
+    timeout_option,
+    wait_option,
 )
 
 
