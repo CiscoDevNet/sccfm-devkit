@@ -20,6 +20,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - [Modules](#modules)
   - [cisco.sccfm.onboard_asa](#ciscosccfmonboard_asa)
   - [cisco.sccfm.execute_asa_cli](#ciscosccfmexecute_asa_cli)
+  - [cisco.sccfm.change_asa_boot_image](#ciscosccfmchange_asa_boot_image)
 - [Ansible Vault Management](#ansible-vault-management)
   - [What is Ansible Vault?](#what-is-ansible-vault)
   - [Vault Commands Reference](#vault-commands-reference)
@@ -41,6 +42,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - **Dynamic Inventory Plugin**: Automatically load SCCFM devices into Ansible inventory
 - **ASA Onboarding Module**: Onboard ASA devices to your SCCFM tenant
 - **ASA CLI Execution Module**: Execute CLI commands on ASA devices
+- **ASA Boot Image Module**: Change the configured next-boot ASA image
 - **Device Grouping**: Automatically group devices by type (ASA, CDFMC_MANAGED_FTD, etc.)
 - **Ansible Vault Integration**: Secure credential management for API tokens and device passwords
 - **Module Defaults Support**: Set region/API token once for all tasks
@@ -239,6 +241,17 @@ Execute CLI commands on ASA devices via SCCFM. Show commands require devices to 
 
 See [`examples/execute_asa_cli.yml`](examples/execute_asa_cli.yml) for usage, or run `ansible-doc cisco.sccfm.execute_asa_cli` for full parameter documentation.
 
+### cisco.sccfm.change_asa_boot_image
+
+Change the configured ASA boot image for the next reload. The image must already
+exist on the device. This module does not upload the image and does not reboot
+the device. In `check_mode`, it validates the image path and inspects the
+containing filesystem without changing config.
+
+See [`examples/change_asa_boot_image.yml`](examples/change_asa_boot_image.yml) for usage,
+or run `ansible-doc cisco.sccfm.change_asa_boot_image` for full parameter
+documentation.
+
 ## Ansible Vault Management
 
 ### What is Ansible Vault?
@@ -362,6 +375,7 @@ See the `examples/` directory for complete working examples:
 - **`show_devices.yml`** - Display all devices from inventory
 - **`onboard_asas.yml`** - Onboard multiple ASA devices with vault passwords
 - **`execute_asa_cli.yml`** - Execute CLI commands on ASA devices
+- **`change_asa_boot_image.yml`** - Change the configured ASA boot image
 - **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
 - **`group_vars/all/vault.yml`** - Encrypted secrets (API token, passwords)
 - **`group_vars/all/vault.yml.example`** - Template for vault structure

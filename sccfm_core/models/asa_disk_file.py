@@ -16,7 +16,9 @@ class AsaDiskFileType(str, Enum):
 def classify_file(filename: str) -> AsaDiskFileType:
     """Classify a file based on its name."""
     lower = filename.lower()
-    if lower.startswith("asa") and lower.endswith(".bin"):
+    if (lower.startswith("asa") or lower.startswith("cisco-asa")) and lower.endswith(
+        (".bin", ".spa")
+    ):
         return AsaDiskFileType.OS_IMAGE
     if lower.startswith("asdm") and lower.endswith(".bin"):
         return AsaDiskFileType.ASDM_IMAGE

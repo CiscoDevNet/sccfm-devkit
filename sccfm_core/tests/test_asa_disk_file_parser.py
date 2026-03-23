@@ -55,6 +55,15 @@ class TestParseDiskFileListing:
         files = parse_disk_file_listing(SAMPLE_DIR_OUTPUT)
         assert files[0].file_type == AsaDiskFileType.OS_IMAGE
 
+    def test_should_classify_spa_os_image(self) -> None:
+        """Parser should classify common Cisco ASA .SPA images as OS_IMAGE."""
+        output = """\
+Directory of disk0:/
+253      -rwx  21199744     15:30:22 Dec 14 2023  cisco-asa-fp1k.9.20.2.10.SPA
+"""
+        files = parse_disk_file_listing(output)
+        assert files[0].file_type == AsaDiskFileType.OS_IMAGE
+
     def test_should_classify_anyconnect_packages(self) -> None:
         """Parser should classify anyconnect*.pkg as ANYCONNECT_PACKAGE."""
         files = parse_disk_file_listing(SAMPLE_DIR_OUTPUT)
