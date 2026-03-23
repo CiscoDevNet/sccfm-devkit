@@ -7,6 +7,9 @@ from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.ftd.upgrade.compatible_versions import (
     FtdUpgradeCompatibleVersionsCommand,
 )
+from sccfm_cli.commands.inventory.devices.ftd.upgrade.trigger import (
+    FtdUpgradeTriggerCommand,
+)
 
 
 class FtdUpgradeCommand(BaseCommand):
@@ -14,6 +17,7 @@ class FtdUpgradeCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             FtdUpgradeCompatibleVersionsCommand(console),
+            FtdUpgradeTriggerCommand(console),
         ]
 
     @property
