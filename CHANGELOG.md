@@ -1,3 +1,9 @@
+## v0.20.0 (2026-03-23)
+
+### Feat
+
+- **lh-105592**: wait for transaction on asa upgrade (#41)
+
 ## v0.19.0 (2026-03-20)
 
 ### Feat
