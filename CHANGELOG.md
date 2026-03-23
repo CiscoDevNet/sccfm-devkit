@@ -1,3 +1,9 @@
+## v0.21.0 (2026-03-23)
+
+### Feat
+
+- **LH-102401**: add ASA boot image change workflow (#40)
+
 ## v0.20.0 (2026-03-23)
 
 ### Feat
