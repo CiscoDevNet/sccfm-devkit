@@ -28,6 +28,27 @@ def config_path_option() -> click.Option:
     )
 
 
+def wait_option() -> click.Option:
+    """Reusable --wait flag to poll a transaction until it finishes."""
+    return click.Option(
+        ["--wait/--no-wait"],
+        default=False,
+        show_default=True,
+        help="Wait for the transaction to finish before returning.",
+    )
+
+
+def timeout_option(default: int = 3600) -> click.Option:
+    """Reusable --timeout option (seconds) for transaction polling."""
+    return click.Option(
+        ["--timeout"],
+        type=click.IntRange(min=1),
+        default=default,
+        show_default=True,
+        help="Maximum seconds to wait for the transaction to complete (used with --wait).",
+    )
+
+
 def limit_option() -> click.Option:
     """Reusable --limit option for pagination."""
     return click.Option(

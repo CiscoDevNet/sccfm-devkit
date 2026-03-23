@@ -10,9 +10,8 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     AsaDeviceTargetCommand,
     asa_check_option,
     asa_device_filter_params,
-    asa_wait_option,
 )
-from sccfm_cli.commands.inventory.options import config_path_option, format_option
+from sccfm_cli.commands.inventory.options import config_path_option, format_option, wait_option
 from sccfm_cli.utils import with_spinner
 from sccfm_core.services.inventory.asa_shun_service import AsaShunService
 
@@ -36,7 +35,7 @@ class ClearShunCommand(AsaDeviceTargetCommand):
                 device_uids_help_text="List of device UIDs to clear shuns on.",
             ),
             asa_check_option(),
-            asa_wait_option(),
+            wait_option(),
             format_option(),
             config_path_option(),
         ]

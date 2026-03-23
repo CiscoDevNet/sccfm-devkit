@@ -43,6 +43,18 @@ SAMPLE_TRANSACTION = CdoTransaction(
 )
 
 
+def _make_transaction(
+    transaction_uid: str = "txn-001",
+    status: str = "PENDING",
+    error_message: str | None = None,
+) -> CdoTransaction:
+    return CdoTransaction(
+        transactionUid=transaction_uid,
+        cdoTransactionStatus=status,
+        errorMessage=error_message,
+    )
+
+
 @pytest.fixture
 def base_params() -> dict[str, Any]:
     return {
@@ -123,6 +135,58 @@ def test_should_trigger_upgrade(
     assert kw["changed"] is True
     assert kw["device_count"] == 1
     assert "transaction" in kw
+
+
+@patch("plugins.modules.trigger_asa_upgrade.Config")
+@patch("plugins.modules.trigger_asa_upgrade.TransactionService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeVersionService")
+@patch("plugins.modules.trigger_asa_upgrade.InventoryService")
+@patch("plugins.modules.trigger_asa_upgrade.AnsibleModule")
+def test_should_wait_for_upgrade_completion(
+    mock_ansible_cls: MagicMock,
+    mock_inv_cls: MagicMock,
+    mock_ver_cls: MagicMock,
+    mock_upg_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should return the final completed transaction."""
+    mock_module.params["wait"] = True
+    mock_module.params["timeout"] = 900
+    mock_ansible_cls.return_value = mock_module
+
+    device = _make_device()
+    mock_inv = MagicMock()
+    mock_inv.get_devices.return_value = _device_page(device)
+    mock_inv_cls.return_value = mock_inv
+
+    mock_ver = MagicMock()
+    mock_ver.get_compatible_versions.return_value = _compatible_versions()
+    mock_ver_cls.return_value = mock_ver
+
+    mock_upg = MagicMock()
+    mock_upg.upgrade_single.return_value = _make_transaction(status="PENDING")
+    mock_upg_cls.return_value = mock_upg
+
+    completed_transaction = _make_transaction(status="DONE")
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = completed_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        trigger_asa_upgrade.run_module()
+
+    mock_txn.wait_for_transaction_to_finish.assert_called_once_with(
+        transaction_uid="txn-001",
+        timeout_sec=900,
+    )
+    mock_module.exit_json.assert_called_once()
+    kw = mock_module.exit_json.call_args[1]
+    assert kw["changed"] is True
+    assert "completed" in kw["msg"]
+    assert kw["transaction"]["cdoTransactionStatus"] == "DONE"
 
 
 # ---------- Idempotency ----------
@@ -426,3 +490,141 @@ def test_should_fail_when_query_returns_no_devices(
     mock_module.fail_json.assert_called_once()
     kw = mock_module.fail_json.call_args[1]
     assert "No devices found" in kw["msg"]
+
+
+@patch("plugins.modules.trigger_asa_upgrade.Config")
+@patch("plugins.modules.trigger_asa_upgrade.TransactionService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeVersionService")
+@patch("plugins.modules.trigger_asa_upgrade.InventoryService")
+@patch("plugins.modules.trigger_asa_upgrade.AnsibleModule")
+def test_should_fail_when_waited_transaction_errors(
+    mock_ansible_cls: MagicMock,
+    mock_inv_cls: MagicMock,
+    mock_ver_cls: MagicMock,
+    mock_upg_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should fail when the transaction ends in ERROR."""
+    mock_module.params["wait"] = True
+    mock_ansible_cls.return_value = mock_module
+
+    device = _make_device()
+    mock_inv = MagicMock()
+    mock_inv.get_devices.return_value = _device_page(device)
+    mock_inv_cls.return_value = mock_inv
+
+    mock_ver = MagicMock()
+    mock_ver.get_compatible_versions.return_value = _compatible_versions()
+    mock_ver_cls.return_value = mock_ver
+
+    mock_upg = MagicMock()
+    mock_upg.upgrade_single.return_value = _make_transaction(status="PENDING")
+    mock_upg_cls.return_value = mock_upg
+
+    failed_transaction = _make_transaction(status="ERROR", error_message="Device unreachable")
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = failed_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        trigger_asa_upgrade.run_module()
+
+    mock_module.fail_json.assert_called_once()
+    kw = mock_module.fail_json.call_args[1]
+    assert "failed with status: ERROR" in kw["msg"]
+    assert kw["transaction"]["errorMessage"] == "Device unreachable"
+
+
+@patch("plugins.modules.trigger_asa_upgrade.Config")
+@patch("plugins.modules.trigger_asa_upgrade.TransactionService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeVersionService")
+@patch("plugins.modules.trigger_asa_upgrade.InventoryService")
+@patch("plugins.modules.trigger_asa_upgrade.AnsibleModule")
+def test_should_fail_when_waited_transaction_is_cancelled(
+    mock_ansible_cls: MagicMock,
+    mock_inv_cls: MagicMock,
+    mock_ver_cls: MagicMock,
+    mock_upg_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should fail when the transaction ends in CANCELLED."""
+    mock_module.params["wait"] = True
+    mock_ansible_cls.return_value = mock_module
+
+    device = _make_device()
+    mock_inv = MagicMock()
+    mock_inv.get_devices.return_value = _device_page(device)
+    mock_inv_cls.return_value = mock_inv
+
+    mock_ver = MagicMock()
+    mock_ver.get_compatible_versions.return_value = _compatible_versions()
+    mock_ver_cls.return_value = mock_ver
+
+    mock_upg = MagicMock()
+    mock_upg.upgrade_single.return_value = _make_transaction(status="PENDING")
+    mock_upg_cls.return_value = mock_upg
+
+    cancelled_transaction = _make_transaction(status="CANCELLED")
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = cancelled_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        trigger_asa_upgrade.run_module()
+
+    mock_module.fail_json.assert_called_once()
+    kw = mock_module.fail_json.call_args[1]
+    assert "failed with status: CANCELLED" in kw["msg"]
+
+
+@patch("plugins.modules.trigger_asa_upgrade.Config")
+@patch("plugins.modules.trigger_asa_upgrade.TransactionService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeService")
+@patch("plugins.modules.trigger_asa_upgrade.AsaUpgradeVersionService")
+@patch("plugins.modules.trigger_asa_upgrade.InventoryService")
+@patch("plugins.modules.trigger_asa_upgrade.AnsibleModule")
+def test_should_fail_when_wait_times_out(
+    mock_ansible_cls: MagicMock,
+    mock_inv_cls: MagicMock,
+    mock_ver_cls: MagicMock,
+    mock_upg_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should surface transaction timeout errors."""
+    mock_module.params["wait"] = True
+    mock_module.params["timeout"] = 30
+    mock_ansible_cls.return_value = mock_module
+
+    device = _make_device()
+    mock_inv = MagicMock()
+    mock_inv.get_devices.return_value = _device_page(device)
+    mock_inv_cls.return_value = mock_inv
+
+    mock_ver = MagicMock()
+    mock_ver.get_compatible_versions.return_value = _compatible_versions()
+    mock_ver_cls.return_value = mock_ver
+
+    mock_upg = MagicMock()
+    mock_upg.upgrade_single.return_value = _make_transaction(status="PENDING")
+    mock_upg_cls.return_value = mock_upg
+
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.side_effect = TimeoutError(
+        "Transaction txn-001 did not complete within 30 seconds"
+    )
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        trigger_asa_upgrade.run_module()
+
+    mock_module.fail_json.assert_called_once()
+    kw = mock_module.fail_json.call_args[1]
+    assert "did not complete within 30 seconds" in kw["msg"]

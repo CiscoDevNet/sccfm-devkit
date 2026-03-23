@@ -11,12 +11,14 @@ from scc_firewall_manager_sdk import (
 )
 
 from sccfm_core import InventoryService, SccApiError
+from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.inventory import (
     AsaUpgradeService,
     AsaUpgradeVersionService,
     get_asdm_compatibility_info,
     is_version_downgrade,
 )
+from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec
@@ -99,6 +101,21 @@ options:
       - Human-readable name to identify and track the upgrade run.
     required: false
     type: str
+  wait:
+    description:
+      - Wait for the returned upgrade transaction to reach a terminal status.
+      - When enabled, the module fails if the transaction ends in C(ERROR)
+        or C(CANCELLED).
+    required: false
+    type: bool
+    default: false
+  timeout:
+    description:
+      - Maximum number of seconds to wait for the upgrade transaction when
+        C(wait=true).
+    required: false
+    type: int
+    default: 300
   region:
     description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
     required: false
@@ -141,11 +158,20 @@ EXAMPLES = r"""
       - "uid-1"
       - "uid-2"
     asdm_version: "7.18(1.152)"
+
+# Example 4: Wait for the upgrade transaction to finish
+- name: Trigger ASA upgrade and wait for completion
+  cisco.sccfm.trigger_asa_upgrade:
+    uids:
+      - "uid-1"
+    software_version: "9.18(4)"
+    wait: true
+    timeout: 900
 """
 
 RETURN = r"""
 transaction:
-  description: The transaction object tracking the async upgrade.
+  description: The triggered or completed transaction object for the upgrade.
   returned: success (changed=True)
   type: dict
 device_count:
@@ -167,6 +193,8 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "force_upgrade": {"type": "bool", "required": False, "default": False},
         "ignore_maintenance_window": {"type": "bool", "required": False, "default": False},
         "upgrade_name": {"type": "str", "required": False},
+        "wait": {"type": "bool", "required": False, "default": False},
+        "timeout": {"type": "int", "required": False, "default": 300},
         **base_argument_spec(),
     }
 
@@ -348,6 +376,13 @@ def _trigger_upgrade(
     )
 
 
+def _is_failed_transaction(transaction: CdoTransaction) -> bool:
+    return transaction.cdo_transaction_status in {
+        CdoTransactionStatus.ERROR,
+        CdoTransactionStatus.CANCELLED,
+    }
+
+
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
@@ -426,6 +461,8 @@ def run_module() -> None:
         force_upgrade: bool = module.params.get("force_upgrade", False)
         ignore_maintenance_window: bool = module.params.get("ignore_maintenance_window", False)
         upgrade_name: str | None = module.params.get("upgrade_name")
+        wait_for_completion: bool = module.params.get("wait", False)
+        timeout: int = module.params.get("timeout", 300)
 
         transaction = _trigger_upgrade(
             config=config,
@@ -438,9 +475,32 @@ def run_module() -> None:
             upgrade_name=upgrade_name,
         )
 
+        if wait_for_completion:
+            if transaction.transaction_uid is None:
+                module.fail_json(msg="Transaction UID missing from upgrade response.")
+
+            transaction = TransactionService(config=config).wait_for_transaction_to_finish(
+                transaction_uid=transaction.transaction_uid,
+                timeout_sec=timeout,
+            )
+
+            if _is_failed_transaction(transaction):
+                module.fail_json(
+                    msg=(
+                        f"Upgrade transaction {transaction.transaction_uid} failed with status: "
+                        f"{transaction.cdo_transaction_status}"
+                    ),
+                    device_count=len(device_uids),
+                    transaction=transaction.to_dict(),
+                )
+
         module.exit_json(
             changed=True,
-            msg=f"Upgrade triggered on {len(device_uids)} device(s).",
+            msg=(
+                f"Upgrade completed on {len(device_uids)} device(s)."
+                if wait_for_completion
+                else f"Upgrade triggered on {len(device_uids)} device(s)."
+            ),
             device_count=len(device_uids),
             transaction=transaction.to_dict(),
         )
@@ -448,6 +508,8 @@ def run_module() -> None:
     except ApiException as e:
         error = SccApiError.from_exception(e)
         module.fail_json(**error.to_dict())
+    except TimeoutError as e:
+        module.fail_json(msg=str(e))
     except Exception as e:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
 

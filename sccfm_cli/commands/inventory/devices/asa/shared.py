@@ -39,16 +39,6 @@ def asa_check_option() -> click.Option:
     )
 
 
-def asa_wait_option() -> click.Option:
-    """Reusable --wait flag for ASA mutating commands."""
-    return click.Option(
-        ["--wait"],
-        is_flag=True,
-        default=False,
-        help="Wait for the transaction to complete before returning.",
-    )
-
-
 def asa_device_filter_params(
     *,
     include_device_name: bool,

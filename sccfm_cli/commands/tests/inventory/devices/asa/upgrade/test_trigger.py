@@ -20,6 +20,7 @@ from sccfm_cli.models import Config
 from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
 from sccfm_core.services import InventoryService
 from sccfm_core.services.inventory import AsaUpgradeService, AsaUpgradeVersionService
+from sccfm_core.services.transaction_service import TransactionService
 
 
 def _fake_transaction(uid: str = "txn-1") -> CdoTransaction:
@@ -1010,3 +1011,301 @@ class TestAsdmOnlyCompatibilityValidation:
         )
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
+
+
+# ── Wait / transaction polling tests ──────────────────────────
+
+
+def _stub_transaction_init(self: TransactionService, config: Any) -> None:
+    return None
+
+
+def _done_transaction(uid: str = "txn-waited") -> CdoTransaction:
+    return CdoTransaction(
+        transactionUid=uid,
+        cdoTransactionStatus="DONE",
+    )
+
+
+def _error_transaction(uid: str = "txn-error") -> CdoTransaction:
+    return CdoTransaction(
+        transactionUid=uid,
+        cdoTransactionStatus="ERROR",
+        errorMessage="Upgrade failed: device unreachable",
+    )
+
+
+def _cancelled_transaction(uid: str = "txn-cancelled") -> CdoTransaction:
+    return CdoTransaction(
+        transactionUid=uid,
+        cdoTransactionStatus="CANCELLED",
+    )
+
+
+def _patch_wait(monkeypatch: MonkeyPatch, result_transaction: CdoTransaction) -> None:
+    """Stub TransactionService so wait_for_transaction_to_finish returns immediately."""
+    monkeypatch.setattr(TransactionService, "__init__", _stub_transaction_init)
+    monkeypatch.setattr(
+        TransactionService,
+        "wait_for_transaction_to_finish",
+        lambda self, **kw: result_transaction,
+    )
+
+
+def _patch_single_trigger(monkeypatch: MonkeyPatch, txn: CdoTransaction) -> None:
+    """Stub the upgrade service to return a given transaction."""
+    monkeypatch.setattr(AsaUpgradeService, "__init__", _stub_upgrade_init)
+    monkeypatch.setattr(
+        AsaUpgradeService,
+        "upgrade_single",
+        lambda self, **kw: txn,
+    )
+
+
+class TestWaitForTransaction:
+    """Tests for --wait / --timeout behaviour."""
+
+    def test_wait_success_table(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)")
+        _patch_inventory(monkeypatch, [device])
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
+
+        pending = _fake_transaction("txn-wait-ok")
+        done = _done_transaction("txn-wait-ok")
+
+        _patch_single_trigger(monkeypatch, pending)
+        _patch_wait(monkeypatch, done)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--wait",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        assert "Upgrade triggered" in result.output
+        assert "DONE" in result.output
+        assert result.output.count("Transaction UID") == 1
+
+    def test_wait_success_json_produces_valid_json(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Regression: --wait --format json must produce valid JSON on stdout."""
+        device = _single_device(asdm_version="7.18(1.152)")
+        _patch_inventory(monkeypatch, [device])
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
+
+        pending = _fake_transaction("txn-json-ok")
+        done = _done_transaction("txn-json-ok")
+
+        _patch_single_trigger(monkeypatch, pending)
+        _patch_wait(monkeypatch, done)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--wait",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        payload = json.loads(result.output)
+        assert payload["transactionUid"] == "txn-json-ok"
+        assert payload["cdoTransactionStatus"] == "DONE"
+
+    def test_wait_error_table_shows_failure(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)")
+        _patch_inventory(monkeypatch, [device])
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
+
+        pending = _fake_transaction("txn-err")
+        error = _error_transaction("txn-err")
+
+        _patch_single_trigger(monkeypatch, pending)
+        _patch_wait(monkeypatch, error)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--wait",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "failed" in result.output
+        assert "Upgrade failed: device unreachable" in result.output
+
+    def test_wait_error_json_produces_valid_json_with_nonzero_exit(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)")
+        _patch_inventory(monkeypatch, [device])
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
+
+        pending = _fake_transaction("txn-err-json")
+        error = _error_transaction("txn-err-json")
+
+        _patch_single_trigger(monkeypatch, pending)
+        _patch_wait(monkeypatch, error)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--wait",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code != 0
+        payload = json.loads(result.output)
+        assert payload["cdoTransactionStatus"] == "ERROR"
+
+    def test_wait_cancelled_is_reported_as_failure(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)")
+        _patch_inventory(monkeypatch, [device])
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
+
+        pending = _fake_transaction("txn-cancel")
+        cancelled = _cancelled_transaction("txn-cancel")
+
+        _patch_single_trigger(monkeypatch, pending)
+        _patch_wait(monkeypatch, cancelled)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--wait",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "failed" in result.output
+
+    def test_wait_timeout_raises_error(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        device = _single_device(asdm_version="7.18(1.152)")
+        _patch_inventory(monkeypatch, [device])
+        _patch_compatible_versions(monkeypatch, [_cv("9.18(4)", "7.18(1.152)")])
+
+        pending = _fake_transaction("txn-timeout")
+
+        _patch_single_trigger(monkeypatch, pending)
+        monkeypatch.setattr(TransactionService, "__init__", _stub_transaction_init)
+
+        def raise_timeout(**kw: Any) -> CdoTransaction:
+            raise TimeoutError("Transaction txn-timeout did not complete within 5 seconds")
+
+        monkeypatch.setattr(
+            TransactionService,
+            "wait_for_transaction_to_finish",
+            lambda self, **kw: raise_timeout(**kw),
+        )
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "upgrade",
+                "trigger",
+                "-u",
+                "uid-1",
+                "--software-version",
+                "9.18(4)",
+                "--wait",
+                "--timeout",
+                "5",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "did not complete" in result.output
