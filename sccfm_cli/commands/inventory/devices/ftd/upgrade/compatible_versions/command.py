@@ -65,7 +65,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
         for uid, reason in results.skipped.items():
             name = targets.uid_to_device.get(uid)
             label = name.name if name else uid
-            self.console.print(f"[yellow]Skipping '{label}': {reason}[/yellow]")
+            self.console.print(f"[blue]ℹ[/blue] [yellow]Skipping '{label}': {reason}[/yellow]")
 
         if not results.per_device:
             ctx.fail("No devices returned compatible versions.")
