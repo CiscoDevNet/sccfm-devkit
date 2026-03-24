@@ -15,6 +15,7 @@ action_groups:
     - list_asa_compatible_versions
     - list_asa_disk_files
     - list_asa_local_users
+    - list_asa_not_on_version
     - list_network_groups
     - list_network_objects
     - onboard_asa

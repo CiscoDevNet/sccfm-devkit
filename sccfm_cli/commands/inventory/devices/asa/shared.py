@@ -108,6 +108,7 @@ class AsaDeviceTargetCommand(BaseCommand):
         filters: AsaDeviceFilters,
         include_device_name: bool,
         require_exactly_one: bool = False,
+        allow_no_filters: bool = False,
     ) -> None:
         selectors = [bool(filters.query), bool(filters.device_uids)]
         option_list = "--query or --device-uids"
@@ -121,6 +122,8 @@ class AsaDeviceTargetCommand(BaseCommand):
             return
 
         if selected_count == 0:
+            if allow_no_filters:
+                return
             ctx.fail(f"Provide one of: {option_list}.")
         if selected_count > 1:
             ctx.fail(f"Provide only one of: {option_list}.")
@@ -150,13 +153,21 @@ class AsaDeviceTargetCommand(BaseCommand):
                 offset=filters.offset,
                 query=self._query_with_asa_device_type(resolved_query, wrap_query=wrap_query),
             )
-            return cast(list[Device], page.items)
+            return cast(list[Device], page.items or [])
 
-        uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids or ()])
+        if filters.device_uids:
+            uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids])
+            page = inventory_service.get_devices(
+                limit=filters.limit, offset=filters.offset, query=uid_query
+            )
+            return cast(list[Device], page.items or [])
+
         page = inventory_service.get_devices(
-            limit=filters.limit, offset=filters.offset, query=uid_query
+            limit=filters.limit,
+            offset=filters.offset,
+            query=f"deviceType:{EntityType.ASA.value}",
         )
-        return cast(list[Device], page.items)
+        return cast(list[Device], page.items or [])
 
     def resolve_asa_targets_from_kwargs(
         self,
@@ -167,6 +178,7 @@ class AsaDeviceTargetCommand(BaseCommand):
         include_device_name: bool,
         wrap_query_with_parentheses: bool = False,
         require_exactly_one_filter: bool = False,
+        allow_no_filters: bool = False,
     ) -> AsaDeviceTargets:
         filters = self._extract_asa_device_filters(
             kwargs=kwargs, include_device_name=include_device_name
@@ -176,6 +188,7 @@ class AsaDeviceTargetCommand(BaseCommand):
             filters=filters,
             include_device_name=include_device_name,
             require_exactly_one=require_exactly_one_filter,
+            allow_no_filters=allow_no_filters,
         )
         devices = self._get_asa_devices(
             config=config,
