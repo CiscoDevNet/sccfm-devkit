@@ -1,0 +1,89 @@
+---
+# Trigger an FTD firmware upgrade via SCCFM
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/trigger_ftd_upgrade.yml \
+#     -e '{"device_uids":["uid-1","uid-2"]}' \
+#     -e software_version="7.4.1"
+#
+# Stage-only (download + readiness checks, no reboot):
+#   ansible-playbook examples/trigger_ftd_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e software_version="7.4.1" \
+#     -e stage_upgrade=true
+#
+# Dry-run (check mode):
+#   ansible-playbook examples/trigger_ftd_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e software_version="7.4.1" \
+#     --check
+#
+# Wait for transaction completion:
+#   ansible-playbook examples/trigger_ftd_upgrade.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e software_version="7.4.1" \
+#     -e wait_for_completion=true \
+#     -e wait_timeout=3600
+
+- name: Trigger FTD firmware upgrade
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uids: []
+    software_version: ""
+    stage_upgrade: false
+    ignore_maintenance_window: false
+    upgrade_name: ""
+    wait_for_completion: false
+    wait_timeout: 3600
+
+  tasks:
+    - name: Validate that device UIDs are provided
+      ansible.builtin.fail:
+        msg: >-
+          device_uids is required. Pass it with
+          -e '{"device_uids":["uid-1","uid-2"]}'
+      when: device_uids | length == 0
+
+    - name: Validate that software_version is provided
+      ansible.builtin.fail:
+        msg: >-
+          software_version is required.
+      when: software_version | length == 0
+
+    - name: Trigger FTD upgrade
+      cisco.sccfm.trigger_ftd_upgrade:
+        uids: "{{ device_uids }}"
+        software_version: "{{ software_version }}"
+        stage_upgrade: "{{ stage_upgrade }}"
+        ignore_maintenance_window: "{{ ignore_maintenance_window }}"
+        upgrade_name: "{{ upgrade_name if upgrade_name | length > 0 else omit }}"
+        wait: "{{ wait_for_completion }}"
+        timeout: "{{ wait_timeout }}"
+      register: upgrade_result
+
+    - name: Display upgrade result
+      ansible.builtin.debug:
+        msg: >-
+          changed={{ upgrade_result.changed }},
+          msg={{ upgrade_result.msg }},
+          device_count={{ upgrade_result.device_count }}
+
+    - name: Display skipped devices
+      ansible.builtin.debug:
+        msg: "Skipped device {{ item.key }}: {{ item.value }}"
+      loop: "{{ upgrade_result.skipped | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: upgrade_result.skipped | length > 0
+
+    - name: Display transaction details
+      ansible.builtin.debug:
+        var: upgrade_result.transaction
+      when: upgrade_result.changed
