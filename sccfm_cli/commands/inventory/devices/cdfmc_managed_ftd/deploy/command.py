@@ -29,10 +29,7 @@ class FtdDeployCommand(CdfmcFtdDeviceTargetCommand):
 
     @property
     def help_text(self) -> str:
-        return (
-            "Deploy pending configuration changes to one or more "
-            "cdFMC-managed FTD devices."
-        )
+        return "Deploy pending configuration changes to one or more " "cdFMC-managed FTD devices."
 
     def build_params(self) -> Sequence[click.Parameter]:
         return [
@@ -204,22 +201,14 @@ class FtdDeployCommand(CdfmcFtdDeviceTargetCommand):
             return
 
         if failed:
-            self.console.print(
-                f"[red]\u2717[/red] Deploy failed for {device_count} device(s)."
-            )
+            self.console.print(f"[red]\u2717[/red] Deploy failed for {device_count} device(s).")
         else:
             self.console.print(
                 f"[green]\u2713[/green] Deploy triggered for {device_count} device(s)."
             )
-        self.console.print(
-            f"  [bold]Transaction UID:[/bold] {transaction.transaction_uid}"
-        )
-        self.console.print(
-            f"  [bold]Status:[/bold] {transaction.cdo_transaction_status}"
-        )
+        self.console.print(f"  [bold]Transaction UID:[/bold] {transaction.transaction_uid}")
+        self.console.print(f"  [bold]Status:[/bold] {transaction.cdo_transaction_status}")
         if transaction.error_message:
             self.console.print(f"  [bold]Error:[/bold] {transaction.error_message}")
         if transaction.transaction_polling_url:
-            self.console.print(
-                f"  [bold]Polling URL:[/bold] {transaction.transaction_polling_url}"
-            )
+            self.console.print(f"  [bold]Polling URL:[/bold] {transaction.transaction_polling_url}")

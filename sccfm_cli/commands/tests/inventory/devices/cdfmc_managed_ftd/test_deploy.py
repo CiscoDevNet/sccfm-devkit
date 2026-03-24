@@ -375,9 +375,7 @@ class TestWaitMode:
         ) -> CdoTransaction:
             return done_txn
 
-        monkeypatch.setattr(
-            TransactionService, "wait_for_transaction_to_finish", fake_wait
-        )
+        monkeypatch.setattr(TransactionService, "wait_for_transaction_to_finish", fake_wait)
 
         result = cli_runner.invoke(
             cli,
@@ -431,9 +429,7 @@ class TestWaitMode:
         ) -> CdoTransaction:
             return error_txn
 
-        monkeypatch.setattr(
-            TransactionService, "wait_for_transaction_to_finish", fake_wait
-        )
+        monkeypatch.setattr(TransactionService, "wait_for_transaction_to_finish", fake_wait)
 
         result = cli_runner.invoke(
             cli,
@@ -483,9 +479,7 @@ class TestWaitMode:
         ) -> CdoTransaction:
             return done_txn
 
-        monkeypatch.setattr(
-            TransactionService, "wait_for_transaction_to_finish", fake_wait
-        )
+        monkeypatch.setattr(TransactionService, "wait_for_transaction_to_finish", fake_wait)
 
         result = cli_runner.invoke(
             cli,
