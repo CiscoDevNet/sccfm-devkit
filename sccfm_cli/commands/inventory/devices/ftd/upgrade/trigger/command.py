@@ -213,14 +213,14 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
             device_uids=[d.uid for d in eligible],
         )
 
-        uid = resolve_upgrade_package_uid(compat.common_versions, software_version)
-        if uid is None:
+        package_uid = resolve_upgrade_package_uid(compat.common_versions, software_version)
+        if package_uid is None:
             ctx.fail(
                 f"Software version {software_version} is not compatible "
                 f"with the selected device(s). "
                 f"Run 'compatible-versions' to see available options."
             )
-        return uid, targets
+        return package_uid or "", targets
 
     def _trigger_upgrade(
         self,
