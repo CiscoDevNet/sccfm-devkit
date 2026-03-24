@@ -122,17 +122,17 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
             ignore_maintenance_window = cast(bool, kwargs.get("ignore_maintenance_window", False))
             upgrade_name = cast(str | None, kwargs.get("upgrade_name"))
 
-            self._validate_no_downgrade(
-                ctx=ctx,
-                targets=targets,
-                target_version=software_version,
-            )
-
             upgrade_package_uid, targets = self._resolve_upgrade_package(
                 ctx=ctx,
                 config=config,
                 targets=targets,
                 software_version=software_version,
+            )
+
+            self._validate_no_downgrade(
+                ctx=ctx,
+                targets=targets,
+                target_version=software_version,
             )
 
             upgrade_service = FtdUpgradeService(config=config)
