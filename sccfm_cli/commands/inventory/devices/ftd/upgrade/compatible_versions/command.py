@@ -62,6 +62,14 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
         upgrade_service = FtdUpgradeVersionService(config=config)
         results = upgrade_service.get_compatible_versions(device_uids=targets.device_uids)
 
+        for uid, reason in results.skipped.items():
+            name = targets.uid_to_device.get(uid)
+            label = name.name if name else uid
+            self.console.print(f"[yellow]Skipping '{label}': {reason}[/yellow]")
+
+        if not results.per_device:
+            ctx.fail("No devices returned compatible versions.")
+
         self._render_results(
             results=results,
             uid_to_device=targets.uid_to_device,
@@ -76,7 +84,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
         format: str,
         show_per_device: bool,
     ) -> None:
-        is_single = len(uid_to_device) == 1
+        is_single = len(results.per_device) == 1
         if format == "json":
             self._render_json(
                 results=results,
@@ -108,7 +116,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
                 "compatible_versions": [_version_to_dict(v) for v in versions],
             }
         else:
-            device_count = len(uid_to_device)
+            device_count = len(results.per_device)
             common = [_version_to_dict(v) for v in results.common_versions]
             output = {
                 "device_count": device_count,
@@ -163,7 +171,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
         uid_to_device: Dict[str, Device],
         show_per_device: bool,
     ) -> None:
-        device_count = len(uid_to_device)
+        device_count = len(results.per_device)
         self.console.print(
             f"\n[bold]Common compatible versions across {device_count} device(s):[/bold]"
         )

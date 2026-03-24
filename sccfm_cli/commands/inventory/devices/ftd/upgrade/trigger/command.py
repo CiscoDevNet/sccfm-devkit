@@ -128,7 +128,7 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
                 target_version=software_version,
             )
 
-            upgrade_package_uid = self._resolve_upgrade_package(
+            upgrade_package_uid, targets = self._resolve_upgrade_package(
                 ctx=ctx,
                 config=config,
                 targets=targets,
@@ -182,17 +182,37 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
                 f"device software version {current}. Downgrades are not supported."
             )
 
-    @staticmethod
     def _resolve_upgrade_package(
+        self,
         *,
         ctx: click.Context,
         config: Any,
         targets: FtdDeviceTargets,
         software_version: str,
-    ) -> str:
-        """Resolve the upgrade_package_uid for the requested software version."""
+    ) -> tuple[str, FtdDeviceTargets]:
+        """Resolve the upgrade_package_uid and narrow targets to eligible devices.
+
+        Devices that the API rejects during version lookup are excluded and
+        a warning is printed for each.
+        """
         version_service = FtdUpgradeVersionService(config=config)
         compat = version_service.get_compatible_versions(device_uids=targets.device_uids)
+
+        for uid, reason in compat.skipped.items():
+            device = targets.uid_to_device.get(uid)
+            label = device.name if device else uid
+            self.console.print(f"[yellow]Skipping '{label}': {reason}[/yellow]")
+
+        if not compat.per_device:
+            ctx.fail("No devices returned compatible versions.")
+
+        eligible = [d for d in targets.devices if d.uid in compat.per_device]
+        targets = FtdDeviceTargets(
+            devices=eligible,
+            uid_to_device={d.uid: d for d in eligible},
+            device_uids=[d.uid for d in eligible],
+        )
+
         uid = resolve_upgrade_package_uid(compat.common_versions, software_version)
         if uid is None:
             ctx.fail(
@@ -200,7 +220,7 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
                 f"with the selected device(s). "
                 f"Run 'compatible-versions' to see available options."
             )
-        return uid
+        return uid, targets
 
     def _trigger_upgrade(
         self,

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from functools import reduce
 
-from scc_firewall_manager_sdk import DeviceUpgradesApi, FtdVersion
+from scc_firewall_manager_sdk import ApiException, DeviceUpgradesApi, FtdVersion
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.factories import ApiClientFactory
 from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from sccfm_core.services.inventory.asa_upgrade_version_service import (
@@ -26,16 +27,26 @@ class FtdUpgradeVersionService:
         The intersection is determined by ``software_version`` — a version
         is "common" only when its ``software_version`` string appears in
         every device's compatible-version list.
+
+        Devices that the API rejects (e.g. unsupported device type) are
+        collected in ``skipped`` rather than aborting the whole request.
         """
         validate_uids(device_uids)
 
         per_device: dict[str, list[FtdVersion]] = {}
+        skipped: dict[str, str] = {}
         for uid in device_uids:
-            response = self._upgrades_api.get_compatible_ftd_versions(device_uid=uid)
-            per_device[uid] = list(response.items or [])
+            try:
+                response = self._upgrades_api.get_compatible_ftd_versions(device_uid=uid)
+                per_device[uid] = list(response.items or [])
+            except ApiException as exc:
+                error = SccApiError.from_exception(exc)
+                skipped[uid] = error.message
 
         common = _compute_intersection(per_device)
-        return FtdGroupCompatibleVersions(per_device=per_device, common_versions=common)
+        return FtdGroupCompatibleVersions(
+            per_device=per_device, common_versions=common, skipped=skipped
+        )
 
 
 def resolve_upgrade_package_uid(
