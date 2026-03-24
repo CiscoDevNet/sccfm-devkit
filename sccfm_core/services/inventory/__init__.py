@@ -2,6 +2,7 @@ from sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageSer
 from sccfm_core.services.inventory.asa_boot_registry_service import (
     AsaBootRegistryService,
 )
+from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
 from sccfm_core.services.inventory.asa_cli_service import AsaCommandLineService
 from sccfm_core.services.inventory.asa_disk_file_service import AsaDiskFileService
 from sccfm_core.services.inventory.asa_onboard_service import AsaOnboardService
@@ -22,6 +23,7 @@ __all__ = [
     "AsdmCompatibilityInfo",
     "AsaBootImageService",
     "AsaBootRegistryService",
+    "FtdDeployService",
     "AsaCommandLineService",
     "AsaDiskFileService",
     "AsaOnboardService",

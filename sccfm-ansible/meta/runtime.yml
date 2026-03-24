@@ -8,6 +8,7 @@ action_groups:
     - change_asa_local_password
     - clear_asa_shun
     - create_network_group
+    - deploy_cdfmc_ftd
     - create_network_object
     - delete_network_group
     - delete_network_object
