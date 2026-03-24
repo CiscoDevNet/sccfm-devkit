@@ -196,9 +196,7 @@ def _fetch_devices(module: AnsibleModule) -> list[Device]:
 
     if uids:
         uid_query = " OR ".join(f"uid:{uid}" for uid in uids)
-        page: DevicePage = inventory_service.get_devices(
-            limit=len(uids), offset=0, query=uid_query
-        )
+        page: DevicePage = inventory_service.get_devices(limit=len(uids), offset=0, query=uid_query)
     elif query:
         page = inventory_service.get_devices(
             limit=limit,

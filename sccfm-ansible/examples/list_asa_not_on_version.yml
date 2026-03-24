@@ -97,18 +97,19 @@
     - name: Summary
       ansible.builtin.debug:
         msg: >-
-          {% if not_on_version_result.matched_device_count == 0 -%}
+          {% set matched = not_on_version_result.matched_device_count | default(0) -%}
+          {% set not_on = not_on_version_result.device_count | default(0) -%}
+          {% if matched == 0 -%}
           No ASA devices matched the selected filter.
           {%- else -%}
-          {{ not_on_version_result.device_count }} of
-          {{ not_on_version_result.matched_device_count }} matched device(s)
+          {{ not_on }} of {{ matched }} matched device(s)
           are NOT on version {{ resolved_target_version | trim }}.
           {%- endif %}
 
     - name: Show devices not on target version
       ansible.builtin.debug:
         msg: "{{ item.name }} is currently on {{ item.software_version }}"
-      loop: "{{ not_on_version_result.devices }}"
+      loop: "{{ not_on_version_result.devices | default([]) }}"
       loop_control:
         label: "{{ item.name }}"
-      when: not_on_version_result.device_count > 0
+      when: (not_on_version_result.device_count | default(0)) > 0

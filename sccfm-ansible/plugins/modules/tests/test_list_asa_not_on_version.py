@@ -379,9 +379,7 @@ def test_fails_on_api_exception(
     mock_ansible_cls.return_value = mock_module
 
     api_error = ApiException(status=403, reason="Forbidden")
-    api_error.body = (
-        '{"errorMsg": "Access denied", "errorCode": "FORBIDDEN", "details": {}}'
-    )
+    api_error.body = '{"errorMsg": "Access denied", "errorCode": "FORBIDDEN", "details": {}}'
     mock_inv = MagicMock()
     mock_inv.get_devices.side_effect = api_error
     mock_inventory_cls.return_value = mock_inv
@@ -412,9 +410,7 @@ def test_idempotent_returns_same_result_on_repeated_calls(
 ) -> None:
     """Running the module twice with the same data produces identical results."""
     params = {**base_params, "query": "name:prod-*"}
-    page = DevicePage(
-        count=2, limit=50, offset=0, items=[device_on_target, device_off_target]
-    )
+    page = DevicePage(count=2, limit=50, offset=0, items=[device_on_target, device_off_target])
 
     results: list[dict[str, Any]] = []
     for _ in range(2):

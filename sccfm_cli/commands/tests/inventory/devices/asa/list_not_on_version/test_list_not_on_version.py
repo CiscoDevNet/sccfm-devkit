@@ -70,7 +70,16 @@ def test_returns_devices_as_json(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "list-not-on-version", "--version", _TARGET_VERSION, "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -127,7 +136,16 @@ def test_query_filters_by_asa_device_type(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "list-not-on-version", "--version", _TARGET_VERSION, "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -156,7 +174,16 @@ def test_client_side_filters_out_matching_version(
 
     result = cli_runner.invoke(
         cli,
-        ["inventory", "devices", "asa", "list-not-on-version", "--version", _TARGET_VERSION, "--format", "json"],
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -183,10 +210,16 @@ def test_combines_device_name_with_asa_type_filter(
     result = cli_runner.invoke(
         cli,
         [
-            "inventory", "devices", "asa", "list-not-on-version",
-            "--version", _TARGET_VERSION,
-            "--device-name", "branch-*",
-            "--format", "json",
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--device-name",
+            "branch-*",
+            "--format",
+            "json",
         ],
     )
 
@@ -208,10 +241,16 @@ def test_combines_user_query_with_asa_type_filter(
     result = cli_runner.invoke(
         cli,
         [
-            "inventory", "devices", "asa", "list-not-on-version",
-            "--version", _TARGET_VERSION,
-            "--query", "name:edge-*",
-            "--format", "json",
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--query",
+            "name:edge-*",
+            "--format",
+            "json",
         ],
     )
 
@@ -236,11 +275,18 @@ def test_passes_limit_and_offset(
     result = cli_runner.invoke(
         cli,
         [
-            "inventory", "devices", "asa", "list-not-on-version",
-            "--version", _TARGET_VERSION,
-            "--limit", "25",
-            "--offset", "10",
-            "--format", "json",
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--limit",
+            "25",
+            "--offset",
+            "10",
+            "--format",
+            "json",
         ],
     )
 
@@ -357,7 +403,16 @@ def test_idempotent_repeated_invocations_return_same_json(
     for _ in range(2):
         result = cli_runner.invoke(
             cli,
-            ["inventory", "devices", "asa", "list-not-on-version", "--version", _TARGET_VERSION, "--format", "json"],
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "list-not-on-version",
+                "--version",
+                _TARGET_VERSION,
+                "--format",
+                "json",
+            ],
         )
         assert result.exit_code == 0, f"Command failed: {result.output}"
         results.append(json.loads(result.output))
@@ -387,7 +442,16 @@ def test_idempotent_all_on_version_stays_empty(
     for _ in range(2):
         result = cli_runner.invoke(
             cli,
-            ["inventory", "devices", "asa", "list-not-on-version", "--version", _TARGET_VERSION, "--format", "json"],
+            [
+                "inventory",
+                "devices",
+                "asa",
+                "list-not-on-version",
+                "--version",
+                _TARGET_VERSION,
+                "--format",
+                "json",
+            ],
         )
         assert result.exit_code == 0, f"Command failed: {result.output}"
         assert json.loads(result.output) == {
@@ -427,10 +491,16 @@ def test_rejects_both_device_name_and_query(
     result = cli_runner.invoke(
         cli,
         [
-            "inventory", "devices", "asa", "list-not-on-version",
-            "--version", _TARGET_VERSION,
-            "--device-name", "branch-*",
-            "--query", "name:edge-*",
+            "inventory",
+            "devices",
+            "asa",
+            "list-not-on-version",
+            "--version",
+            _TARGET_VERSION,
+            "--device-name",
+            "branch-*",
+            "--query",
+            "name:edge-*",
         ],
     )
 
