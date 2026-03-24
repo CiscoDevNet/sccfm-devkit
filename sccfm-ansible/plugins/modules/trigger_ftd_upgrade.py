@@ -236,9 +236,8 @@ def _validate_no_downgrade(
         if not page.items:
             continue
         device = page.items[0]
-        if (
-            device.software_version
-            and is_version_downgrade(software_version, device.software_version)
+        if device.software_version and is_version_downgrade(
+            software_version, device.software_version
         ):
             return (
                 f"Software version {software_version} is lower than "
@@ -341,9 +340,7 @@ def run_module() -> None:
             module.fail_json(msg=downgrade_err)
 
         # Resolve upgrade package UID from compatible versions
-        upgrade_package_uid = resolve_upgrade_package_uid(
-            compat.common_versions, software_version
-        )
+        upgrade_package_uid = resolve_upgrade_package_uid(compat.common_versions, software_version)
         if upgrade_package_uid is None:
             module.fail_json(
                 msg=(
