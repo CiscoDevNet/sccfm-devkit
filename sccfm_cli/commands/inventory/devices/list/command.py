@@ -39,4 +39,4 @@ class DevicesListCommand(BaseCommand):
             query=query,
         )
 
-        render_device_page(self.console, page, output_format)
+        render_device_page(self.console, page, output_format, limit=limit, offset=offset)

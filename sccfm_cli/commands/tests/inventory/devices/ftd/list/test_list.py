@@ -121,6 +121,7 @@ def test_should_display_ftd_devices_as_table(
 
     assert result.exit_code == 0
     assert "Devices" in result.output
+    assert "Page:" in result.output
     for device in devices:
         assert device.name in result.output
 

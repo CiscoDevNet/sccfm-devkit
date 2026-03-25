@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import json
+import math
 
 from rich.console import Console
 from rich.table import Table
 from scc_firewall_manager_sdk import DevicePage
 
 
-def render_device_page(console: Console, page: DevicePage, output_format: str) -> None:
+def render_device_page(
+    console: Console,
+    page: DevicePage,
+    output_format: str,
+    *,
+    limit: int,
+    offset: int,
+) -> None:
     """Render a :class:`DevicePage` as JSON or a Rich table."""
     if output_format == "json":
         items = page.items or []
@@ -15,7 +23,11 @@ def render_device_page(console: Console, page: DevicePage, output_format: str) -
         console.print(json.dumps(items_dict, indent=2, default=str))
         return
 
+    current_page = (offset // limit) + 1
+    total_pages = max(1, math.ceil(page.count / limit)) if page.count else 1
+
     console.print(f"Number of entries:  {page.count}")
+    console.print(f"Page:               {current_page} / {total_pages}")
     table = Table(title="Devices", width=120)
     table.add_column("UID")
     table.add_column("Name")

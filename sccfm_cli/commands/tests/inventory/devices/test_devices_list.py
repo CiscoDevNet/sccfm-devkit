@@ -81,5 +81,6 @@ def test_should_display_devices_as_table(
 
     assert result.exit_code == 0
     assert "Devices" in result.output
+    assert "Page:" in result.output
     for sample_device in sample_devices:
         assert sample_device.name in result.output
