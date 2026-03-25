@@ -33,6 +33,7 @@ poetry run devkit              # interactive developer toolkit menu
 - `sccfm-cli status [--config-path PATH]`: Shows the current profile plus mock subsystem health using Rich tables.
 - `sccfm-cli inventory devices list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists device inventory with pagination and optional name filtering.
 - `sccfm-cli inventory managers list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
+- `sccfm-cli inventory devices asa change-boot-image --image-path disk0:/asa9xxx.bin ...`: Changes the configured ASA boot image for the next reload. The image must already exist on the device; the command does not upload or reboot. `--check` performs non-mutating validation of the image path and containing filesystem before any change.
 
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
 Every command lives in `sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
@@ -94,6 +95,7 @@ Key tooling:
 
 - `click` plus `click-option-group` power the CLI ergonomics, and `rich` handles presentation.
 - `pytest`, `coverage`, `mypy`, `black`, `isort`, and `pre-commit` enforce correctness and consistency.
+- ASA disk discovery can help operators find likely image paths before using `change-boot-image`, and `change-boot-image --check` validates the chosen path on-device before mutating config.
 
 To add a new command, drop a file under `sccfm_cli/commands/`, subclass `BaseCommand`, and register it in `sccfm_cli/cli.py`. SDK integrations live in `sccfm_core/`, keeping external dependencies isolated and easy to reuse (CLI or Ansible).
 

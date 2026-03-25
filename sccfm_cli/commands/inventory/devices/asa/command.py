@@ -4,6 +4,9 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.asa.change_boot_image import (
+    AsaChangeBootImageCommand,
+)
 from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
 from sccfm_cli.commands.inventory.devices.asa.disk import AsaDiskCommand
 from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command import (
@@ -11,6 +14,9 @@ from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command impor
 )
 from sccfm_cli.commands.inventory.devices.asa.list_boot_registry import (
     AsaListBootRegistryCommand,
+)
+from sccfm_cli.commands.inventory.devices.asa.list_not_on_version import (
+    AsaListNotOnVersionCommand,
 )
 from sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
 from sccfm_cli.commands.inventory.devices.asa.shun import AsaShunCommand
@@ -23,9 +29,11 @@ class AsaCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
+            AsaChangeBootImageCommand(console),
             AsaCliCommand(console),
             AsaDiskCommand(console),
             AsaListBootRegistryCommand(console),
+            AsaListNotOnVersionCommand(console),
             SmartlicenseCommand(console),
             AsaOnboardCommand(console),
             AsaListLocalUsersCommand(console),

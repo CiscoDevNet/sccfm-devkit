@@ -1,0 +1,30 @@
+- name: Change ASA boot image via SCCFM
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Preview boot image change on branch ASAs
+      cisco.sccfm.change_asa_boot_image:
+        query: "name:branch-*"
+        image_path: "disk0:/asa9-18-4-smp-k8.bin"
+      check_mode: true
+      register: boot_preview
+
+    - name: Show preview results
+      ansible.builtin.debug:
+        var: boot_preview.results
+
+    - name: Change boot image on specific ASA by UID
+      cisco.sccfm.change_asa_boot_image:
+        uids:
+          - "{{ lookup('env', 'TARGET_ASA_UID') }}"
+        image_path: "disk0:/asa9-18-4-smp-k8.bin"
+      register: boot_change
+
+    - name: Show boot change results
+      ansible.builtin.debug:
+        var: boot_change.results

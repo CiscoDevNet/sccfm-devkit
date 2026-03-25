@@ -1,8 +1,27 @@
+## v0.22.0 (2026-03-25)
+
+### Feat
+
+- add cdfmc-managed FTD device deployment command (#43)
+
+## v0.21.0 (2026-03-23)
+
+### Feat
+
+- **LH-102401**: add ASA boot image change workflow (#40)
+
+## v0.20.0 (2026-03-23)
+
+### Feat
+
+- **lh-105592**: wait for transaction on asa upgrade (#41)
+
 ## v0.19.0 (2026-03-20)
 
 ### Feat
 
 - **LH-105684**: ASA shun add wait flag and improve bulk inside a single transaction (#39)
+- **LH-102401**: add ASA boot image change workflow for CLI and Ansible (#40)
 
 ## v0.18.0 (2026-03-18)
 

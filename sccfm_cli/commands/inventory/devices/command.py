@@ -7,6 +7,7 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.asa import AsaCommand
+from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd import CdfmcManagedFtdCommand
 from sccfm_cli.commands.inventory.devices.ftd import FtdCommand
 from sccfm_cli.commands.inventory.devices.list import DevicesListCommand
 
@@ -17,6 +18,7 @@ class DevicesCommand(BaseCommand):
         self._subcommands: List[BaseCommand] = [
             AsaCommand(console),
             FtdCommand(console),
+            CdfmcManagedFtdCommand(console),
             DevicesListCommand(console),
         ]
 

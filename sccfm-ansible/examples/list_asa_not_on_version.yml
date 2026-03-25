@@ -1,0 +1,115 @@
+---
+# List ASA devices not on a specific software version via SCCFM
+#
+# This playbook:
+#   1. Resolves the target version from -e target_version, or by auto-detecting
+#      the most common version across online+synced ASA devices.
+#   2. Lists all ASA devices that are NOT currently running that version.
+#
+# RUN THIS PLAYBOOK (auto-detect majority version):
+#   ansible-playbook examples/list_asa_not_on_version.yml \
+#     --vault-password-file examples/.vault_pass
+#
+# Narrow the check to a subset of devices (optional):
+#   ansible-playbook examples/list_asa_not_on_version.yml \
+#     --vault-password-file examples/.vault_pass \
+#     -e check_query="name:branch-*"
+#
+# Specify the target version directly (recommended):
+#   ansible-playbook examples/list_asa_not_on_version.yml \
+#     --vault-password-file examples/.vault_pass \
+#     -e target_version="9.20(3)13"
+
+- name: List ASA devices not on the target version
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    target_version: ""
+    check_query: ""
+
+  tasks:
+    # ============================================================
+    # Step 1: Resolve the target version
+    # ============================================================
+
+    - name: Use explicitly provided target version
+      ansible.builtin.set_fact:
+        resolved_target_version: "{{ target_version }}"
+      when: target_version | length > 0
+
+    - name: Fetch online ASA devices to detect majority version
+      cisco.sccfm.list_asa_not_on_version:
+        version: "0.0"
+        query: "connectivityState:ONLINE AND configState:SYNCED"
+        limit: 200
+      register: all_asa_result
+      when: target_version | length == 0
+
+    - name: Auto-detect the most common version across online ASAs
+      ansible.builtin.set_fact:
+        resolved_target_version: >-
+          {%- set versions = all_asa_result.devices
+                | map(attribute='software_version')
+                | reject('none') | reject('equalto', '')
+                | list -%}
+          {%- set ns = namespace(best='', best_count=0) -%}
+          {%- for v in versions | unique -%}
+          {%-   set count = versions | select('equalto', v) | list | length -%}
+          {%-   if count > ns.best_count -%}
+          {%-     set ns.best_count = count -%}
+          {%-     set ns.best = v -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {{ ns.best }}
+      when: >-
+        target_version | length == 0
+        and all_asa_result.devices | default([]) | length > 0
+
+    - name: Fail if no target version could be resolved
+      ansible.builtin.fail:
+        msg: >-
+          Could not resolve a target version. No online+synced ASA devices
+          were found. Pass -e target_version="9.20(3)13" to specify directly.
+      when: >-
+        resolved_target_version is not defined
+        or resolved_target_version | trim | length == 0
+
+    - name: Show resolved target version
+      ansible.builtin.debug:
+        msg: "Target version: {{ resolved_target_version }}"
+
+    # ============================================================
+    # Step 2: List ASAs not on the target version
+    # ============================================================
+
+    - name: List ASAs not on target version
+      cisco.sccfm.list_asa_not_on_version:
+        version: "{{ resolved_target_version | trim }}"
+        query: "{{ check_query if check_query | length > 0 else omit }}"
+      register: not_on_version_result
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {% set matched = not_on_version_result.matched_device_count | default(0) -%}
+          {% set not_on = not_on_version_result.device_count | default(0) -%}
+          {% if matched == 0 -%}
+          No ASA devices matched the selected filter.
+          {%- else -%}
+          {{ not_on }} of {{ matched }} matched device(s)
+          are NOT on version {{ resolved_target_version | trim }}.
+          {%- endif %}
+
+    - name: Show devices not on target version
+      ansible.builtin.debug:
+        msg: "{{ item.name }} is currently on {{ item.software_version }}"
+      loop: "{{ not_on_version_result.devices | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: (not_on_version_result.device_count | default(0)) > 0

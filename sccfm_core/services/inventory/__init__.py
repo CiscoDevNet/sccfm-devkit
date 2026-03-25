@@ -1,3 +1,4 @@
+from sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageService
 from sccfm_core.services.inventory.asa_boot_registry_service import (
     AsaBootRegistryService,
 )
@@ -15,6 +16,7 @@ from sccfm_core.services.inventory.asa_upgrade_version_service import (
 from sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
 )
+from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
 from sccfm_core.services.inventory.ftd_upgrade_service import FtdUpgradeService
 from sccfm_core.services.inventory.ftd_upgrade_version_service import (
     FtdUpgradeVersionService,
@@ -24,7 +26,9 @@ from sccfm_core.services.inventory.inventory_service import InventoryService
 
 __all__ = [
     "AsdmCompatibilityInfo",
+    "AsaBootImageService",
     "AsaBootRegistryService",
+    "FtdDeployService",
     "AsaCommandLineService",
     "AsaDiskFileService",
     "AsaOnboardService",

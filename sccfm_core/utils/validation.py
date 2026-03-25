@@ -1,5 +1,8 @@
+import re
 import uuid
 from typing import List
+
+_ASA_IMAGE_PATH_RE = re.compile(r"^[A-Za-z0-9_-]+:/\S+$")
 
 
 def validate_uids(uids: List[str]) -> None:
@@ -21,3 +24,18 @@ def validate_uids(uids: List[str]) -> None:
             invalid_uids.append(uid)
     if invalid_uids:
         raise ValueError(f"Invalid UUIDv4(s): {', '.join(invalid_uids)}")
+
+
+def validate_asa_image_path(image_path: str) -> None:
+    """Validate an ASA on-device image path.
+
+    The path must include a device filesystem prefix such as ``disk0:/`` or
+    ``boot:/``.
+    """
+    if not image_path.strip():
+        raise ValueError("ASA image path cannot be empty.")
+    if not _ASA_IMAGE_PATH_RE.match(image_path):
+        raise ValueError(
+            "ASA image path must be a full device path such as 'disk0:/asa9xxx.bin' "
+            "or 'boot:/asa9xxx.bin'."
+        )

@@ -29,8 +29,7 @@ def device_uids_option(help_text: str = _DEFAULT_DEVICE_UIDS_HELP) -> click.Opti
     )
 
 
-def asa_check_option() -> click.Option:
-    """Reusable --check flag for ASA mutating commands."""
+def ftd_check_option() -> click.Option:
     return click.Option(
         ["--check"],
         is_flag=True,
@@ -39,7 +38,7 @@ def asa_check_option() -> click.Option:
     )
 
 
-def asa_device_filter_params(
+def ftd_device_filter_params(
     *,
     include_device_name: bool,
     query_help_text: str,
@@ -60,7 +59,7 @@ def asa_device_filter_params(
 
 
 @dataclass(frozen=True)
-class AsaDeviceFilters:
+class FtdDeviceFilters:
     device_name: str | None
     query: str | None
     device_uids: tuple[str, ...] | None
@@ -69,21 +68,21 @@ class AsaDeviceFilters:
 
 
 @dataclass(frozen=True)
-class AsaDeviceTargets:
+class FtdDeviceTargets:
     devices: list[Device]
     uid_to_device: dict[str, Device]
     device_uids: list[str]
 
 
-class AsaDeviceTargetCommand(BaseCommand):
-    def _extract_asa_device_filters(
+class CdfmcFtdDeviceTargetCommand(BaseCommand):
+    def _extract_ftd_device_filters(
         self,
         kwargs: Mapping[str, Any],
         *,
         include_device_name: bool,
-    ) -> AsaDeviceFilters:
+    ) -> FtdDeviceFilters:
         device_name = cast(str | None, kwargs.get("device_name")) if include_device_name else None
-        return AsaDeviceFilters(
+        return FtdDeviceFilters(
             device_name=device_name,
             query=cast(str | None, kwargs.get("query")),
             device_uids=cast(tuple[str, ...] | None, kwargs.get("device_uids")),
@@ -91,14 +90,12 @@ class AsaDeviceTargetCommand(BaseCommand):
             offset=cast(int, kwargs.get("offset")),
         )
 
-    def _validate_asa_device_filters(
+    def _validate_ftd_device_filters(
         self,
         ctx: click.Context,
         *,
-        filters: AsaDeviceFilters,
+        filters: FtdDeviceFilters,
         include_device_name: bool,
-        require_exactly_one: bool = False,
-        allow_no_filters: bool = False,
     ) -> None:
         selectors = [bool(filters.query), bool(filters.device_uids)]
         option_list = "--query or --device-uids"
@@ -107,32 +104,26 @@ class AsaDeviceTargetCommand(BaseCommand):
             option_list = "--device-name, --query, or --device-uids"
 
         selected_count = sum(selectors)
-        if require_exactly_one and selected_count != 1:
-            ctx.fail(f"Provide exactly one of {option_list}.")
-            return
-
         if selected_count == 0:
-            if allow_no_filters:
-                return
             ctx.fail(f"Provide one of: {option_list}.")
         if selected_count > 1:
             ctx.fail(f"Provide only one of: {option_list}.")
 
-    def _query_with_asa_device_type(self, query: str, *, wrap_query: bool) -> str:
+    def _query_with_ftd_device_type(self, query: str, *, wrap_query: bool) -> str:
         if wrap_query:
-            return f"({query}) AND deviceType:{EntityType.ASA.value}"
-        return f"{query} AND deviceType:{EntityType.ASA.value}"
+            return f"({query}) AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}"
+        return f"{query} AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}"
 
-    def _resolve_query(self, filters: AsaDeviceFilters) -> str | None:
+    def _resolve_query(self, filters: FtdDeviceFilters) -> str | None:
         if filters.device_name:
             return f"name:{filters.device_name}"
         return filters.query
 
-    def _get_asa_devices(
+    def _get_ftd_devices(
         self,
         config: ConfigLike,
         *,
-        filters: AsaDeviceFilters,
+        filters: FtdDeviceFilters,
         wrap_query: bool,
     ) -> list[Device]:
         inventory_service = InventoryService(config=config)
@@ -141,25 +132,17 @@ class AsaDeviceTargetCommand(BaseCommand):
             page: DevicePage = inventory_service.get_devices(
                 limit=filters.limit,
                 offset=filters.offset,
-                query=self._query_with_asa_device_type(resolved_query, wrap_query=wrap_query),
+                query=self._query_with_ftd_device_type(resolved_query, wrap_query=wrap_query),
             )
-            return cast(list[Device], page.items or [])
+            return cast(list[Device], page.items)
 
-        if filters.device_uids:
-            uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids])
-            page = inventory_service.get_devices(
-                limit=filters.limit, offset=filters.offset, query=uid_query
-            )
-            return cast(list[Device], page.items or [])
-
+        uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids or ()])
         page = inventory_service.get_devices(
-            limit=filters.limit,
-            offset=filters.offset,
-            query=f"deviceType:{EntityType.ASA.value}",
+            limit=filters.limit, offset=filters.offset, query=uid_query
         )
-        return cast(list[Device], page.items or [])
+        return cast(list[Device], page.items)
 
-    def resolve_asa_targets_from_kwargs(
+    def resolve_ftd_targets_from_kwargs(
         self,
         *,
         ctx: click.Context,
@@ -167,20 +150,16 @@ class AsaDeviceTargetCommand(BaseCommand):
         config: ConfigLike,
         include_device_name: bool,
         wrap_query_with_parentheses: bool = False,
-        require_exactly_one_filter: bool = False,
-        allow_no_filters: bool = False,
-    ) -> AsaDeviceTargets:
-        filters = self._extract_asa_device_filters(
+    ) -> FtdDeviceTargets:
+        filters = self._extract_ftd_device_filters(
             kwargs=kwargs, include_device_name=include_device_name
         )
-        self._validate_asa_device_filters(
+        self._validate_ftd_device_filters(
             ctx=ctx,
             filters=filters,
             include_device_name=include_device_name,
-            require_exactly_one=require_exactly_one_filter,
-            allow_no_filters=allow_no_filters,
         )
-        devices = self._get_asa_devices(
+        devices = self._get_ftd_devices(
             config=config,
             filters=filters,
             wrap_query=wrap_query_with_parentheses,
@@ -188,7 +167,7 @@ class AsaDeviceTargetCommand(BaseCommand):
         uid_to_device: dict[str, Device] = {device.uid: device for device in devices}
         device_uids = [device.uid for device in devices]
 
-        return AsaDeviceTargets(
+        return FtdDeviceTargets(
             devices=devices,
             uid_to_device=uid_to_device,
             device_uids=device_uids,
@@ -196,11 +175,10 @@ class AsaDeviceTargetCommand(BaseCommand):
 
     def report_check_targets(
         self,
-        targets: AsaDeviceTargets,
+        targets: FtdDeviceTargets,
         output_format: str = "table",
         operation: str = "operation",
     ) -> None:
-        """Report matched device targets for ``--check`` mode."""
         can_proceed = len(targets.devices) > 0
         reason = "targets_found" if can_proceed else "no_targets_matched"
 

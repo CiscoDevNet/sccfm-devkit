@@ -1,0 +1,64 @@
+---
+# Deploy pending configuration changes to cdFMC-managed FTD devices via SCCFM
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/deploy_cdfmc_ftd.yml \
+#     -e '{"device_uids":["uid-1","uid-2"]}'
+#
+# With deployment notes:
+#   ansible-playbook examples/deploy_cdfmc_ftd.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e deployment_notes="Ticket-123: policy update"
+#
+# Ignore warnings:
+#   ansible-playbook examples/deploy_cdfmc_ftd.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e ignore_warnings=true
+#
+# Dry-run (check mode):
+#   ansible-playbook examples/deploy_cdfmc_ftd.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     --check
+
+- name: Deploy cdFMC-managed FTD device changes
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uids: []
+    deployment_notes: ""
+    description: ""
+    ignore_warnings: false
+
+  tasks:
+    - name: Validate that device UIDs are provided
+      ansible.builtin.fail:
+        msg: >-
+          device_uids is required. Pass it with
+          -e '{"device_uids":["uid-1","uid-2"]}'
+      when: device_uids | length == 0
+
+    - name: Deploy FTD changes
+      cisco.sccfm.deploy_cdfmc_ftd:
+        uids: "{{ device_uids }}"
+        deployment_notes: "{{ deployment_notes if deployment_notes | length > 0 else omit }}"
+        description: "{{ description if description | length > 0 else omit }}"
+        ignore_warnings: "{{ ignore_warnings }}"
+      register: deploy_result
+
+    - name: Display deploy result
+      ansible.builtin.debug:
+        msg: >-
+          changed={{ deploy_result.changed }},
+          msg={{ deploy_result.msg }},
+          device_count={{ deploy_result.device_count }}
+
+    - name: Display transaction details
+      ansible.builtin.debug:
+        var: deploy_result.transaction
+      when: deploy_result.changed
