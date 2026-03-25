@@ -1,3 +1,9 @@
+## v0.22.0 (2026-03-25)
+
+### Feat
+
+- add cdfmc-managed FTD device deployment command (#43)
+
 ## v0.21.0 (2026-03-23)
 
 ### Feat
