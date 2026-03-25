@@ -15,6 +15,9 @@ from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command impor
 from sccfm_cli.commands.inventory.devices.asa.list_boot_registry import (
     AsaListBootRegistryCommand,
 )
+from sccfm_cli.commands.inventory.devices.asa.list_not_on_version import (
+    AsaListNotOnVersionCommand,
+)
 from sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
 from sccfm_cli.commands.inventory.devices.asa.shun import AsaShunCommand
 from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
@@ -30,6 +33,7 @@ class AsaCommand(BaseCommand):
             AsaCliCommand(console),
             AsaDiskCommand(console),
             AsaListBootRegistryCommand(console),
+            AsaListNotOnVersionCommand(console),
             SmartlicenseCommand(console),
             AsaOnboardCommand(console),
             AsaListLocalUsersCommand(console),
