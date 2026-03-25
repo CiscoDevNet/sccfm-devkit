@@ -1,0 +1,130 @@
+---
+# List software versions compatible with a group of FTD devices via SCCFM
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.list_ftd_compatible_versions \
+#     -a 'query="connectivityState:ONLINE AND configState:SYNCED" limit=1'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/list_ftd_compatible_versions.yml
+#
+# Optionally pass a single UID:
+#   ansible-playbook examples/list_ftd_compatible_versions.yml \
+#     -e device_uid=<your-device-uid>
+#
+# Optionally pass a group of UIDs:
+#   ansible-playbook examples/list_ftd_compatible_versions.yml \
+#     -e '{"device_uids":["uid-1","uid-2"]}'
+
+- name: List compatible upgrade versions for FTD devices
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uid: ""
+    device_uids: []
+    discovery_query: "deviceType:CDFMC_MANAGED_FTD AND connectivityState:ONLINE AND configState:SYNCED"
+    discovery_limit: 1
+
+  tasks:
+    # ============================================================
+    # QUICK TEST: Try to auto-discover a candidate device
+    # ============================================================
+    - name: "Quick test: Discover first SYNCED online FTD"
+      cisco.sccfm.list_ftd_compatible_versions:
+        query: "{{ discovery_query }}"
+        limit: "{{ discovery_limit }}"
+        per_device: true
+      register: quick_test_result
+      when: device_uid | length == 0 and device_uids | length == 0
+      failed_when: false
+
+    - name: Resolve target group UIDs (explicit list > single UID > auto-discovered)
+      ansible.builtin.set_fact:
+        resolved_uids: >-
+          {{
+            device_uids
+            if device_uids | length > 0
+            else (
+              [device_uid]
+              if device_uid | length > 0
+              else (
+                quick_test_result.per_device.keys() | list
+                if (
+                  quick_test_result is defined
+                  and quick_test_result.per_device is defined
+                  and quick_test_result.per_device | length > 0
+                )
+                else []
+              )
+            )
+          }}
+
+    - name: Hint when no compatible candidate was discovered
+      ansible.builtin.debug:
+        msg: >-
+          No compatible candidate was auto-discovered. Pass -e device_uid=<uid>
+          or -e '{"device_uids":["uid-1","uid-2"]}'.
+      when: resolved_uids | length == 0
+
+    - name: "Group test: Get compatible versions for selected FTD group"
+      cisco.sccfm.list_ftd_compatible_versions:
+        uids: "{{ resolved_uids }}"
+      register: group_result
+      when: resolved_uids | length > 0
+
+    - name: Display common compatible versions for group
+      ansible.builtin.debug:
+        var: group_result.common_versions
+      when: group_result is defined and "common_versions" in group_result
+
+    - name: Display compatible versions for single device
+      ansible.builtin.debug:
+        var: group_result.compatible_versions
+      when: group_result is defined and "compatible_versions" in group_result
+
+    # ============================================================
+    # Example 1: Compatible versions for a specific device by UID
+    # ============================================================
+    - name: Set resolved single UID (first from resolved group)
+      ansible.builtin.set_fact:
+        resolved_uid: "{{ resolved_uids[0] }}"
+      when: resolved_uids | length > 0
+
+    - name: "UID test: Get compatible versions for a specific FTD"
+      cisco.sccfm.list_ftd_compatible_versions:
+        uids:
+          - "{{ resolved_uid }}"
+      register: uid_result
+      when: resolved_uid is defined
+
+    - name: Display compatible versions for single device (flat list)
+      ansible.builtin.debug:
+        msg: "FTD {{ item.software_version }} ({{ item.upgrade_type }}){{ ' [suggested]' if item.is_suggested_version else '' }}"
+      loop: "{{ uid_result.compatible_versions | default([]) }}"
+      loop_control:
+        label: "{{ item.software_version }}"
+      when: uid_result is defined and "compatible_versions" in uid_result
+
+    # ============================================================
+    # Example 2: Show per-device breakdown (opt-in via per_device)
+    # ============================================================
+    - name: "Per-device test: Get per-device breakdown for group"
+      cisco.sccfm.list_ftd_compatible_versions:
+        uids: "{{ resolved_uids }}"
+        per_device: true
+      register: per_device_result
+      when: resolved_uids | length > 1
+
+    - name: Show per-device compatible version counts
+      ansible.builtin.debug:
+        msg: "Device {{ item.key }}: {{ item.value | length }} compatible version(s)"
+      loop: "{{ per_device_result.per_device | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: per_device_result is defined and "per_device" in per_device_result
