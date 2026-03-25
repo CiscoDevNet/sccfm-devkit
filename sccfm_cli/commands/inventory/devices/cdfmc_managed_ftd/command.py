@@ -5,12 +5,14 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.deploy import FtdDeployCommand
+from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.list import CdfmcFtdListCommand
 
 
 class CdfmcManagedFtdCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
+            CdfmcFtdListCommand(console),
             FtdDeployCommand(console),
         ]
 

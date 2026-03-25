@@ -9,6 +9,7 @@ from sccfm_cli.commands.inventory.devices.asa.change_boot_image import (
 )
 from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
 from sccfm_cli.commands.inventory.devices.asa.disk import AsaDiskCommand
+from sccfm_cli.commands.inventory.devices.asa.list import AsaListCommand
 from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command import (
     AsaListLocalUsersCommand,
 )
@@ -32,6 +33,7 @@ class AsaCommand(BaseCommand):
             AsaChangeBootImageCommand(console),
             AsaCliCommand(console),
             AsaDiskCommand(console),
+            AsaListCommand(console),
             AsaListBootRegistryCommand(console),
             AsaListNotOnVersionCommand(console),
             SmartlicenseCommand(console),
