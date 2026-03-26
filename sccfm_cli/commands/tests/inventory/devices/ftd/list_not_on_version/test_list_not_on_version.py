@@ -107,7 +107,8 @@ def test_version_mode_returns_devices_as_json(
     _patch_inventory(monkeypatch, _sample_ftd_devices())
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -133,7 +134,8 @@ def test_version_mode_returns_devices_as_table(
     _patch_inventory(monkeypatch, _sample_ftd_devices())
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -164,7 +166,8 @@ def test_version_mode_filters_out_matching_version(
     _patch_inventory(monkeypatch, devices_with_target)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -189,7 +192,8 @@ def test_version_mode_query_filters_by_ftd_device_type(
     _patch_inventory(monkeypatch, [], captured=captured)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -210,7 +214,17 @@ def test_version_mode_passes_limit_and_offset(
 
     result = cli_runner.invoke(
         cli,
-        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--limit", "25", "--offset", "10", "--format", "json"],
+        [
+            *_CLI_PREFIX,
+            "--version",
+            _TARGET_VERSION,
+            "--limit",
+            "25",
+            "--offset",
+            "10",
+            "--format",
+            "json",
+        ],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -230,7 +244,8 @@ def test_version_mode_handles_empty_results(
     _patch_inventory(monkeypatch, [])
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--query", "name:missing-*"],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--query", "name:missing-*"],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -256,7 +271,8 @@ def test_version_mode_handles_device_page_items_none(
     monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--format", "json"],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -287,7 +303,8 @@ def test_version_mode_all_compliant_devices(
     _patch_inventory(monkeypatch, all_on_target)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION],
     )
 
     assert result.exit_code == 0, f"Command failed: {result.output}"
@@ -318,7 +335,8 @@ def test_recommended_mode_identifies_devices_not_on_suggested(
     _patch_upgrade_version_service(monkeypatch, group_versions)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--recommended", "--format", "json"],
+        cli,
+        [*_CLI_PREFIX, "--recommended", "--format", "json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -359,7 +377,8 @@ def test_recommended_mode_all_on_recommended(
     _patch_upgrade_version_service(monkeypatch, group_versions)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--recommended"],
+        cli,
+        [*_CLI_PREFIX, "--recommended"],
     )
 
     assert result.exit_code == 0, result.output
@@ -388,7 +407,8 @@ def test_recommended_mode_handles_no_suggested_version(
     _patch_upgrade_version_service(monkeypatch, group_versions)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--recommended", "--format", "json"],
+        cli,
+        [*_CLI_PREFIX, "--recommended", "--format", "json"],
     )
 
     assert result.exit_code == 0, result.output
@@ -429,7 +449,8 @@ def test_recommended_mode_all_devices_skipped(
     _patch_upgrade_version_service(monkeypatch, group_versions)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--recommended"],
+        cli,
+        [*_CLI_PREFIX, "--recommended"],
     )
 
     assert result.exit_code == 0, result.output
@@ -460,7 +481,8 @@ def test_recommended_mode_table_shows_recommended_column(
     _patch_upgrade_version_service(monkeypatch, group_versions)
 
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--recommended"],
+        cli,
+        [*_CLI_PREFIX, "--recommended"],
     )
 
     assert result.exit_code == 0, result.output
@@ -477,7 +499,8 @@ def test_rejects_both_version_and_recommended(
     default_config: Config,
 ) -> None:
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--recommended"],
+        cli,
+        [*_CLI_PREFIX, "--version", _TARGET_VERSION, "--recommended"],
     )
 
     assert result.exit_code != 0
@@ -492,7 +515,8 @@ def test_rejects_missing_mode(
     default_config: Config,
 ) -> None:
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX],
+        cli,
+        [*_CLI_PREFIX],
     )
 
     assert result.exit_code != 0
@@ -507,7 +531,8 @@ def test_rejects_invalid_version_format(
     default_config: Config,
 ) -> None:
     result = cli_runner.invoke(
-        cli, [*_CLI_PREFIX, "--version", "not-a-version"],
+        cli,
+        [*_CLI_PREFIX, "--version", "not-a-version"],
     )
 
     assert result.exit_code != 0

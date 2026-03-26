@@ -217,8 +217,7 @@ def _validate_mode(module: AnsibleModule) -> None:
     if version and not _VERSION_RE.match(version):
         module.fail_json(
             msg=(
-                f"Invalid version format: '{version}'. "
-                "Expected format like '7.4.1' or '7.2.0'."
+                f"Invalid version format: '{version}'. " "Expected format like '7.4.1' or '7.2.0'."
             )
         )
 
@@ -236,9 +235,7 @@ def _fetch_devices(module: AnsibleModule) -> list[Device]:
 
     if uids:
         uid_query = " OR ".join(f"uid:{uid}" for uid in uids)
-        page: DevicePage = inventory_service.get_devices(
-            limit=len(uids), offset=0, query=uid_query
-        )
+        page: DevicePage = inventory_service.get_devices(limit=len(uids), offset=0, query=uid_query)
     elif query:
         page = inventory_service.get_devices(
             limit=limit,
@@ -290,9 +287,7 @@ def _check_recommended(
             continue
 
         compatible = results.per_device.get(device.uid, [])
-        suggested = next(
-            (v for v in compatible if v.is_suggested_version), None
-        )
+        suggested = next((v for v in compatible if v.is_suggested_version), None)
 
         if suggested is None:
             skipped[device.uid] = "No recommended version available"
@@ -326,9 +321,7 @@ def run_module() -> None:
             serialized, skipped = _check_recommended(module, all_devices)
             evaluated_count = matched_device_count - len(skipped)
         else:
-            devices_not_on_version = [
-                d for d in all_devices if d.software_version != version
-            ]
+            devices_not_on_version = [d for d in all_devices if d.software_version != version]
             serialized = [_serialize_device(d) for d in devices_not_on_version]
             skipped = {}
             evaluated_count = matched_device_count
@@ -349,14 +342,10 @@ def run_module() -> None:
                 "none could be evaluated."
             )
         elif count == 0:
-            version_label = (
-                "their recommended version" if recommended else f"version {version}"
-            )
+            version_label = "their recommended version" if recommended else f"version {version}"
             msg = f"All {evaluated_count} evaluated device(s) are on {version_label}."
         else:
-            version_label = (
-                "their recommended version" if recommended else f"version {version}"
-            )
+            version_label = "their recommended version" if recommended else f"version {version}"
             msg = (
                 f"Found {count} device(s) not on {version_label} "
                 f"out of {evaluated_count} evaluated device(s)."

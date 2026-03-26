@@ -97,6 +97,7 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
         )
         all_devices = targets.devices
 
+        skipped: dict[str, str] = {}
         if recommended:
             not_on_version, skipped = self._check_recommended(
                 config=config,
@@ -106,11 +107,8 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
         else:
             assert version is not None
             not_on_version = [
-                _NotOnVersionDevice(device=d)
-                for d in all_devices
-                if d.software_version != version
+                _NotOnVersionDevice(device=d) for d in all_devices if d.software_version != version
             ]
-            skipped: dict[str, str] = {}
 
         self._render_results(
             not_on_version=not_on_version,
@@ -124,17 +122,14 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
         )
 
     @staticmethod
-    def _validate_mode(
-        ctx: click.Context, version: str | None, recommended: bool
-    ) -> None:
+    def _validate_mode(ctx: click.Context, version: str | None, recommended: bool) -> None:
         if version and recommended:
             ctx.fail("Provide either --version or --recommended, not both.")
         if not version and not recommended:
             ctx.fail("Provide one of --version or --recommended.")
         if version and not _VERSION_RE.match(version):
             ctx.fail(
-                f"Invalid version format: '{version}'. "
-                "Expected format like '7.4.1' or '7.2.0'."
+                f"Invalid version format: '{version}'. " "Expected format like '7.4.1' or '7.2.0'."
             )
 
     def _check_recommended(
@@ -148,9 +143,7 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
             return [], {}
 
         upgrade_version_service = FtdUpgradeVersionService(config=config)
-        results = upgrade_version_service.get_compatible_versions(
-            device_uids=device_uids
-        )
+        results = upgrade_version_service.get_compatible_versions(device_uids=device_uids)
 
         not_on_version: list[_NotOnVersionDevice] = []
         skipped: dict[str, str] = {}
@@ -159,16 +152,15 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
             skipped[uid] = reason
 
         for device in devices:
-            if device.uid in results.skipped:
+            uid = device.uid or ""
+            if uid in results.skipped:
                 continue
 
-            compatible = results.per_device.get(device.uid, [])
-            suggested = next(
-                (v for v in compatible if v.is_suggested_version), None
-            )
+            compatible = results.per_device.get(uid, [])
+            suggested = next((v for v in compatible if v.is_suggested_version), None)
 
             if suggested is None:
-                skipped[device.uid] = "No recommended version available"
+                skipped[uid] = "No recommended version available"
                 continue
 
             if device.software_version != suggested.software_version:
@@ -226,8 +218,7 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
             "matched_device_count": matched_device_count,
             "device_count": len(not_on_version),
             "devices": [
-                self._device_to_dict(entry, recommended=recommended)
-                for entry in not_on_version
+                self._device_to_dict(entry, recommended=recommended) for entry in not_on_version
             ],
         }
         if version:
@@ -254,9 +245,7 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
                 device = uid_to_device.get(uid)
                 name = device.name if device else None
                 label = f"{name} ('{uid}')" if name else f"'{uid}'"
-                self.console.print(
-                    f"[blue]i[/blue] [yellow]Skipped {label}: {reason}[/yellow]"
-                )
+                self.console.print(f"[blue]i[/blue] [yellow]Skipped {label}: {reason}[/yellow]")
 
         if matched_device_count == 0:
             message = "No FTD devices matched the given filter."
@@ -312,17 +301,13 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
         )
 
     @staticmethod
-    def _device_to_dict(
-        entry: _NotOnVersionDevice, *, recommended: bool
-    ) -> dict[str, Any]:
+    def _device_to_dict(entry: _NotOnVersionDevice, *, recommended: bool) -> dict[str, Any]:
         d = entry.device
         result: dict[str, Any] = {
             "uid": d.uid,
             "name": d.name,
             "software_version": d.software_version,
-            "connectivity_state": (
-                d.connectivity_state.value if d.connectivity_state else None
-            ),
+            "connectivity_state": (d.connectivity_state.value if d.connectivity_state else None),
             "config_state": d.config_state.value if d.config_state else None,
         }
         if recommended:
