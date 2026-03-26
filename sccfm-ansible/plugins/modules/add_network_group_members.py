@@ -75,10 +75,10 @@ EXAMPLES = r"""
 # Example 2: Add members by UID
 - name: Add members to a network group by UID
   cisco.sccfm.add_network_group_members:
-    uid: "abc-123-def-456"
+    uid: "11111111-1111-1111-1111-111111111111"
     referenced_objects:
-      - "ref-uid-001"
-      - "ref-uid-002"
+      - "22222222-2222-2222-2222-222222222222"
+      - "33333333-3333-3333-3333-333333333333"
 """
 
 RETURN = r"""
