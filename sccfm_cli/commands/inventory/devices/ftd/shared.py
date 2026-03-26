@@ -104,6 +104,7 @@ class FtdDeviceTargetCommand(BaseCommand):
         filters: FtdDeviceFilters,
         include_device_name: bool,
         require_exactly_one: bool = False,
+        allow_no_filters: bool = False,
     ) -> None:
         selectors = [bool(filters.query), bool(filters.device_uids)]
         option_list = "--query or --device-uids"
@@ -116,7 +117,7 @@ class FtdDeviceTargetCommand(BaseCommand):
             ctx.fail(f"Provide exactly one of {option_list}.")
             return
 
-        if selected_count == 0:
+        if selected_count == 0 and not allow_no_filters:
             ctx.fail(f"Provide one of: {option_list}.")
         if selected_count > 1:
             ctx.fail(f"Provide only one of: {option_list}.")
@@ -138,6 +139,7 @@ class FtdDeviceTargetCommand(BaseCommand):
         *,
         filters: FtdDeviceFilters,
         wrap_query: bool,
+        allow_no_filters: bool = False,
     ) -> list[Device]:
         inventory_service = InventoryService(config=config)
         resolved_query = self._resolve_query(filters=filters)
@@ -147,13 +149,23 @@ class FtdDeviceTargetCommand(BaseCommand):
                 offset=filters.offset,
                 query=self._query_with_ftd_device_type(resolved_query, wrap_query=wrap_query),
             )
-            return cast(list[Device], page.items)
+            return cast(list[Device], page.items or [])
 
-        uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids or ()])
-        page = inventory_service.get_devices(
-            limit=filters.limit, offset=filters.offset, query=uid_query
-        )
-        return cast(list[Device], page.items)
+        if filters.device_uids:
+            uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids])
+            page = inventory_service.get_devices(
+                limit=filters.limit, offset=filters.offset, query=uid_query
+            )
+            return cast(list[Device], page.items or [])
+
+        if allow_no_filters:
+            type_filter = " OR ".join(f"deviceType:{t.value}" for t in _FTD_ENTITY_TYPES)
+            page = inventory_service.get_devices(
+                limit=filters.limit, offset=filters.offset, query=type_filter
+            )
+            return cast(list[Device], page.items or [])
+
+        return []
 
     def resolve_ftd_targets_from_kwargs(
         self,
@@ -164,6 +176,7 @@ class FtdDeviceTargetCommand(BaseCommand):
         include_device_name: bool,
         wrap_query_with_parentheses: bool = False,
         require_exactly_one_filter: bool = False,
+        allow_no_filters: bool = False,
     ) -> FtdDeviceTargets:
         filters = self._extract_ftd_device_filters(
             kwargs=kwargs, include_device_name=include_device_name
@@ -173,11 +186,13 @@ class FtdDeviceTargetCommand(BaseCommand):
             filters=filters,
             include_device_name=include_device_name,
             require_exactly_one=require_exactly_one_filter,
+            allow_no_filters=allow_no_filters,
         )
         devices = self._get_ftd_devices(
             config=config,
             filters=filters,
             wrap_query=wrap_query_with_parentheses,
+            allow_no_filters=allow_no_filters,
         )
         uid_to_device: dict[str, Device] = {device.uid: device for device in devices}
         device_uids = [device.uid for device in devices]

@@ -4,6 +4,9 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.ftd.list_not_on_version import (
+    FtdListNotOnVersionCommand,
+)
 from sccfm_cli.commands.inventory.devices.ftd.upgrade import FtdUpgradeCommand
 
 
@@ -11,6 +14,7 @@ class FtdCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
+            FtdListNotOnVersionCommand(console),
             FtdUpgradeCommand(console),
         ]
 
