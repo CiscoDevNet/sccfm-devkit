@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-from abc import abstractmethod
 from typing import Any, Sequence, cast
 
 import click
@@ -66,25 +65,38 @@ def _build_device_type_filter(entity_types: Sequence[EntityType]) -> str:
 
 
 class DeviceListCommand(BaseCommand):
-    """Base class for device-type-scoped list commands.
+    """Reusable list command for a specific set of device types.
 
-    Subclasses only need to define :attr:`entity_types`,
-    :attr:`help_text`, and :attr:`spinner_text`.
+    Instantiate directly — no subclassing required::
+
+        AsaListCommand = DeviceListCommand(
+            console,
+            entity_types=[EntityType.ASA],
+            spinner_text="Fetching ASA devices…",
+            help_text="List ASA devices.",
+        )
     """
+
+    def __init__(
+        self,
+        console: Console,
+        *,
+        entity_types: Sequence[EntityType],
+        spinner_text: str,
+        help_text: str = "",
+    ) -> None:
+        super().__init__(console)
+        self._entity_types = entity_types
+        self._spinner_text = spinner_text
+        self._help_text = help_text
 
     @property
     def name(self) -> str:
         return "list"
 
     @property
-    @abstractmethod
-    def entity_types(self) -> Sequence[EntityType]:
-        """Device types to filter on."""
-
-    @property
-    @abstractmethod
-    def spinner_text(self) -> str:
-        """Spinner message shown while fetching."""
+    def help_text(self) -> str:
+        return self._help_text
 
     def build_params(self) -> Sequence[click.Parameter]:
         return inventory_list_params()
@@ -98,22 +110,22 @@ class DeviceListCommand(BaseCommand):
         config = self.get_profile(ctx=ctx, **kwargs)
         inventory_service = InventoryService(config)
 
-        device_type_filter = _build_device_type_filter(self.entity_types)
-        effective_query = (
-            f"({query}) AND {device_type_filter}" if query else device_type_filter
-        )
+        device_type_filter = _build_device_type_filter(self._entity_types)
+        effective_query = f"({query}) AND {device_type_filter}" if query else device_type_filter
 
         silent = ctx.obj.get("silent", False) if ctx.obj else False
 
         def _fetch() -> DevicePage:
             return inventory_service.get_devices(
-                limit=limit, offset=offset, query=effective_query,
+                limit=limit,
+                offset=offset,
+                query=effective_query,
             )
 
         if silent:
             page = _fetch()
         else:
-            spinner = Spinner("dots", text=self.spinner_text)
+            spinner = Spinner("dots", text=self._spinner_text)
             with Live(spinner, console=self.console, refresh_per_second=10, transient=True):
                 page = _fetch()
 

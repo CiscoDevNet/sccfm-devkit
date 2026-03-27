@@ -2,17 +2,23 @@ from typing import Any, List
 
 import click
 from rich.console import Console
+from scc_firewall_manager_sdk import EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.deploy import FtdDeployCommand
-from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.list import CdfmcFtdListCommand
+from sccfm_cli.commands.inventory.devices.rendering import DeviceListCommand
 
 
 class CdfmcManagedFtdCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
-            CdfmcFtdListCommand(console),
+            DeviceListCommand(
+                console,
+                entity_types=[EntityType.CDFMC_MANAGED_FTD],
+                spinner_text="Fetching cdFMC-managed FTD devices from SCC Firewall Manager...",
+                help_text="List cdFMC-managed FTD devices.",
+            ),
             FtdDeployCommand(console),
         ]
 
