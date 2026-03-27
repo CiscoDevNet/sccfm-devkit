@@ -4,13 +4,24 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.ftd.constants import FTD_ENTITY_TYPES
 from sccfm_cli.commands.inventory.devices.ftd.upgrade import FtdUpgradeCommand
+from sccfm_cli.commands.inventory.devices.rendering import DeviceListCommand
 
 
 class FtdCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
+            DeviceListCommand(
+                console,
+                entity_types=FTD_ENTITY_TYPES,
+                spinner_text="Fetching FTD devices from SCC Firewall Manager...",
+                help_text=(
+                    "List FTD devices (includes cdFMC-managed, FDM-managed, "
+                    "and on-prem FMC-managed FTDs)."
+                ),
+            ),
             FtdUpgradeCommand(console),
         ]
 

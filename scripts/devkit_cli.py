@@ -39,7 +39,7 @@ def _ask(
         choices=choices,
         use_search_filter=True,
         use_jk_keys=False,
-    ).ask()
+    ).unsafe_ask()
 
 
 # ── Task implementations ─────────────────────────────────────────
@@ -100,15 +100,11 @@ def _run_format() -> None:
 
 def _run_test() -> None:
     """Run the test suite with pytest."""
-    verbose = questionary.confirm("Verbose output?", default=False).ask()
-    if verbose is None:
-        return  # user cancelled
+    verbose = questionary.confirm("Verbose output?", default=False).unsafe_ask()
 
     expression: str | None = questionary.text(
         "Filter expression (-k)? Leave blank for all tests:",
-    ).ask()
-    if expression is None:
-        return
+    ).unsafe_ask()
 
     cmd: list[str] = [sys.executable, "-m", "pytest"]
     if verbose:
@@ -144,18 +140,14 @@ def _execute_cli_command(cmd: object) -> None:
         if not isinstance(param, CliParam):
             continue
         if param.is_flag:
-            confirmed = questionary.confirm(f"{param.label}?", default=False).ask()
-            if confirmed is None:
-                return  # Ctrl+C
+            confirmed = questionary.confirm(f"{param.label}?", default=False).unsafe_ask()
             if confirmed:
                 argv.append(param.flag)
         elif param.multiple:
             console.print(f"[dim]{param.label} — enter one value per line, blank to finish:[/dim]")
             has_value = False
             while True:
-                value: str | None = questionary.text(f"  {param.flag}").ask()
-                if value is None:
-                    return  # Ctrl+C
+                value: str | None = questionary.text(f"  {param.flag}").unsafe_ask()
                 if not value.strip():
                     break
                 argv.extend([param.flag, value.strip()])
@@ -165,9 +157,7 @@ def _execute_cli_command(cmd: object) -> None:
                 return
         else:
             prompt = f"{param.label}{'' if param.required else ' (leave blank to skip)'}"
-            single: str | None = questionary.text(prompt).ask()
-            if single is None:
-                return  # Ctrl+C
+            single: str | None = questionary.text(prompt).unsafe_ask()
             if single.strip():
                 argv.extend([param.flag, single.strip()])
             elif param.required:
@@ -293,10 +283,9 @@ def _update_token() -> None:
         console.print("[red]Token not found.[/red]")
         return
 
-    new_token_value = questionary.text(f"Paste new API token for '{token_to_update.name}':").ask()
-    if new_token_value is None:
-        console.print("[dim]Cancelled.[/dim]")
-        return
+    new_token_value = questionary.text(
+        f"Paste new API token for '{token_to_update.name}':",
+    ).unsafe_ask()
     new_token_value = new_token_value.strip()
     if not new_token_value:
         console.print("[red]Token cannot be empty.[/red]")
@@ -357,7 +346,7 @@ def _remove_token() -> None:
     confirmed = questionary.confirm(
         f"Remove token '{token_to_remove.name}' (region={token_to_remove.region})?",
         default=True,
-    ).ask()
+    ).unsafe_ask()
     if not confirmed:
         console.print("[dim]Cancelled.[/dim]")
         return
@@ -445,7 +434,8 @@ def _interactive_menu() -> None:
             if not _dispatch(answer):
                 break
         except KeyboardInterrupt:
-            console.print("\n[yellow]Interrupted.[/yellow]")
+            console.print("\n[yellow]Exiting.[/yellow]")
+            break
         console.print()
 
     console.print("[dim]Bye![/dim]")

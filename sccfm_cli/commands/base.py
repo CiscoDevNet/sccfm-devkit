@@ -87,6 +87,8 @@ class BaseCommand(ABC):
             raise
         except (click.Abort, click.exceptions.Exit):
             raise
+        except KeyboardInterrupt:
+            sys.exit(130)
         except Exception as e:
             self.console.print(f"[red]Error: {e}[/red]")
             sys.exit(-1)

@@ -8,18 +8,13 @@ import click
 from scc_firewall_manager_sdk import Device, DevicePage, EntityType
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.ftd.constants import FTD_ENTITY_TYPES
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
 from sccfm_core import InventoryService
 from sccfm_core.types import ConfigLike
 
 _DEFAULT_DEVICE_NAME_HELP = "Device name to search for (supports wildcards like 'branch-*')."
 _DEFAULT_DEVICE_UIDS_HELP = "List of device UIDs to query."
-
-_FTD_ENTITY_TYPES = [
-    EntityType.CDFMC_MANAGED_FTD,
-    EntityType.FDM_MANAGED_FTD,
-    EntityType.ONPREM_FMC_MANAGED_FTD,
-]
 
 
 def device_name_option(help_text: str = _DEFAULT_DEVICE_NAME_HELP) -> click.Option:
@@ -122,7 +117,7 @@ class FtdDeviceTargetCommand(BaseCommand):
             ctx.fail(f"Provide only one of: {option_list}.")
 
     def _query_with_ftd_device_type(self, query: str, *, wrap_query: bool) -> str:
-        type_filter = " OR ".join(f"deviceType:{t.value}" for t in _FTD_ENTITY_TYPES)
+        type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
         if wrap_query:
             return f"({query}) AND ({type_filter})"
         return f"{query} AND ({type_filter})"
