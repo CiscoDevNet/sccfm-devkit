@@ -8,7 +8,7 @@ import click
 from scc_firewall_manager_sdk import Device, DevicePage, EntityType
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.devices.ftd.constants import FTD_ENTITY_TYPES
+from sccfm_core import FTD_ENTITY_TYPES
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
 from sccfm_core import InventoryService
 from sccfm_core.types import ConfigLike

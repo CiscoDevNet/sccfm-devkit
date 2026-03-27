@@ -10,7 +10,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import FTD_ENTITY_TYPES, InventoryService, SccApiError
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.inventory import (
     FtdUpgradeService,
@@ -22,12 +22,6 @@ from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import create_config
-
-_FTD_ENTITY_TYPES = [
-    EntityType.CDFMC_MANAGED_FTD,
-    EntityType.FDM_MANAGED_FTD,
-    EntityType.ONPREM_FMC_MANAGED_FTD,
-]
 
 DOCUMENTATION = r"""
 ---
@@ -198,7 +192,7 @@ def resolve_device_uids_from_query(
 ) -> list[str]:
     """Resolve device UIDs from a Lucene query."""
     inventory_service = InventoryService(config=config)
-    type_filter = " OR ".join(f"deviceType:{t.value}" for t in _FTD_ENTITY_TYPES)
+    type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,

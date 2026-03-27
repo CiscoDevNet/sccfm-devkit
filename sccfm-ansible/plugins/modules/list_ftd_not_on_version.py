@@ -6,17 +6,11 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage, EntityType, FtdVersion
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import FTD_ENTITY_TYPES, InventoryService, SccApiError
 from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from sccfm_core.services.inventory import FtdUpgradeVersionService
 
 from ..module_utils.config import base_argument_spec, create_config
-
-_FTD_ENTITY_TYPES = [
-    EntityType.CDFMC_MANAGED_FTD,
-    EntityType.FDM_MANAGED_FTD,
-    EntityType.ONPREM_FMC_MANAGED_FTD,
-]
 
 DOCUMENTATION = r"""
 ---
@@ -231,7 +225,7 @@ def _fetch_devices(module: AnsibleModule) -> list[Device]:
     limit: int = module.params["limit"]
     offset: int = module.params["offset"]
 
-    type_filter = " OR ".join(f"deviceType:{t.value}" for t in _FTD_ENTITY_TYPES)
+    type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
 
     if uids:
         uid_query = " OR ".join(f"uid:{uid}" for uid in uids)

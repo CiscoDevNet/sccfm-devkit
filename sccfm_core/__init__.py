@@ -1,3 +1,4 @@
+from sccfm_core.constants import FTD_ENTITY_TYPES
 from sccfm_core.errors import SccApiError
 from sccfm_core.factories.api_client_factory import ApiClientFactory
 from sccfm_core.services.health_service import HealthService, HealthStatus
@@ -16,6 +17,7 @@ from sccfm_core.services.inventory import (
 
 __all__ = [
     "ApiClientFactory",
+    "FTD_ENTITY_TYPES",
     "AsaBootImageService",
     "AsaBootRegistryService",
     "AsaCommandLineService",
