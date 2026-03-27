@@ -8,9 +8,8 @@ import click
 from scc_firewall_manager_sdk import Device, DevicePage, EntityType
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_core import FTD_ENTITY_TYPES
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
-from sccfm_core import InventoryService
+from sccfm_core import FTD_ENTITY_TYPES, InventoryService
 from sccfm_core.types import ConfigLike
 
 _DEFAULT_DEVICE_NAME_HELP = "Device name to search for (supports wildcards like 'branch-*')."
