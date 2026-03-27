@@ -2,6 +2,7 @@ from typing import Any, List
 
 import click
 from rich.console import Console
+from scc_firewall_manager_sdk import EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.asa.change_boot_image import (
@@ -23,6 +24,7 @@ from sccfm_cli.commands.inventory.devices.asa.shun import AsaShunCommand
 from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
 from sccfm_cli.commands.inventory.devices.asa.upgrade import AsaUpgradeCommand
 from sccfm_cli.commands.inventory.devices.asa.user import AsaUserCommand
+from sccfm_cli.commands.inventory.devices.rendering import DeviceListCommand
 
 
 class AsaCommand(BaseCommand):
@@ -32,6 +34,12 @@ class AsaCommand(BaseCommand):
             AsaChangeBootImageCommand(console),
             AsaCliCommand(console),
             AsaDiskCommand(console),
+            DeviceListCommand(
+                console,
+                entity_types=[EntityType.ASA],
+                spinner_text="Fetching ASA devices from SCC Firewall Manager...",
+                help_text="List ASA devices.",
+            ),
             AsaListBootRegistryCommand(console),
             AsaListNotOnVersionCommand(console),
             SmartlicenseCommand(console),

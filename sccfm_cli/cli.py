@@ -52,4 +52,7 @@ cli = _build_cli()
 
 
 if __name__ == "__main__":
-    cli()
+    try:
+        cli()
+    except KeyboardInterrupt:
+        raise SystemExit(130)

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
-from rich.table import Table
 from scc_firewall_manager_sdk import DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.devices.rendering import render_device_page
 from sccfm_cli.commands.inventory.options import inventory_list_params
 from sccfm_cli.utils import with_spinner
 from sccfm_core.services import InventoryService
@@ -29,7 +28,7 @@ class DevicesListCommand(BaseCommand):
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         limit = cast(int, kwargs.get("limit"))
         offset = cast(int, kwargs.get("offset"))
-        query = cast(str, kwargs.get("query"))
+        query = cast(str | None, kwargs.get("query"))
         output_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
@@ -40,31 +39,4 @@ class DevicesListCommand(BaseCommand):
             query=query,
         )
 
-        self._render_page(page, output_format)
-
-    def _render_page(self, page: DevicePage, output_format: str) -> None:
-        if output_format == "json":
-            items = page.items or []
-            items_dict = [item.to_dict() for item in items]
-            self.console.print(json.dumps(items_dict, indent=2, default=str))
-            return
-
-        self.console.print(f"Number of entries:  {page.count}")
-        table = Table(title="Devices", width=120)
-        table.add_column("UID")
-        table.add_column("Name")
-        table.add_column("Device Type")
-        table.add_column("Software Version")
-        table.add_column("Connectivity")
-        table.add_column("Configuration")
-        items = page.items or []
-        for device in items:
-            table.add_row(
-                device.uid,
-                device.name,
-                device.device_type,
-                device.software_version,
-                device.connectivity_state,
-                device.config_state,
-            )
-        self.console.print(table)
+        render_device_page(self.console, page, output_format, limit=limit, offset=offset)
