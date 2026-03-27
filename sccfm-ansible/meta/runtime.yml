@@ -17,6 +17,7 @@ action_groups:
     - list_asa_compatible_versions
     - list_asa_disk_files
     - list_ftd_compatible_versions
+    - list_ftd_not_on_version
     - list_asa_local_users
     - list_asa_not_on_version
     - list_network_groups

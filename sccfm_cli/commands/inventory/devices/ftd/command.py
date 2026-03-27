@@ -4,9 +4,12 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.devices.ftd.constants import FTD_ENTITY_TYPES
+from sccfm_cli.commands.inventory.devices.ftd.list_not_on_version import (
+    FtdListNotOnVersionCommand,
+)
 from sccfm_cli.commands.inventory.devices.ftd.upgrade import FtdUpgradeCommand
 from sccfm_cli.commands.inventory.devices.rendering import DeviceListCommand
+from sccfm_core import FTD_ENTITY_TYPES
 
 
 class FtdCommand(BaseCommand):
@@ -22,6 +25,7 @@ class FtdCommand(BaseCommand):
                     "and on-prem FMC-managed FTDs)."
                 ),
             ),
+            FtdListNotOnVersionCommand(console),
             FtdUpgradeCommand(console),
         ]
 
