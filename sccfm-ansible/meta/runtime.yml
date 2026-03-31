@@ -5,6 +5,7 @@ action_groups:
   cisco.sccfm.all:
     - add_asa_shun
     - add_object_override
+    - apply_object_override_as_default
     - change_asa_boot_image
     - change_asa_local_password
     - clear_asa_shun
@@ -13,8 +14,10 @@ action_groups:
     - create_network_object
     - delete_network_group
     - delete_network_object
+    - delete_object_override
+    - edit_object_override
     - execute_asa_cli
-    - get_object_targets
+    - get_object
     - list_asa_boot_registry
     - list_asa_compatible_versions
     - list_asa_disk_files
@@ -31,6 +34,7 @@ action_groups:
     - trigger_ftd_upgrade
     - update_network_group
     - update_network_object
+    - update_object_default
 
 module_defaults:
   group/cisco.sccfm.all:
