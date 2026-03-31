@@ -1,0 +1,55 @@
+---
+# Add a device-specific override to an object in SCC Firewall Manager.
+#
+# Fetches the object's attached devices, picks the first one, and adds
+# an override with the supplied value.
+#
+# Usage:
+#   ansible-playbook examples/add_object_override.yml \
+#     -e object_uid=<object-uid> \
+#     -e override_ip=10.10.10.10
+#
+# Required variables:
+#   object_uid   - UID of the shared object to override
+#   override_ip  - The override value (IP, CIDR, range, or URL)
+
+- name: Add a device-specific override to an object
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Get devices attached to the object
+      cisco.sccfm.get_object_targets:
+        uid: "{{ object_uid }}"
+      register: targets_result
+
+    - name: Show attached devices
+      ansible.builtin.debug:
+        msg: >-
+          Object '{{ targets_result.object_targets.name }}' is attached to
+          {{ targets_result.object_targets.targets | length }} device(s).
+
+    - name: Fail if no devices are attached
+      ansible.builtin.fail:
+        msg: "Object {{ object_uid }} is not attached to any device."
+      when: targets_result.object_targets.targets | length == 0
+
+    - name: Add override on the first targeted device
+      cisco.sccfm.add_object_override:
+        uid: "{{ object_uid }}"
+        target_id: "{{ targets_result.object_targets.targets[0].id }}"
+        override_value: "{{ override_ip }}"
+      register: override_result
+
+    - name: Show override result
+      ansible.builtin.debug:
+        msg: >-
+          Override added to object '{{ override_result.object_override.name }}'
+          ({{ override_result.object_override.object_type }})
+          on device '{{ targets_result.object_targets.targets[0].display_name }}'.
+          Total overrides: {{ override_result.object_override.overrides_count }}.

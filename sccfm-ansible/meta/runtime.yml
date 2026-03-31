@@ -4,6 +4,7 @@ requires_ansible: ">=2.15.0"
 action_groups:
   cisco.sccfm.all:
     - add_asa_shun
+    - add_object_override
     - change_asa_boot_image
     - change_asa_local_password
     - clear_asa_shun
@@ -13,6 +14,7 @@ action_groups:
     - delete_network_group
     - delete_network_object
     - execute_asa_cli
+    - get_object_targets
     - list_asa_boot_registry
     - list_asa_compatible_versions
     - list_asa_disk_files
