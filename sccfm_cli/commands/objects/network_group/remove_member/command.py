@@ -8,10 +8,14 @@ from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.options import format_tags, group_member_mutation_params
-from sccfm_cli.commands.objects.utils import check_object_exists, validate_identifier
+from sccfm_cli.commands.objects.utils import (
+    check_object_exists,
+    check_referenced_objects_exist,
+    validate_identifier,
+)
 from sccfm_cli.utils import with_spinner
 from sccfm_core.errors import NotFoundError
-from sccfm_core.services import NetworkGroupService
+from sccfm_core.services import NetworkGroupService, NetworkObjectService
 from sccfm_core.services.object_management import (
     NetworkGroupMemberMutationResult,
     NetworkGroupResponse,
@@ -45,6 +49,38 @@ class RemoveNetworkGroupMemberCommand(BaseCommand):
         service = NetworkGroupService(config)
 
         if check:
+            ref_objects_tuple = cast(tuple[str, ...] | None, kwargs.get("referenced_object"))
+            if output_format == "json" and ref_objects_tuple:
+                group_check = check_object_exists(
+                    console=self.console,
+                    uid=uid,
+                    name=name,
+                    get_by_uid_fn=service.get_network_group,
+                    get_by_name_fn=service.get_network_group_by_name,
+                    object_name="Network group",
+                    output_format=output_format,
+                    operation="update",
+                    emit=False,
+                )
+                obj_service = NetworkObjectService(config)
+                ref_checks = check_referenced_objects_exist(
+                    console=self.console,
+                    referenced_objects=list(ref_objects_tuple),
+                    obj_service=obj_service,
+                    output_format=output_format,
+                    emit=False,
+                )
+                self.console.print(
+                    json.dumps(
+                        {
+                            "target": group_check,
+                            "referenced_objects": ref_checks,
+                        },
+                        indent=2,
+                    )
+                )
+                return
+
             check_object_exists(
                 console=self.console,
                 uid=uid,
@@ -55,6 +91,14 @@ class RemoveNetworkGroupMemberCommand(BaseCommand):
                 output_format=output_format,
                 operation="update",
             )
+            if ref_objects_tuple:
+                obj_service = NetworkObjectService(config)
+                check_referenced_objects_exist(
+                    console=self.console,
+                    referenced_objects=list(ref_objects_tuple),
+                    obj_service=obj_service,
+                    output_format=output_format,
+                )
             return
 
         ref_objects_tuple = cast(tuple[str, ...] | None, kwargs.get("referenced_object"))

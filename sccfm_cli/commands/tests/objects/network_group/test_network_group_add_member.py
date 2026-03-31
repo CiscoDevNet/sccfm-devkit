@@ -9,10 +9,11 @@ from click.testing import CliRunner
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
 from sccfm_core.errors import NotFoundError
-from sccfm_core.services import NetworkGroupService
+from sccfm_core.services import NetworkGroupService, NetworkObjectService
 from sccfm_core.services.object_management import (
     NetworkGroupMemberMutationResult,
     NetworkGroupResponse,
+    NetworkObjectResponse,
 )
 
 CURRENT_GROUP = NetworkGroupResponse(
@@ -41,6 +42,10 @@ UPDATED_GROUP = NetworkGroupResponse(
 
 
 def _stub_init(self: NetworkGroupService, config: Any) -> None:
+    return None
+
+
+def _stub_obj_init(self: NetworkObjectService, config: Any) -> None:
     return None
 
 
@@ -158,3 +163,133 @@ class TestNetworkGroupAddMemberCommand:
 
         assert result.exit_code != 0
         assert "Network group with name 'missing' not found." in result.output
+
+    def test_check_should_validate_referenced_objects(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_get_group_by_name(
+            self: NetworkGroupService, name: str
+        ) -> NetworkGroupResponse | None:
+            return CURRENT_GROUP
+
+        obj_response = NetworkObjectResponse(
+            uid="obj-uid-001",
+            name="web-server-01",
+            description=None,
+            elements=[],
+            labels=[],
+            tags={},
+            object_type="NETWORK_OBJECT",
+            literal="10.0.1.100",
+        )
+
+        def fake_get_obj_by_name(
+            self: NetworkObjectService, name: str
+        ) -> NetworkObjectResponse | None:
+            if name == "web-server-01":
+                return obj_response
+            return None
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(
+            NetworkGroupService, "get_network_group_by_name", fake_get_group_by_name
+        )
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_obj_init)
+        monkeypatch.setattr(
+            NetworkObjectService, "get_network_object_by_name", fake_get_obj_by_name
+        )
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "objects",
+                "network-group",
+                "add-member",
+                "--name",
+                "test-network-group",
+                "--referenced-object",
+                "web-server-01",
+                "--referenced-object",
+                "does-not-exist",
+                "--check",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Referenced object 'web-server-01' exists" in result.output
+        assert "Referenced object 'does-not-exist' not found" in result.output
+
+    def test_check_json_should_emit_single_payload_with_referenced_object_results(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_get_group_by_name(
+            self: NetworkGroupService, name: str
+        ) -> NetworkGroupResponse | None:
+            return CURRENT_GROUP
+
+        obj_response = NetworkObjectResponse(
+            uid="11111111-1111-1111-1111-111111111111",
+            name="web-server-01",
+            description=None,
+            elements=[],
+            labels=[],
+            tags={},
+            object_type="NETWORK_OBJECT",
+            literal="10.0.1.100",
+        )
+
+        def fake_get_obj_by_name(
+            self: NetworkObjectService, name: str
+        ) -> NetworkObjectResponse | None:
+            if name == "web-server-01":
+                return obj_response
+            return None
+
+        monkeypatch.setattr(NetworkGroupService, "__init__", _stub_init)
+        monkeypatch.setattr(
+            NetworkGroupService, "get_network_group_by_name", fake_get_group_by_name
+        )
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_obj_init)
+        monkeypatch.setattr(
+            NetworkObjectService, "get_network_object_by_name", fake_get_obj_by_name
+        )
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "objects",
+                "network-group",
+                "add-member",
+                "--name",
+                "test-network-group",
+                "--referenced-object",
+                "web-server-01",
+                "--referenced-object",
+                "does-not-exist",
+                "--check",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["target"]["exists"] is True
+        assert payload["referenced_objects"] == [
+            {
+                "identifier": "web-server-01",
+                "exists": True,
+                "uid": "11111111-1111-1111-1111-111111111111",
+            },
+            {
+                "identifier": "does-not-exist",
+                "exists": False,
+                "uid": None,
+            },
+        ]

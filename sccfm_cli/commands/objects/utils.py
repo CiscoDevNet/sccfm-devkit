@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid as uuid_mod
 from typing import Any, Callable, Literal, Protocol
 
 import click
@@ -15,6 +16,12 @@ class _HasUid(Protocol):
 
     @property
     def name(self) -> str: ...
+
+
+class _NetworkObjectLookup(Protocol):
+    def get_network_object(self, uid: str) -> _HasUid | None: ...
+
+    def get_network_object_by_name(self, name: str) -> _HasUid | None: ...
 
 
 CheckOperation = Literal["create", "update", "delete"]
@@ -94,8 +101,9 @@ def check_object_exists(
     object_name: str,
     output_format: str = "table",
     operation: CheckOperation = "update",
-) -> None:
-    """Check whether an object exists and print the result.
+    emit: bool = True,
+) -> dict[str, Any]:
+    """Check whether an object exists and optionally print the result.
 
     Always exits with success (exit code 0).  When the entity is not
     found, an informational message is printed rather than a failure.
@@ -109,6 +117,10 @@ def check_object_exists(
         object_name: Human-readable object label (e.g. "Network object").
         output_format: ``"table"`` for Rich output, ``"json"`` for JSON.
         operation: Intended mutation operation being preflight-checked.
+        emit: Whether to print the result to the console.
+
+    Returns:
+        A dict describing the existence check result.
     """
     identifier = uid or name
     entity: _HasUid | None = None
@@ -136,25 +148,87 @@ def check_object_exists(
     else:
         summary = f"{object_name} '{identifier}' {blocked_state}; {operation} would fail."
 
+    result = {
+        "entity_type": object_name,
+        "identifier": identifier,
+        "operation": operation,
+        "exists": exists,
+        "can_proceed": can_proceed,
+        "reason": reason,
+        "uid": found_uid,
+        "name": found_name,
+    }
+
+    if not emit:
+        return result
+
     if output_format == "json":
         console.print(
             json.dumps(
-                {
-                    "entity_type": object_name,
-                    "identifier": identifier,
-                    "operation": operation,
-                    "exists": exists,
-                    "can_proceed": can_proceed,
-                    "reason": reason,
-                    "uid": found_uid,
-                    "name": found_name,
-                },
+                result,
                 indent=2,
             )
         )
-        return
+        return result
 
     if can_proceed:
         console.print(f"[green]✓[/green] {summary}")
     else:
         console.print(f"[yellow]![/yellow] {summary}")
+    return result
+
+
+def check_referenced_objects_exist(
+    *,
+    console: Console,
+    referenced_objects: list[str],
+    obj_service: _NetworkObjectLookup,
+    output_format: str = "table",
+    emit: bool = True,
+) -> list[dict[str, Any]]:
+    """Check whether referenced network objects exist and optionally print results.
+
+    Each entry is resolved by UID (if it looks like a UUID) or by name.
+    Always exits with success (exit code 0).
+
+    Args:
+        console: Rich console for output.
+        referenced_objects: List of network object names or UIDs.
+        obj_service: NetworkObjectService instance.
+        output_format: ``"table"`` for Rich output, ``"json"`` for JSON.
+        emit: Whether to print the results to the console.
+
+    Returns:
+        A list of dicts describing each referenced-object lookup result.
+    """
+    results: list[dict[str, Any]] = []
+    for ref in referenced_objects:
+        try:
+            uid = str(uuid_mod.UUID(ref))
+            entity = obj_service.get_network_object(uid)
+        except ValueError:
+            entity = obj_service.get_network_object_by_name(ref)
+
+        exists = entity is not None
+        found_uid = entity.uid if entity else None
+        results.append({"identifier": ref, "exists": exists, "uid": found_uid})
+
+    if not emit:
+        return results
+
+    if output_format == "json":
+        console.print(
+            json.dumps(
+                {"referenced_objects": results},
+                indent=2,
+            )
+        )
+        return results
+
+    for item in results:
+        ref = item["identifier"]
+        if item["exists"]:
+            console.print(f"[green]✓[/green] Referenced object '{ref}' exists (UID: {item['uid']})")
+        else:
+            console.print(f"[yellow]![/yellow] Referenced object '{ref}' not found")
+    return results
