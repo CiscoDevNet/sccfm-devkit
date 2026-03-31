@@ -9,7 +9,12 @@ from click.testing import CliRunner
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
-from sccfm_core.services.object_management import ObjectDetailsResponse, ObjectOverrideItem, ObjectOverrideService, ObjectTargetItem
+from sccfm_core.services.object_management import (
+    ObjectDetailsResponse,
+    ObjectOverrideItem,
+    ObjectOverrideService,
+    ObjectTargetItem,
+)
 from sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 
 SAMPLE_RESPONSE = ObjectDetailsResponse(
@@ -23,8 +28,16 @@ SAMPLE_RESPONSE = ObjectDetailsResponse(
         ObjectOverrideItem(target_id="897b293f-132e-4678-9d78-0f0947629500", value="11.14.11.14"),
     ],
     targets=[
-        ObjectTargetItem(id="897b293f-132e-4678-9d78-0f0947629500", display_name="alex-fdm-template", type="FDM_MANAGED_FTD"),
-        ObjectTargetItem(id="0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55", display_name="alex-fercal-crush-ftd-template", type="FDM_MANAGED_FTD"),
+        ObjectTargetItem(
+            id="897b293f-132e-4678-9d78-0f0947629500",
+            display_name="alex-fdm-template",
+            type="FDM_MANAGED_FTD",
+        ),
+        ObjectTargetItem(
+            id="0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55",
+            display_name="alex-fercal-crush-ftd-template",
+            type="FDM_MANAGED_FTD",
+        ),
     ],
 )
 
@@ -53,7 +66,14 @@ class TestShowObjectCommand:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "show", "--uid", "fd526e22-12ff-4fa0-a88d-7375c5d1e144", "--format", "json"],
+            [
+                "objects",
+                "show",
+                "--uid",
+                "fd526e22-12ff-4fa0-a88d-7375c5d1e144",
+                "--format",
+                "json",
+            ],
         )
 
         assert result.exit_code == 0
@@ -123,7 +143,14 @@ class TestShowObjectOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "show", "--uid", "fd526e22-12ff-4fa0-a88d-7375c5d1e144", "--format", "json"],
+            [
+                "objects",
+                "show",
+                "--uid",
+                "fd526e22-12ff-4fa0-a88d-7375c5d1e144",
+                "--format",
+                "json",
+            ],
         )
 
         assert result.exit_code == 0
@@ -140,9 +167,13 @@ class TestShowObjectOutput:
     ) -> None:
         def fake_get(self: ObjectOverrideService, **kwargs: Any) -> ObjectDetailsResponse:
             return ObjectDetailsResponse(
-                uid="obj-123", name="test-obj", description="",
-                object_type="NETWORK_OBJECT", default_value="1.2.3.4",
-                overrides=[], targets=[],
+                uid="obj-123",
+                name="test-obj",
+                description="",
+                object_type="NETWORK_OBJECT",
+                default_value="1.2.3.4",
+                overrides=[],
+                targets=[],
             )
 
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
@@ -175,13 +206,27 @@ class TestObjectOverrideServiceGetObject:
                 "objectType": "NETWORK_OBJECT",
                 "defaultContent": {"literal": "hr88.cisco.com"},
                 "overrides": [
-                    {"targetId": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55", "content": {"literal": "11.10.11.122"}},
-                    {"targetId": "897b293f-132e-4678-9d78-0f0947629500", "content": {"literal": "11.14.11.14"}},
+                    {
+                        "targetId": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55",
+                        "content": {"literal": "11.10.11.122"},
+                    },
+                    {
+                        "targetId": "897b293f-132e-4678-9d78-0f0947629500",
+                        "content": {"literal": "11.14.11.14"},
+                    },
                 ],
             },
             "targets": [
-                {"id": "897b293f-132e-4678-9d78-0f0947629500", "displayName": "alex-fdm-template", "type": "FDM_MANAGED_FTD"},
-                {"id": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55", "displayName": "alex-fercal-crush-ftd-template", "type": "FDM_MANAGED_FTD"},
+                {
+                    "id": "897b293f-132e-4678-9d78-0f0947629500",
+                    "displayName": "alex-fdm-template",
+                    "type": "FDM_MANAGED_FTD",
+                },
+                {
+                    "id": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55",
+                    "displayName": "alex-fercal-crush-ftd-template",
+                    "type": "FDM_MANAGED_FTD",
+                },
             ],
         }
         mock_api.get_object_without_preload_content.return_value = self._make_response(raw_object)
@@ -202,7 +247,9 @@ class TestObjectOverrideServiceGetObject:
         assert len(result.targets) == 2
         assert result.targets[0].display_name == "alex-fdm-template"
 
-    def test_should_handle_object_with_no_overrides_or_targets(self, monkeypatch: MonkeyPatch) -> None:
+    def test_should_handle_object_with_no_overrides_or_targets(
+        self, monkeypatch: MonkeyPatch
+    ) -> None:
         mock_api = Mock()
 
         raw_object = {

@@ -49,9 +49,12 @@ class TestApplyOverrideAsDefaultCommand:
             [
                 "objects",
                 "apply-override-as-default",
-                "--uid", "obj-123",
-                "--target-id", "device-456",
-                "--format", "json",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--format",
+                "json",
             ],
         )
 
@@ -116,7 +119,14 @@ class TestApplyOverrideAsDefaultErrors:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "apply-override-as-default", "--uid", "obj-123", "--target-id", "device-456"],
+            [
+                "objects",
+                "apply-override-as-default",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+            ],
         )
 
         assert result.exit_code != 0
@@ -128,7 +138,9 @@ class TestApplyOverrideAsDefaultErrors:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        error_body = json.dumps({"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}})
+        error_body = json.dumps(
+            {"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}}
+        )
 
         def fake_apply(self: ObjectOverrideService, **kwargs: Any) -> ObjectOverrideResponse:
             raise ApiException(status=404, body=error_body)
@@ -138,7 +150,14 @@ class TestApplyOverrideAsDefaultErrors:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "apply-override-as-default", "--uid", "obj-123", "--target-id", "device-456"],
+            [
+                "objects",
+                "apply-override-as-default",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+            ],
         )
 
         assert result.exit_code != 0
@@ -162,7 +181,14 @@ class TestApplyOverrideAsDefaultOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "apply-override-as-default", "--uid", "obj-123", "--target-id", "device-456"],
+            [
+                "objects",
+                "apply-override-as-default",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+            ],
         )
 
         assert result.exit_code == 0
@@ -184,7 +210,16 @@ class TestApplyOverrideAsDefaultOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "apply-override-as-default", "--uid", "obj-123", "--target-id", "device-456", "--format", "json"],
+            [
+                "objects",
+                "apply-override-as-default",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--format",
+                "json",
+            ],
         )
 
         assert result.exit_code == 0
@@ -214,8 +249,14 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
                 "objectType": "NETWORK_OBJECT",
                 "defaultContent": {"literal": "hr88.cisco.com"},
                 "overrides": [
-                    {"targetId": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55", "content": {"literal": "11.10.11.122"}},
-                    {"targetId": "897b293f-132e-4678-9d78-0f0947629500", "content": {"literal": "11.14.11.14"}},
+                    {
+                        "targetId": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55",
+                        "content": {"literal": "11.10.11.122"},
+                    },
+                    {
+                        "targetId": "897b293f-132e-4678-9d78-0f0947629500",
+                        "content": {"literal": "11.14.11.14"},
+                    },
                 ],
             },
         }
@@ -228,11 +269,16 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
                 "objectType": "NETWORK_OBJECT",
                 "defaultContent": {"literal": "11.14.11.14"},
                 "overrides": [
-                    {"targetId": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55", "content": {"literal": "11.10.11.122"}},
+                    {
+                        "targetId": "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55",
+                        "content": {"literal": "11.10.11.122"},
+                    },
                 ],
             },
         }
-        mock_api.modify_object_without_preload_content.return_value = self._make_response(patched_object)
+        mock_api.modify_object_without_preload_content.return_value = self._make_response(
+            patched_object
+        )
 
         service = ObjectOverrideService.__new__(ObjectOverrideService)
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
@@ -246,7 +292,9 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
         assert result.uid == "fd526e22-12ff-4fa0-a88d-7375c5d1e144"
         assert result.overrides_count == 1
 
-        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs["update_request"]
+        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
+            "update_request"
+        ]
         # New default should be the promoted override value
         assert update_request.value.default_content.actual_instance.literal == "11.14.11.14"
         # Promoted target's override should be removed
@@ -281,7 +329,9 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
                 "defaultContent": {"literal": "5.5.5.5"},
             },
         }
-        mock_api.modify_object_without_preload_content.return_value = self._make_response(patched_object)
+        mock_api.modify_object_without_preload_content.return_value = self._make_response(
+            patched_object
+        )
 
         service = ObjectOverrideService.__new__(ObjectOverrideService)
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
@@ -291,7 +341,9 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
 
         assert result.overrides_count == 0
 
-        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs["update_request"]
+        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
+            "update_request"
+        ]
         assert update_request.value.default_content.actual_instance.literal == "5.5.5.5"
         assert update_request.value.overrides is None
 

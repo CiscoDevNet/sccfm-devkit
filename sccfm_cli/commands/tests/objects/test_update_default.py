@@ -37,9 +37,7 @@ class TestUpdateDefaultCommand:
     ) -> None:
         captured: dict[str, Any] = {}
 
-        def fake_update(
-            self: ObjectOverrideService, **kwargs: Any
-        ) -> UpdateDefaultValueResponse:
+        def fake_update(self: ObjectOverrideService, **kwargs: Any) -> UpdateDefaultValueResponse:
             captured.update(kwargs)
             return SAMPLE_RESPONSE
 
@@ -79,9 +77,7 @@ class TestUpdateDefaultValidation:
     ) -> None:
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
 
-        result = cli_runner.invoke(
-            cli, ["objects", "update-default", "--value", "10.10.10.10"]
-        )
+        result = cli_runner.invoke(cli, ["objects", "update-default", "--value", "10.10.10.10"])
 
         assert result.exit_code != 0
         assert "uid" in result.output.lower()
@@ -94,9 +90,7 @@ class TestUpdateDefaultValidation:
     ) -> None:
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
 
-        result = cli_runner.invoke(
-            cli, ["objects", "update-default", "--uid", "obj-123"]
-        )
+        result = cli_runner.invoke(cli, ["objects", "update-default", "--uid", "obj-123"])
 
         assert result.exit_code != 0
         assert "value" in result.output.lower()
@@ -111,10 +105,10 @@ class TestUpdateDefaultErrors:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        def fake_update(
-            self: ObjectOverrideService, **kwargs: Any
-        ) -> UpdateDefaultValueResponse:
-            raise ValueError("Updating default value is not supported for object type 'SERVICE_OBJECT'.")
+        def fake_update(self: ObjectOverrideService, **kwargs: Any) -> UpdateDefaultValueResponse:
+            raise ValueError(
+                "Updating default value is not supported for object type 'SERVICE_OBJECT'."
+            )
 
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
         monkeypatch.setattr(ObjectOverrideService, "update_default_value", fake_update)
@@ -133,11 +127,11 @@ class TestUpdateDefaultErrors:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        error_body = json.dumps({"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}})
+        error_body = json.dumps(
+            {"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}}
+        )
 
-        def fake_update(
-            self: ObjectOverrideService, **kwargs: Any
-        ) -> UpdateDefaultValueResponse:
+        def fake_update(self: ObjectOverrideService, **kwargs: Any) -> UpdateDefaultValueResponse:
             raise ApiException(status=404, body=error_body)
 
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
@@ -161,9 +155,7 @@ class TestUpdateDefaultOutput:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        def fake_update(
-            self: ObjectOverrideService, **kwargs: Any
-        ) -> UpdateDefaultValueResponse:
+        def fake_update(self: ObjectOverrideService, **kwargs: Any) -> UpdateDefaultValueResponse:
             return SAMPLE_RESPONSE
 
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
@@ -185,9 +177,7 @@ class TestUpdateDefaultOutput:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        def fake_update(
-            self: ObjectOverrideService, **kwargs: Any
-        ) -> UpdateDefaultValueResponse:
+        def fake_update(self: ObjectOverrideService, **kwargs: Any) -> UpdateDefaultValueResponse:
             return SAMPLE_RESPONSE
 
         monkeypatch.setattr(ObjectOverrideService, "__init__", _stub_init)
@@ -195,7 +185,16 @@ class TestUpdateDefaultOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "update-default", "--uid", "obj-123", "--value", "10.10.10.10", "--format", "json"],
+            [
+                "objects",
+                "update-default",
+                "--uid",
+                "obj-123",
+                "--value",
+                "10.10.10.10",
+                "--format",
+                "json",
+            ],
         )
 
         assert result.exit_code == 0
@@ -214,9 +213,7 @@ class TestObjectOverrideServiceUpdateDefault:
         mock.read.return_value = json.dumps(data).encode("utf-8")
         return mock
 
-    def test_should_update_default_and_preserve_overrides(
-        self, monkeypatch: MonkeyPatch
-    ) -> None:
+    def test_should_update_default_and_preserve_overrides(self, monkeypatch: MonkeyPatch) -> None:
         mock_api = Mock()
 
         raw_object = {

@@ -49,9 +49,12 @@ class TestDeleteOverrideCommand:
             [
                 "objects",
                 "delete-override",
-                "--uid", "obj-123",
-                "--target-id", "device-456",
-                "--format", "json",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--format",
+                "json",
             ],
         )
 
@@ -128,7 +131,9 @@ class TestDeleteOverrideErrors:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        error_body = json.dumps({"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}})
+        error_body = json.dumps(
+            {"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}}
+        )
 
         def fake_delete(self: ObjectOverrideService, **kwargs: Any) -> ObjectOverrideResponse:
             raise ApiException(status=404, body=error_body)
@@ -184,7 +189,16 @@ class TestDeleteOverrideOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "delete-override", "--uid", "obj-123", "--target-id", "device-456", "--format", "json"],
+            [
+                "objects",
+                "delete-override",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--format",
+                "json",
+            ],
         )
 
         assert result.exit_code == 0
@@ -245,7 +259,9 @@ class TestObjectOverrideServiceDeleteOverride:
         assert result.uid == "obj-123"
         assert result.overrides_count == 1
 
-        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs["update_request"]
+        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
+            "update_request"
+        ]
         assert len(update_request.value.overrides) == 1
         remaining = update_request.value.overrides[0]
         assert remaining.target_id == "device-789"
@@ -290,7 +306,9 @@ class TestObjectOverrideServiceDeleteOverride:
         assert result.uid == "obj-123"
         assert result.overrides_count == 0
 
-        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs["update_request"]
+        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
+            "update_request"
+        ]
         assert update_request.value.overrides is None
 
     def test_should_raise_when_override_not_found(self, monkeypatch: MonkeyPatch) -> None:

@@ -49,10 +49,14 @@ class TestEditOverrideCommand:
             [
                 "objects",
                 "edit-override",
-                "--uid", "obj-123",
-                "--target-id", "device-456",
-                "--override-value", "10.10.10.10",
-                "--format", "json",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--override-value",
+                "10.10.10.10",
+                "--format",
+                "json",
             ],
         )
 
@@ -78,7 +82,14 @@ class TestEditOverrideValidation:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "edit-override", "--target-id", "device-456", "--override-value", "10.10.10.10"],
+            [
+                "objects",
+                "edit-override",
+                "--target-id",
+                "device-456",
+                "--override-value",
+                "10.10.10.10",
+            ],
         )
 
         assert result.exit_code != 0
@@ -134,7 +145,16 @@ class TestEditOverrideErrors:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "edit-override", "--uid", "obj-123", "--target-id", "device-456", "--override-value", "10.10.10.10"],
+            [
+                "objects",
+                "edit-override",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--override-value",
+                "10.10.10.10",
+            ],
         )
 
         assert result.exit_code != 0
@@ -146,7 +166,9 @@ class TestEditOverrideErrors:
         default_config: Config,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        error_body = json.dumps({"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}})
+        error_body = json.dumps(
+            {"errorMsg": "Object not found", "errorCode": "NOT_FOUND", "details": {}}
+        )
 
         def fake_edit(self: ObjectOverrideService, **kwargs: Any) -> ObjectOverrideResponse:
             raise ApiException(status=404, body=error_body)
@@ -156,7 +178,16 @@ class TestEditOverrideErrors:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "edit-override", "--uid", "obj-123", "--target-id", "device-456", "--override-value", "10.10.10.10"],
+            [
+                "objects",
+                "edit-override",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--override-value",
+                "10.10.10.10",
+            ],
         )
 
         assert result.exit_code != 0
@@ -180,7 +211,16 @@ class TestEditOverrideOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "edit-override", "--uid", "obj-123", "--target-id", "device-456", "--override-value", "10.10.10.10"],
+            [
+                "objects",
+                "edit-override",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--override-value",
+                "10.10.10.10",
+            ],
         )
 
         assert result.exit_code == 0
@@ -202,7 +242,18 @@ class TestEditOverrideOutput:
 
         result = cli_runner.invoke(
             cli,
-            ["objects", "edit-override", "--uid", "obj-123", "--target-id", "device-456", "--override-value", "10.10.10.10", "--format", "json"],
+            [
+                "objects",
+                "edit-override",
+                "--uid",
+                "obj-123",
+                "--target-id",
+                "device-456",
+                "--override-value",
+                "10.10.10.10",
+                "--format",
+                "json",
+            ],
         )
 
         assert result.exit_code == 0
@@ -259,12 +310,16 @@ class TestObjectOverrideServiceEditOverride:
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
         service._object_api = mock_api
 
-        result = service.edit_override(uid="obj-123", target_id="device-456", new_value="10.10.10.10")
+        result = service.edit_override(
+            uid="obj-123", target_id="device-456", new_value="10.10.10.10"
+        )
 
         assert result.uid == "obj-123"
         assert result.overrides_count == 2
 
-        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs["update_request"]
+        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
+            "update_request"
+        ]
         assert len(update_request.value.overrides) == 2
         edited = next(o for o in update_request.value.overrides if o.target_id == "device-456")
         assert edited.content.actual_instance.literal == "10.10.10.10"
@@ -323,16 +378,22 @@ class TestObjectOverrideServiceEditOverride:
                 ],
             },
         }
-        mock_api.modify_object_without_preload_content.return_value = self._make_response(patched_object)
+        mock_api.modify_object_without_preload_content.return_value = self._make_response(
+            patched_object
+        )
 
         service = ObjectOverrideService.__new__(ObjectOverrideService)
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
         service._object_api = mock_api
 
-        result = service.edit_override(uid="obj-url", target_id="device-456", new_value="new.example.com")
+        result = service.edit_override(
+            uid="obj-url", target_id="device-456", new_value="new.example.com"
+        )
 
         assert result.uid == "obj-url"
-        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs["update_request"]
+        update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
+            "update_request"
+        ]
         edited = update_request.value.overrides[0]
         assert edited.content.actual_instance.url == "new.example.com"
 
