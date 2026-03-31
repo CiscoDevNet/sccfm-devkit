@@ -156,9 +156,7 @@ class ObjectDetailsResponse:
     def from_dict(cls, data: dict[str, Any]) -> "ObjectDetailsResponse":
         value: dict[str, Any] = data.get("value") or {}
         default_content: dict[str, Any] = value.get("defaultContent") or {}
-        default_value = str(
-            default_content.get("literal") or default_content.get("url") or ""
-        )
+        default_value = str(default_content.get("literal") or default_content.get("url") or "")
         raw_overrides: list[dict[str, Any]] = value.get("overrides") or []
         raw_targets: list[dict[str, Any]] = data.get("targets") or []
         return cls(
@@ -343,12 +341,14 @@ class ObjectOverrideService:
             )
 
         updated_overrides = [
-            Override(
-                content=self._build_content_from_value(new_value, object_type),
-                targetId=target_id,
+            (
+                Override(
+                    content=self._build_content_from_value(new_value, object_type),
+                    targetId=target_id,
+                )
+                if o.get("targetId") == target_id
+                else self._build_override_from_raw(o, object_type)
             )
-            if o.get("targetId") == target_id
-            else self._build_override_from_raw(o, object_type)
             for o in raw_overrides
         ]
 
@@ -406,9 +406,7 @@ class ObjectOverrideService:
 
         raw_overrides: list[dict[str, Any]] = value.get("overrides") or []
         if not any(o.get("targetId") == target_id for o in raw_overrides):
-            raise ValueError(
-                f"No override found for target ID '{target_id}'."
-            )
+            raise ValueError(f"No override found for target ID '{target_id}'.")
 
         remaining_overrides = [
             self._build_override_from_raw(o, object_type)
@@ -477,9 +475,7 @@ class ObjectOverrideService:
                 "Use 'add-override' to create a new one."
             )
 
-        new_default_content = self._build_object_content(
-            matching.get("content") or {}, object_type
-        )
+        new_default_content = self._build_object_content(matching.get("content") or {}, object_type)
         remaining_overrides = [
             self._build_override_from_raw(o, object_type)
             for o in raw_overrides
