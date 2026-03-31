@@ -1,3 +1,9 @@
+## v0.23.0 (2026-03-31)
+
+### Feat
+
+- **LH-104307**: add override to object ansible and cli (#48)
+
 ## v0.22.0 (2026-03-25)
 
 ### Feat
