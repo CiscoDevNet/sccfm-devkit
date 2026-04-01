@@ -9,10 +9,13 @@ from sccfm_core.services.object_management.network_object_service import (
     NetworkObjectService,
 )
 from sccfm_core.services.object_management.object_override_service import (
+    ObjectDetailsResponse,
+    ObjectOverrideItem,
     ObjectOverrideResponse,
     ObjectOverrideService,
     ObjectTargetItem,
     ObjectTargetsResponse,
+    UpdateDefaultValueResponse,
 )
 
 __all__ = [
@@ -22,8 +25,11 @@ __all__ = [
     "NetworkObjectListResponse",
     "NetworkObjectResponse",
     "NetworkObjectService",
+    "ObjectDetailsResponse",
+    "ObjectOverrideItem",
     "ObjectOverrideResponse",
     "ObjectOverrideService",
     "ObjectTargetItem",
     "ObjectTargetsResponse",
+    "UpdateDefaultValueResponse",
 ]
