@@ -1,3 +1,9 @@
+## v0.25.0 (2026-04-01)
+
+### Feat
+
+- **LH-104308**: add network group add-member and remove-member commands (#46)
+
 ## v0.24.0 (2026-04-01)
 
 ### Feat
