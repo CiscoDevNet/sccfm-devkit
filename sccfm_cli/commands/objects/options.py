@@ -298,6 +298,18 @@ def group_update_params() -> List[click.Parameter]:
     ]
 
 
+def group_member_mutation_params() -> List[click.Parameter]:
+    """Parameters for network-group referenced-member add/remove commands."""
+    return [
+        uid_option(),
+        object_name_option(),
+        referenced_object_option(),
+        check_option(),
+        format_option(),
+        config_path_option(),
+    ]
+
+
 def format_tags(tags: dict[str, list[str]]) -> str:
     """Format tags dict as readable key=value lines."""
     return "\n".join(f"{key}={','.join(values)}" for key, values in tags.items())

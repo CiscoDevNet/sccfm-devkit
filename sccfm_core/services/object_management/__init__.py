@@ -1,5 +1,6 @@
 from sccfm_core.services.object_management.network_group_service import (
     NetworkGroupListResponse,
+    NetworkGroupMemberMutationResult,
     NetworkGroupResponse,
     NetworkGroupService,
 )
@@ -20,6 +21,7 @@ from sccfm_core.services.object_management.object_override_service import (
 
 __all__ = [
     "NetworkGroupListResponse",
+    "NetworkGroupMemberMutationResult",
     "NetworkGroupResponse",
     "NetworkGroupService",
     "NetworkObjectListResponse",

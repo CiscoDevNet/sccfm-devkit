@@ -275,3 +275,141 @@ class TestNetworkGroupServiceUpdate:
 
         with pytest.raises(ValueError, match="Only one"):
             service.update_network_group(uid="uid", name="name", description="test")
+
+
+class TestNetworkGroupServiceMemberMutation:
+    """Tests for referenced-member add/remove operations."""
+
+    def test_add_members_preserves_literals_and_appends_in_order(self) -> None:
+        old_ref = "00000000-0000-0000-0000-000000000010"
+        new_ref = "00000000-0000-0000-0000-000000000020"
+        existing = _make_raw_api_response(
+            network_literals=["10.0.0.0/24"],
+            referenced_object_uids=[old_ref],
+        )
+        updated = _make_raw_api_response(
+            network_literals=["10.0.0.0/24"],
+            referenced_object_uids=[old_ref, new_ref],
+        )
+
+        mock_api = Mock()
+        mock_api.get_object_without_preload_content.return_value = _mock_api_response(existing)
+        mock_api.modify_object_without_preload_content.return_value = _mock_api_response(updated)
+
+        service = NetworkGroupService.__new__(NetworkGroupService)
+        service._object_api = mock_api
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._network_object_service = _mock_network_object_service_for_uid(new_ref)
+
+        result = service.add_network_group_members(
+            uid="00000000-0000-0000-0000-000000000001",
+            referenced_objects=[new_ref, new_ref],
+        )
+
+        assert result.changed is True
+        assert result.network_group.referenced_object_uids == [old_ref, new_ref]
+        assert result.network_group.literals == ["10.0.0.0/24"]
+
+        call_kwargs = mock_api.modify_object_without_preload_content.call_args
+        update_req = call_kwargs.kwargs["update_request"]
+        content = update_req.value.default_content.actual_instance
+        assert content.referenced_object_uids == [old_ref, new_ref]
+        assert len(content.literals) == 1
+
+    def test_add_members_apply_changes_false_reports_change_without_patch(self) -> None:
+        old_ref = "00000000-0000-0000-0000-000000000010"
+        new_ref = "00000000-0000-0000-0000-000000000020"
+        existing = _make_raw_api_response(
+            network_literals=["10.0.0.0/24"],
+            referenced_object_uids=[old_ref],
+        )
+
+        mock_api = Mock()
+        mock_api.get_object_without_preload_content.return_value = _mock_api_response(existing)
+
+        service = NetworkGroupService.__new__(NetworkGroupService)
+        service._object_api = mock_api
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._network_object_service = _mock_network_object_service_for_uid(new_ref)
+
+        result = service.add_network_group_members(
+            uid="00000000-0000-0000-0000-000000000001",
+            referenced_objects=[new_ref],
+            apply_changes=False,
+        )
+
+        assert result.changed is True
+        assert result.network_group.referenced_object_uids == [old_ref]
+        mock_api.modify_object_without_preload_content.assert_not_called()
+
+    def test_remove_members_by_name_preserves_url_literals(self) -> None:
+        remove_ref = "00000000-0000-0000-0000-000000000010"
+        keep_ref = "00000000-0000-0000-0000-000000000020"
+        existing = _make_raw_api_response(
+            url_literals=["https://example.com"],
+            referenced_object_uids=[remove_ref, keep_ref],
+        )
+        updated = _make_raw_api_response(
+            url_literals=["https://example.com"],
+            referenced_object_uids=[keep_ref],
+        )
+
+        mock_api = Mock()
+        mock_api.get_object_without_preload_content.return_value = _mock_api_response(existing)
+        mock_api.modify_object_without_preload_content.return_value = _mock_api_response(updated)
+
+        mock_obj_service = Mock(spec=NetworkObjectService)
+        mock_obj_service.get_network_object_by_name.return_value = NetworkObjectResponse(
+            uid=remove_ref,
+            name="remove-me",
+            description=None,
+            elements=[],
+            labels=[],
+            tags={},
+            object_type="NETWORK_OBJECT",
+            literal="10.0.0.1",
+        )
+
+        service = NetworkGroupService.__new__(NetworkGroupService)
+        service._object_api = mock_api
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._network_object_service = mock_obj_service
+
+        result = service.remove_network_group_members(
+            uid="00000000-0000-0000-0000-000000000001",
+            referenced_objects=["remove-me"],
+        )
+
+        assert result.changed is True
+        assert result.network_group.referenced_object_uids == [keep_ref]
+
+        call_kwargs = mock_api.modify_object_without_preload_content.call_args
+        update_req = call_kwargs.kwargs["update_request"]
+        content = update_req.value.default_content.actual_instance
+        assert content.referenced_object_uids == [keep_ref]
+        assert len(content.literals) == 1
+
+    def test_remove_members_is_noop_when_requested_refs_are_absent(self) -> None:
+        keep_ref = "00000000-0000-0000-0000-000000000020"
+        missing_ref = "00000000-0000-0000-0000-000000000030"
+        existing = _make_raw_api_response(
+            network_literals=["10.0.0.0/24"],
+            referenced_object_uids=[keep_ref],
+        )
+
+        mock_api = Mock()
+        mock_api.get_object_without_preload_content.return_value = _mock_api_response(existing)
+
+        service = NetworkGroupService.__new__(NetworkGroupService)
+        service._object_api = mock_api
+        service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
+        service._network_object_service = _mock_network_object_service_for_uid(missing_ref)
+
+        result = service.remove_network_group_members(
+            uid="00000000-0000-0000-0000-000000000001",
+            referenced_objects=[missing_ref],
+        )
+
+        assert result.changed is False
+        assert result.network_group.referenced_object_uids == [keep_ref]
+        mock_api.modify_object_without_preload_content.assert_not_called()
