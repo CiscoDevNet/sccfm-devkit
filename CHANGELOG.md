@@ -1,3 +1,9 @@
+## v0.24.0 (2026-04-01)
+
+### Feat
+
+- **LH-106152**: object override improvements (#49)
+
 ## v0.23.0 (2026-03-31)
 
 ### Feat
