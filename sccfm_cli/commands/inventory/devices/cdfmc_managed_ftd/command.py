@@ -6,6 +6,7 @@ from scc_firewall_manager_sdk import EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.deploy import FtdDeployCommand
+from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.onboard import FtdOnboardCommand
 from sccfm_cli.commands.inventory.devices.rendering import DeviceListCommand
 
 
@@ -20,6 +21,7 @@ class CdfmcManagedFtdCommand(BaseCommand):
                 help_text="List cdFMC-managed FTD devices.",
             ),
             FtdDeployCommand(console),
+            FtdOnboardCommand(console),
         ]
 
     @property

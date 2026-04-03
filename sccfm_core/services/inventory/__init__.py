@@ -17,6 +17,7 @@ from sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
 )
 from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
+from sccfm_core.services.inventory.ftd_onboard_service import FtdOnboardService
 from sccfm_core.services.inventory.ftd_upgrade_service import FtdUpgradeService
 from sccfm_core.services.inventory.ftd_upgrade_version_service import (
     FtdUpgradeVersionService,
@@ -29,6 +30,7 @@ __all__ = [
     "AsaBootImageService",
     "AsaBootRegistryService",
     "FtdDeployService",
+    "FtdOnboardService",
     "AsaCommandLineService",
     "AsaDiskFileService",
     "AsaOnboardService",

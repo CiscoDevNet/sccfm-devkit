@@ -1,0 +1,97 @@
+---
+# Onboard a cdFMC-managed FTD device (non-ZTP) via SCCFM
+#
+# After onboarding, the CLI key is printed. Paste it into the FTD device's CLI
+# to complete registration with the cdFMC.
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
+#     -e name="My FTD" \
+#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
+#     -e '{"licenses":["BASE"]}'
+#
+# With a virtual FTD:
+#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
+#     -e name="My vFTD" \
+#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
+#     -e '{"licenses":["BASE","CARRIER"]}' \
+#     -e virtual=true \
+#     -e performance_tier=FTDv5
+#
+# With labels:
+#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
+#     -e name="My FTD" \
+#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
+#     -e '{"licenses":["BASE"],"ungrouped_labels":["ra-vpn-headend"]}'
+#
+# Dry-run (check mode):
+#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
+#     -e name="My FTD" \
+#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
+#     -e '{"licenses":["BASE"]}' \
+#     --check
+
+- name: Onboard cdFMC-managed FTD device (non-ZTP)
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    name: ""
+    fmc_access_policy_uid: ""
+    licenses: []
+    virtual: false
+    performance_tier: ""
+    grouped_labels: {}
+    ungrouped_labels: []
+
+  tasks:
+    - name: Validate that name is provided
+      ansible.builtin.fail:
+        msg: >-
+          name is required. Pass it with -e name="My FTD"
+      when: name | length == 0
+
+    - name: Validate that fmc_access_policy_uid is provided
+      ansible.builtin.fail:
+        msg: >-
+          fmc_access_policy_uid is required. Pass it with
+          -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb"
+      when: fmc_access_policy_uid | length == 0
+
+    - name: Validate that at least one license is provided
+      ansible.builtin.fail:
+        msg: >-
+          licenses is required. Pass it with -e '{"licenses":["BASE"]}'
+      when: licenses | length == 0
+
+    - name: Onboard cdFMC-managed FTD device
+      cisco.sccfm.onboard_cdfmc_ftd:
+        name: "{{ name }}"
+        fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
+        licenses: "{{ licenses }}"
+        virtual: "{{ virtual }}"
+        performance_tier: "{{ performance_tier if performance_tier | length > 0 else omit }}"
+        grouped_labels: "{{ grouped_labels if grouped_labels | length > 0 else omit }}"
+        ungrouped_labels: "{{ ungrouped_labels if ungrouped_labels | length > 0 else omit }}"
+      register: onboard_result
+
+    - name: Display onboard result
+      ansible.builtin.debug:
+        msg: >-
+          changed={{ onboard_result.changed }},
+          msg={{ onboard_result.msg }}
+
+    - name: Display CLI key
+      ansible.builtin.debug:
+        msg: "CLI Key (paste into FTD CLI): {{ onboard_result.cli_key }}"
+      when: onboard_result.changed and onboard_result.cli_key is not none
+
+    - name: Display device details
+      ansible.builtin.debug:
+        var: onboard_result.device
+      when: onboard_result.changed
