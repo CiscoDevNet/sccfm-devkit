@@ -1,4 +1,8 @@
 from sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageService
+from sccfm_core.services.inventory.cdfmc_access_policy_service import (
+    CdfmcAccessPolicyService,
+    FmcAccessPolicy,
+)
 from sccfm_core.services.inventory.asa_boot_registry_service import (
     AsaBootRegistryService,
 )
@@ -28,6 +32,8 @@ from sccfm_core.services.inventory.inventory_service import InventoryService
 __all__ = [
     "AsdmCompatibilityInfo",
     "AsaBootImageService",
+    "CdfmcAccessPolicyService",
+    "FmcAccessPolicy",
     "AsaBootRegistryService",
     "FtdDeployService",
     "FtdOnboardService",

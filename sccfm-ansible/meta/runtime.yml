@@ -22,9 +22,12 @@ action_groups:
     - list_ftd_not_on_version
     - list_asa_local_users
     - list_asa_not_on_version
+    - list_cdfmc_access_policies
+    - list_managers
     - list_network_groups
     - list_network_objects
     - onboard_asa
+    - onboard_cdfmc_ftd
     - remove_asa_shun
     - show_asa_shun
     - trigger_asa_upgrade

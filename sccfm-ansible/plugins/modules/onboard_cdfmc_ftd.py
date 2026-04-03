@@ -127,6 +127,10 @@ cli_key:
     - Can be passed directly to a subsequent SSH task.
   returned: success (changed=True)
   type: str
+device:
+  description: The onboarded device returned by SCC Firewall Manager.
+  returned: success (changed=True)
+  type: dict
 """
 
 
@@ -213,9 +217,7 @@ def run_module() -> None:
 
     try:
         if _check_name_exists(config, name):
-            module.fail_json(
-                msg=f"cdFMC-managed FTD device with name '{name}' already exists."
-            )
+            module.fail_json(msg=f"cdFMC-managed FTD device with name '{name}' already exists.")
             return
 
         if module.check_mode:
@@ -223,6 +225,7 @@ def run_module() -> None:
                 changed=True,
                 msg=f"Would onboard cdFMC-managed FTD device '{name}'.",
                 cli_key=None,
+                device={},
             )
             return
 
@@ -245,6 +248,7 @@ def run_module() -> None:
             changed=True,
             msg=f"cdFMC-managed FTD device '{name}' onboarded successfully.",
             cli_key=cli_key,
+            device=device.to_dict(),
         )
 
     except ApiException as e:

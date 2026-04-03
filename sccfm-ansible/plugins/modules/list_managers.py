@@ -1,0 +1,174 @@
+from __future__ import annotations
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException, DevicePage
+
+from sccfm_core import SccApiError
+from sccfm_core.services.inventory import InventoryService
+
+from ..module_utils.config import base_argument_spec, create_config
+
+DOCUMENTATION = r"""
+---
+module: list_managers
+short_description: List FMC managers in SCC Firewall Manager
+description:
+  - List on-premises and cloud-delivered FMC managers in your SCC Firewall Manager tenant.
+  - Supports pagination via C(limit) and C(offset).
+  - Supports Lucene query filtering via C(query).
+options:
+  query:
+    description: Optional Lucene query string to filter results (e.g. C(name:myFMC*)).
+    required: false
+    type: str
+  limit:
+    description: Maximum number of results to return.
+    required: false
+    type: int
+    default: 50
+  offset:
+    description: Pagination offset (number of results to skip).
+    required: false
+    type: int
+    default: 0
+  region:
+    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    required: false
+    type: str
+    env:
+      - name: SCCFM_REGION
+  api_token:
+    description: API token for SCCFM.
+    required: false
+    type: str
+    no_log: true
+    env:
+      - name: SCCFM_API_TOKEN
+author:
+  - Cisco SCCFM Team
+"""
+
+EXAMPLES = r"""
+# Example 1: List all managers
+- name: List all managers
+  cisco.sccfm.list_managers:
+    region: "{{ sccfm_region }}"
+    api_token: "{{ sccfm_api_token }}"
+  register: result
+
+- name: Show managers
+  ansible.builtin.debug:
+    var: result.managers
+
+# Example 2: Find a specific manager by name
+- name: Find cdFMC manager
+  cisco.sccfm.list_managers:
+    query: "name:mycdFMC"
+  register: result
+
+- name: Get domain UID
+  ansible.builtin.set_fact:
+    domain_uid: "{{ result.managers[0].fmc_domain_uid }}"
+"""
+
+RETURN = r"""
+managers:
+  description: List of managers returned by the API.
+  returned: success
+  type: list
+  elements: dict
+  contains:
+    uid:
+      description: Unique identifier of the manager.
+      type: str
+    name:
+      description: Name of the manager.
+      type: str
+    device_type:
+      description: Type of the manager (e.g. CDFMC, ONPREM_FMC).
+      type: str
+    fmc_domain_uid:
+      description: The FMC domain UID. Pass this to list_cdfmc_access_policies.
+      type: str
+    connectivity_state:
+      description: Connectivity state of the manager.
+      type: str
+    software_version:
+      description: Software version of the manager.
+      type: str
+count:
+  description: Total number of matching managers.
+  returned: success
+  type: int
+limit:
+  description: The limit used in the request.
+  returned: success
+  type: int
+offset:
+  description: The offset used in the request.
+  returned: success
+  type: int
+"""
+
+
+def build_argument_spec() -> dict[str, dict[str, Any]]:
+    return {
+        "query": {"type": "str", "required": False, "default": None},
+        "limit": {"type": "int", "required": False, "default": 50},
+        "offset": {"type": "int", "required": False, "default": 0},
+        **base_argument_spec(),
+    }
+
+
+def run_module() -> None:
+    module = AnsibleModule(
+        argument_spec=build_argument_spec(),
+        supports_check_mode=True,
+    )
+
+    if module.check_mode:
+        module.exit_json(changed=False, managers=[], count=0, limit=0, offset=0)
+        return
+
+    config = create_config(module)
+
+    try:
+        service = InventoryService(config)
+        page: DevicePage = service.get_managers(
+            limit=module.params["limit"],
+            offset=module.params["offset"],
+            query=module.params.get("query"),
+        )
+        managers = [
+            {
+                "uid": d.uid,
+                "name": d.name,
+                "device_type": d.device_type,
+                "fmc_domain_uid": d.fmc_domain_uid,
+                "connectivity_state": d.connectivity_state,
+                "software_version": d.software_version,
+            }
+            for d in (page.items or [])
+        ]
+        module.exit_json(
+            changed=False,
+            managers=managers,
+            count=page.count or 0,
+            limit=module.params["limit"],
+            offset=module.params["offset"],
+        )
+    except ApiException as e:
+        error = SccApiError.from_exception(e)
+        module.fail_json(**error.to_dict())
+    except Exception as e:
+        module.fail_json(msg=f"Failed to list managers: {str(e)}")
+
+
+def main() -> None:
+    run_module()
+
+
+if __name__ == "__main__":
+    main()

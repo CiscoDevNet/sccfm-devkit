@@ -1,35 +1,27 @@
 ---
 # Onboard a cdFMC-managed FTD device (non-ZTP) via SCCFM
 #
-# After onboarding, the CLI key is printed. Paste it into the FTD device's CLI
-# to complete registration with the cdFMC.
+# Automatically resolves the cdFMC domain UID and access policy UID before
+# onboarding. If multiple access policies exist, re-run with
+# -e access_policy_name="..." to select one.
 #
-# RUN THIS PLAYBOOK:
-#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
-#     -e name="My FTD" \
-#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
-#     -e '{"licenses":["BASE"]}'
+# After onboarding, paste the CLI key into the FTD device's CLI to complete
+# registration with the cdFMC.
 #
-# With a virtual FTD:
+# USAGE:
 #   ansible-playbook examples/onboard_cdfmc_ftd.yml \
-#     -e name="My vFTD" \
-#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
-#     -e '{"licenses":["BASE","CARRIER"]}' \
-#     -e virtual=true \
-#     -e performance_tier=FTDv5
-#
-# With labels:
-#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
-#     -e name="My FTD" \
-#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
-#     -e '{"licenses":["BASE"],"ungrouped_labels":["ra-vpn-headend"]}'
-#
-# Dry-run (check mode):
-#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
-#     -e name="My FTD" \
-#     -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb" \
+#     -e device_name="My FTD" \
+#     -e manager_name="MycdFMC" \
 #     -e '{"licenses":["BASE"]}' \
-#     --check
+#     --ask-vault-pass
+#
+# If multiple access policies exist:
+#   ansible-playbook examples/onboard_cdfmc_ftd.yml \
+#     -e device_name="My FTD" \
+#     -e manager_name="MycdFMC" \
+#     -e access_policy_name="My Access Policy" \
+#     -e '{"licenses":["BASE"]}' \
+#     --ask-vault-pass
 
 - name: Onboard cdFMC-managed FTD device (non-ZTP)
   hosts: localhost
@@ -41,8 +33,9 @@
       api_token: "{{ sccfm_api_token }}"
 
   vars:
-    name: ""
-    fmc_access_policy_uid: ""
+    device_name: ""
+    manager_name: ""
+    access_policy_name: ""
     licenses: []
     virtual: false
     performance_tier: ""
@@ -50,28 +43,116 @@
     ungrouped_labels: []
 
   tasks:
-    - name: Validate that name is provided
+    # --- Input validation ---
+    - name: Validate required inputs
+      ansible.builtin.fail:
+        msg: "{{ item.msg }}"
+      loop:
+        - msg: "device_name is required. Pass it with -e device_name=\"My FTD\""
+          when: "{{ device_name | length == 0 }}"
+        - msg: "manager_name is required. Pass it with -e manager_name=\"MycdFMC\""
+          when: "{{ manager_name | length == 0 }}"
+        - msg: "licenses is required. Pass it with -e '{\"licenses\":[\"BASE\"]}'"
+          when: "{{ licenses | length == 0 }}"
+      when: item.when
+
+    # --- Step 1: Resolve cdFMC domain UID ---
+    - name: Find cdFMC manager by name
+      cisco.sccfm.list_managers:
+        query: "name:{{ manager_name }}"
+      register: managers_result
+
+    - name: Fail if manager not found
+      ansible.builtin.fail:
+        msg: "No manager found with name '{{ manager_name }}'."
+      when: managers_result.managers | length == 0
+
+    - name: Fail if manager query is ambiguous
       ansible.builtin.fail:
         msg: >-
-          name is required. Pass it with -e name="My FTD"
-      when: name | length == 0
+          Multiple managers found for '{{ manager_name }}'. Re-run with a more specific
+          manager_name. Available: {{ managers_result.managers | map(attribute='name') | list }}
+      when: managers_result.managers | length > 1
 
-    - name: Validate that fmc_access_policy_uid is provided
+    - name: Fail if selected manager does not expose an FMC domain UID
       ansible.builtin.fail:
         msg: >-
-          fmc_access_policy_uid is required. Pass it with
-          -e fmc_access_policy_uid="7131daad-e813-4b8f-8f42-be1e241e8cdb"
-      when: fmc_access_policy_uid | length == 0
+          Manager '{{ manager_name }}' does not expose an fmc_domain_uid. Make sure
+          manager_name resolves to the target cdFMC manager.
+      when:
+        - managers_result.managers | length == 1
+        - managers_result.managers[0].fmc_domain_uid is not defined
+          or managers_result.managers[0].fmc_domain_uid is none
+          or managers_result.managers[0].fmc_domain_uid | length == 0
 
-    - name: Validate that at least one license is provided
+    - name: Set cdFMC domain UID
+      ansible.builtin.set_fact:
+        fmc_domain_uid: "{{ managers_result.managers[0].fmc_domain_uid }}"
+
+    # --- Step 2: Resolve fmcAccessPolicyUid ---
+    - name: List access policies for the cdFMC domain
+      cisco.sccfm.list_cdfmc_access_policies:
+        domain_uid: "{{ fmc_domain_uid }}"
+      register: policies_result
+
+    - name: Fail if no access policies found
+      ansible.builtin.fail:
+        msg: "No access policies found in cdFMC domain '{{ fmc_domain_uid }}'."
+      when: policies_result.access_policies | length == 0
+
+    - name: Fail if multiple access policies exist and none specified
       ansible.builtin.fail:
         msg: >-
-          licenses is required. Pass it with -e '{"licenses":["BASE"]}'
-      when: licenses | length == 0
+          Multiple access policies found. Re-run with
+          -e access_policy_name="..." to select one.
+          Available: {{ policies_result.access_policies | map(attribute='name') | list }}
+      when:
+        - access_policy_name | length == 0
+        - policies_result.access_policies | length > 1
 
+    - name: Select matching access policies
+      ansible.builtin.set_fact:
+        matching_access_policies: >-
+          {{
+            policies_result.access_policies
+            | selectattr('name', 'equalto', access_policy_name)
+            | list
+          }}
+      when: access_policy_name | length > 0
+
+    - name: Fail if requested access policy was not found
+      ansible.builtin.fail:
+        msg: >-
+          Access policy '{{ access_policy_name }}' was not found in cdFMC domain
+          '{{ fmc_domain_uid }}'. Available:
+          {{ policies_result.access_policies | map(attribute='name') | list }}
+      when:
+        - access_policy_name | length > 0
+        - matching_access_policies | length == 0
+
+    - name: Fail if requested access policy name is ambiguous
+      ansible.builtin.fail:
+        msg: >-
+          Multiple access policies matched '{{ access_policy_name }}'. Available:
+          {{ policies_result.access_policies | map(attribute='name') | list }}
+      when:
+        - access_policy_name | length > 0
+        - matching_access_policies | length > 1
+
+    - name: Set fmcAccessPolicyUid from the requested policy
+      ansible.builtin.set_fact:
+        fmc_access_policy_uid: "{{ matching_access_policies[0].uid }}"
+      when: access_policy_name | length > 0
+
+    - name: Set fmcAccessPolicyUid from the only available policy
+      ansible.builtin.set_fact:
+        fmc_access_policy_uid: "{{ policies_result.access_policies[0].uid }}"
+      when: access_policy_name | length == 0
+
+    # --- Step 3: Onboard ---
     - name: Onboard cdFMC-managed FTD device
       cisco.sccfm.onboard_cdfmc_ftd:
-        name: "{{ name }}"
+        name: "{{ device_name }}"
         fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
         licenses: "{{ licenses }}"
         virtual: "{{ virtual }}"
@@ -79,12 +160,6 @@
         grouped_labels: "{{ grouped_labels if grouped_labels | length > 0 else omit }}"
         ungrouped_labels: "{{ ungrouped_labels if ungrouped_labels | length > 0 else omit }}"
       register: onboard_result
-
-    - name: Display onboard result
-      ansible.builtin.debug:
-        msg: >-
-          changed={{ onboard_result.changed }},
-          msg={{ onboard_result.msg }}
 
     - name: Display CLI key
       ansible.builtin.debug:
@@ -94,4 +169,4 @@
     - name: Display device details
       ansible.builtin.debug:
         var: onboard_result.device
-      when: onboard_result.changed
+      when: onboard_result.changed and onboard_result.device is defined
