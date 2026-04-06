@@ -165,8 +165,3 @@
       ansible.builtin.debug:
         msg: "CLI Key (paste into FTD CLI): {{ onboard_result.cli_key }}"
       when: onboard_result.changed and onboard_result.cli_key is not none
-
-    - name: Display device details
-      ansible.builtin.debug:
-        var: onboard_result.device
-      when: onboard_result.changed and onboard_result.device is defined
