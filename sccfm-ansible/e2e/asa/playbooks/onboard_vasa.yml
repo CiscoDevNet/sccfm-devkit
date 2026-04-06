@@ -1,0 +1,40 @@
+---
+# Onboard the CI vASA to the SCCFM tenant.
+#
+# Expected environment variable:
+#   ASA_HOST — IP or hostname of the provisioned vASA (set by Jenkins)
+
+- name: "CI: Onboard vASA to SCCFM tenant"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Validate ASA_HOST is set
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'ASA_HOST') | length > 0
+        fail_msg: "ASA_HOST environment variable must be set to the vASA address"
+
+    - name: Onboard vASA device
+      cisco.sccfm.onboard_asa:
+        name: "ci-e2e-asa-{{ lookup('env', 'ASA_HOST') | regex_replace('[^a-zA-Z0-9]', '-') }}"
+        device_address: "{{ lookup('env', 'ASA_HOST') }}:443"
+        username: "{{ default_asa_username }}"
+        password: ""
+        connector_type: "{{ default_connector_type }}"
+        ignore_certificate: "{{ default_ignore_certificate }}"
+      register: onboard_result
+
+    - name: Show onboard result
+      ansible.builtin.debug:
+        var: onboard_result
