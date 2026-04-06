@@ -34,7 +34,7 @@ class CdfmcAccessPolicyService:
             collection_formats=None,
         )
         response = self._api_client.call_api(*params)
-        response.read()
+        response.read()  # type: ignore[no-untyped-call]
         data = json.loads(response.data)
         return [
             FmcAccessPolicy(uid=item["id"], name=item["name"]) for item in data.get("items", [])
