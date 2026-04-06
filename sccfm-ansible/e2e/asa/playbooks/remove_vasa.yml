@@ -8,13 +8,10 @@
   hosts: localhost
   gather_facts: false
 
-  vars_files:
-    - ../../../examples/group_vars/all/vars.yml
-    - ../../../examples/group_vars/all/vault.yml
-    - vars/test_data.yml
-
   vars:
     sccfm_api_base: "https://ci.manage.security.cisco.com/api/rest"
+    sccfm_api_token: "{{ lookup('env', 'API_TOKEN') }}"
+    asa_test_query_all: "name:ci-e2e-asa-*"
 
   tasks:
     - name: Find CI vASA devices
