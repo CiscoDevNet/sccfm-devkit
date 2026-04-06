@@ -13,11 +13,8 @@ from scc_firewall_manager_sdk import (
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
-from sccfm_core import InventoryService
+from sccfm_core import FTD_LICENSES, FTDV_PERFORMANCE_TIERS, InventoryService
 from sccfm_core.services.inventory import FtdOnboardService
-
-_PERFORMANCE_TIERS = ["FTDv5", "FTDv10", "FTDv20", "FTDv30", "FTDv50", "FTDv100", "FTDv"]
-_LICENSES = ["BASE", "CARRIER", "THREAT", "MALWARE", "URLFilter"]
 
 
 class FtdOnboardCommand(BaseCommand):
@@ -48,7 +45,7 @@ class FtdOnboardCommand(BaseCommand):
                 ["--licenses"],
                 required=True,
                 multiple=True,
-                type=click.Choice(_LICENSES, case_sensitive=True),
+                type=click.Choice(FTD_LICENSES, case_sensitive=True),
                 help=(
                     "License(s) to apply to the device. "
                     "Can be specified multiple times (e.g. --licenses BASE --licenses CARRIER)."
@@ -63,8 +60,8 @@ class FtdOnboardCommand(BaseCommand):
             click.Option(
                 ["--performance-tier"],
                 default=None,
-                type=click.Choice(_PERFORMANCE_TIERS, case_sensitive=True),
-                help="Performance tier of the FTDv (required when --virtual is set).",
+                type=click.Choice(FTDV_PERFORMANCE_TIERS, case_sensitive=True),
+                help="Performance tier of the FTDv (required when --virtual is set, e.g., FTDv5, FTDv10, FTDv20).",
             ),
             click.Option(
                 ["--grouped-labels"],
