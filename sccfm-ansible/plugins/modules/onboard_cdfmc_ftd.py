@@ -127,11 +127,11 @@ cli_key:
     - Can be passed directly to a subsequent SSH task.
   returned: success (changed=True)
   type: str
-device:
-  description: The onboarded device returned by SCC Firewall Manager.
-  returned: success (changed=True)
-  type: dict
 """
+
+
+_VALID_LICENSES = ["BASE", "CARRIER", "THREAT", "MALWARE", "URLFilter"]
+_VALID_PERFORMANCE_TIERS = ["FTDv5", "FTDv10", "FTDv20", "FTDv30", "FTDv50", "FTDv100", "FTDv"]
 
 
 def build_argument_spec() -> dict:
@@ -140,7 +140,7 @@ def build_argument_spec() -> dict:
         "fmc_access_policy_uid": {"type": "str", "required": True},
         "licenses": {"type": "list", "elements": "str", "required": True},
         "virtual": {"type": "bool", "required": False, "default": False},
-        "performance_tier": {"type": "str", "required": False},
+        "performance_tier": {"type": "str", "required": False, "choices": _VALID_PERFORMANCE_TIERS},
         "grouped_labels": {"type": "dict", "required": False},
         "ungrouped_labels": {"type": "list", "elements": "str", "required": False},
         **base_argument_spec(),
@@ -149,10 +149,11 @@ def build_argument_spec() -> dict:
 
 def _check_name_exists(config: ConfigLike, name: str) -> bool:
     inventory_service = InventoryService(config=config)
+    escaped = name.replace("\\", "\\\\").replace('"', '\\"')
     page: DevicePage = inventory_service.get_devices(
         limit=1,
         offset=0,
-        query=f"deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:{name}",
+        query=f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:"{escaped}"',
     )
     return page.count is not None and page.count > 0
 
@@ -209,6 +210,13 @@ def run_module() -> None:
 
     if not licenses:
         module.fail_json(msg="At least one license is required.")
+        return
+
+    invalid_licenses = [lic for lic in licenses if lic not in _VALID_LICENSES]
+    if invalid_licenses:
+        module.fail_json(
+            msg=f"Invalid license(s): {invalid_licenses}. Must be one of: {_VALID_LICENSES}."
+        )
         return
 
     if virtual and not performance_tier:

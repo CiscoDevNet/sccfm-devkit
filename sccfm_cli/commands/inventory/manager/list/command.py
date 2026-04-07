@@ -57,6 +57,7 @@ class ManagersListCommand(BaseCommand):
         table.add_column("Software Version")
         table.add_column("Connectivity")
         table.add_column("Configuration")
+        table.add_column("FMC Domain UID")
         items = page.items or []
         for device in items:
             table.add_row(
@@ -66,5 +67,6 @@ class ManagersListCommand(BaseCommand):
                 device.software_version,
                 device.connectivity_state,
                 device.config_state,
+                device.fmc_domain_uid,
             )
         self.console.print(table)

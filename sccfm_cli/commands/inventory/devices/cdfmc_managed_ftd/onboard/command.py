@@ -210,4 +210,5 @@ class FtdOnboardCommand(BaseCommand):
 
     @staticmethod
     def _ftd_name_query(name: str) -> str:
-        return f"deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:{name}"
+        escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+        return f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:"{escaped}"'
