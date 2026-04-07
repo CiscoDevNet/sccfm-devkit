@@ -27,8 +27,12 @@ description:
   - Applies to 1xxx/2xxx/3xxx series physical FTD devices.
   - This module is idempotent - if a device with the same name and serial number is already
     onboarded, it returns C(changed=False) without error.
-  - If the name is taken by a device with a different serial number, or the serial number is
-    already onboarded under a different name, the module fails with a clear error message.
+  - If the name is already taken by a device with a different serial number, the module fails
+    with a clear error message.
+  - >
+    Note: the inventory API does not support searching by serial number, so a device onboarded
+    under a different name with the same serial cannot be detected at this stage. The API will
+    return an error in that case.
 options:
   name:
     description: Human-readable name for the FTD device.
