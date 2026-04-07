@@ -1,3 +1,9 @@
+## v0.26.0 (2026-04-07)
+
+### Feat
+
+- **LH-102412**: create CDFMC Managed FTD (Non-ZTP) (#50)
+
 ## v0.25.0 (2026-04-01)
 
 ### Feat

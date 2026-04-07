@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sccfm"
-version = "0.25.0"
+version = "0.26.0"
 description = "Command line interface for SCC Firewall Manager"
 authors = ["Siddhu Warrier <siwarrie@cisco.com>"]
 license = "MIT"
