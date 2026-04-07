@@ -6,25 +6,23 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.inventory.manager.access_policies import AccessPoliciesCommand
-from sccfm_cli.commands.inventory.manager.list import ManagersListCommand
+from sccfm_cli.commands.inventory.manager.access_policies.list import ListAccessPoliciesCommand
 
 
-class ManagersCommand(BaseCommand):
+class AccessPoliciesCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
-            ManagersListCommand(console),
-            AccessPoliciesCommand(console),
+            ListAccessPoliciesCommand(console),
         ]
 
     @property
     def name(self) -> str:
-        return "manager"
+        return "access-policies"
 
     @property
     def help_text(self) -> str:
-        return "Manager inventory operations."
+        return "FMC access policy operations."
 
     def build(self) -> click.Command:
         group = click.Group(name=self.name, help=self.help_text)
@@ -33,4 +31,4 @@ class ManagersCommand(BaseCommand):
         return group
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:  # pragma: no cover
-        ctx.fail("Specify a subcommand for manager (e.g., list).")
+        ctx.fail("Specify a subcommand for access-policies (e.g., list).")

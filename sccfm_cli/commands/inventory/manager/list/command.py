@@ -9,6 +9,7 @@ from scc_firewall_manager_sdk import DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
+from sccfm_cli.utils import with_spinner
 from sccfm_core.services import InventoryService
 
 
@@ -24,6 +25,7 @@ class ManagersListCommand(BaseCommand):
     def build_params(self) -> Sequence[click.Parameter]:
         return inventory_list_params()
 
+    @with_spinner("Fetching managers from SCC Firewall Manager...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         limit = cast(int, kwargs.get("limit"))
         offset = cast(int, kwargs.get("offset"))
@@ -34,7 +36,6 @@ class ManagersListCommand(BaseCommand):
 
         inventory_service = InventoryService(config)
         page: DevicePage = inventory_service.get_managers(
-            config=config,
             limit=limit,
             offset=offset,
             query=query,
@@ -56,6 +57,7 @@ class ManagersListCommand(BaseCommand):
         table.add_column("Software Version")
         table.add_column("Connectivity")
         table.add_column("Configuration")
+        table.add_column("FMC Domain UID")
         items = page.items or []
         for device in items:
             table.add_row(
@@ -65,5 +67,6 @@ class ManagersListCommand(BaseCommand):
                 device.software_version,
                 device.connectivity_state,
                 device.config_state,
+                device.fmc_domain_uid,
             )
         self.console.print(table)

@@ -17,7 +17,5 @@ class InventoryService:
     def get_device_by_uid(self, device_uid: str) -> Device:
         return self.inventory_api.get_device(device_uid=device_uid)
 
-    def get_managers(
-        self, *, config: ConfigLike, limit: int, offset: int, query: str = ""
-    ) -> DevicePage:
+    def get_managers(self, *, limit: int, offset: int, query: str | None = None) -> DevicePage:
         return self.inventory_api.get_device_managers(limit=str(limit), offset=str(offset), q=query)

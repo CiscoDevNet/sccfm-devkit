@@ -16,7 +16,12 @@ from sccfm_core.services.inventory.asa_upgrade_version_service import (
 from sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
 )
+from sccfm_core.services.inventory.cdfmc_access_policy_service import (
+    CdfmcAccessPolicyService,
+    FmcAccessPolicy,
+)
 from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
+from sccfm_core.services.inventory.ftd_onboard_service import FtdOnboardService
 from sccfm_core.services.inventory.ftd_upgrade_service import FtdUpgradeService
 from sccfm_core.services.inventory.ftd_upgrade_version_service import (
     FtdUpgradeVersionService,
@@ -28,7 +33,6 @@ __all__ = [
     "AsdmCompatibilityInfo",
     "AsaBootImageService",
     "AsaBootRegistryService",
-    "FtdDeployService",
     "AsaCommandLineService",
     "AsaDiskFileService",
     "AsaOnboardService",
@@ -36,6 +40,10 @@ __all__ = [
     "AsaUpgradeService",
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
+    "CdfmcAccessPolicyService",
+    "FmcAccessPolicy",
+    "FtdDeployService",
+    "FtdOnboardService",
     "FtdUpgradeService",
     "FtdUpgradeVersionService",
     "InventoryService",
