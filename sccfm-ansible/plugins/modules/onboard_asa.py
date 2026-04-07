@@ -161,8 +161,12 @@ def build_argument_spec() -> dict[str, dict[str, str | bool | list[str]]]:
 def build_asa_input(
     params: dict[str, str | bool | list[str] | dict[str, list[str]] | None],
 ) -> AsaCreateOrUpdateInput:
-    """Build AsaCreateOrUpdateInput from Ansible module parameters."""
-    return AsaCreateOrUpdateInput(
+    """Build AsaCreateOrUpdateInput from Ansible module parameters.
+
+    Uses model_construct to skip Pydantic validation, allowing empty
+    passwords (e.g. vASA devices with no password set).
+    """
+    return AsaCreateOrUpdateInput.model_construct(
         name=str(params["name"]),
         deviceAddress=str(params["device_address"]),
         username=str(params["username"]),
