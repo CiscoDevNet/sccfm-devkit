@@ -1,0 +1,88 @@
+---
+# Add and remove referenced members from network groups in SCC Firewall Manager
+#
+# This playbook demonstrates idempotent add-member and remove-member operations.
+# Network object names are resolved to UIDs automatically.
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/manage_network_group_members.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+#   - The network group and referenced network objects must already exist.
+#     Run create_network_objects.yml and create_network_groups.yml first.
+
+- name: Manage network group members - add and remove
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    group_name: web-servers
+    members_to_add:
+      - web-server-01
+      - web-server-02
+    members_to_remove:
+      - web-server-02
+
+  tasks:
+    # ============================================================
+    # 1. Add members to the group
+    # ============================================================
+    - name: Add members to network group
+      cisco.sccfm.add_network_group_members:
+        name: "{{ group_name }}"
+        referenced_objects: "{{ members_to_add }}"
+      register: add_result
+
+    - name: Display add result
+      ansible.builtin.debug:
+        msg: "changed={{ add_result.changed }} - {{ add_result.msg }}"
+
+    # ============================================================
+    # 2. Verify idempotency - re-add same members (should be no-op)
+    # ============================================================
+    - name: Re-add same members (idempotent)
+      cisco.sccfm.add_network_group_members:
+        name: "{{ group_name }}"
+        referenced_objects: "{{ members_to_add }}"
+      register: readd_result
+
+    - name: Verify no change on re-add
+      ansible.builtin.assert:
+        that:
+          - not readd_result.changed
+        fail_msg: "Expected no change on idempotent re-add"
+
+    # ============================================================
+    # 3. Remove a member from the group
+    # ============================================================
+    - name: Remove a member from network group
+      cisco.sccfm.remove_network_group_members:
+        name: "{{ group_name }}"
+        referenced_objects: "{{ members_to_remove }}"
+      register: remove_result
+
+    - name: Display remove result
+      ansible.builtin.debug:
+        msg: "changed={{ remove_result.changed }} - {{ remove_result.msg }}"
+
+    # ============================================================
+    # 4. Verify idempotency - re-remove same member (should be no-op)
+    # ============================================================
+    - name: Re-remove same member (idempotent)
+      cisco.sccfm.remove_network_group_members:
+        name: "{{ group_name }}"
+        referenced_objects: "{{ members_to_remove }}"
+      register: reremove_result
+
+    - name: Verify no change on re-remove
+      ansible.builtin.assert:
+        that:
+          - not reremove_result.changed
+        fail_msg: "Expected no change on idempotent re-remove"

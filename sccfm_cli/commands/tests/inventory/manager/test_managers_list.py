@@ -27,10 +27,9 @@ def test_should_return_managers_as_json(
     def fake_get_managers(
         self: InventoryService,
         *,
-        config: Config,
         limit: int,
         offset: int,
-        query: str = "",
+        query: str | None = None,
     ) -> DevicePage:
         captured_params["limit"] = limit
         captured_params["offset"] = offset
@@ -75,7 +74,7 @@ def test_should_display_managers_as_table(
     """Managers list command should display formatted table with manager information."""
 
     def fake_get_managers(
-        self: InventoryService, *, config: Config, limit: int, offset: int, query: str = ""
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
     ) -> DevicePage:
         return DevicePage(count=len(sample_managers), items=sample_managers)
 

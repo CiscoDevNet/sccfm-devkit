@@ -1,8 +1,32 @@
-## v0.23.0 (2026-04-01)
+## v0.27.0 (2026-04-07)
 
 ### Feat
 
 - **LH-102418**: add access rule creation for policies — core service, CLI command, and Ansible module
+
+## v0.26.0 (2026-04-07)
+
+### Feat
+
+- **LH-102412**: create CDFMC Managed FTD (Non-ZTP) (#50)
+
+## v0.25.0 (2026-04-01)
+
+### Feat
+
+- **LH-104308**: add network group add-member and remove-member commands (#46)
+
+## v0.24.0 (2026-04-01)
+
+### Feat
+
+- **LH-106152**: object override improvements (#49)
+
+## v0.23.0 (2026-03-31)
+
+### Feat
+
+- **LH-104307**: add override to object ansible and cli (#48)
 
 ## v0.22.0 (2026-03-25)
 

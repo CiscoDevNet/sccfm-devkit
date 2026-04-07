@@ -1,0 +1,132 @@
+---
+# Object override lifecycle in SCC Firewall Manager.
+#
+# Flow:
+#   1. Inspect the object
+#   2. Delete all existing overrides
+#   3. Set the first override value as the new default
+#   4. Add overrides for remaining targets
+#   5. Edit the remaining overrides
+#   6. Show final state
+#
+# Usage:
+#   ansible-playbook examples/add_object_override.yml \
+#     -e object_uid=<object-uid> \
+#     -e '{"override_values": ["10.10.10.10", "10.20.20.20"]}' \
+#     -e edited_override_value=10.99.99.99
+#
+# Required variables:
+#   object_uid            - UID of the shared object to operate on
+#   override_values       - List of values, one per target in order
+#   edited_override_value - Value to set when editing the remaining override
+
+- name: Object override lifecycle
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # 1. Inspect current state
+    # -------------------------------------------------------------------------
+    - name: Show current object state
+      cisco.sccfm.get_object:
+        uid: "{{ object_uid }}"
+      register: obj
+
+    - name: Display current object state
+      ansible.builtin.debug:
+        msg: >-
+          Object '{{ obj.object.name }}' ({{ obj.object.object_type }})
+          — default: {{ obj.object.default_value }}
+          — overrides: {{ obj.object.overrides | length }}
+          — targets: {{ obj.object.targets | map(attribute='display_name') | list }}
+
+    - name: Fail if no targets are attached
+      ansible.builtin.fail:
+        msg: "Object {{ object_uid }} is not attached to any device."
+      when: obj.object.targets | length == 0
+
+    # -------------------------------------------------------------------------
+    # 2. Delete all existing overrides
+    # -------------------------------------------------------------------------
+    - name: Delete existing overrides
+      cisco.sccfm.delete_object_override:
+        uid: "{{ object_uid }}"
+        target_id: "{{ item.target_id }}"
+      loop: "{{ obj.object.overrides }}"
+      when: obj.object.overrides | length > 0
+
+    # -------------------------------------------------------------------------
+    # 3. Set the first override value as the new default
+    # -------------------------------------------------------------------------
+    - name: Set first override value as new default
+      cisco.sccfm.update_object_default:
+        uid: "{{ object_uid }}"
+        value: "{{ override_values[0] }}"
+      register: default_result
+
+    - name: Display result after setting new default
+      ansible.builtin.debug:
+        msg: >-
+          Default value updated to '{{ override_values[0] }}'.
+
+    # -------------------------------------------------------------------------
+    # 4. Add overrides for remaining targets
+    # -------------------------------------------------------------------------
+    - name: Add override on remaining targets
+      cisco.sccfm.add_object_override:
+        uid: "{{ object_uid }}"
+        target_id: "{{ obj.object.targets[idx + 1].id }}"
+        override_value: "{{ item }}"
+      loop: "{{ override_values[1:] }}"
+      loop_control:
+        index_var: idx
+      register: add_results
+      when: override_values | length > 1
+
+    - name: Display result after adding overrides
+      ansible.builtin.debug:
+        msg: >-
+          Added override '{{ item.item }}' on '{{ obj.object.targets[item_idx + 1].display_name }}'.
+      loop: "{{ add_results.results }}"
+      loop_control:
+        index_var: item_idx
+      when: add_results.results is defined
+
+    # -------------------------------------------------------------------------
+    # 5. Edit the remaining overrides
+    # -------------------------------------------------------------------------
+    - name: Edit remaining override
+      cisco.sccfm.edit_object_override:
+        uid: "{{ object_uid }}"
+        target_id: "{{ obj.object.targets[1].id }}"
+        override_value: "{{ edited_override_value }}"
+      register: edit_result
+      when: obj.object.targets | length > 1
+
+    - name: Display result after edit
+      ansible.builtin.debug:
+        msg: >-
+          Override updated on '{{ obj.object.targets[1].display_name }}'.
+          Total overrides: {{ edit_result.object_override.overrides_count }}.
+      when: obj.object.targets | length > 1
+
+    # -------------------------------------------------------------------------
+    # 6. Show final state
+    # -------------------------------------------------------------------------
+    - name: Show final object state
+      cisco.sccfm.get_object:
+        uid: "{{ object_uid }}"
+      register: final_obj
+
+    - name: Display final object state
+      ansible.builtin.debug:
+        msg: >-
+          Final state — '{{ final_obj.object.name }}'
+          default: {{ final_obj.object.default_value }}
+          — overrides: {{ final_obj.object.overrides }}

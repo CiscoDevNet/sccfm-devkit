@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from scc_firewall_manager_sdk.models.create_request import CreateRequest
 from scc_firewall_manager_sdk.models.group_content import GroupContent
@@ -78,6 +78,14 @@ class NetworkGroupResponse:
             "literals": self.literals,
             "referenced_object_uids": self.referenced_object_uids,
         }
+
+
+@dataclass
+class NetworkGroupMemberMutationResult:
+    """Result of a network-group referenced-member mutation."""
+
+    network_group: NetworkGroupResponse
+    changed: bool
 
 
 @dataclass
@@ -162,12 +170,16 @@ class NetworkGroupService:
         Raises:
             NotFoundError: If the group is not found.
         """
+        data = self._get_raw_group_data(uid)
+        value: dict[str, Any] = data.get("value") or {}
+        return value.get("defaultContent") or {}
+
+    def _get_raw_group_data(self, uid: str) -> dict[str, Any]:
+        """Fetch the raw object payload for a network group."""
         response = self._object_api.get_object_without_preload_content(uid=uid)
         if response.status == 404:
             raise NotFoundError(f"Network group with UID '{uid}' not found.")
-        data = self._helper.read_raw_response(response)
-        value: dict[str, Any] = data.get("value") or {}
-        return value.get("defaultContent") or {}
+        return self._helper.read_raw_response(response)
 
     def get_network_group_by_name(self, name: str) -> NetworkGroupResponse | None:
         """Search for a network group object by name.
@@ -387,6 +399,91 @@ class NetworkGroupService:
         data = self._helper.read_raw_response(response)
         return NetworkGroupResponse.from_dict(data)
 
+    def add_network_group_members(
+        self,
+        *,
+        uid: str | None = None,
+        name: str | None = None,
+        referenced_objects: list[str],
+        apply_changes: bool = True,
+    ) -> NetworkGroupMemberMutationResult:
+        """Add referenced network-object members to a network group."""
+        return self._mutate_network_group_members(
+            uid=uid,
+            name=name,
+            referenced_objects=referenced_objects,
+            operation="add",
+            apply_changes=apply_changes,
+        )
+
+    def remove_network_group_members(
+        self,
+        *,
+        uid: str | None = None,
+        name: str | None = None,
+        referenced_objects: list[str],
+        apply_changes: bool = True,
+    ) -> NetworkGroupMemberMutationResult:
+        """Remove referenced network-object members from a network group."""
+        return self._mutate_network_group_members(
+            uid=uid,
+            name=name,
+            referenced_objects=referenced_objects,
+            operation="remove",
+            apply_changes=apply_changes,
+        )
+
+    def _mutate_network_group_members(
+        self,
+        *,
+        uid: str | None,
+        name: str | None,
+        referenced_objects: list[str],
+        operation: Literal["add", "remove"],
+        apply_changes: bool,
+    ) -> NetworkGroupMemberMutationResult:
+        """Best-effort read/modify/write for referenced network-object members."""
+        resolved_uid = self._resolve_uid(uid=uid, name=name)
+        self._validate_referenced_objects(referenced_objects)
+
+        current_data = self._get_raw_group_data(resolved_uid)
+        current_group = NetworkGroupResponse.from_dict(current_data)
+        resolved_refs = self._resolve_referenced_object_uids(referenced_objects)
+        final_refs = self._merge_referenced_object_uids(
+            current_group.referenced_object_uids,
+            resolved_refs,
+            operation=operation,
+        )
+        changed = final_refs != current_group.referenced_object_uids
+        if not changed or not apply_changes:
+            return NetworkGroupMemberMutationResult(
+                network_group=current_group,
+                changed=changed,
+            )
+
+        current_content = self._extract_default_content(current_data)
+        existing_literals = self._rebuild_literal_contents(current_content)
+        shared_value = self._build_shared_value(
+            single_contents=existing_literals,
+            referenced_object_uids=final_refs,
+        )
+        update_request = UpdateRequest(value=shared_value)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Pydantic serializer warnings",
+                category=UserWarning,
+            )
+            response = self._object_api.modify_object_without_preload_content(
+                uid=resolved_uid,
+                update_request=update_request,
+            )
+        data = self._helper.read_raw_response(response)
+        return NetworkGroupMemberMutationResult(
+            network_group=NetworkGroupResponse.from_dict(data),
+            changed=True,
+        )
+
     def _build_shared_value(
         self,
         *,
@@ -433,6 +530,12 @@ class NetworkGroupService:
         for url in url_literals:
             contents.append(SingleContent(actual_instance=UrlObjectContent(url=url)))
         return contents
+
+    @staticmethod
+    def _extract_default_content(raw_data: dict[str, Any]) -> dict[str, Any]:
+        """Extract the raw defaultContent dict from a group payload."""
+        value: dict[str, Any] = raw_data.get("value") or {}
+        return value.get("defaultContent") or {}
 
     @staticmethod
     def _rebuild_literal_contents(
@@ -495,6 +598,34 @@ class NetworkGroupService:
                     raise NotFoundError(f"Network object with name '{ref}' not found.")
                 resolved.append(obj.uid)
         return resolved
+
+    @staticmethod
+    def _merge_referenced_object_uids(
+        current_uids: list[str],
+        requested_uids: list[str],
+        *,
+        operation: Literal["add", "remove"],
+    ) -> list[str]:
+        """Merge referenced-object UIDs while preserving stable order."""
+        current = NetworkGroupService._dedupe_preserve_order(current_uids)
+        requested = NetworkGroupService._dedupe_preserve_order(requested_uids)
+        if operation == "add":
+            return NetworkGroupService._dedupe_preserve_order([*current, *requested])
+
+        requested_set = set(requested)
+        return [uid for uid in current if uid not in requested_set]
+
+    @staticmethod
+    def _dedupe_preserve_order(values: list[str]) -> list[str]:
+        """Remove duplicates while preserving first-seen order."""
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            deduped.append(value)
+        return deduped
 
     @staticmethod
     def _is_uuid(value: str) -> bool:

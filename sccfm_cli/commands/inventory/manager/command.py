@@ -6,6 +6,7 @@ import click
 from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.inventory.manager.access_policies import AccessPoliciesCommand
 from sccfm_cli.commands.inventory.manager.list import ManagersListCommand
 
 
@@ -14,6 +15,7 @@ class ManagersCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             ManagersListCommand(console),
+            AccessPoliciesCommand(console),
         ]
 
     @property

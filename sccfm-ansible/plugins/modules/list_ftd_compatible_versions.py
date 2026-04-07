@@ -10,18 +10,12 @@ from scc_firewall_manager_sdk import (
     FtdVersion,
 )
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import FTD_ENTITY_TYPES, InventoryService, SccApiError
 from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from sccfm_core.services.inventory import FtdUpgradeVersionService
 from sccfm_core.types import ConfigLike
 
 from ..module_utils.config import create_config
-
-_FTD_ENTITY_TYPES = [
-    EntityType.CDFMC_MANAGED_FTD,
-    EntityType.FDM_MANAGED_FTD,
-    EntityType.ONPREM_FMC_MANAGED_FTD,
-]
 
 DOCUMENTATION = r"""
 ---
@@ -177,7 +171,7 @@ def resolve_device_uids_from_query(
 ) -> list[str]:
     """Resolve device UIDs from a query. Returns empty list if no devices match."""
     inventory_service = InventoryService(config=config)
-    type_filter = " OR ".join(f"deviceType:{t.value}" for t in _FTD_ENTITY_TYPES)
+    type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,

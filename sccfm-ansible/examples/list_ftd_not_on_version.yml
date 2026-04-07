@@ -1,0 +1,86 @@
+---
+# List FTD devices not on a specific or recommended software version via SCCFM
+#
+# This playbook supports two modes:
+#   1. Specified version: check devices against a given version string.
+#   2. Recommended version: check each device against its Cisco-suggested version.
+#
+# RUN THIS PLAYBOOK (check against recommended version):
+#   ansible-playbook examples/list_ftd_not_on_version.yml \
+#     --vault-password-file examples/.vault_pass
+#
+# Specify the target version directly:
+#   ansible-playbook examples/list_ftd_not_on_version.yml \
+#     --vault-password-file examples/.vault_pass \
+#     -e target_version="7.4.1"
+#
+# Narrow the check to a subset of devices (optional):
+#   ansible-playbook examples/list_ftd_not_on_version.yml \
+#     --vault-password-file examples/.vault_pass \
+#     -e check_query="name:branch-*"
+
+- name: List FTD devices not on the target or recommended version
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    target_version: ""
+    check_query: ""
+
+  tasks:
+    # ============================================================
+    # Mode 1: Check against a specific version
+    # ============================================================
+
+    - name: List FTDs not on specified version
+      cisco.sccfm.list_ftd_not_on_version:
+        version: "{{ target_version }}"
+        query: "{{ check_query if check_query | length > 0 else omit }}"
+      register: specified_result
+      when: target_version | length > 0
+
+    # ============================================================
+    # Mode 2: Check against the recommended version
+    # ============================================================
+
+    - name: List FTDs not on recommended version
+      cisco.sccfm.list_ftd_not_on_version:
+        recommended: true
+        query: "{{ check_query if check_query | length > 0 else omit }}"
+      register: recommended_result
+      when: target_version | length == 0
+
+    # ============================================================
+    # Summary
+    # ============================================================
+
+    - name: Set result fact
+      ansible.builtin.set_fact:
+        result: "{{ specified_result if target_version | length > 0 else recommended_result }}"
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {% set matched = result.matched_device_count | default(0) -%}
+          {% set not_on = result.device_count | default(0) -%}
+          {% if matched == 0 -%}
+          No FTD devices matched the selected filter.
+          {%- else -%}
+          {{ not_on }} of {{ matched }} matched device(s)
+          are NOT on {{ 'their recommended version' if result.mode == 'recommended' else 'version ' + target_version }}.
+          {%- endif %}
+
+    - name: Show devices not on target version
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.name }} is on {{ item.software_version }}
+          {{ '(recommended: ' + item.recommended_version + ')' if item.recommended_version is defined else '' }}
+      loop: "{{ result.devices | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: (result.device_count | default(0)) > 0
