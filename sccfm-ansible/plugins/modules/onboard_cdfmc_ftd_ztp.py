@@ -171,7 +171,9 @@ def run_module() -> None:
 
     try:
         name_page = _query_by_name(config, name)
-        name_match: Optional[Device] = name_page.items[0] if name_page.count else None
+        name_match: Optional[Device] = (
+            name_page.items[0] if name_page.count and name_page.items else None
+        )
 
         if name_match is not None:
             # Idempotency: same device (name + serial match) already onboarded

@@ -189,7 +189,7 @@ class FtdZtpOnboardCommand(BaseCommand):
         name_page: DevicePage = inventory_service.get_devices(
             limit=1, offset=0, query=self._ftd_name_query(name)
         )
-        name_match = name_page.items[0] if name_page.count else None
+        name_match = name_page.items[0] if name_page.count and name_page.items else None
 
         if name_match is None:
             return None
