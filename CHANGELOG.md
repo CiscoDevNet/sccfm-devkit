@@ -1,3 +1,9 @@
+## v0.23.0 (2026-04-01)
+
+### Feat
+
+- **LH-102418**: add access rule creation for policies — core service, CLI command, and Ansible module
+
 ## v0.22.0 (2026-03-25)
 
 ### Feat
