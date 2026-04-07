@@ -7,8 +7,10 @@ import click
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
+from sccfm_cli.commands.objects.utils import check_object_exists
 from sccfm_cli.commands.shared_options import config_path_option, format_option
 from sccfm_cli.utils import with_spinner
+from sccfm_core.services import NetworkObjectService
 from sccfm_core.services.policy import AccessRuleResponse, AccessRuleService
 
 
@@ -92,6 +94,12 @@ def _access_rule_create_params() -> list[click.Parameter]:
             default=None,
             help="Whether the rule is active.",
         ),
+        click.Option(
+            ["--check"],
+            is_flag=True,
+            default=False,
+            help="Run a preflight check without performing the operation.",
+        ),
         format_option(),
         config_path_option(),
     ]
@@ -114,6 +122,37 @@ class CreateAccessRuleCommand(BaseCommand):
     @with_spinner("Creating access rule...")
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         config = self.get_profile(ctx=ctx, **kwargs)
+        output_format = cast(str, kwargs.get("format"))
+        check = cast(bool, kwargs.get("check", False))
+
+        if check:
+            network_service = NetworkObjectService(config)
+            source = cast(str | None, kwargs.get("source_network"))
+            destination = cast(str | None, kwargs.get("destination_network"))
+            if source:
+                check_object_exists(
+                    console=self.console,
+                    uid=None,
+                    name=source,
+                    get_by_uid_fn=None,
+                    get_by_name_fn=network_service.get_network_object_by_name,
+                    object_name="Source network object",
+                    output_format=output_format,
+                    operation="update",
+                )
+            if destination:
+                check_object_exists(
+                    console=self.console,
+                    uid=None,
+                    name=destination,
+                    get_by_uid_fn=None,
+                    get_by_name_fn=network_service.get_network_object_by_name,
+                    object_name="Destination network object",
+                    output_format=output_format,
+                    operation="update",
+                )
+            return
+
         service = AccessRuleService(config)
 
         response = service.create_access_rule(
@@ -132,7 +171,7 @@ class CreateAccessRuleCommand(BaseCommand):
             active=cast(bool | None, kwargs.get("active")),
         )
 
-        self._render_response(response, cast(str, kwargs.get("format")))
+        self._render_response(response, output_format)
 
     def _render_response(self, response: AccessRuleResponse, output_format: str) -> None:
         if output_format == "json":
