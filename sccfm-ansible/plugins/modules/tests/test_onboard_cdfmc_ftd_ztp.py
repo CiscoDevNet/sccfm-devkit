@@ -111,10 +111,10 @@ def test_idempotent_when_device_already_exists(
     """Same name + same serial → changed=False (idempotent)."""
     mock_ansible_module_class.return_value = mock_module_instance
 
-    existing_page = DevicePage(count=1, limit=1, offset=0, items=[sample_device])
-
     mock_inventory = MagicMock()
-    mock_inventory.get_devices.return_value = existing_page
+    mock_inventory.get_devices.return_value = DevicePage(
+        count=1, limit=1, offset=0, items=[sample_device]
+    )
     mock_inventory_service_class.return_value = mock_inventory
 
     with pytest.raises(SystemExit):
@@ -124,42 +124,6 @@ def test_idempotent_when_device_already_exists(
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
     assert call_kwargs["device_uid"] == "device-uid-999"
-
-
-@patch("plugins.modules.onboard_cdfmc_ftd_ztp.Config")
-@patch("plugins.modules.onboard_cdfmc_ftd_ztp.InventoryService")
-@patch("plugins.modules.onboard_cdfmc_ftd_ztp.AnsibleModule")
-def test_fails_when_serial_taken_under_different_name(
-    mock_ansible_module_class: MagicMock,
-    mock_inventory_service_class: MagicMock,
-    _mock_config_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """Serial already onboarded under a different name → fail_json."""
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    serial_device = Device(
-        uid="uid-serial",
-        name="old-name",
-        deviceType=EntityType.CDFMC_MANAGED_FTD,
-        serial="FTD1234567890",
-    )
-
-    def fake_get_devices(*, limit: int, offset: int, query: str | None = None) -> DevicePage:
-        if query and 'serial:"FTD1234567890"' in query:
-            return DevicePage(count=1, limit=limit, offset=offset, items=[serial_device])
-        return DevicePage(count=0, limit=limit, offset=offset, items=[])
-
-    mock_inventory = MagicMock()
-    mock_inventory.get_devices.side_effect = fake_get_devices
-    mock_inventory_service_class.return_value = mock_inventory
-
-    with pytest.raises(SystemExit):
-        onboard_cdfmc_ftd_ztp.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance.fail_json.call_args[1]
-    assert "old-name" in call_kwargs["msg"]
 
 
 @patch("plugins.modules.onboard_cdfmc_ftd_ztp.Config")
@@ -181,13 +145,10 @@ def test_fails_when_name_taken_by_different_serial(
         serial="DIFFERENT_SERIAL",
     )
 
-    def fake_get_devices(*, limit: int, offset: int, query: str | None = None) -> DevicePage:
-        if query and 'name:"branch-ftd-01"' in query:
-            return DevicePage(count=1, limit=limit, offset=offset, items=[name_device])
-        return DevicePage(count=0, limit=limit, offset=offset, items=[])
-
     mock_inventory = MagicMock()
-    mock_inventory.get_devices.side_effect = fake_get_devices
+    mock_inventory.get_devices.return_value = DevicePage(
+        count=1, limit=1, offset=0, items=[name_device]
+    )
     mock_inventory_service_class.return_value = mock_inventory
 
     with pytest.raises(SystemExit):

@@ -22,7 +22,7 @@ from sccfm_core.services.inventory import FtdZtpOnboardService
 
 @dataclass(frozen=True)
 class _ConflictResult:
-    reason: str  # "already_exists" | "name_conflict" | "serial_conflict"
+    reason: str  # "already_exists" | "name_conflict"
     device: Device
 
 
@@ -116,16 +116,10 @@ class FtdZtpOnboardCommand(BaseCommand):
                     f"cdFMC-managed FTD device '{name}' with serial '{serial_number}' "
                     f"is already onboarded (uid: {conflict.device.uid})."
                 )
-            elif conflict.reason == "name_conflict":
+            else:  # name_conflict
                 ctx.fail(
                     f"A cdFMC-managed FTD device named '{name}' already exists "
                     f"with a different serial number (uid: {conflict.device.uid})."
-                )
-            else:  # serial_conflict
-                ctx.fail(
-                    f"A cdFMC-managed FTD device with serial '{serial_number}' is already "
-                    f"onboarded under the name '{conflict.device.name}' "
-                    f"(uid: {conflict.device.uid})."
                 )
 
         ztp_input = self._build_ztp_input(**kwargs)
@@ -173,23 +167,17 @@ class FtdZtpOnboardCommand(BaseCommand):
 
         if can_proceed:
             self.console.print(
-                f"[green]\u2713[/green] No conflicts found for '{name}' / '{serial_number}'; "
-                f"onboard-ztp can proceed."
+                f"[green]\u2713[/green] No conflicts found for '{name}'; onboard-ztp can proceed."
             )
         elif reason == "already_exists":
             self.console.print(
                 f"[yellow]![/yellow] FTD device '{name}' with serial '{serial_number}' "
                 f"is already onboarded; onboard-ztp would be a no-op."
             )
-        elif reason == "name_conflict":
+        else:  # name_conflict
             self.console.print(
                 f"[red]✗[/red] A device named '{name}' already exists with a different serial; "
                 f"onboard-ztp would fail."
-            )
-        else:
-            self.console.print(
-                f"[red]✗[/red] Serial '{serial_number}' is already onboarded under a different "
-                f"name; onboard-ztp would fail."
             )
 
     def _find_conflict(
@@ -203,24 +191,13 @@ class FtdZtpOnboardCommand(BaseCommand):
         )
         name_match = name_page.items[0] if name_page.count else None
 
-        serial_page: DevicePage = inventory_service.get_devices(
-            limit=1, offset=0, query=self._ftd_serial_query(serial_number)
-        )
-        serial_match = serial_page.items[0] if serial_page.count else None
+        if name_match is None:
+            return None
 
-        if name_match is not None and serial_match is not None:
-            if name_match.uid == serial_match.uid:
-                return _ConflictResult(reason="already_exists", device=name_match)
-            # Both match but different devices — name conflict takes precedence
-            return _ConflictResult(reason="name_conflict", device=name_match)
+        if name_match.serial == serial_number:
+            return _ConflictResult(reason="already_exists", device=name_match)
 
-        if name_match is not None:
-            return _ConflictResult(reason="name_conflict", device=name_match)
-
-        if serial_match is not None:
-            return _ConflictResult(reason="serial_conflict", device=serial_match)
-
-        return None
+        return _ConflictResult(reason="name_conflict", device=name_match)
 
     def _build_ztp_input(self, **kwargs: Any) -> ZtpOnboardingInput:
         name = cast(str, kwargs.get("name"))
@@ -243,8 +220,3 @@ class FtdZtpOnboardCommand(BaseCommand):
     def _ftd_name_query(name: str) -> str:
         escaped = name.replace("\\", "\\\\").replace('"', '\\"')
         return f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:"{escaped}"'
-
-    @staticmethod
-    def _ftd_serial_query(serial_number: str) -> str:
-        escaped = serial_number.replace("\\", "\\\\").replace('"', '\\"')
-        return f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND serial:"{escaped}"'

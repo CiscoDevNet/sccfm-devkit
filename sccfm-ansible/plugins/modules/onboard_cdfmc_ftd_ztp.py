@@ -136,15 +136,6 @@ def _query_by_name(config: ConfigLike, name: str) -> DevicePage:
     )
 
 
-def _query_by_serial(config: ConfigLike, serial_number: str) -> DevicePage:
-    escaped = serial_number.replace("\\", "\\\\").replace('"', '\\"')
-    return InventoryService(config=config).get_devices(
-        limit=1,
-        offset=0,
-        query=f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND serial:"{escaped}"',
-    )
-
-
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
@@ -182,12 +173,9 @@ def run_module() -> None:
         name_page = _query_by_name(config, name)
         name_match: Optional[Device] = name_page.items[0] if name_page.count else None
 
-        serial_page = _query_by_serial(config, serial_number)
-        serial_match: Optional[Device] = serial_page.items[0] if serial_page.count else None
-
-        # Idempotency: same device already onboarded
-        if name_match is not None and serial_match is not None:
-            if name_match.uid == serial_match.uid:
+        if name_match is not None:
+            # Idempotency: same device (name + serial match) already onboarded
+            if name_match.serial == serial_number:
                 module.exit_json(
                     changed=False,
                     msg=f"cdFMC-managed FTD device '{name}' with serial '{serial_number}' "
@@ -195,25 +183,10 @@ def run_module() -> None:
                     device_uid=name_match.uid,
                 )
                 return
-            # Both match but different devices
-            module.fail_json(
-                msg=f"Name '{name}' is already taken by a different device "
-                f"(uid: {name_match.uid}) and serial '{serial_number}' is already onboarded "
-                f"under '{serial_match.name}' (uid: {serial_match.uid})."
-            )
-            return
-
-        if name_match is not None:
+            # Name taken by a device with a different serial
             module.fail_json(
                 msg=f"A cdFMC-managed FTD device named '{name}' already exists with a different "
                 f"serial number (uid: {name_match.uid})."
-            )
-            return
-
-        if serial_match is not None:
-            module.fail_json(
-                msg=f"A cdFMC-managed FTD device with serial '{serial_number}' is already "
-                f"onboarded under the name '{serial_match.name}' (uid: {serial_match.uid})."
             )
             return
 
