@@ -176,9 +176,13 @@ class TestCheck:
 
         assert result.exit_code == 0
         assert create_called["called"] is False
-        assert '"can_proceed": true' in result.output
-        assert '"Source network object"' in result.output
-        assert '"Destination network object"' in result.output
+        payload = json.loads(result.output)
+        assert payload["operation"] == "create"
+        assert payload["can_proceed"] is True
+        assert payload["reason"] == "network_references_resolved"
+        assert len(payload["network_references"]) == 2
+        assert payload["network_references"][0]["entity_type"] == "Source network object"
+        assert payload["network_references"][1]["entity_type"] == "Destination network object"
 
     def test_table_output_when_reference_missing(
         self,
@@ -233,7 +237,49 @@ class TestCheck:
 
         assert result.exit_code == 0
         assert create_called["called"] is False
+        assert "create would fail" in result.output
         assert "Source network object" in result.output
-        assert "exists" in result.output
         assert "missing-dst" in result.output
         assert "not found" in result.output
+
+    def test_check_no_networks_succeeds(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """--check with no network references should pass with no_network_references."""
+        create_called = {"called": False}
+
+        def fake_create(self: AccessRuleService, **kwargs: Any) -> AccessRuleResponse:
+            create_called["called"] = True
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "create_access_rule", fake_create)
+        monkeypatch.setattr(NetworkObjectService, "__init__", _stub_network_object_init)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "create",
+                "--access-group-uid",
+                "ag-uid-456",
+                "--entity-uid",
+                "device-uid-789",
+                "--index",
+                "1",
+                "--check",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert create_called["called"] is False
+        payload = json.loads(result.output)
+        assert payload["can_proceed"] is True
+        assert payload["reason"] == "no_network_references"
+        assert payload["network_references"] == []

@@ -126,31 +126,7 @@ class CreateAccessRuleCommand(BaseCommand):
         check = cast(bool, kwargs.get("check", False))
 
         if check:
-            network_service = NetworkObjectService(config)
-            source = cast(str | None, kwargs.get("source_network"))
-            destination = cast(str | None, kwargs.get("destination_network"))
-            if source:
-                check_object_exists(
-                    console=self.console,
-                    uid=None,
-                    name=source,
-                    get_by_uid_fn=None,
-                    get_by_name_fn=network_service.get_network_object_by_name,
-                    object_name="Source network object",
-                    output_format=output_format,
-                    operation="update",
-                )
-            if destination:
-                check_object_exists(
-                    console=self.console,
-                    uid=None,
-                    name=destination,
-                    get_by_uid_fn=None,
-                    get_by_name_fn=network_service.get_network_object_by_name,
-                    object_name="Destination network object",
-                    output_format=output_format,
-                    operation="update",
-                )
+            self._run_check(config=config, kwargs=kwargs, output_format=output_format)
             return
 
         service = AccessRuleService(config)
@@ -172,6 +148,82 @@ class CreateAccessRuleCommand(BaseCommand):
         )
 
         self._render_response(response, output_format)
+
+    def _run_check(self, *, config: Any, kwargs: dict[str, Any], output_format: str) -> None:
+        network_service = NetworkObjectService(config)
+        source = cast(str | None, kwargs.get("source_network"))
+        destination = cast(str | None, kwargs.get("destination_network"))
+
+        references: list[dict[str, Any]] = []
+        if source:
+            ref = check_object_exists(
+                console=self.console,
+                uid=None,
+                name=source,
+                get_by_uid_fn=None,
+                get_by_name_fn=network_service.get_network_object_by_name,
+                object_name="Source network object",
+                output_format=output_format,
+                operation="update",
+                emit=False,
+            )
+            references.append(ref)
+        if destination:
+            ref = check_object_exists(
+                console=self.console,
+                uid=None,
+                name=destination,
+                get_by_uid_fn=None,
+                get_by_name_fn=network_service.get_network_object_by_name,
+                object_name="Destination network object",
+                output_format=output_format,
+                operation="update",
+                emit=False,
+            )
+            references.append(ref)
+
+        all_exist = all(ref["exists"] for ref in references)
+        can_proceed = all_exist
+        if not references:
+            reason = "no_network_references"
+        elif can_proceed:
+            reason = "network_references_resolved"
+        else:
+            reason = "missing_network_references"
+
+        result: dict[str, Any] = {
+            "operation": "create",
+            "entity_type": "Access rule",
+            "access_group_uid": cast(str, kwargs["access_group_uid"]),
+            "entity_uid": cast(str, kwargs["entity_uid"]),
+            "index": cast(int, kwargs["index"]),
+            "can_proceed": can_proceed,
+            "reason": reason,
+            "network_references": references,
+        }
+        self._render_check_result(result, output_format)
+
+    def _render_check_result(self, result: dict[str, Any], output_format: str) -> None:
+        if output_format == "json":
+            self.console.print(json.dumps(result, indent=2, default=str))
+            return
+
+        if result["can_proceed"]:
+            self.console.print("[green]✓[/green] Access rule preflight passed; create can proceed.")
+        else:
+            self.console.print(
+                "[yellow]![/yellow] Access rule preflight found issues; " "create would fail."
+            )
+
+        for ref in result["network_references"]:
+            label = ref["entity_type"]
+            name = ref["identifier"]
+            if ref["exists"]:
+                self.console.print(
+                    f"  [green]✓[/green] {label} '{name}' exists (UID: {ref['uid']})"
+                )
+            else:
+                self.console.print(f"  [yellow]![/yellow] {label} '{name}' not found")
 
     def _render_response(self, response: AccessRuleResponse, output_format: str) -> None:
         if output_format == "json":
