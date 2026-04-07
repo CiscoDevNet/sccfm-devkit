@@ -36,6 +36,7 @@ def _fake_device() -> Device:
         uid="device-uid-999",
         name="branch-ftd-01",
         deviceType=EntityType.CDFMC_MANAGED_FTD,
+        serial="FTD1234567890",
     )
 
 
@@ -48,6 +49,7 @@ def _empty_device_page(
 def _existing_device_page(
     self: InventoryService, *, limit: int, offset: int, query: str | None = None
 ) -> DevicePage:
+    """Returns the same device for every query — simulates name+serial pointing to same uid."""
     return DevicePage(count=1, items=[_fake_device()], limit=limit, offset=offset)
 
 
@@ -209,8 +211,7 @@ class TestCheckMode:
         result = cli_runner.invoke(cli, _BASE_ARGS + ["--check", "--format", "table"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
-        assert "not found" in result.output
-        assert "can proceed" in result.output
+        assert "No conflicts found" in result.output
 
     def test_check_device_not_found_json(
         self,
@@ -229,6 +230,8 @@ class TestCheckMode:
         assert payload["exists"] is False
         assert payload["reason"] == "not_found"
         assert payload["operation"] == "onboard-ztp"
+        assert payload["identifier"]["name"] == "branch-ftd-01"
+        assert payload["identifier"]["serial_number"] == "FTD1234567890"
 
     def test_check_device_already_exists_table(
         self,
@@ -242,7 +245,7 @@ class TestCheckMode:
         result = cli_runner.invoke(cli, _BASE_ARGS + ["--check", "--format", "table"])
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
-        assert "already exists" in result.output
+        assert "already onboarded" in result.output
 
     def test_check_device_already_exists_json(
         self,
@@ -260,6 +263,151 @@ class TestCheckMode:
         assert payload["can_proceed"] is False
         assert payload["exists"] is True
         assert payload["reason"] == "already_exists"
+        assert payload["device"]["uid"] == "device-uid-999"
+
+    def test_check_name_conflict_json(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """--check should report name_conflict when name is taken by a different serial."""
+        name_device = Device(
+            uid="uid-other",
+            name="branch-ftd-01",
+            deviceType=EntityType.CDFMC_MANAGED_FTD,
+            serial="DIFFERENT_SERIAL",
+        )
+
+        def fake_get_devices(
+            self: InventoryService, *, limit: int, offset: int, query: str | None = None
+        ) -> DevicePage:
+            if query and 'name:"branch-ftd-01"' in query:
+                return DevicePage(count=1, items=[name_device], limit=limit, offset=offset)
+            return DevicePage(count=0, items=[], limit=limit, offset=offset)
+
+        monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+
+        result = cli_runner.invoke(cli, _BASE_ARGS + ["--check", "--format", "json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["can_proceed"] is False
+        assert payload["exists"] is True
+        assert payload["reason"] == "name_conflict"
+        assert payload["device"]["uid"] == "uid-other"
+
+    def test_check_serial_conflict_json(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """--check should report serial_conflict when serial is taken under a different name."""
+        serial_device = Device(
+            uid="uid-serial",
+            name="old-name",
+            deviceType=EntityType.CDFMC_MANAGED_FTD,
+            serial="FTD1234567890",
+        )
+
+        def fake_get_devices(
+            self: InventoryService, *, limit: int, offset: int, query: str | None = None
+        ) -> DevicePage:
+            if query and 'serial:"FTD1234567890"' in query:
+                return DevicePage(count=1, items=[serial_device], limit=limit, offset=offset)
+            return DevicePage(count=0, items=[], limit=limit, offset=offset)
+
+        monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+
+        result = cli_runner.invoke(cli, _BASE_ARGS + ["--check", "--format", "json"])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["can_proceed"] is False
+        assert payload["exists"] is True
+        assert payload["reason"] == "serial_conflict"
+        assert payload["device"]["uid"] == "uid-serial"
+
+
+# ── Conflict detection ──────────────────────────────────────────
+
+
+class TestConflictDetection:
+    def test_should_fail_when_name_taken_by_different_serial(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """onboard-ztp should fail when the name is taken by a device with a different serial."""
+        name_device = Device(
+            uid="uid-other",
+            name="branch-ftd-01",
+            deviceType=EntityType.CDFMC_MANAGED_FTD,
+            serial="DIFFERENT_SERIAL",
+        )
+
+        def fake_get_devices(
+            self: InventoryService, *, limit: int, offset: int, query: str | None = None
+        ) -> DevicePage:
+            if query and 'name:"branch-ftd-01"' in query:
+                return DevicePage(count=1, items=[name_device], limit=limit, offset=offset)
+            return DevicePage(count=0, items=[], limit=limit, offset=offset)
+
+        monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+
+        result = cli_runner.invoke(cli, _BASE_ARGS)
+
+        assert result.exit_code != 0
+        assert "already exists with a different serial" in result.output
+
+    def test_should_fail_when_serial_taken_under_different_name(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """onboard-ztp should fail when the serial is already onboarded under a different name."""
+        serial_device = Device(
+            uid="uid-serial",
+            name="old-name",
+            deviceType=EntityType.CDFMC_MANAGED_FTD,
+            serial="FTD1234567890",
+        )
+
+        def fake_get_devices(
+            self: InventoryService, *, limit: int, offset: int, query: str | None = None
+        ) -> DevicePage:
+            if query and 'serial:"FTD1234567890"' in query:
+                return DevicePage(count=1, items=[serial_device], limit=limit, offset=offset)
+            return DevicePage(count=0, items=[], limit=limit, offset=offset)
+
+        monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+
+        result = cli_runner.invoke(cli, _BASE_ARGS)
+
+        assert result.exit_code != 0
+        assert "already onboarded under the name" in result.output
+
+    def test_should_fail_when_device_already_exists(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """onboard-ztp should fail when the exact same device (name+serial) is already present."""
+        monkeypatch.setattr(InventoryService, "get_devices", _existing_device_page)
+
+        result = cli_runner.invoke(cli, _BASE_ARGS)
+
+        assert result.exit_code != 0
+        assert "already onboarded" in result.output
 
 
 # ── Validation ─────────────────────────────────────────────────
@@ -278,7 +426,7 @@ class TestValidation:
         result = cli_runner.invoke(cli, _BASE_ARGS + ["--format", "json"])
 
         assert result.exit_code != 0
-        assert "already exists" in result.output
+        assert "already" in result.output
 
     def test_should_fail_when_name_missing(
         self,

@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import json
+from dataclasses import dataclass
 from typing import Any, Sequence, cast
 
 import click
 from rich.console import Console
 from scc_firewall_manager_sdk import (
     Device,
+    DevicePage,
     EntityType,
     ZtpOnboardingInput,
 )
@@ -14,6 +18,12 @@ from sccfm_cli.commands.inventory.options import config_path_option, format_opti
 from sccfm_cli.utils import with_spinner
 from sccfm_core import FTD_LICENSES, InventoryService
 from sccfm_core.services.inventory import FtdZtpOnboardService
+
+
+@dataclass(frozen=True)
+class _ConflictResult:
+    reason: str  # "already_exists" | "name_conflict" | "serial_conflict"
+    device: Device
 
 
 class FtdZtpOnboardCommand(BaseCommand):
@@ -85,34 +95,44 @@ class FtdZtpOnboardCommand(BaseCommand):
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         check = cast(bool, kwargs.get("check", False))
         name = cast(str, kwargs.get("name"))
+        serial_number = cast(str, kwargs.get("serial_number"))
         output_format = cast(str, kwargs.get("format"))
 
         config = self.get_profile(ctx=ctx, **kwargs)
         inventory_service = InventoryService(config=config)
 
         if check:
-            self._handle_check(inventory_service, name, output_format)
+            self._handle_check(inventory_service, name, serial_number, output_format)
             return
 
         licenses = cast(tuple[str, ...], kwargs.get("licenses", ()))
         if not licenses:
             ctx.fail("--licenses is required.")
 
-        device_page = inventory_service.get_devices(
-            limit=1,
-            offset=0,
-            query=self._ftd_name_query(name),
-        )
-        if device_page.count is not None and device_page.count > 0:
-            ctx.fail(f"cdFMC-managed FTD device with name '{name}' already exists.")
+        conflict = self._find_conflict(inventory_service, name, serial_number)
+        if conflict is not None:
+            if conflict.reason == "already_exists":
+                ctx.fail(
+                    f"cdFMC-managed FTD device '{name}' with serial '{serial_number}' "
+                    f"is already onboarded (uid: {conflict.device.uid})."
+                )
+            elif conflict.reason == "name_conflict":
+                ctx.fail(
+                    f"A cdFMC-managed FTD device named '{name}' already exists "
+                    f"with a different serial number (uid: {conflict.device.uid})."
+                )
+            else:  # serial_conflict
+                ctx.fail(
+                    f"A cdFMC-managed FTD device with serial '{serial_number}' is already "
+                    f"onboarded under the name '{conflict.device.name}' "
+                    f"(uid: {conflict.device.uid})."
+                )
 
         ztp_input = self._build_ztp_input(**kwargs)
-
         ztp_onboard_service = FtdZtpOnboardService(config=config)
         device: Device = ztp_onboard_service.onboard_ftd_ztp(ztp_onboarding_input=ztp_input)
 
         uid = device.uid
-
         if output_format == "json":
             self.console.print(json.dumps({"uid": uid}, indent=2))
         else:
@@ -125,28 +145,22 @@ class FtdZtpOnboardCommand(BaseCommand):
         self,
         inventory_service: InventoryService,
         name: str,
+        serial_number: str,
         output_format: str,
     ) -> None:
-        device_page = inventory_service.get_devices(
-            limit=1,
-            offset=0,
-            query=self._ftd_name_query(name),
-        )
-        exists = device_page.count is not None and device_page.count > 0
-        can_proceed = not exists
-        reason = "not_found" if can_proceed else "already_exists"
+        conflict = self._find_conflict(inventory_service, name, serial_number)
+        can_proceed = conflict is None
+        reason = conflict.reason if conflict is not None else "not_found"
 
         if output_format == "json":
-            device_data = None
-            if exists and device_page.items:
-                device_data = device_page.items[0].to_dict()
+            device_data = conflict.device.to_dict() if conflict is not None else None
             self.console.print(
                 json.dumps(
                     {
                         "entity_type": "cdFMC-managed FTD device",
-                        "identifier": name,
+                        "identifier": {"name": name, "serial_number": serial_number},
                         "operation": "onboard-ztp",
-                        "exists": exists,
+                        "exists": conflict is not None,
                         "can_proceed": can_proceed,
                         "reason": reason,
                         "device": device_data,
@@ -159,12 +173,54 @@ class FtdZtpOnboardCommand(BaseCommand):
 
         if can_proceed:
             self.console.print(
-                f"[green]\u2713[/green] FTD device '{name}' not found; onboard-ztp can proceed."
+                f"[green]\u2713[/green] No conflicts found for '{name}' / '{serial_number}'; "
+                f"onboard-ztp can proceed."
+            )
+        elif reason == "already_exists":
+            self.console.print(
+                f"[yellow]![/yellow] FTD device '{name}' with serial '{serial_number}' "
+                f"is already onboarded; onboard-ztp would be a no-op."
+            )
+        elif reason == "name_conflict":
+            self.console.print(
+                f"[red]✗[/red] A device named '{name}' already exists with a different serial; "
+                f"onboard-ztp would fail."
             )
         else:
             self.console.print(
-                f"[yellow]![/yellow] FTD device '{name}' already exists; onboard-ztp would fail."
+                f"[red]✗[/red] Serial '{serial_number}' is already onboarded under a different "
+                f"name; onboard-ztp would fail."
             )
+
+    def _find_conflict(
+        self,
+        inventory_service: InventoryService,
+        name: str,
+        serial_number: str,
+    ) -> _ConflictResult | None:
+        name_page: DevicePage = inventory_service.get_devices(
+            limit=1, offset=0, query=self._ftd_name_query(name)
+        )
+        name_match = name_page.items[0] if name_page.count else None
+
+        serial_page: DevicePage = inventory_service.get_devices(
+            limit=1, offset=0, query=self._ftd_serial_query(serial_number)
+        )
+        serial_match = serial_page.items[0] if serial_page.count else None
+
+        if name_match is not None and serial_match is not None:
+            if name_match.uid == serial_match.uid:
+                return _ConflictResult(reason="already_exists", device=name_match)
+            # Both match but different devices — name conflict takes precedence
+            return _ConflictResult(reason="name_conflict", device=name_match)
+
+        if name_match is not None:
+            return _ConflictResult(reason="name_conflict", device=name_match)
+
+        if serial_match is not None:
+            return _ConflictResult(reason="serial_conflict", device=serial_match)
+
+        return None
 
     def _build_ztp_input(self, **kwargs: Any) -> ZtpOnboardingInput:
         name = cast(str, kwargs.get("name"))
@@ -185,4 +241,10 @@ class FtdZtpOnboardCommand(BaseCommand):
 
     @staticmethod
     def _ftd_name_query(name: str) -> str:
-        return f"deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:{name}"
+        escaped = name.replace("\\", "\\\\").replace('"', '\\"')
+        return f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:"{escaped}"'
+
+    @staticmethod
+    def _ftd_serial_query(serial_number: str) -> str:
+        escaped = serial_number.replace("\\", "\\\\").replace('"', '\\"')
+        return f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND serial:"{escaped}"'
