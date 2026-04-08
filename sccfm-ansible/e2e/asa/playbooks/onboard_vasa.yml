@@ -30,7 +30,7 @@
         name: "ci-e2e-asa-{{ lookup('env', 'ASA_HOST') | regex_replace('[^a-zA-Z0-9]', '-') }}"
         device_address: "{{ lookup('env', 'ASA_HOST') }}:443"
         username: admin
-        password: "1234567890"
+        password: ""
         connector_type: "{{ default_connector_type }}"
         ignore_certificate: "{{ default_ignore_certificate }}"
       register: onboard_result
