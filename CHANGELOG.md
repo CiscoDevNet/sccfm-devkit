@@ -1,8 +1,14 @@
-## v0.27.0 (2026-04-07)
+## v0.28.0 (2026-04-08)
 
 ### Feat
 
 - **LH-102418**: add access rule creation for policies — core service, CLI command, and Ansible module
+
+## v0.27.0 (2026-04-08)
+
+### Feat
+
+- **LH-102432**: Onboard CDFMC Managed FTD (ZTP) (#52)
 
 ## v0.26.0 (2026-04-07)
 
