@@ -162,7 +162,7 @@ def build_asa_input(
     params: dict[str, str | bool | list[str] | dict[str, list[str]] | None],
 ) -> AsaCreateOrUpdateInput:
     """Build AsaCreateOrUpdateInput from Ansible module parameters."""
-    return AsaCreateOrUpdateInput(
+    return AsaCreateOrUpdateInput.model_construct(
         name=str(params["name"]),
         deviceAddress=str(params["device_address"]),
         username=str(params["username"]),
