@@ -1,0 +1,49 @@
+---
+# Create an access rule in SCC Firewall Manager
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.create_access_rule \
+#     -a 'access_group_uid=YOUR_ACCESS_GROUP_UID entity_uid=YOUR_DEVICE_UID index=1 \
+#         source_network=web-servers destination_network=db-servers protocol=tcp \
+#         destination_port=443 remark="Allow web to database HTTPS"'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/access_rules.yml
+#
+# PREREQUISITES:
+#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
+#   - Region and API token in group_vars/all/vars.yml
+#   - A valid device UID and access group UID
+#   - Existing source and destination network objects referenced by the rule
+
+- name: Create an access rule
+  hosts: localhost
+  gather_facts: false
+
+  # Use module_defaults to avoid repeating region and api_token
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uid: "YOUR_DEVICE_UID"
+    access_group_uid: "YOUR_ACCESS_GROUP_UID"
+
+  tasks:
+    - name: Create a permit rule for web traffic
+      cisco.sccfm.create_access_rule:
+        access_group_uid: "{{ access_group_uid }}"
+        entity_uid: "{{ device_uid }}"
+        index: 1
+        rule_action: PERMIT
+        source_network: web-servers
+        destination_network: db-servers
+        protocol: tcp
+        destination_port: "443"
+        remark: "Allow web to database HTTPS"
+      register: created_rule
+
+    - name: Display created rule
+      ansible.builtin.debug:
+        msg: "Created rule UID: {{ created_rule.access_rule.uid }}"
