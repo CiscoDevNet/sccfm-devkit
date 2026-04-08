@@ -1,3 +1,9 @@
+## v0.27.0 (2026-04-08)
+
+### Feat
+
+- **LH-102432**: Onboard CDFMC Managed FTD (ZTP) (#52)
+
 ## v0.26.0 (2026-04-07)
 
 ### Feat
