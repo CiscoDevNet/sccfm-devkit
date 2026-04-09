@@ -1,0 +1,28 @@
+---
+# Verify all shun entries have been cleared on CI ASA devices.
+
+- name: "CI: Verify ASA shun entries cleared"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Show shun entries after clear
+      cisco.sccfm.show_asa_shun:
+        query: "{{ asa_test_query }}"
+      register: result
+
+    - name: Assert no shun entries remain
+      ansible.builtin.assert:
+        that:
+          - result.results | length == 0
+        fail_msg: "Expected no shun entries after clearing, but found {{ result.results | length }}"
