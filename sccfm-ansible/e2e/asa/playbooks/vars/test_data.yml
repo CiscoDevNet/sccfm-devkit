@@ -21,6 +21,7 @@ shun_test_source_ips:
   - "198.51.100.2"
 
 # Upgrade workflow — staging only (no reboot)
-asa_upgrade_software_version: "9.6(4.14)"
-asa_upgrade_asdm_version: "7.9(1)"
-asa_upgrade_name: "ci-e2e-asa-upgrade"
+# Disabled: vASA 9.4(1)200 cannot fetch upgrade images from CDO CloudFront
+# asa_upgrade_software_version: "9.6(4.14)"
+# asa_upgrade_asdm_version: "7.9(1)"
+# asa_upgrade_name: "ci-e2e-asa-upgrade"
