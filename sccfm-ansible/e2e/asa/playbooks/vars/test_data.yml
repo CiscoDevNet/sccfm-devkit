@@ -1,7 +1,7 @@
 ---
-# Device selection — CI tenant must have ASA(s) named targaryen-ansible-upgrade-01
-asa_test_query: "name:targaryen-ansible-upgrade-01 AND connectivityState:ONLINE"
-asa_test_query_all: "name:targaryen-ansible-upgrade-01"
+# Device selection — matches the vASA onboarded by onboard_vasa.yml (ci-e2e-asa-<ip>)
+asa_test_query: "name:ci-e2e-asa AND connectivityState:ONLINE"
+asa_test_query_all: "name:ci-e2e-asa"
 
 # Read-only CLI commands for execute_asa_cli
 asa_cli_commands:
