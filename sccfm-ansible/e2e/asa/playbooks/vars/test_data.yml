@@ -1,7 +1,7 @@
 ---
 # Device selection — matches the vASA onboarded by onboard_vasa.yml (ci-e2e-asa-<ip>)
-asa_test_query: "name:ci-e2e-asa AND connectivityState:ONLINE"
-asa_test_query_all: "name:ci-e2e-asa"
+asa_test_query: "name:ci-e2e-asa-* AND connectivityState:ONLINE"
+asa_test_query_all: "name:ci-e2e-asa-*"
 
 # Read-only CLI commands for execute_asa_cli
 asa_cli_commands:
