@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from scc_firewall_manager_sdk.models.access_rule_create_input import AccessRuleCreateInput
+from scc_firewall_manager_sdk.models.access_rule_update_input import AccessRuleUpdateInput
 from scc_firewall_manager_sdk.models.destination_network_content import DestinationNetworkContent
 from scc_firewall_manager_sdk.models.destination_port_content import DestinationPortContent
 from scc_firewall_manager_sdk.models.log_settings import LogSettings
@@ -83,6 +84,34 @@ class AccessRuleResponse:
         }
 
 
+@dataclass
+class AccessRuleListResponse:
+    """Paginated response for listing access rules."""
+
+    count: int
+    items: list[AccessRuleResponse]
+    limit: int
+    offset: int
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AccessRuleListResponse:
+        raw_items: list[dict[str, Any]] = data.get("items") or []
+        return cls(
+            count=int(data.get("count") or 0),
+            items=[AccessRuleResponse.from_dict(item) for item in raw_items],
+            limit=int(data.get("limit") or 0),
+            offset=int(data.get("offset") or 0),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "count": self.count,
+            "items": [item.to_dict() for item in self.items],
+            "limit": self.limit,
+            "offset": self.offset,
+        }
+
+
 class AccessRuleService:
     """Service for managing ASA access rules via the SCC Firewall Manager API."""
 
@@ -144,6 +173,96 @@ class AccessRuleService:
         )
         data = self._helper.read_raw_response(response)
         return AccessRuleResponse.from_dict(data)
+
+    def fetch_access_rule(self, *, uid: str) -> AccessRuleResponse:
+        """Fetch a single access rule by UID."""
+        response = self._rules_api.fetch_access_rule_without_preload_content(access_rule_uid=uid)
+        data = self._helper.read_raw_response(response)
+        return AccessRuleResponse.from_dict(data)
+
+    def list_access_rules(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        query: str | None = None,
+    ) -> AccessRuleListResponse:
+        """List access rules with optional pagination and search.
+
+        Args:
+            limit: Maximum number of results to return.
+            offset: Pagination offset.
+            query: Optional Lucene query string.
+        """
+        response = self._rules_api.list_access_rules_without_preload_content(
+            limit=str(limit),
+            offset=str(offset),
+            q=query,
+        )
+        data = self._helper.read_raw_response(response)
+        return AccessRuleListResponse.from_dict(data)
+
+    def modify_access_rule(
+        self,
+        *,
+        uid: str,
+        index: int | None = None,
+        rule_action: str | None = None,
+        remark: str | None = None,
+        source_network: str | None = None,
+        destination_network: str | None = None,
+        protocol: str | None = None,
+        source_port: str | None = None,
+        destination_port: str | None = None,
+        log_level: str | None = None,
+        log_interval: int | None = None,
+        active: bool | None = None,
+    ) -> AccessRuleResponse:
+        """Update an existing access rule.
+
+        Args:
+            uid: UID of the access rule to modify.
+            index: New position in the ordered list.
+            rule_action: PERMIT or DENY.
+            remark: Human-readable description.
+            source_network: Network object name for the source.
+            destination_network: Network object name for the destination.
+            protocol: Protocol name (e.g. "tcp", "udp", "ip").
+            source_port: Source port or port range.
+            destination_port: Destination port or port range.
+            log_level: Log level string.
+            log_interval: Log interval in seconds.
+            active: Whether the rule is active.
+        """
+        update_input = AccessRuleUpdateInput(
+            uid=uid,
+            index=index,
+            rule_action=rule_action,
+            remark=remark,
+            source_network=self._resolve_source_network(source_network),
+            destination_network=self._resolve_destination_network(destination_network),
+            protocol=self._build_protocol(protocol),
+            source_port=self._build_source_port(source_port),
+            destination_port=self._build_destination_port(destination_port),
+            log_settings=self._build_log_settings(log_level, log_interval),
+            is_active_rule=active,
+        )
+        response = self._rules_api.modify_access_rule_without_preload_content(
+            access_rule_uid=uid,
+            access_rule_update_input=update_input,
+        )
+        data = self._helper.read_raw_response(response)
+        return AccessRuleResponse.from_dict(data)
+
+    def delete_access_rule(self, *, uid: str) -> str:
+        """Delete an access rule by UID.
+
+        Returns:
+            The UID of the deleted access rule.
+        """
+        response = self._rules_api.delete_access_rule_without_preload_content(access_rule_uid=uid)
+        self._helper.check_raw_response(response)
+        return uid
 
     # -- network name → SDK content builders --
 

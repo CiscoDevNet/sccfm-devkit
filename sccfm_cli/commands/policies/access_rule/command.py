@@ -7,6 +7,10 @@ from rich.console import Console
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.policies.access_rule.create import CreateAccessRuleCommand
+from sccfm_cli.commands.policies.access_rule.delete import DeleteAccessRuleCommand
+from sccfm_cli.commands.policies.access_rule.get import GetAccessRuleCommand
+from sccfm_cli.commands.policies.access_rule.list import ListAccessRuleCommand
+from sccfm_cli.commands.policies.access_rule.update import UpdateAccessRuleCommand
 
 
 class AccessRuleCommand(BaseCommand):
@@ -16,6 +20,10 @@ class AccessRuleCommand(BaseCommand):
         super().__init__(console)
         self._subcommands: List[BaseCommand] = [
             CreateAccessRuleCommand(console),
+            GetAccessRuleCommand(console),
+            ListAccessRuleCommand(console),
+            UpdateAccessRuleCommand(console),
+            DeleteAccessRuleCommand(console),
         ]
 
     @property
@@ -24,7 +32,7 @@ class AccessRuleCommand(BaseCommand):
 
     @property
     def help_text(self) -> str:
-        return "Create ASA access rules."
+        return "Manage ASA access rules."
 
     def build(self) -> click.Command:
         group = click.Group(name=self.name, help=self.help_text)
@@ -33,4 +41,4 @@ class AccessRuleCommand(BaseCommand):
         return group
 
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:  # pragma: no cover
-        ctx.fail("Specify a subcommand: create")
+        ctx.fail("Specify a subcommand: create, get, list, update, delete")

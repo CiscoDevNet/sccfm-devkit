@@ -11,6 +11,7 @@ from sccfm_cli.models import Config
 from sccfm_core.services import NetworkObjectService
 from sccfm_core.services.object_management import NetworkObjectResponse
 from sccfm_core.services.policy.access_rule_service import (
+    AccessRuleListResponse,
     AccessRuleResponse,
     AccessRuleService,
 )
@@ -283,3 +284,241 @@ class TestCheck:
         assert payload["can_proceed"] is True
         assert payload["reason"] == "no_network_references"
         assert payload["network_references"] == []
+
+
+SAMPLE_LIST_RESPONSE = AccessRuleListResponse(
+    count=2,
+    items=[SAMPLE_RESPONSE, SAMPLE_RESPONSE],
+    limit=50,
+    offset=0,
+)
+
+
+class TestGetAccessRule:
+    def test_json_output(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_fetch(self: AccessRuleService, **kwargs: Any) -> AccessRuleResponse:
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "fetch_access_rule", fake_fetch)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "get",
+                "--uid",
+                "rule-uid-123",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["uid"] == "rule-uid-123"
+        assert payload["rule_action"] == "PERMIT"
+
+    def test_table_output(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_fetch(self: AccessRuleService, **kwargs: Any) -> AccessRuleResponse:
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "fetch_access_rule", fake_fetch)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "get",
+                "--uid",
+                "rule-uid-123",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "rule-uid-123" in result.output
+
+
+class TestListAccessRule:
+    def test_json_output(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_list(self: AccessRuleService, **kwargs: Any) -> AccessRuleListResponse:
+            return SAMPLE_LIST_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "list_access_rules", fake_list)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "list",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["count"] == 2
+        assert len(payload["items"]) == 2
+
+    def test_table_output(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_list(self: AccessRuleService, **kwargs: Any) -> AccessRuleListResponse:
+            return SAMPLE_LIST_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "list_access_rules", fake_list)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "list",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Access Rules" in result.output
+
+
+class TestUpdateAccessRule:
+    def test_json_output(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_modify(self: AccessRuleService, **kwargs: Any) -> AccessRuleResponse:
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "modify_access_rule", fake_modify)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "update",
+                "--uid",
+                "rule-uid-123",
+                "--remark",
+                "Updated remark",
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["uid"] == "rule-uid-123"
+
+    def test_table_output(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_modify(self: AccessRuleService, **kwargs: Any) -> AccessRuleResponse:
+            return SAMPLE_RESPONSE
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "modify_access_rule", fake_modify)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "update",
+                "--uid",
+                "rule-uid-123",
+                "--rule-action",
+                "DENY",
+                "--format",
+                "table",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Access rule updated" in result.output
+
+    def test_fails_without_update_fields(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "update",
+                "--uid",
+                "rule-uid-123",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "At least one update field" in result.output
+
+
+class TestDeleteAccessRule:
+    def test_delete_success(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        def fake_delete(self: AccessRuleService, **kwargs: Any) -> str:
+            return "rule-uid-123"
+
+        monkeypatch.setattr(AccessRuleService, "__init__", _stub_init)
+        monkeypatch.setattr(AccessRuleService, "delete_access_rule", fake_delete)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "policies",
+                "access-rule",
+                "delete",
+                "--uid",
+                "rule-uid-123",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Access rule deleted" in result.output
+        assert "rule-uid-123" in result.output
