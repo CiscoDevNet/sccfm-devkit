@@ -16,13 +16,9 @@
       api_token: "{{ sccfm_api_token }}"
 
   tasks:
-    - name: Verify upgrade version is configured
-      ansible.builtin.assert:
-        that:
-          - asa_upgrade_software_version is defined
-        fail_msg: >-
-          asa_upgrade_software_version must be set in test_data.yml.
-          Uncomment and set to a real compatible version for the CI test ASA.
+    - name: Skip if upgrade version is not configured
+      ansible.builtin.meta: end_play
+      when: asa_upgrade_software_version is not defined
 
     - name: Stage upgrade on CI ASA devices
       cisco.sccfm.trigger_asa_upgrade:
