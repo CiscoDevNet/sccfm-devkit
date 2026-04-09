@@ -21,6 +21,5 @@ shun_test_source_ips:
   - "198.51.100.2"
 
 # Upgrade workflow — staging only (no reboot)
-# Uncomment and set to a real compatible version for the CI test ASA
-# asa_upgrade_software_version: "9.6(4.14)"
-# asa_upgrade_name: "targaryen-ansible-upgrade-01"
+asa_upgrade_software_version: "9.6(4.14)"
+asa_upgrade_name: "ci-e2e-asa-upgrade-01"
