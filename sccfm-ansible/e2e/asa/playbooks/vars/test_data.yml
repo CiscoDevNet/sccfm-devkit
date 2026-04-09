@@ -22,4 +22,5 @@ shun_test_source_ips:
 
 # Upgrade workflow — staging only (no reboot)
 asa_upgrade_software_version: "9.6(4.14)"
-asa_upgrade_name: "ci-e2e-asa-upgrade-01"
+asa_upgrade_asdm_version: "7.9(1)"
+asa_upgrade_name: "ci-e2e-asa-upgrade"

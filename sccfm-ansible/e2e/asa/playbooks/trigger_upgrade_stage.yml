@@ -28,6 +28,7 @@
       cisco.sccfm.trigger_asa_upgrade:
         query: "{{ asa_test_query }}"
         software_version: "{{ asa_upgrade_software_version }}"
+        asdm_version: "{{ asa_upgrade_asdm_version | default(omit) }}"
         stage_upgrade: true
         wait: true
         timeout: 600
