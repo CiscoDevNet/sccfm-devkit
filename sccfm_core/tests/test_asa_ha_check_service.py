@@ -287,7 +287,7 @@ class TestRunChecks:
 class TestFindUnmonitoredInterfaces:
     def test_should_capture_interface_lookup_errors(self) -> None:
         service = AsaHaCheckService.__new__(AsaHaCheckService)
-        service._interfaces_api = _FakeInterfacesApi(
+        service._interfaces_api = _FakeInterfacesApi(  # type: ignore[assignment]
             physical_error=RuntimeError("physical lookup failed"),
             subinterface_items=[
                 _mock_interface(
@@ -323,7 +323,7 @@ def _mock_interface(
             self.monitor_interface = monitor_interface
             self.hardware_name = hardware_name
 
-    return _FakeInterface()  # type: ignore[return-value]
+    return _FakeInterface()
 
 
 class _FakeInterfacesApi:
