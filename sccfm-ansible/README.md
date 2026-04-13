@@ -20,6 +20,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - [Modules](#modules)
   - [cisco.sccfm.onboard_asa](#ciscosccfmonboard_asa)
   - [cisco.sccfm.execute_asa_cli](#ciscosccfmexecute_asa_cli)
+  - [cisco.sccfm.asa_ha_check](#ciscosccfmasa_ha_check)
   - [cisco.sccfm.change_asa_boot_image](#ciscosccfmchange_asa_boot_image)
 - [Ansible Vault Management](#ansible-vault-management)
   - [What is Ansible Vault?](#what-is-ansible-vault)
@@ -42,6 +43,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - **Dynamic Inventory Plugin**: Automatically load SCCFM devices into Ansible inventory
 - **ASA Onboarding Module**: Onboard ASA devices to your SCCFM tenant
 - **ASA CLI Execution Module**: Execute CLI commands on ASA devices
+- **ASA HA Health Check Module**: Validate ASA failover health and common HA issues
 - **ASA Boot Image Module**: Change the configured next-boot ASA image
 - **Device Grouping**: Automatically group devices by type (ASA, CDFMC_MANAGED_FTD, etc.)
 - **Ansible Vault Integration**: Secure credential management for API tokens and device passwords
@@ -241,6 +243,17 @@ Execute CLI commands on ASA devices via SCCFM. Show commands require devices to 
 
 See [`examples/execute_asa_cli.yml`](examples/execute_asa_cli.yml) for usage, or run `ansible-doc cisco.sccfm.execute_asa_cli` for full parameter documentation.
 
+### cisco.sccfm.asa_ha_check
+
+Run HA health checks on ASA failover devices via SCCFM. The module executes
+`show failover` and `show failover state`, then validates failover enablement,
+LAN/stateful health, version parity, interface health, config sync, and
+interfaces that are enabled but not monitored for failover.
+
+See [`examples/asa_ha_check.yml`](examples/asa_ha_check.yml) for usage,
+or run `ansible-doc cisco.sccfm.asa_ha_check` for full parameter
+documentation.
+
 ### cisco.sccfm.change_asa_boot_image
 
 Change the configured ASA boot image for the next reload. The image must already
@@ -375,6 +388,7 @@ See the `examples/` directory for complete working examples:
 - **`show_devices.yml`** - Display all devices from inventory
 - **`onboard_asas.yml`** - Onboard multiple ASA devices with vault passwords
 - **`execute_asa_cli.yml`** - Execute CLI commands on ASA devices
+- **`asa_ha_check.yml`** - Run HA health checks on ASA failover devices
 - **`change_asa_boot_image.yml`** - Change the configured ASA boot image
 - **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
 - **`group_vars/all/vault.yml`** - Encrypted secrets (API token, passwords)
