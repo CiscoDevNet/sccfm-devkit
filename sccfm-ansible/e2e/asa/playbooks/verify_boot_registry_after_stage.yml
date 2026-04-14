@@ -1,0 +1,30 @@
+---
+# Verify boot registry reflects the staged upgrade.
+
+- name: "CI: Verify boot registry after staging"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List boot registry after staging
+      cisco.sccfm.list_asa_boot_registry:
+        query: "{{ asa_test_query }}"
+      register: result
+
+    - name: Assert boot registry data available after staging
+      ansible.builtin.assert:
+        that:
+          - result.results | length > 0
+          - result.results[0].device_uid is defined
+          - result.results[0].boot_system_entries is defined
+        fail_msg: "Expected boot registry data after staging upgrade"

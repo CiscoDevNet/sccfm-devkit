@@ -1,0 +1,29 @@
+---
+# Show shun statistics on CI ASA devices.
+
+- name: "CI: Show ASA shun statistics"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Show shun statistics on CI ASA devices
+      cisco.sccfm.show_asa_shun:
+        query: "{{ asa_test_query }}"
+        statistics: true
+      register: result
+
+    - name: Assert shun statistics returned
+      ansible.builtin.assert:
+        that:
+          - result.results is defined
+        fail_msg: "Expected shun statistics from at least one ASA device"

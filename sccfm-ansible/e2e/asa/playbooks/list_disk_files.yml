@@ -1,0 +1,30 @@
+---
+# List disk files on CI ASA devices.
+
+- name: "CI: List ASA disk files"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List disk files on CI ASA devices
+      cisco.sccfm.list_asa_disk_files:
+        query: "{{ asa_test_query }}"
+      register: result
+
+    - name: Assert at least one file returned
+      ansible.builtin.assert:
+        that:
+          - result.results | length > 0
+          - result.results[0].device_uid is defined
+          - result.results[0].file_name is defined
+        fail_msg: "Expected disk file data from at least one ASA device"

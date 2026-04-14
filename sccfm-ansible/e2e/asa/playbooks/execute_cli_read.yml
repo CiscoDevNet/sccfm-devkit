@@ -1,0 +1,31 @@
+---
+# Execute read-only CLI commands on CI ASA devices.
+
+- name: "CI: Execute ASA CLI read commands"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Execute read-only CLI commands on CI ASA devices
+      cisco.sccfm.execute_asa_cli:
+        query: "{{ asa_test_query }}"
+        commands: "{{ asa_cli_commands }}"
+      register: result
+
+    - name: Assert CLI results returned
+      ansible.builtin.assert:
+        that:
+          - result.results | length > 0
+          - result.results[0].device_uid is defined
+          - result.results[0].result is defined
+        fail_msg: "Expected CLI output from at least one ASA device"

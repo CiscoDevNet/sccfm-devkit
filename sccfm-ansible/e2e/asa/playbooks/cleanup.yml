@@ -1,0 +1,23 @@
+---
+# Pre/post-clean: clear any shun entries left by tests.
+
+- name: "CI: ASA E2E cleanup"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Clear all shun entries on CI ASA devices
+      cisco.sccfm.clear_asa_shun:
+        query: "{{ asa_test_query_all }}"
+      register: clear_result
+      failed_when: false

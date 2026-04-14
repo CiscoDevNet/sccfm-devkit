@@ -1,0 +1,30 @@
+---
+# Add shun entries on CI ASA devices using TEST-NET addresses.
+
+- name: "CI: Add ASA shun entries"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Add shun entries on CI ASA devices
+      cisco.sccfm.add_asa_shun:
+        query: "{{ asa_test_query }}"
+        entries: "{{ shun_test_entries }}"
+      register: result
+
+    - name: Assert shun entries were added
+      ansible.builtin.assert:
+        that:
+          - result.changed
+          - result.results | length > 0
+        fail_msg: "Expected shun entries to be added on at least one ASA device"
