@@ -1,3 +1,9 @@
+## v0.29.0 (2026-04-14)
+
+### Feat
+
+- **Lh 105871**: add sccfm ansible asa test suite (#53)
+
 ## v0.28.0 (2026-04-08)
 
 ### Feat
