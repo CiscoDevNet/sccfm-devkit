@@ -7,7 +7,7 @@ from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import Device, DevicePage
+from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
@@ -216,6 +216,43 @@ def test_should_return_failures_in_json(
     failed_checks = [c for c in report["checks"] if not c["passed"]]
     assert len(failed_checks) == 2
     assert report["unmonitored_interfaces"][0]["name"] == "dmz"
+
+
+def test_should_render_failed_transaction_as_json_when_requested(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+) -> None:
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        return DevicePage(count=len(sample_devices), items=sample_devices)
+
+    def fake_check_ha(self: AsaHaCheckService, device_uids: list[str]) -> CdoTransaction:
+        return CdoTransaction(
+            transactionUid="tx-123",
+            cdoTransactionStatus="ERROR",
+            errorMessage="HA check execution failed",
+        )
+
+    def stub_init(self: AsaHaCheckService, config: Any) -> None:
+        return None
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaHaCheckService, "check_ha", fake_check_ha)
+    monkeypatch.setattr(AsaHaCheckService, "__init__", stub_init)
+
+    result = cli_runner.invoke(
+        cli,
+        ["inventory", "devices", "asa", "ha-check", "-u", "uid-1", "--format", "json"],
+    )
+
+    assert result.exit_code != 0
+    payload = json.loads(result.output)
+    assert payload["transactionUid"] == "tx-123"
+    assert payload["cdoTransactionStatus"] == "ERROR"
 
 
 # ── Table output tests ──────────────────────────────────────────

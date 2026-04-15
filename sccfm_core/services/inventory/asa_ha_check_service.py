@@ -22,6 +22,7 @@ from sccfm_core.types import ConfigLike
 
 _SHOW_FAILOVER = "show failover"
 _SHOW_FAILOVER_STATE = "show failover state"
+_INTERFACE_PAGE_SIZE = 200
 
 
 @dataclass(frozen=True)
@@ -110,21 +111,33 @@ class AsaHaCheckService:
         fetch_interfaces: Callable[..., Any],
         scope_name: str,
     ) -> InterfaceLookupResult:
-        try:
-            page = fetch_interfaces(device_uid=device_uid, limit="200")
-        except Exception as exc:
-            return InterfaceLookupResult(errors=[_format_interface_lookup_error(scope_name, exc)])
+        offset = 0
+        unmonitored_interfaces: list[UnmonitoredInterface] = []
 
-        return InterfaceLookupResult(
-            unmonitored_interfaces=[
-                UnmonitoredInterface(
-                    hardware_name=iface.hardware_name or "",
-                    name=iface.name or "",
+        while True:
+            try:
+                page = fetch_interfaces(
+                    device_uid=device_uid,
+                    limit=str(_INTERFACE_PAGE_SIZE),
+                    offset=str(offset),
                 )
-                for iface in page.items or []
-                if _is_unmonitored(iface)
-            ]
-        )
+            except Exception as exc:
+                return InterfaceLookupResult(
+                    unmonitored_interfaces=unmonitored_interfaces,
+                    errors=[_format_interface_lookup_error(scope_name, exc)],
+                )
+
+            items = list(page.items or [])
+            unmonitored_interfaces.extend(_collect_unmonitored_interfaces(items))
+
+            next_offset = _next_interface_offset(
+                page=page,
+                current_offset=offset,
+                page_size=len(items),
+            )
+            if next_offset is None:
+                return InterfaceLookupResult(unmonitored_interfaces=unmonitored_interfaces)
+            offset = next_offset
 
 
 def _is_unmonitored(iface: AsaInterface) -> bool:
@@ -138,6 +151,32 @@ def _is_unmonitored(iface: AsaInterface) -> bool:
     return True
 
 
+def _collect_unmonitored_interfaces(items: list[AsaInterface]) -> list[UnmonitoredInterface]:
+    return [
+        UnmonitoredInterface(
+            hardware_name=iface.hardware_name or "",
+            name=iface.name or "",
+        )
+        for iface in items
+        if _is_unmonitored(iface)
+    ]
+
+
+def _next_interface_offset(*, page: Any, current_offset: int, page_size: int) -> int | None:
+    if page_size == 0:
+        return None
+
+    page_offset = int(page.offset or current_offset)
+    next_offset = page_offset + page_size
+    total_count = getattr(page, "count", None)
+
+    if total_count is not None and next_offset >= total_count:
+        return None
+    if page_size < _INTERFACE_PAGE_SIZE:
+        return None
+    return next_offset
+
+
 def _parse_cli_results(results: list[CdoCliResult]) -> dict[str, AsaFailoverStatus]:
     """Group CLI results by device and parse combined output."""
     device_outputs: dict[str, dict[str, str]] = {}
@@ -145,17 +184,17 @@ def _parse_cli_results(results: list[CdoCliResult]) -> dict[str, AsaFailoverStat
     for result in results:
         uid = result.device_uid
         raw = result.result or ""
-        script = (result.script or "").strip().lower()
+        commands = _script_commands(result.script or "")
 
         if uid not in device_outputs:
             device_outputs[uid] = {"show_failover": "", "show_failover_state": ""}
 
-        is_combined = "show failover" in script and "show failover state" in script
+        is_combined = {_SHOW_FAILOVER, _SHOW_FAILOVER_STATE}.issubset(commands)
 
         if is_combined:
             device_outputs[uid]["show_failover"] = raw
             device_outputs[uid]["show_failover_state"] = raw
-        elif "show failover state" in script:
+        elif _SHOW_FAILOVER_STATE in commands:
             device_outputs[uid]["show_failover_state"] = raw
         else:
             device_outputs[uid]["show_failover"] = raw
@@ -168,6 +207,10 @@ def _parse_cli_results(results: list[CdoCliResult]) -> dict[str, AsaFailoverStat
         )
 
     return parsed
+
+
+def _script_commands(script: str) -> set[str]:
+    return {line.strip().lower() for line in script.splitlines() if line.strip()}
 
 
 def _run_checks(

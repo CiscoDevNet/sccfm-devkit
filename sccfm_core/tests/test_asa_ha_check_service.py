@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from scc_firewall_manager_sdk import CdoCliResult
+
 from sccfm_core.models.asa_failover_status import (
     AsaFailoverInterface,
     AsaFailoverStatus,
@@ -22,8 +24,38 @@ from sccfm_core.services.inventory.asa_ha_check_service import (
     _check_unmonitored,
     _check_version_match,
     _is_unmonitored,
+    _parse_cli_results,
     _run_checks,
 )
+
+_SHOW_FAILOVER_OUTPUT = """\
+Failover On
+Failover unit Primary
+Failover LAN Interface: INTFC GigabitEthernet0/8 (up)
+Monitored Interfaces 3 of 110 maximum
+Version: Ours 9.20(3)10, Mate 9.20(3)10
+Serial Number: Ours JAD251400QT, Mate 9AA77409PDA
+Last Failover at: 14:23:15 UTC Jun 5 2024
+        This host: Primary - Active
+                Active time: 12345 (sec)
+                  Interface outside (10.0.0.1): Normal (Monitored)
+        Other host: Secondary - Standby Ready
+                Active time: 0 (sec)
+                  Interface outside (10.0.0.2): Normal (Monitored)
+"""
+
+_SHOW_FAILOVER_STATE_OUTPUT = """\
+               State          Last Failure Reason      Date/Time
+This host  -   Primary
+               Active         None
+Other host -   Secondary
+               Standby Ready  None
+
+====Configuration State===
+        Sync Done
+====Communication State===
+        Mac set
+"""
 
 
 def _make_status(
@@ -284,6 +316,44 @@ class TestRunChecks:
         assert all(isinstance(c, HaCheckResult) for c in checks)
 
 
+class TestParseCliResults:
+    def test_should_keep_show_failover_state_separate(self) -> None:
+        results = [
+            CdoCliResult(
+                uid="r1",
+                device_uid="uid-1",
+                result=_SHOW_FAILOVER_OUTPUT,
+                script="show failover",
+            ),
+            CdoCliResult(
+                uid="r2",
+                device_uid="uid-1",
+                result=_SHOW_FAILOVER_STATE_OUTPUT,
+                script="show failover state",
+            ),
+        ]
+
+        parsed = _parse_cli_results(results)
+
+        assert parsed["uid-1"].failover_enabled is True
+        assert parsed["uid-1"].config_sync_state == "Sync Done"
+
+    def test_should_parse_combined_failover_result(self) -> None:
+        parsed = _parse_cli_results(
+            [
+                CdoCliResult(
+                    uid="r1",
+                    device_uid="uid-1",
+                    result=f"{_SHOW_FAILOVER_OUTPUT}\n{_SHOW_FAILOVER_STATE_OUTPUT}",
+                    script="show failover\nshow failover state",
+                )
+            ]
+        )
+
+        assert parsed["uid-1"].failover_enabled is True
+        assert parsed["uid-1"].config_sync_state == "Sync Done"
+
+
 class TestFindUnmonitoredInterfaces:
     def test_should_capture_interface_lookup_errors(self) -> None:
         service = AsaHaCheckService.__new__(AsaHaCheckService)
@@ -304,6 +374,35 @@ class TestFindUnmonitoredInterfaces:
         assert result.errors == ["physical interfaces: physical lookup failed"]
         assert result.unmonitored_interfaces == [
             UnmonitoredInterface(hardware_name="GigabitEthernet0/3", name="dmz")
+        ]
+
+    def test_should_fetch_all_interface_pages(self) -> None:
+        service = AsaHaCheckService.__new__(AsaHaCheckService)
+        service._interfaces_api = _FakeInterfacesApi(  # type: ignore[assignment]
+            physical_items=[
+                _mock_interface(
+                    enabled=True,
+                    name=f"inside-{index}",
+                    monitor_interface=True,
+                    hardware_name=f"GigabitEthernet0/{index}",
+                )
+                for index in range(200)
+            ]
+            + [
+                _mock_interface(
+                    enabled=True,
+                    name="dmz",
+                    monitor_interface=False,
+                    hardware_name="GigabitEthernet0/200",
+                )
+            ]
+        )
+
+        result = service._find_unmonitored_interfaces("uid-1")
+
+        assert result.errors == []
+        assert result.unmonitored_interfaces == [
+            UnmonitoredInterface(hardware_name="GigabitEthernet0/200", name="dmz")
         ]
 
 
@@ -340,14 +439,38 @@ class _FakeInterfacesApi:
         self._physical_error = physical_error
         self._subinterface_error = subinterface_error
 
-    def get_asa_physical_interfaces(self, *, device_uid: str, limit: str) -> SimpleNamespace:
-        del device_uid, limit
+    def get_asa_physical_interfaces(
+        self,
+        *,
+        device_uid: str,
+        limit: str,
+        offset: str | None = None,
+    ) -> SimpleNamespace:
+        del device_uid
         if self._physical_error is not None:
             raise self._physical_error
-        return SimpleNamespace(items=self._physical_items)
+        return _build_page(self._physical_items, limit=limit, offset=offset)
 
-    def get_asa_sub_interfaces(self, *, device_uid: str, limit: str) -> SimpleNamespace:
-        del device_uid, limit
+    def get_asa_sub_interfaces(
+        self,
+        *,
+        device_uid: str,
+        limit: str,
+        offset: str | None = None,
+    ) -> SimpleNamespace:
+        del device_uid
         if self._subinterface_error is not None:
             raise self._subinterface_error
-        return SimpleNamespace(items=self._subinterface_items)
+        return _build_page(self._subinterface_items, limit=limit, offset=offset)
+
+
+def _build_page(items: list[object], *, limit: str, offset: str | None) -> SimpleNamespace:
+    limit_value = int(limit)
+    offset_value = int(offset or "0")
+    page_items = items[offset_value : offset_value + limit_value]
+    return SimpleNamespace(
+        count=len(items),
+        items=page_items,
+        limit=limit_value,
+        offset=offset_value,
+    )

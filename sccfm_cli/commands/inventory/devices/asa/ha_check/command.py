@@ -75,7 +75,7 @@ class AsaHaCheckCommand(AsaDeviceTargetCommand):
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
-            self.print_failed_transaction_details(cdo_transaction=results, format="table")
+            self.print_failed_transaction_details(cdo_transaction=results, format=format)
             return
 
         if format == "json":
