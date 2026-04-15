@@ -1,0 +1,27 @@
+---
+# Device selection — matches the vASA onboarded by onboard_vasa.yml (ci-e2e-asa-<ip>)
+asa_test_query: "name:ci-e2e-asa-* AND connectivityState:ONLINE"
+asa_test_query_all: "name:ci-e2e-asa-*"
+
+# Read-only CLI commands for execute_asa_cli
+asa_cli_commands:
+  - "show version"
+  - "show running-config hostname"
+
+# For list_asa_not_on_version — fake version no device should be on
+asa_not_on_version: "9.99(0)"
+
+# Shun lifecycle — RFC 5737 TEST-NET addresses (safe, non-routable)
+shun_test_source_ip: "198.51.100.1"
+shun_test_entries:
+  - source_ip: "198.51.100.1"
+  - source_ip: "198.51.100.2"
+shun_test_source_ips:
+  - "198.51.100.1"
+  - "198.51.100.2"
+
+# Upgrade workflow — staging only (no reboot)
+# Disabled: vASA 9.4(1)200 cannot fetch upgrade images from CDO CloudFront
+# asa_upgrade_software_version: "9.6(4.14)"
+# asa_upgrade_asdm_version: "7.9(1)"
+# asa_upgrade_name: "ci-e2e-asa-upgrade"

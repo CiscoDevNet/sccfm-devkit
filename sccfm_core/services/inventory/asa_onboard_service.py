@@ -21,9 +21,14 @@ class AsaOnboardService:
             )
         )
         if completed_transaction.cdo_transaction_status != CdoTransactionStatus.DONE:
-            raise Exception(
+            error_msg = (
                 f"Transaction {completed_transaction.transaction_uid} failed with status "
                 f"{completed_transaction.cdo_transaction_status}"
             )
+            if completed_transaction.error_message:
+                error_msg += f": {completed_transaction.error_message}"
+            if completed_transaction.error_details:
+                error_msg += f" (details: {completed_transaction.error_details})"
+            raise Exception(error_msg)
 
         return self.inventory_api.get_device(device_uid=completed_transaction.entity_uid)
