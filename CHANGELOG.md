@@ -1,3 +1,9 @@
+## v0.30.0 (2026-04-15)
+
+### Feat
+
+- **LH-102404**: add ASA HA health check command (#55)
+
 ## v0.29.0 (2026-04-14)
 
 ### Feat
