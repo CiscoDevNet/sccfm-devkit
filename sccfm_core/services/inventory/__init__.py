@@ -4,6 +4,10 @@ from sccfm_core.services.inventory.asa_boot_registry_service import (
 )
 from sccfm_core.services.inventory.asa_cli_service import AsaCommandLineService
 from sccfm_core.services.inventory.asa_disk_file_service import AsaDiskFileService
+from sccfm_core.services.inventory.asa_ha_check_service import (
+    AsaHaCheckReport,
+    AsaHaCheckService,
+)
 from sccfm_core.services.inventory.asa_onboard_service import AsaOnboardService
 from sccfm_core.services.inventory.asa_shun_service import AsaShunService, ShunEntrySpec
 from sccfm_core.services.inventory.asa_upgrade_service import AsaUpgradeService
@@ -36,6 +40,8 @@ __all__ = [
     "AsaBootRegistryService",
     "AsaCommandLineService",
     "AsaDiskFileService",
+    "AsaHaCheckReport",
+    "AsaHaCheckService",
     "AsaOnboardService",
     "AsaShunService",
     "AsaUpgradeService",

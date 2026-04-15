@@ -1,0 +1,125 @@
+---
+# Run HA health checks on ASA failover devices via SCCFM
+#
+# QUICK TEST (adhoc command):
+#   ansible localhost -m cisco.sccfm.asa_ha_check \
+#     -a 'query="asaFailoverMode:ACTIVE_STANDBY AND connectivityState:ONLINE" limit=1'
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/asa_ha_check.yml
+#
+# Optionally pass a device UID to run UID-specific examples:
+#   ansible-playbook examples/asa_ha_check.yml \
+#     -e device_uid=<your-device-uid>
+#
+# NOTE: Devices must be ONLINE for the CLI commands to succeed.
+# TIP: Querying on asaFailoverMode:ACTIVE_STANDBY usually narrows results
+#      to the ASA pairs where this check is most useful.
+
+- name: Run HA health checks on ASA devices
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uid: ""
+
+  tasks:
+    # ============================================================
+    # QUICK TEST: Run HA checks on one ONLINE failover ASA
+    # ============================================================
+    - name: "Quick test: Run HA checks on first available ACTIVE_STANDBY ASA"
+      cisco.sccfm.asa_ha_check:
+        query: "asaFailoverMode:ACTIVE_STANDBY AND connectivityState:ONLINE"
+        limit: 1
+      register: quick_test_result
+
+    - name: Display quick test HA results
+      ansible.builtin.debug:
+        var: quick_test_result.results
+      when: quick_test_result.results is defined
+
+    - name: Set resolved device UID (use provided or auto-discovered)
+      ansible.builtin.set_fact:
+        resolved_uid: >-
+          {{
+            device_uid
+            if device_uid | length > 0
+            else quick_test_result.results[0].device_uid
+          }}
+      when:
+        - quick_test_result.results is defined
+        - quick_test_result.results | length > 0
+
+    # ============================================================
+    # Example 1: Run the check on a specific device by UID
+    # ============================================================
+    - name: "UID test: Run HA checks on a specific ASA"
+      cisco.sccfm.asa_ha_check:
+        uids:
+          - "{{ resolved_uid }}"
+      register: uid_result
+      when: resolved_uid is defined
+
+    - name: Show per-device HA summary
+      ansible.builtin.debug:
+        msg: >-
+          Device {{ item.device_uid }}:
+          all_passed={{ item.all_passed }},
+          this_host={{ item.this_host_state }},
+          other_host={{ item.other_host_state }},
+          failover_unit={{ item.failover_unit }}
+      loop: "{{ uid_result.results | default([]) }}"
+      loop_control:
+        label: "{{ item.device_uid }}"
+
+    # ============================================================
+    # Example 2: Run the check across all ONLINE active/standby ASAs
+    # ============================================================
+    - name: Run HA checks on all ONLINE active/standby ASAs
+      cisco.sccfm.asa_ha_check:
+        query: "asaFailoverMode:ACTIVE_STANDBY AND connectivityState:ONLINE"
+        limit: 20
+      register: fleet_result
+
+    - name: Display any failed HA checks
+      ansible.builtin.debug:
+        msg: >-
+          Device {{ item.0.device_uid }} failed {{ item.1.name }}:
+          {{ item.1.detail }}
+      loop: >-
+        {{
+          fleet_result.results | default([])
+          | subelements('checks')
+        }}
+      loop_control:
+        label: "{{ item.0.device_uid }} :: {{ item.1.name }}"
+      when: not item.1.passed
+
+    # ============================================================
+    # Example 3: Assert fleet health
+    # ============================================================
+    - name: Assert all HA checks passed
+      ansible.builtin.assert:
+        that:
+          - fleet_result.all_passed
+        fail_msg: "One or more ASA HA health checks failed"
+        success_msg: "All ASA HA health checks passed"
+      when: fleet_result.results is defined
+
+    # ============================================================
+    # Example 4: Show interfaces that are enabled but not monitored
+    # ============================================================
+    - name: Show unmonitored interfaces
+      ansible.builtin.debug:
+        msg: >-
+          Device {{ item.device_uid }} has unmonitored interfaces:
+          {{ item.unmonitored_interfaces | map(attribute='name') | list }}
+      loop: "{{ fleet_result.results | default([]) }}"
+      loop_control:
+        label: "{{ item.device_uid }}"
+      when: item.unmonitored_interfaces | length > 0
