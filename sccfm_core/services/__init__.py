@@ -19,7 +19,14 @@ from sccfm_core.services.object_management import (
     NetworkObjectResponse,
     NetworkObjectService,
 )
-from sccfm_core.services.policy import AccessRuleResponse, AccessRuleService
+from sccfm_core.services.policy import (
+    AccessGroupListResponse,
+    AccessGroupResponse,
+    AccessGroupService,
+    AccessRuleListResponse,
+    AccessRuleResponse,
+    AccessRuleService,
+)
 
 __all__ = [
     "AsaBootImageService",
@@ -33,6 +40,10 @@ __all__ = [
     "HealthService",
     "HealthStatus",
     "InventoryService",
+    "AccessGroupListResponse",
+    "AccessGroupResponse",
+    "AccessGroupService",
+    "AccessRuleListResponse",
     "AccessRuleResponse",
     "AccessRuleService",
     "NetworkGroupListResponse",

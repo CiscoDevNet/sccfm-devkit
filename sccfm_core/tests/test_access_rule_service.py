@@ -10,6 +10,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services.object_management import NetworkObjectResponse, NetworkObjectService
 from sccfm_core.services.policy.access_rule_service import (
+    AccessRuleListResponse,
     AccessRuleResponse,
     AccessRuleService,
 )
@@ -164,3 +165,140 @@ class TestAccessRuleResponse:
         d = response.to_dict()
         assert d["uid"] == "rule-uid-123"
         assert d["rule_action"] == "PERMIT"
+
+
+SAMPLE_LIST_JSON: dict[str, Any] = {
+    "count": 2,
+    "items": [SAMPLE_RULE_JSON, SAMPLE_RULE_JSON],
+    "limit": 50,
+    "offset": 0,
+}
+
+
+class TestAccessRuleServiceFetch:
+    def test_fetch_returns_access_rule(self, monkeypatch: MonkeyPatch) -> None:
+        service, mock_api = _build_service(monkeypatch)
+        mock_api.fetch_access_rule_without_preload_content.return_value = _mock_api_response(
+            SAMPLE_RULE_JSON
+        )
+
+        result = service.fetch_access_rule(uid="rule-uid-123")
+
+        assert result.uid == "rule-uid-123"
+        assert result.rule_action == "PERMIT"
+        mock_api.fetch_access_rule_without_preload_content.assert_called_once_with(
+            access_rule_uid="rule-uid-123"
+        )
+
+
+class TestAccessRuleServiceList:
+    def test_list_returns_paginated_response(self, monkeypatch: MonkeyPatch) -> None:
+        service, mock_api = _build_service(monkeypatch)
+        mock_api.list_access_rules_without_preload_content.return_value = _mock_api_response(
+            SAMPLE_LIST_JSON
+        )
+
+        result = service.list_access_rules(limit=50, offset=0)
+
+        assert result.count == 2
+        assert len(result.items) == 2
+        assert result.items[0].uid == "rule-uid-123"
+        mock_api.list_access_rules_without_preload_content.assert_called_once_with(
+            limit="50", offset="0", q=None
+        )
+
+    def test_list_with_query(self, monkeypatch: MonkeyPatch) -> None:
+        service, mock_api = _build_service(monkeypatch)
+        empty_page: dict[str, Any] = {"count": 0, "items": [], "limit": 10, "offset": 0}
+        mock_api.list_access_rules_without_preload_content.return_value = _mock_api_response(
+            empty_page
+        )
+
+        result = service.list_access_rules(limit=10, offset=0, query="ruleAction:DENY")
+
+        assert result.count == 0
+        assert result.items == []
+        mock_api.list_access_rules_without_preload_content.assert_called_once_with(
+            limit="10", offset="0", q="ruleAction:DENY"
+        )
+
+
+class TestAccessRuleServiceModify:
+    def test_modify_calls_api_with_correct_params(self, monkeypatch: MonkeyPatch) -> None:
+        service, mock_api = _build_service(monkeypatch)
+        mock_api.modify_access_rule_without_preload_content.return_value = _mock_api_response(
+            SAMPLE_RULE_JSON
+        )
+        monkeypatch.setattr(
+            NetworkObjectService,
+            "get_network_object_by_name",
+            lambda self, name: SAMPLE_NET_OBJ if name == "web-servers" else SAMPLE_NET_OBJ_2,
+        )
+
+        result = service.modify_access_rule(
+            uid="rule-uid-123",
+            remark="Updated remark",
+            source_network="web-servers",
+            destination_network="db-servers",
+        )
+
+        assert result.uid == "rule-uid-123"
+        mock_api.modify_access_rule_without_preload_content.assert_called_once()
+        call_kwargs = mock_api.modify_access_rule_without_preload_content.call_args
+        assert call_kwargs.kwargs["access_rule_uid"] == "rule-uid-123"
+        update_input = call_kwargs.kwargs["access_rule_update_input"]
+        assert update_input.uid == "rule-uid-123"
+        assert update_input.remark == "Updated remark"
+        assert update_input.source_network.name == "web-servers"
+
+    def test_modify_with_minimal_params(self, monkeypatch: MonkeyPatch) -> None:
+        service, mock_api = _build_service(monkeypatch)
+        mock_api.modify_access_rule_without_preload_content.return_value = _mock_api_response(
+            SAMPLE_RULE_JSON
+        )
+
+        result = service.modify_access_rule(uid="rule-uid-123", rule_action="DENY")
+
+        assert result.uid == "rule-uid-123"
+        call_kwargs = mock_api.modify_access_rule_without_preload_content.call_args
+        update_input = call_kwargs.kwargs["access_rule_update_input"]
+        assert update_input.rule_action == "DENY"
+        assert update_input.source_network is None
+        assert update_input.destination_network is None
+
+
+class TestAccessRuleServiceDelete:
+    def test_delete_returns_uid(self, monkeypatch: MonkeyPatch) -> None:
+        service, mock_api = _build_service(monkeypatch)
+        delete_response = Mock()
+        delete_response.status = 204
+        delete_response.read.return_value = b""
+        mock_api.delete_access_rule_without_preload_content.return_value = delete_response
+
+        result = service.delete_access_rule(uid="rule-uid-123")
+
+        assert result == "rule-uid-123"
+        mock_api.delete_access_rule_without_preload_content.assert_called_once_with(
+            access_rule_uid="rule-uid-123"
+        )
+
+
+class TestAccessRuleListResponse:
+    def test_from_dict_roundtrip(self) -> None:
+        response = AccessRuleListResponse.from_dict(SAMPLE_LIST_JSON)
+        assert response.count == 2
+        assert len(response.items) == 2
+        assert response.items[0].uid == "rule-uid-123"
+        assert response.limit == 50
+        assert response.offset == 0
+
+        d = response.to_dict()
+        assert d["count"] == 2
+        assert len(d["items"]) == 2
+        assert d["items"][0]["uid"] == "rule-uid-123"
+
+    def test_from_dict_empty(self) -> None:
+        empty: dict[str, Any] = {"count": 0, "items": [], "limit": 50, "offset": 0}
+        response = AccessRuleListResponse.from_dict(empty)
+        assert response.count == 0
+        assert response.items == []

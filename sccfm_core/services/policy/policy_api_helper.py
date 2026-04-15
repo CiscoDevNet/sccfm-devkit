@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from scc_firewall_manager_sdk.api.asa_access_groups_api import ASAAccessGroupsApi
 from scc_firewall_manager_sdk.api.asa_access_rules_api import ASAAccessRulesApi
 from scc_firewall_manager_sdk.exceptions import ApiException
 
@@ -26,6 +27,7 @@ class PolicyApiHelper:
     def __init__(self, config: ConfigLike) -> None:
         api_client = ApiClientFactory().build(config)
         self.rules_api = ASAAccessRulesApi(api_client)
+        self.groups_api = ASAAccessGroupsApi(api_client)
 
     def read_raw_response(self, response: Any) -> dict[str, Any]:
         """Read and validate a raw HTTP response, returning parsed JSON."""
