@@ -1,6 +1,7 @@
 # sccfm-api-cli
 
 ## Dev environment tips
+
 - Use `poetry` for dependency management.
 - Use `black` for syntax formatting.
 - Use `isort` for import sorting.
@@ -18,4 +19,5 @@
 - Use Python type hints strictly. Do not write code without typing.
 
 ## Commit and PR instructions
-- Do not commit. I will do it.
+
+- Do not commit unless I tell you to.
