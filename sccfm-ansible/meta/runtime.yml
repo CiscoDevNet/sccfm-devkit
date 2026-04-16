@@ -17,6 +17,7 @@ action_groups:
     - delete_object_override
     - edit_object_override
     - execute_asa_cli
+    - execute_ftd_cli
     - get_object
     - list_asa_boot_registry
     - list_asa_compatible_versions

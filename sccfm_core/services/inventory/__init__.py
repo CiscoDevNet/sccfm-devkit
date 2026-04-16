@@ -24,6 +24,7 @@ from sccfm_core.services.inventory.cdfmc_access_policy_service import (
     CdfmcAccessPolicyService,
     FmcAccessPolicy,
 )
+from sccfm_core.services.inventory.ftd_cli_service import FtdCommandLineService
 from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
 from sccfm_core.services.inventory.ftd_onboard_service import FtdOnboardService
 from sccfm_core.services.inventory.ftd_upgrade_service import FtdUpgradeService
@@ -49,6 +50,7 @@ __all__ = [
     "AsaUserPasswordService",
     "CdfmcAccessPolicyService",
     "FmcAccessPolicy",
+    "FtdCommandLineService",
     "FtdDeployService",
     "FtdOnboardService",
     "FtdZtpOnboardService",
