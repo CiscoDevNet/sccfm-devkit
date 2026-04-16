@@ -10,16 +10,18 @@ test_acl_name: "ci-e2e-test-acl"
 # entityUid, isShared, name, sharedAccessGroupUid, uid
 access_group_query: "name:{{ test_acl_name }}"
 
-# Access rule test data.
-# source_network / destination_network are intentionally omitted so the rule
-# applies to any source and any destination.  The service resolves named
-# network objects and raises NotFoundError for strings that do not exist,
-# so omitting the fields is the correct CI-safe way to express "any".
+# Access rule test data — follows the pattern from examples/access_rules.yml:
+# named network objects for source/destination, protocol, destination_port,
+# remark.  No source_port (the API does not require it).
+test_source_network: "ci-e2e-src-host"
+test_destination_network: "ci-e2e-dst-host"
+
 test_rule:
   index: 1
   rule_action: PERMIT
+  source_network: "{{ test_source_network }}"
+  destination_network: "{{ test_destination_network }}"
   protocol: tcp
-  source_port: "80"
   destination_port: "443"
   remark: "CI test rule - allow HTTPS"
   active: true

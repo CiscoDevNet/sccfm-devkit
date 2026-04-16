@@ -17,6 +17,26 @@
       api_token: "{{ sccfm_api_token }}"
 
   tasks:
+    - name: Create source network object for access rule tests
+      cisco.sccfm.create_network_object:
+        name: "{{ test_source_network }}"
+        value: "198.51.100.1"
+        description: "CI E2E source host for access rule tests"
+      register: src_obj
+      failed_when:
+        - src_obj is failed
+        - "'already exists' not in (src_obj.msg | default('') | lower)"
+
+    - name: Create destination network object for access rule tests
+      cisco.sccfm.create_network_object:
+        name: "{{ test_destination_network }}"
+        value: "198.51.100.2"
+        description: "CI E2E destination host for access rule tests"
+      register: dst_obj
+      failed_when:
+        - dst_obj is failed
+        - "'already exists' not in (dst_obj.msg | default('') | lower)"
+
     - name: Create test ACL and apply as global access-group
       cisco.sccfm.execute_asa_cli:
         query: "{{ asa_test_query }}"

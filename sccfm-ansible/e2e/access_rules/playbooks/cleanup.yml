@@ -41,6 +41,18 @@
         path: "/tmp/ci_access_rule_uid"
         state: absent
 
+    # ── Network object cleanup ────────────────────────────────────
+
+    - name: Delete source network object
+      cisco.sccfm.delete_network_object:
+        name: "{{ test_source_network }}"
+      failed_when: false
+
+    - name: Delete destination network object
+      cisco.sccfm.delete_network_object:
+        name: "{{ test_destination_network }}"
+      failed_when: false
+
     # ── Access group cleanup (provisioned via CLI) ───────────────
 
     - name: Remove provisioned test access group via CLI
