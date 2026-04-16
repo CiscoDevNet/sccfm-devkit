@@ -1,0 +1,37 @@
+---
+# List access groups for the CI test device and cache the first UID for subsequent phases.
+
+- name: "CI: List access groups"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List access groups for CI ASA device
+      cisco.sccfm.list_access_groups:
+        query: "{{ asa_test_query }}"
+        limit: 10
+      register: result
+
+    - name: Assert at least one access group is returned
+      ansible.builtin.assert:
+        that:
+          - not result.changed
+          - result.access_groups | length > 0
+          - result.count > 0
+        fail_msg: "Expected at least one access group for query '{{ asa_test_query }}'"
+
+    - name: Cache access group UID for subsequent plays
+      ansible.builtin.copy:
+        content: "{{ result.access_groups[0].uid }}"
+        dest: "/tmp/ci_access_group_uid"
+        mode: "0600"

@@ -1,0 +1,33 @@
+---
+# List access rules and verify the response shape.
+
+- name: "CI: List access rules"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List access rules (first page)
+      cisco.sccfm.list_access_rules:
+        limit: 10
+        offset: 0
+      register: result
+
+    - name: Assert response shape is correct
+      ansible.builtin.assert:
+        that:
+          - not result.changed
+          - result.access_rules is defined
+          - result.count is defined
+          - result.limit == 10
+          - result.offset == 0
+        fail_msg: "Expected list_access_rules to return access_rules, count, limit, and offset"

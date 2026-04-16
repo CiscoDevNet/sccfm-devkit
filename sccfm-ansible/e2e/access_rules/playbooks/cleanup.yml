@@ -1,0 +1,38 @@
+---
+# Pre/post-test cleanup: remove the test access rule if it exists.
+
+- name: "CI: Pre-clean test access rule"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID (if present)
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+      failed_when: false
+
+    - name: Delete cached test access rule
+      cisco.sccfm.delete_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: delete_result
+      when: cached_uid.content is defined
+      failed_when:
+        - delete_result.failed is defined
+        - delete_result.failed
+        - "'not found' not in (delete_result.msg | default('') | lower)"
+
+    - name: Remove cached UID file
+      ansible.builtin.file:
+        path: "/tmp/ci_access_rule_uid"
+        state: absent

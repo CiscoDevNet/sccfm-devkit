@@ -1,0 +1,55 @@
+---
+# Create a test access rule on the CI ASA device.
+
+- name: "CI: Create access rule"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached access group UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_group_uid"
+      register: cached_uid
+
+    - name: Read cached entity UID from access group
+      cisco.sccfm.get_access_group:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: access_group
+
+    - name: Create access rule
+      cisco.sccfm.create_access_rule:
+        access_group_uid: "{{ access_group.access_group.uid }}"
+        entity_uid: "{{ access_group.access_group.entity_uid }}"
+        index: "{{ test_rule.index }}"
+        rule_action: "{{ test_rule.rule_action }}"
+        protocol: "{{ test_rule.protocol }}"
+        destination_port: "{{ test_rule.destination_port }}"
+        remark: "{{ test_rule.remark }}"
+        active: "{{ test_rule.active }}"
+      register: create_result
+
+    - name: Cache created rule UID for subsequent phases
+      ansible.builtin.copy:
+        content: "{{ create_result.access_rule.uid }}"
+        dest: "/tmp/ci_access_rule_uid"
+        mode: "0600"
+      when: create_result.access_rule.uid is defined
+
+    - name: Assert rule was created
+      ansible.builtin.assert:
+        that:
+          - create_result.changed
+          - create_result.access_rule.uid is defined
+          - create_result.access_rule.rule_action == test_rule.rule_action
+          - create_result.access_rule.remark == test_rule.remark
+        fail_msg: "Expected access rule to be created with action '{{ test_rule.rule_action }}'"

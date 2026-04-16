@@ -1,0 +1,19 @@
+---
+# Device selection — matches the vASA onboarded for CI (same as asa/ suite)
+asa_test_query: "name:ci-e2e-asa-* AND connectivityState:ONLINE"
+
+# Access rule test data.
+# source_network / destination_network are intentionally omitted so the rule
+# applies to any source and any destination.  The service resolves named
+# network objects and raises NotFoundError for strings that do not exist,
+# so omitting the fields is the correct CI-safe way to express "any".
+test_rule:
+  index: 1
+  rule_action: PERMIT
+  protocol: tcp
+  destination_port: "443"
+  remark: "CI test rule - allow HTTPS"
+  active: true
+
+updated_rule_remark: "CI test rule - allow HTTPS (updated)"
+updated_rule_destination_port: "8443"

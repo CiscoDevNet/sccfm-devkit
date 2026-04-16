@@ -1,0 +1,37 @@
+---
+# Fetch the access rule and verify the updated fields are persisted.
+
+- name: "CI: Verify updated access rule"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+
+    - name: Get access rule by UID
+      cisco.sccfm.get_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: result
+
+    - name: Assert updated fields are persisted
+      ansible.builtin.assert:
+        that:
+          - not result.changed
+          - result.access_rule.remark == updated_rule_remark
+          - result.access_rule.destination_port == updated_rule_destination_port
+        fail_msg: >-
+          Expected rule remark to be '{{ updated_rule_remark }}'
+          and destination_port to be '{{ updated_rule_destination_port }}' after update
