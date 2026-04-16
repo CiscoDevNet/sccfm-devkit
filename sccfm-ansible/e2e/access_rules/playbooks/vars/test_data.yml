@@ -19,6 +19,7 @@ test_rule:
   index: 1
   rule_action: PERMIT
   protocol: tcp
+  source_port: "80"
   destination_port: "443"
   remark: "CI test rule - allow HTTPS"
   active: true

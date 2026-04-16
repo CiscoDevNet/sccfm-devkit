@@ -33,6 +33,7 @@
         index: "{{ test_rule.index }}"
         rule_action: "{{ test_rule.rule_action }}"
         protocol: "{{ test_rule.protocol }}"
+        source_port: "{{ test_rule.source_port }}"
         destination_port: "{{ test_rule.destination_port }}"
         remark: "{{ test_rule.remark }}"
         active: "{{ test_rule.active }}"
