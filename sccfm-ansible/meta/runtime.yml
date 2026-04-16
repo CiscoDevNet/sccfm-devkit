@@ -16,6 +16,7 @@ action_groups:
     - delete_network_object
     - delete_object_override
     - edit_object_override
+    - asa_ha_check
     - execute_asa_cli
     - get_object
     - list_asa_boot_registry

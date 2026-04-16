@@ -1,0 +1,29 @@
+---
+# Run HA health checks with limit=1 to verify pagination parameter works.
+
+- name: "CI: Run ASA HA check with limit"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Run HA checks with limit of 1
+      cisco.sccfm.asa_ha_check:
+        query: "{{ asa_ha_test_query }}"
+        limit: 1
+      register: result
+
+    - name: Assert exactly one device result returned
+      ansible.builtin.assert:
+        that:
+          - result.results | length == 1
+        fail_msg: "Expected exactly 1 device result when limit=1"
