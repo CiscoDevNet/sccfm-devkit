@@ -21,7 +21,14 @@
         query: "{{ asa_test_query }}"
         limit: 10
       register: result
-      until: (result.access_groups | default([])) | length > 0
+      # Stop retrying when results arrive OR when a non-retryable error
+      # occurs (e.g. missing api_token).  Only empty-result responses are
+      # worth retrying while CDO indexes the new access group.
+      until: >-
+        (result.access_groups | default([])) | length > 0
+        or (result is failed
+            and 'not found' not in (result.msg | default('') | lower)
+            and (result.access_groups | default([])) | length == 0)
       retries: 12
       delay: 10
 
