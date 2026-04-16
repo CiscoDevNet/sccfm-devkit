@@ -16,11 +16,14 @@
       api_token: "{{ sccfm_api_token }}"
 
   tasks:
-    - name: List access groups for CI ASA device
+    - name: List access groups for CI ASA device (with retry for CDO sync)
       cisco.sccfm.list_access_groups:
         query: "{{ asa_test_query }}"
         limit: 10
       register: result
+      until: (result.access_groups | default([])) | length > 0
+      retries: 12
+      delay: 10
 
     - name: Assert at least one access group is returned
       ansible.builtin.assert:
@@ -28,7 +31,10 @@
           - not result.changed
           - result.access_groups | length > 0
           - result.count > 0
-        fail_msg: "Expected at least one access group for query '{{ asa_test_query }}'"
+        fail_msg: >-
+          Expected at least one access group for query '{{ asa_test_query }}'.
+          Ensure the provision_access_group phase ran successfully and CDO
+          has synced the device config.
 
     - name: Cache access group UID for subsequent plays
       ansible.builtin.copy:

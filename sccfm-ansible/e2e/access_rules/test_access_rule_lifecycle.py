@@ -27,8 +27,16 @@ class PhaseCase:
     depends_on: tuple[str, ...] = ()
 
 
+SETUP_PHASES: Final[tuple[PhaseCase, ...]] = (
+    PhaseCase("provision_access_group", "provision_access_group.yml"),
+)
+
 READ_PHASES: Final[tuple[PhaseCase, ...]] = (
-    PhaseCase("list_access_groups", "list_access_groups.yml"),
+    PhaseCase(
+        "list_access_groups",
+        "list_access_groups.yml",
+        ("provision_access_group",),
+    ),
     PhaseCase("get_access_group", "get_access_group.yml", ("list_access_groups",)),
     PhaseCase("list_access_rules", "list_access_rules.yml", ("list_access_groups",)),
 )
@@ -75,6 +83,17 @@ def _run_case(case: PhaseCase) -> None:
     """Evaluate dependencies, then execute a lifecycle phase."""
     _skip_if_dependencies_incomplete(*case.depends_on)
     _run_phase(case.name, case.playbook)
+
+
+# ── Device Setup ─────────────────────────────────────────────────
+
+
+class TestSetup:
+    """Provision a test access group on the CI ASA (fresh device has none)."""
+
+    @pytest.mark.parametrize("case", SETUP_PHASES, ids=lambda case: case.name)
+    def test_setup_phase(self, case: PhaseCase) -> None:
+        _run_case(case)
 
 
 # ── Access Group Read ────────────────────────────────────────────

@@ -1,7 +1,9 @@
 ---
-# Pre/post-test cleanup: remove the test access rule if it exists.
+# Pre/post-test cleanup: remove the test access rule and the provisioned
+# access group.  Every step tolerates missing resources so both pre-clean
+# and post-clean succeed on a fresh device.
 
-- name: "CI: Pre-clean test access rule"
+- name: "CI: Pre-clean test access rule and access group"
   hosts: localhost
   gather_facts: false
 
@@ -16,6 +18,8 @@
       api_token: "{{ sccfm_api_token }}"
 
   tasks:
+    # ── Access rule cleanup ──────────────────────────────────────
+
     - name: Read cached rule UID (if present)
       ansible.builtin.slurp:
         src: "/tmp/ci_access_rule_uid"
@@ -32,7 +36,24 @@
         - delete_result.failed
         - "'not found' not in (delete_result.msg | default('') | lower)"
 
-    - name: Remove cached UID file
+    - name: Remove cached rule UID file
       ansible.builtin.file:
         path: "/tmp/ci_access_rule_uid"
+        state: absent
+
+    # ── Access group cleanup (provisioned via CLI) ───────────────
+
+    - name: Remove provisioned test access group via CLI
+      cisco.sccfm.execute_asa_cli:
+        query: "{{ asa_test_query }}"
+        commands:
+          - "configure terminal"
+          - "no access-group {{ test_acl_name }} global"
+          - "clear configure access-list {{ test_acl_name }}"
+          - "end"
+      failed_when: false
+
+    - name: Remove cached access group UID file
+      ansible.builtin.file:
+        path: "/tmp/ci_access_group_uid"
         state: absent
