@@ -1,3 +1,9 @@
+## v0.31.0 (2026-04-17)
+
+### Feat
+
+- **LH-106648**: add ASA HA check Ansible e2e test suite (#58)
+
 ## v0.30.0 (2026-04-15)
 
 ### Feat
