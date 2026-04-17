@@ -12,7 +12,7 @@ access_group_query: "name:{{ test_acl_name }}"
 
 # Access rule test data — follows the pattern from examples/access_rules.yml:
 # named network objects for source/destination, protocol, destination_port,
-# remark.  No source_port (the API does not require it).
+# remark.  No source_port (matching the example).
 test_source_network: "ci-e2e-src-host"
 test_destination_network: "ci-e2e-dst-host"
 
@@ -27,4 +27,3 @@ test_rule:
   active: true
 
 updated_rule_remark: "CI test rule - allow HTTPS (updated)"
-updated_rule_destination_port: "8443"

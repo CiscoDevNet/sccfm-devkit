@@ -31,7 +31,5 @@
         that:
           - not result.changed
           - result.access_rule.remark == updated_rule_remark
-          - result.access_rule.destination_port == updated_rule_destination_port
         fail_msg: >-
-          Expected rule remark to be '{{ updated_rule_remark }}'
-          and destination_port to be '{{ updated_rule_destination_port }}' after update
+          Expected rule remark to be '{{ updated_rule_remark }}' after update

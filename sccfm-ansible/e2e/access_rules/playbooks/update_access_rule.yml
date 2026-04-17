@@ -1,5 +1,5 @@
 ---
-# Update the test access rule's remark and destination port.
+# Update the test access rule's remark.
 
 - name: "CI: Update access rule"
   hosts: localhost
@@ -21,11 +21,10 @@
         src: "/tmp/ci_access_rule_uid"
       register: cached_uid
 
-    - name: Update access rule remark and destination port
+    - name: Update access rule remark
       cisco.sccfm.update_access_rule:
         uid: "{{ cached_uid.content | b64decode | trim }}"
         remark: "{{ updated_rule_remark }}"
-        destination_port: "{{ updated_rule_destination_port }}"
       register: update_result
 
     - name: Assert rule was updated

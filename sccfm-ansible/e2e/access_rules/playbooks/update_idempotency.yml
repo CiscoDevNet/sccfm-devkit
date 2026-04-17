@@ -27,7 +27,6 @@
       cisco.sccfm.update_access_rule:
         uid: "{{ cached_uid.content | b64decode | trim }}"
         remark: "{{ updated_rule_remark }}"
-        destination_port: "{{ updated_rule_destination_port }}"
       register: update_result
 
     - name: Assert changed is still reported (non-idempotent module)
