@@ -47,14 +47,22 @@
     - name: Delete source network object
       cisco.sccfm.delete_network_object:
         name: "{{ test_source_network }}"
-      failed_when: false
+      register: src_delete
+      failed_when:
+        - src_delete.failed
+        - "'not found' not in (src_delete.msg | default('') | lower)"
 
     - name: Delete destination network object
       cisco.sccfm.delete_network_object:
         name: "{{ test_destination_network }}"
-      failed_when: false
+      register: dst_delete
+      failed_when:
+        - dst_delete.failed
+        - "'not found' not in (dst_delete.msg | default('') | lower)"
 
     # ── Access group cleanup (provisioned via CLI) ───────────────
+    # CI guarantees exactly one ASA matches asa_test_query.
+    # The CLI commands are no-ops if the ACL does not exist.
 
     - name: Remove provisioned test access group via CLI
       cisco.sccfm.execute_asa_cli:
@@ -64,7 +72,12 @@
           - "no access-group {{ test_acl_name }} global"
           - "clear configure access-list {{ test_acl_name }}"
           - "end"
-      failed_when: false
+      register: cli_result
+      failed_when:
+        - cli_result is failed
+        - "'not synced' not in (cli_result.msg | default('') | lower)"
+        - "'not found' not in (cli_result.msg | default('') | lower)"
+        - "'invalid input' not in (cli_result.msg | default('') | lower)"
 
     - name: Remove cached access group UID file
       ansible.builtin.file:

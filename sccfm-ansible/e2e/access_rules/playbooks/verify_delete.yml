@@ -27,8 +27,15 @@
       register: get_result
       failed_when: false
 
-    - name: Assert rule is no longer found
+    - name: Assert rule is not found (not a generic failure)
       ansible.builtin.assert:
         that:
-          - get_result.failed or get_result.access_rule is not defined
-        fail_msg: "Expected access rule '{{ cached_uid.content | b64decode | trim }}' to be absent after deletion"
+          - get_result.failed
+          - >-
+            'not_found' in (get_result.msg | default('') | lower)
+            or 'not found' in (get_result.msg | default('') | lower)
+            or '404' in (get_result.msg | default(''))
+        fail_msg: >-
+          Expected a not-found error for rule
+          '{{ cached_uid.content | b64decode | trim }}',
+          got: {{ get_result }}

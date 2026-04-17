@@ -1,5 +1,7 @@
 ---
-# Re-delete the already-deleted access rule and assert no change (idempotency).
+# Re-delete the already-deleted access rule and assert no change.
+# The delete_access_rule module is idempotent: it returns changed=False
+# when the rule is already absent.
 
 - name: "CI: Delete idempotency check"
   hosts: localhost
@@ -25,14 +27,9 @@
       cisco.sccfm.delete_access_rule:
         uid: "{{ cached_uid.content | b64decode | trim }}"
       register: delete_result
-      failed_when: false
 
-    - name: Assert no change or not-found on re-delete
+    - name: Assert no change on re-delete
       ansible.builtin.assert:
         that:
-          - >
-            (not delete_result.changed | default(false))
-            or (delete_result.failed | default(false)
-                and ('not_found' in (delete_result.msg | default('') | lower)
-                     or '404' in (delete_result.msg | default(''))))
-        fail_msg: "Expected no change or not-found when re-deleting an already-deleted rule"
+          - not delete_result.changed
+        fail_msg: "Expected changed=False when re-deleting an already-deleted rule"
