@@ -1,0 +1,92 @@
+---
+# Onboard a CI vFTD to the SCCFM tenant via non-ZTP (CLI key).
+#
+# Expected environment variables:
+#   FTD_MANAGER_NAME    — cdFMC manager name in the CI tenant (set by Jenkins)
+#   FTD_HOST            — (optional) IP of the vFTD; when set, the CLI key is applied via SSH automatically
+#   FTD_DEVICE_USERNAME — (optional) SSH username
+#   FTD_DEVICE_PASSWORD — (optional) SSH password
+
+- name: "CI: Onboard vFTD to SCCFM tenant (non-ZTP)"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  vars:
+    ftd_host: "{{ lookup('env', 'FTD_HOST') }}"
+    ftd_ssh_user: "{{ lookup('env', 'FTD_DEVICE_USERNAME') | default('admin', true) }}"
+    ftd_ssh_pass: "{{ lookup('env', 'FTD_DEVICE_PASSWORD') | default('BlueSkittles123!!', true) }}"
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Validate FTD_MANAGER_NAME is set
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'FTD_MANAGER_NAME') | length > 0
+        fail_msg: "FTD_MANAGER_NAME environment variable must be set"
+
+    - name: Resolve cdFMC manager
+      cisco.sccfm.list_managers:
+        query: "name:{{ ftd_ci_manager_name }}"
+      register: managers_result
+
+    - name: Fail if manager not found
+      ansible.builtin.fail:
+        msg: "No manager found with name '{{ ftd_ci_manager_name }}'."
+      when: managers_result.managers | length == 0
+
+    - name: Set cdFMC domain UID
+      ansible.builtin.set_fact:
+        fmc_domain_uid: "{{ managers_result.managers[0].fmc_domain_uid }}"
+
+    - name: List access policies for the cdFMC domain
+      cisco.sccfm.list_cdfmc_access_policies:
+        domain_uid: "{{ fmc_domain_uid }}"
+      register: policies_result
+
+    - name: Fail if no access policies found
+      ansible.builtin.fail:
+        msg: "No access policies found in cdFMC domain '{{ fmc_domain_uid }}'."
+      when: policies_result.access_policies | length == 0
+
+    - name: Set access policy UID
+      ansible.builtin.set_fact:
+        fmc_access_policy_uid: "{{ policies_result.access_policies[0].uid }}"
+
+    - name: Onboard vFTD device (non-ZTP)
+      cisco.sccfm.onboard_cdfmc_ftd:
+        name: "ci-e2e-ftd-cli-{{ 99999999 | random }}"
+        fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
+        licenses: "{{ ftd_ci_licenses }}"
+        virtual: true
+        performance_tier: "FTDv5"
+      register: onboard_result
+
+    - name: Show CLI key
+      ansible.builtin.debug:
+        msg: "CLI Key: {{ onboard_result.cli_key }}"
+      when: onboard_result.changed and onboard_result.cli_key is not none
+
+    - name: Apply CLI key on FTD device
+      ansible.builtin.shell: |
+        sshpass -p '{{ ftd_ssh_pass }}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          {{ ftd_ssh_user }}@{{ ftd_host }} \
+          'configure manager add {{ onboard_result.cli_key }}'
+      when:
+        - ftd_host | length > 0
+        - onboard_result.changed
+        - onboard_result.cli_key is not none
+      register: cli_result
+
+    - name: Show registration result
+      ansible.builtin.debug:
+        var: cli_result.stdout_lines
+      when: cli_result is not skipped
