@@ -20,18 +20,22 @@ _SUITE_ORDER: Final[tuple[str, ...]] = (
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Sort collected tests so suites run in the order defined above."""
+    """Sort collected tests so suites run in the order defined above.
 
-    def _suite_key(item: pytest.Item) -> tuple[int, str]:
+    Within each suite the original collection order (declaration order in
+    the test file) is preserved.
+    """
+
+    def _suite_key(index_item: tuple[int, pytest.Item]) -> tuple[int, int]:
+        index, item = index_item
         parts = item.nodeid.split("/")
-        # e.g. "sccfm-ansible/e2e/access_rules/..." → suite = "access_rules"
         for i, part in enumerate(parts):
             if part == "e2e" and i + 1 < len(parts):
                 suite = parts[i + 1]
                 try:
-                    return (_SUITE_ORDER.index(suite), item.nodeid)
+                    return (_SUITE_ORDER.index(suite), index)
                 except ValueError:
                     break
-        return (len(_SUITE_ORDER), item.nodeid)
+        return (len(_SUITE_ORDER), index)
 
-    items.sort(key=_suite_key)
+    items[:] = [item for _, item in sorted(enumerate(items), key=_suite_key)]
