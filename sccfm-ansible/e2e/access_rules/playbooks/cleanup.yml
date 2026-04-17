@@ -83,5 +83,3 @@
         name: "{{ test_destination_network }}"
       register: dst_delete
       failed_when: false
-        - dst_delete.failed
-        - "'not found' not in (dst_delete.msg | default('') | lower)"
