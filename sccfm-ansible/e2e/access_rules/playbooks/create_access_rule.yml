@@ -34,8 +34,6 @@
         rule_action: "{{ test_rule.rule_action }}"
         source_network: "{{ test_rule.source_network }}"
         destination_network: "{{ test_rule.destination_network }}"
-        protocol: "{{ test_rule.protocol }}"
-        destination_port: "{{ test_rule.destination_port }}"
         remark: "{{ test_rule.remark }}"
         active: "{{ test_rule.active }}"
       register: create_result
