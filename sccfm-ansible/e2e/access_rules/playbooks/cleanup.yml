@@ -56,12 +56,13 @@
           - "clear configure access-list {{ test_acl_name }}"
           - "end"
       register: cli_result
+      until: cli_result is not failed
+      retries: 18
+      delay: 10
       failed_when:
         - cli_result is failed
-        - "'not synced' not in (cli_result.msg | default('') | lower)"
         - "'not found' not in (cli_result.msg | default('') | lower)"
         - "'invalid input' not in (cli_result.msg | default('') | lower)"
-        - "'invalid request' not in (cli_result.msg | default('') | lower)"
 
     - name: Remove cached access group UID file
       ansible.builtin.file:
@@ -70,11 +71,16 @@
 
     # ── Network object cleanup ────────────────────────────────────
     # Runs after ACL teardown so objects are no longer referenced.
+    # CDO may take a moment to de-associate objects after the CLI
+    # ACL removal, so retry for up to 3 minutes.
 
     - name: Delete source network object
       cisco.sccfm.delete_network_object:
         name: "{{ test_source_network }}"
       register: src_delete
+      until: src_delete is not failed
+      retries: 18
+      delay: 10
       failed_when:
         - src_delete.failed
         - "'not found' not in (src_delete.msg | default('') | lower)"
@@ -83,6 +89,9 @@
       cisco.sccfm.delete_network_object:
         name: "{{ test_destination_network }}"
       register: dst_delete
+      until: dst_delete is not failed
+      retries: 18
+      delay: 10
       failed_when:
         - dst_delete.failed
         - "'not found' not in (dst_delete.msg | default('') | lower)"
