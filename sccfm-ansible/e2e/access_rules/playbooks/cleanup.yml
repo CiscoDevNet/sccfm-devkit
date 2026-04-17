@@ -61,6 +61,7 @@
         - "'not synced' not in (cli_result.msg | default('') | lower)"
         - "'not found' not in (cli_result.msg | default('') | lower)"
         - "'invalid input' not in (cli_result.msg | default('') | lower)"
+        - "'invalid request' not in (cli_result.msg | default('') | lower)"
 
     - name: Remove cached access group UID file
       ansible.builtin.file:
