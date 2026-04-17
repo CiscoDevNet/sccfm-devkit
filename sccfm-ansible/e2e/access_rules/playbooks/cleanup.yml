@@ -34,7 +34,8 @@
       failed_when:
         - delete_result.failed is defined
         - delete_result.failed
-        - "'not found' not in (delete_result.msg | default('') | lower)"
+        - "'not_found' not in (delete_result.msg | default('') | lower)"
+        - "'404' not in (delete_result.msg | default(''))"
 
     - name: Remove cached rule UID file
       ansible.builtin.file:
