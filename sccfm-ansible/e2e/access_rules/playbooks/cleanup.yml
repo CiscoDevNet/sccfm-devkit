@@ -42,27 +42,10 @@
         path: "/tmp/ci_access_rule_uid"
         state: absent
 
-    # ── Network object cleanup ────────────────────────────────────
-
-    - name: Delete source network object
-      cisco.sccfm.delete_network_object:
-        name: "{{ test_source_network }}"
-      register: src_delete
-      failed_when:
-        - src_delete.failed
-        - "'not found' not in (src_delete.msg | default('') | lower)"
-
-    - name: Delete destination network object
-      cisco.sccfm.delete_network_object:
-        name: "{{ test_destination_network }}"
-      register: dst_delete
-      failed_when:
-        - dst_delete.failed
-        - "'not found' not in (dst_delete.msg | default('') | lower)"
-
     # ── Access group cleanup (provisioned via CLI) ───────────────
+    # Must run BEFORE network object deletion — network objects
+    # cannot be deleted while referenced by an ACL.
     # CI guarantees exactly one ASA matches asa_test_query.
-    # The CLI commands are no-ops if the ACL does not exist.
 
     - name: Remove provisioned test access group via CLI
       cisco.sccfm.execute_asa_cli:
@@ -83,3 +66,22 @@
       ansible.builtin.file:
         path: "/tmp/ci_access_group_uid"
         state: absent
+
+    # ── Network object cleanup ────────────────────────────────────
+    # Runs after ACL teardown so objects are no longer referenced.
+
+    - name: Delete source network object
+      cisco.sccfm.delete_network_object:
+        name: "{{ test_source_network }}"
+      register: src_delete
+      failed_when:
+        - src_delete.failed
+        - "'not found' not in (src_delete.msg | default('') | lower)"
+
+    - name: Delete destination network object
+      cisco.sccfm.delete_network_object:
+        name: "{{ test_destination_network }}"
+      register: dst_delete
+      failed_when:
+        - dst_delete.failed
+        - "'not found' not in (dst_delete.msg | default('') | lower)"
