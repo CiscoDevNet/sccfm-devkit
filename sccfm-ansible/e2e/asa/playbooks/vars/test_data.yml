@@ -25,3 +25,16 @@ shun_test_source_ips:
 # asa_upgrade_software_version: "9.6(4.14)"
 # asa_upgrade_asdm_version: "7.9(1)"
 # asa_upgrade_name: "ci-e2e-asa-upgrade"
+
+# HA check — device query for HA-enabled ASA
+asa_ha_test_query: "name:asa-ha-951-1516-1110-primary AND connectivityState:ONLINE"
+
+# HA check — expected check names (all 7, from asa_ha_check_service._run_checks)
+asa_ha_expected_check_names:
+  - failover_enabled
+  - lan_link
+  - version_match
+  - mate_ready
+  - interfaces_healthy
+  - config_synced
+  - unmonitored_interfaces

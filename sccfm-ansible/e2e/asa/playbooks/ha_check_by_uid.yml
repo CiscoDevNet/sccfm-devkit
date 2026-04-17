@@ -1,0 +1,40 @@
+---
+# Discover a device UID via query, then re-run HA check using the uids parameter.
+
+- name: "CI: Run ASA HA check by UID"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Discover device UID via query
+      cisco.sccfm.asa_ha_check:
+        query: "{{ asa_ha_test_query }}"
+        limit: 1
+      register: discovery
+
+    - name: Extract discovered device UID
+      ansible.builtin.set_fact:
+        discovered_uid: "{{ discovery.results[0].device_uid }}"
+
+    - name: Run HA check using discovered UID
+      cisco.sccfm.asa_ha_check:
+        uids:
+          - "{{ discovered_uid }}"
+      register: uid_result
+
+    - name: Assert UID-based result matches discovered device
+      ansible.builtin.assert:
+        that:
+          - uid_result.results | length == 1
+          - uid_result.results[0].device_uid == discovered_uid
+        fail_msg: "Expected UID-based HA check to return result for the discovered device"

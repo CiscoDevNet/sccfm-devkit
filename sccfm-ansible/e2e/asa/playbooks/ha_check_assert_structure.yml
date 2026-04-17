@@ -1,0 +1,85 @@
+---
+# Deep structural and behavioral validation of HA check results.
+
+- name: "CI: Assert ASA HA check result structure"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Run HA checks on CI HA-enabled ASA device
+      cisco.sccfm.asa_ha_check:
+        query: "{{ asa_ha_test_query }}"
+        limit: 1
+      register: result
+
+    - name: Set device report for readability
+      ansible.builtin.set_fact:
+        report: "{{ result.results[0] }}"
+
+    - name: Assert top-level result fields
+      ansible.builtin.assert:
+        that:
+          - result.all_passed is defined
+          - result.all_passed is boolean
+          - result.changed is defined
+          - result.msg is defined
+        fail_msg: "Missing or invalid top-level result fields"
+
+    - name: Assert per-device report fields
+      ansible.builtin.assert:
+        that:
+          - report.device_uid is defined
+          - report.device_uid is string
+          - report.all_passed is defined
+          - report.all_passed is boolean
+          - report.failover_unit is defined
+          - report.this_host_state is defined
+          - report.other_host_state is defined
+          - report.checks is defined
+          - report.unmonitored_interfaces is defined
+        fail_msg: "Missing or invalid per-device report fields"
+
+    - name: Assert exactly 7 checks returned
+      ansible.builtin.assert:
+        that:
+          - report.checks | length == 7
+        fail_msg: "Expected exactly 7 HA checks, got {{ report.checks | length }}"
+
+    - name: Assert check names match expected set
+      ansible.builtin.assert:
+        that:
+          - report.checks | map(attribute='name') | list | sort == asa_ha_expected_check_names | sort
+        fail_msg: >-
+          Check names mismatch.
+          Expected: {{ asa_ha_expected_check_names | sort }}.
+          Got: {{ report.checks | map(attribute='name') | list | sort }}
+
+    - name: Assert each check has required fields with correct types
+      ansible.builtin.assert:
+        that:
+          - item.name is defined
+          - item.name is string
+          - item.passed is defined
+          - item.passed is boolean
+          - item.detail is defined
+          - item.detail is string
+        fail_msg: "Check '{{ item.name | default('unknown') }}' has invalid structure"
+      loop: "{{ report.checks }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Assert failover is enabled on HA device
+      ansible.builtin.assert:
+        that:
+          - report.checks | selectattr('name', 'equalto', 'failover_enabled') | map(attribute='passed') | first
+        fail_msg: "Expected failover_enabled check to pass on HA-enabled device"
