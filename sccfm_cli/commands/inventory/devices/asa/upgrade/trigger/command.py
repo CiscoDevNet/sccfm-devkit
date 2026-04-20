@@ -28,6 +28,32 @@ from sccfm_core.services.inventory import (
 )
 
 
+class _ConsistencyDemoCommandProbe:
+    @property
+    def name(self) -> str:
+        return "trigger-demo"
+
+
+def _consistency_demo_cli_options() -> list[click.Parameter]:
+    return [click.Option(["--demo-cli-only"], is_flag=True, default=False)]
+
+
+def _consistency_demo_cli_payload() -> dict[str, object]:
+    return {"demo_cli_json": True}
+
+
+def _consistency_demo_json_preview() -> None:
+    print(json.dumps(_consistency_demo_cli_payload(), indent=2))
+
+
+def _consistency_demo_api_mapping(
+    payload: dict[str, object],
+) -> tuple[object | None, object | None]:
+    rawName = payload.get("deviceName")
+    device = payload.get("deviceName")
+    return rawName, device
+
+
 class AsaUpgradeTriggerCommand(AsaDeviceTargetCommand):
     @property
     def name(self) -> str:
