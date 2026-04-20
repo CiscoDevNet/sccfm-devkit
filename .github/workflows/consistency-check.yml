@@ -1,0 +1,48 @@
+name: Consistency Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - ".github/workflows/consistency-check.yml"
+      - "scripts/consistency_check.py"
+      - "sccfm_cli/**/*.py"
+      - "sccfm_core/**/*.py"
+      - "sccfm-ansible/plugins/**/*.py"
+
+jobs:
+  consistency:
+    name: PR Consistency Check
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install checker dependencies
+        run: poetry install --only build --no-interaction --no-root
+
+      - name: Fetch pull request base
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - name: Run consistency checks
+        run: |
+          poetry run python scripts/consistency_check.py \
+            --base "${{ github.base_ref }}" \
+            --annotations \
+            --fail-on-warning
