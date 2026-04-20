@@ -26,8 +26,8 @@
 
     - name: Delete each CI vFTD device
       ansible.builtin.uri:
-        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ item.uid }}"
-        method: DELETE
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/ftds/cdfmcManaged/{{ item.uid }}/delete"
+        method: POST
         headers:
           Authorization: "Bearer {{ sccfm_api_token }}"
           Content-Type: "application/json"
