@@ -1,0 +1,17 @@
+---
+# Device selection -- matches vFTDs onboarded by onboard_vftd.yml (ci-e2e-ftd-<serial>) or onboard_vftd_cli.yml (ci-e2e-ftd-cli-<random>)
+ftd_test_query: "name:ci-e2e-ftd-* AND connectivityState:ONLINE"
+ftd_test_query_all: "name:ci-e2e-ftd-*"
+
+# For list_ftd_not_on_version -- fake version no device should be on
+ftd_not_on_version: "99.99.99"
+
+# Upgrade workflow -- staging only (no reboot)
+# Disabled: CI vFTD may not have upgrade images available
+# ftd_upgrade_software_version: "7.4.1"
+# ftd_upgrade_name: "ci-e2e-ftd-upgrade"
+
+# Onboarding -- cdFMC manager name for CI tenant
+ftd_ci_manager_name: "{{ lookup('env', 'FTD_MANAGER_NAME') | default('', true) }}"
+ftd_ci_licenses:
+  - BASE
