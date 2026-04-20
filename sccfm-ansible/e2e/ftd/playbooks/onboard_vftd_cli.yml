@@ -87,7 +87,7 @@
       retries: 40
       delay: 30
       register: cli_result
-      until: cli_result.rc == 0
+      until: cli_result is not failed
       when:
         - ftd_host | length > 0
         - onboard_result.changed
