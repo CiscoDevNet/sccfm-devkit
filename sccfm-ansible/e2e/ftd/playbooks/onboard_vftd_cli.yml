@@ -80,11 +80,14 @@
         sshpass -p '{{ ftd_ssh_pass }}' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
           {{ ftd_ssh_user }}@{{ ftd_host }} \
           'configure manager add {{ onboard_result.cli_key }}'
+      retries: 40
+      delay: 30
+      register: cli_result
+      until: cli_result.rc == 0
       when:
         - ftd_host | length > 0
         - onboard_result.changed
         - onboard_result.cli_key is not none
-      register: cli_result
 
     - name: Show registration result
       ansible.builtin.debug:
