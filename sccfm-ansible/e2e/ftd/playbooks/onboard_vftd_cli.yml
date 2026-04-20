@@ -76,18 +76,22 @@
       when: onboard_result.changed and onboard_result.cli_key is not none
 
     - name: Apply CLI key on FTD device
-      ansible.builtin.expect:
-        command: >
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
-          {{ ftd_ssh_user }}@{{ ftd_host }}
+      ansible.builtin.shell: |
+        PASS_SCRIPT=$(mktemp)
+        printf '#!/bin/sh\necho "%s"\n' '{{ ftd_ssh_pass }}' > "$PASS_SCRIPT"
+        chmod +x "$PASS_SCRIPT"
+        export SSH_ASKPASS="$PASS_SCRIPT"
+        export SSH_ASKPASS_REQUIRE=force
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          {{ ftd_ssh_user }}@{{ ftd_host }} \
           'configure manager add {{ onboard_result.cli_key }}'
-        responses:
-          "(?i)password:": "{{ ftd_ssh_pass }}"
-        timeout: 30
+        RC=$?
+        rm -f "$PASS_SCRIPT"
+        exit $RC
       retries: 40
       delay: 30
       register: cli_result
-      until: cli_result is not failed
+      until: cli_result.rc == 0
       when:
         - ftd_host | length > 0
         - onboard_result.changed
