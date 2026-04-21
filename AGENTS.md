@@ -1,5 +1,15 @@
 # sccfm-api-cli
 
+## Agent skills (read these FIRST)
+
+This repository ships skill files that document how to interact with the CLI and Ansible collection. Load the relevant skill before doing any related work — the skills cover environment activation, command discovery, exit-code handling, and verification patterns that you will get wrong without them.
+
+- [skills/sccfm-cli/SKILL.md](skills/sccfm-cli/SKILL.md) — using the `sccfm-cli` tool
+- [skills/sccfm-ansible/SKILL.md](skills/sccfm-ansible/SKILL.md) — using the `cisco.sccfm` Ansible collection
+- [skills/README.md](skills/README.md) — overview of the skills system
+
+**When making changes to CLI commands or Ansible modules, you MUST use the relevant skill to verify your changes work end-to-end** — run the discovery flow, exercise the affected commands, and check exit codes as the skill describes.
+
 ## Dev environment tips
 
 - Use `poetry` for dependency management.

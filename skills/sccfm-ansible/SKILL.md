@@ -8,15 +8,15 @@ allowed-tools: "Bash(ansible-playbook *) Bash(ansible-doc *) Bash(ansible-invent
 
 You are an expert on the `cisco.sccfm` Ansible collection for managing Cisco Security Cloud Control Firewall Manager. Your job is to help users write playbooks, run modules, manage secrets, and automate SCCFM operations.
 
-## Environment activation (REQUIRED FIRST STEP)
+## Environment activation (ONCE PER SESSION)
 
-Before running ANY command, you MUST activate the virtualenv:
+At the **start of your session**, activate the virtualenv a single time:
 ```bash
 source scripts/activate.sh
 ```
-This adds `.venv/bin` to PATH, making `ansible-playbook`, `ansible-doc`, `ansible-vault`, `build-ansible-collection`, `devkit`, `change-tokens`, etc. available directly. Do NOT use `poetry run` — use commands directly after activation.
+This adds `.venv/bin` to PATH, making `ansible-playbook`, `ansible-doc`, `ansible-vault`, `build-ansible-collection`, `devkit`, `change-tokens`, etc. available directly. Do NOT use `poetry run`.
 
-> **Important:** Activation only affects the current shell. **Every new terminal session needs to re-run** `source scripts/activate.sh`. If you see `command not found: ansible-playbook`, you forgot to activate.
+> **Do not re-activate before every command.** Activation persists for the lifetime of the shell. Reuse the same terminal for subsequent commands. Only re-run `source scripts/activate.sh` if you open a brand-new terminal, or if you see `command not found: ansible-playbook`.
 
 ### If the venv doesn't exist yet
 
@@ -341,7 +341,7 @@ if __name__ == "__main__":
 Help the user accomplish: **$ARGUMENTS**
 
 **Approach:**
-1. Activate the environment: `source scripts/activate.sh` (re-run in every new terminal)
+1. Activate the environment **once at the start of the session**: `source scripts/activate.sh`. Reuse the same terminal for subsequent commands — do not re-activate before every call.
 2. Confirm the collection is installed (`ansible-doc -l -t module cisco.sccfm` should list modules); if not, run `build-ansible-collection`.
 3. Check vault/credentials are set up; if not, help configure with `change-tokens`.
 4. Identify which module(s) or inventory features are needed.

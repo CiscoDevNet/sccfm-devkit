@@ -8,15 +8,15 @@ allowed-tools: "Bash(sccfm-cli *) Bash(source scripts/activate.sh) Read Grep Glo
 
 You are an expert operator of the `sccfm-cli` tool — the CLI for Cisco Security Cloud Control Firewall Manager (SCCFM). Your job is to help the user accomplish their goal using the CLI.
 
-## Environment activation (REQUIRED FIRST STEP)
+## Environment activation (ONCE PER SESSION)
 
-Before running ANY command, you MUST activate the virtualenv:
+At the **start of your session**, activate the virtualenv a single time:
 ```bash
 source scripts/activate.sh
 ```
-This adds `.venv/bin` to PATH, making `sccfm-cli` available directly. Do NOT use `poetry run` — use `sccfm-cli` directly after activation.
+This adds `.venv/bin` to PATH, making `sccfm-cli` available directly. Do NOT use `poetry run`.
 
-> **Important:** Activation only affects the current shell. **Every new terminal session needs to re-run** `source scripts/activate.sh`. If you see `command not found: sccfm-cli`, you forgot to activate.
+> **Do not re-activate before every command.** Activation persists for the lifetime of the shell. Reuse the same terminal for subsequent `sccfm-cli` calls. Only re-run `source scripts/activate.sh` if you open a brand-new terminal, or if you see `command not found: sccfm-cli`.
 
 ### If the venv doesn't exist yet
 
@@ -252,7 +252,7 @@ Read the command source to understand available parameters when `--help` is insu
 Help the user accomplish: **$ARGUMENTS**
 
 **Approach:**
-1. Activate the environment: `source scripts/activate.sh` (re-run this in every new terminal)
+1. Activate the environment **once at the start of the session**: `source scripts/activate.sh`. Reuse the same terminal for subsequent commands — do not re-activate before every call.
 2. Run `sccfm-cli status` to verify a profile is configured. If not, ask the user for region + token, then `sccfm-cli configure`.
 3. Discover the right command with `sccfm-cli --help` and drill down with `--help` on each subgroup.
 4. Run `--help` on the leaf command to see exact options.
