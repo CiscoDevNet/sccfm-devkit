@@ -62,6 +62,7 @@ def create_device(
     payload = {
         "name": name,
         "deviceType": "FTDC",
+        "model": False,
         "host": host,
         "ipv4": f"{host}:443",
         "port": "443",
