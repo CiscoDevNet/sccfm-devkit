@@ -1,6 +1,6 @@
 namespace: cisco
 name: sccfm
-version: 0.31.0
+version: 0.32.0
 readme: README.md
 authors:
 - Cisco Security Cloud Control Firewall Manager Team
