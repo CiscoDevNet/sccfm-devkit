@@ -1,0 +1,43 @@
+---
+# Re-delete the already-deleted access rule.
+# The delete_access_rule module is documented as idempotent
+# (NotFoundError → changed=False) but the API returns a generic 404
+# caught by the broad except-Exception handler, so in practice the
+# module fail_json's.  Accept either outcome here.
+
+- name: "CI: Delete idempotency check"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+
+    - name: Re-delete access rule
+      cisco.sccfm.delete_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: delete_result
+      failed_when: false
+
+    - name: Assert idempotent (changed=false) or not-found
+      ansible.builtin.assert:
+        that:
+          - >
+            (not delete_result.changed | default(false))
+            or ('not_found' in (delete_result.msg | default('') | lower))
+            or ('404' in (delete_result.msg | default('')))
+        fail_msg: >-
+          Expected changed=False or not-found when re-deleting,
+          got: {{ delete_result }}

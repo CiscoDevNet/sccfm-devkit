@@ -1,0 +1,54 @@
+---
+# Provision a global access-group on the CI ASA so the CRUD phases have an
+# access group to work with.  A freshly onboarded vASA has no ACLs.
+
+- name: "CI: Provision test access group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Create source network object for access rule tests
+      cisco.sccfm.create_network_object:
+        name: "{{ test_source_network }}"
+        value: "198.51.100.1"
+        description: "CI E2E source host for access rule tests"
+      register: src_obj
+      failed_when:
+        - src_obj is failed
+        - "'already exists' not in (src_obj.msg | default('') | lower)"
+
+    - name: Create destination network object for access rule tests
+      cisco.sccfm.create_network_object:
+        name: "{{ test_destination_network }}"
+        value: "198.51.100.2"
+        description: "CI E2E destination host for access rule tests"
+      register: dst_obj
+      failed_when:
+        - dst_obj is failed
+        - "'already exists' not in (dst_obj.msg | default('') | lower)"
+
+    - name: Create test ACL and apply as global access-group
+      cisco.sccfm.execute_asa_cli:
+        query: "{{ asa_test_query }}"
+        commands:
+          - "configure terminal"
+          - "access-list {{ test_acl_name }} extended permit ip any any"
+          - "access-group {{ test_acl_name }} global"
+          - "end"
+      register: cli_result
+
+    - name: Assert CLI execution succeeded
+      ansible.builtin.assert:
+        that:
+          - cli_result is not failed
+        fail_msg: "Failed to provision test access group via CLI"

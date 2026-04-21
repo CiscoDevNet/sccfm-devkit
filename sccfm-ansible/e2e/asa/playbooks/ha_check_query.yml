@@ -1,0 +1,37 @@
+---
+# Run HA health checks on CI HA-enabled ASA devices using a query.
+
+- name: "CI: Run ASA HA check via query"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Run HA checks on CI HA-enabled ASA devices
+      cisco.sccfm.asa_ha_check:
+        query: "{{ asa_ha_test_query }}"
+      register: result
+
+    - name: Assert HA check results returned with correct shape
+      ansible.builtin.assert:
+        that:
+          - result.results | length > 0
+          - result.all_passed is defined
+          - result.results[0].device_uid is defined
+          - result.results[0].checks | length == 7
+        fail_msg: "Expected HA check results from at least one ASA device with 7 checks"
+
+    - name: Assert failover is enabled on HA device
+      ansible.builtin.assert:
+        that:
+          - result.results[0].checks | selectattr('name', 'equalto', 'failover_enabled') | map(attribute='passed') | first
+        fail_msg: "Expected failover_enabled check to pass on HA-enabled device"

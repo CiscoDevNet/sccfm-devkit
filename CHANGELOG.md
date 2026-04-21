@@ -1,3 +1,15 @@
+## v0.32.0 (2026-04-21)
+
+### Feat
+
+- **LH-106922**: access rules e2e (#56)
+
+## v0.31.0 (2026-04-17)
+
+### Feat
+
+- **LH-106648**: add ASA HA check Ansible e2e test suite (#58)
+
 ## v0.30.0 (2026-04-15)
 
 ### Feat
