@@ -1,3 +1,9 @@
+## v0.33.0 (2026-04-21)
+
+### Feat
+
+- **LH-102404**: add FTD CLI execution for cdFMC-managed devices (#57)
+
 ## v0.32.0 (2026-04-21)
 
 ### Feat
