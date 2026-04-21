@@ -1755,18 +1755,53 @@ def run(
 
     issues.sort(key=lambda issue: (issue.file, issue.line, issue.message))
 
-    for issue in issues:
-        print(issue.as_annotation() if annotations else issue.as_text())
-
     errors = sum(1 for issue in issues if issue.level == "error")
     warnings = sum(1 for issue in issues if issue.level == "warning")
-    print(f"\n{errors} error(s), {warnings} warning(s) across {len(files)} file(s).")
+
+    if annotations:
+        for issue in issues:
+            print(issue.as_annotation())
+        print(f"\n{errors} error(s), {warnings} warning(s) across {len(files)} file(s).")
+    else:
+        _print_readable(issues, files)
 
     if errors > 0:
         return 1
     if fail_on_warning and warnings > 0:
         return 1
     return 0
+
+
+def _print_readable(issues: list[Issue], files: list[Path]) -> None:
+    errors = sum(1 for i in issues if i.level == "error")
+    warnings = sum(1 for i in issues if i.level == "warning")
+
+    if not issues:
+        print(f"✓ No issues found across {len(files)} file(s).")
+        return
+
+    # Group by file
+    by_file: dict[Path, list[Issue]] = {}
+    for issue in issues:
+        by_file.setdefault(issue.file, []).append(issue)
+
+    for file, file_issues in by_file.items():
+        rel = _display_path(file)
+        file_errors = sum(1 for i in file_issues if i.level == "error")
+        file_warnings = sum(1 for i in file_issues if i.level == "warning")
+        parts = []
+        if file_errors:
+            parts.append(f"{file_errors} error(s)")
+        if file_warnings:
+            parts.append(f"{file_warnings} warning(s)")
+        print(f"\n── {rel}  [{', '.join(parts)}]")
+        for issue in file_issues:
+            icon = "✖" if issue.level == "error" else "⚠"
+            print(f"   {icon}  line {issue.line:>4}  {issue.message}")
+
+    print(f"\n{'─' * 60}")
+    print(f"  {errors} error(s)  {warnings} warning(s)  across {len(files)} file(s).")
+    print(f"{'─' * 60}")
 
 
 def main(argv: list[str] | None = None) -> None:
