@@ -16,6 +16,8 @@ source scripts/activate.sh
 ```
 This adds `.venv/bin` to PATH, making `sccfm-cli` available directly. Do NOT use `poetry run` — use `sccfm-cli` directly after activation.
 
+> **Important:** Activation only affects the current shell. **Every new terminal session needs to re-run** `source scripts/activate.sh`. If you see `command not found: sccfm-cli`, you forgot to activate.
+
 ### If the venv doesn't exist yet
 
 Run the full environment setup (installs pyenv, Python 3.12, creates venv, installs all deps):
@@ -35,96 +37,46 @@ source scripts/activate.sh
 - Use `--silent --format json` when output needs to be parsed or piped.
 - For mutating operations, always offer to track the transaction with `--wait` or `transaction`.
 
-## How to discover commands
+## Discovering commands
 
-The CLI is self-documenting. ALWAYS use `--help` to discover the exact syntax before running any command.
+The CLI is self-documenting. ALWAYS use `--help` to discover the live command tree. Do NOT rely on hardcoded lists — they go stale.
 
-**Discovery pattern — use this every time:**
+**Step 1: list top-level commands**
 ```bash
-sccfm-cli --help                          # top-level commands
-sccfm-cli <command> --help                 # subcommands
-sccfm-cli <command> <subcommand> --help    # flags and options
+sccfm-cli --help
 ```
 
-## Full command tree
-
+**Step 2: drill into a command group**
+```bash
+sccfm-cli <group> --help
+sccfm-cli <group> <subgroup> --help
 ```
-sccfm-cli
-├── configure                              # set up profile (region + API token)
-├── status                                 # show current profile config
-├── transaction                            # check transaction status by UID
-│
-├── inventory
-│   ├── devices
-│   │   ├── list                           # all device types
-│   │   ├── asa
-│   │   │   ├── list                       # ASA devices
-│   │   │   ├── onboard
-│   │   │   ├── list-boot-registry
-│   │   │   ├── list-local-users
-│   │   │   ├── list-not-on-version
-│   │   │   ├── smartlicense
-│   │   │   ├── change-boot-image
-│   │   │   ├── cli
-│   │   │   │   └── execute                # run ASA CLI commands
-│   │   │   ├── disk
-│   │   │   │   └── list-files
-│   │   │   ├── shun
-│   │   │   │   ├── add
-│   │   │   │   ├── show
-│   │   │   │   ├── remove
-│   │   │   │   └── clear
-│   │   │   ├── upgrade
-│   │   │   │   ├── compatible-versions
-│   │   │   │   └── trigger
-│   │   │   └── user
-│   │   │       └── change-password
-│   │   ├── ftd
-│   │   │   ├── list
-│   │   │   ├── list-not-on-version
-│   │   │   └── upgrade
-│   │   │       ├── compatible-versions
-│   │   │       └── trigger
-│   │   └── cdfmc-managed-ftd
-│   │       ├── list
-│   │       ├── deploy
-│   │       ├── onboard
-│   │       └── onboard-ztp
-│   └── manager
-│       ├── list
-│       └── access-policies
-│           └── list
-│
-├── objects
-│   ├── show                               # get object by UID
-│   ├── update-default
-│   ├── add-override
-│   ├── edit-override
-│   ├── delete-override
-│   ├── apply-override-as-default
-│   ├── network
-│   │   ├── create
-│   │   ├── list
-│   │   ├── update
-│   │   └── delete
-│   └── network-group
-│       ├── create
-│       ├── list
-│       ├── add-member
-│       ├── remove-member
-│       ├── update
-│       └── delete
-│
-└── policies
-    ├── access-group
-    │   ├── get
-    │   └── list
-    └── access-rule
-        ├── create
-        ├── get
-        ├── list
-        ├── update
-        └── delete
+
+**Step 3: get full options for a leaf command**
+```bash
+sccfm-cli <group> <subgroup> <command> --help
+```
+
+### Top-level groups (stable)
+
+These top-level groups exist and are unlikely to change:
+- `configure` — set up profile
+- `status` — show current profile and run health checks
+- `transaction` — track transaction by UID
+- `inventory` — devices and managers
+- `objects` — network objects, groups, overrides
+- `policies` — access groups and rules
+
+For everything below the top level, run `--help` to discover the current subcommands.
+
+### Bulk discovery
+
+To dump the full live tree at once:
+```bash
+sccfm-cli --help
+for grp in inventory objects policies; do
+  echo "=== $grp ===" && sccfm-cli $grp --help
+done
 ```
 
 ## Configuration
@@ -190,16 +142,46 @@ These are set **before** the command name:
 - `--profile TEXT` — select a configuration profile (default: `default`)
 - `--silent` — suppress spinners and progress output
 
-## Shared command options
+## Common command options
 
-These are available on specific commands (not all commands support all options — use `--help` to check):
+These appear on many commands but not all — always check with `--help`:
 - `--format table|json` — output format (list/get commands)
-- `--config-path PATH` — override the config file location (envvar: `SCCFM_CONFIG`)
+- `--config-path PATH` — override the config file location (envvar: `SCCFM_CONFIG`); per-command, not global
 - `--wait / --no-wait` — poll until transaction completes (mutating commands)
-- `--timeout INT` — max seconds to wait (default: 3600)
+- `--timeout INT` — max seconds to wait, x>=1 (default: 3600)
 - `-l / --limit INT` — results per page, 1–200 (default: 50)
-- `-o / --offset INT` — pagination offset (default: 0)
+- `-o / --offset INT` — pagination offset, x>=0 (default: 0)
 - `-q / --query TEXT` — Lucene-syntax filter expression
+- `-t / --transaction-uid TEXT` — transaction UID (on `transaction` command)
+
+## Exit codes and error handling
+
+The CLI uses these exit codes — agents MUST check them, especially when piping output:
+
+| Exit code | Meaning |
+|-----------|---------|
+| `0` | Success |
+| `1` | Configuration error (e.g., profile not found) — stderr message tells you what to do |
+| `130` | User cancelled (Ctrl-C / `KeyboardInterrupt`) |
+| `255` | API or runtime error (e.g., 401 Unauthorized, network failure) |
+
+**Important gotchas:**
+- `--silent` suppresses the human-readable error message but **preserves the exit code**. Always check `$?` when using `--silent`.
+- `--silent --format json` on a failure prints `{}` to stdout with exit code `255`. Do NOT trust the JSON without checking the exit code.
+- Piping (`sccfm-cli ... | head`) returns the exit code of the LAST pipeline command, masking CLI failures. Use `set -o pipefail` or store the result in a variable first.
+- The `status` command exits `0` even when API connectivity check shows `FAIL` — always read the table output to verify health.
+
+**Recommended pattern for agents:**
+```bash
+output=$(sccfm-cli --silent inventory devices list --format json --limit 10)
+rc=$?
+if [ $rc -ne 0 ]; then
+  # Re-run without --silent to surface the error
+  sccfm-cli inventory devices list --format json --limit 10
+  exit $rc
+fi
+echo "$output" | jq '.items[].name'
+```
 
 ## Working with output
 
@@ -207,6 +189,7 @@ For machine-readable output, combine `--silent` and `--format json`:
 ```bash
 sccfm-cli --silent inventory devices list --format json | jq '.items[].name'
 ```
+Remember to check the exit code (see above).
 
 ## Common workflows
 
@@ -269,14 +252,11 @@ Read the command source to understand available parameters when `--help` is insu
 Help the user accomplish: **$ARGUMENTS**
 
 **Approach:**
-1. Activate the environment: `source scripts/activate.sh`
-2. Identify which CLI command(s) are needed
-3. Run `--help` on those commands to get exact syntax
-4. If the user hasn't configured a profile, help them do that first
-5. Run the command(s), using `--format json` when the user needs to process output
-6. If a command returns a transaction, offer to track it with `--wait` or `transaction`
-7. Explain what happened and what the output means
-3. If the user hasn't configured a profile, help them do that first
-4. Run the command(s), using `--format json` when the user needs to process output
-5. If a command returns a transaction, offer to track it with `--wait` or `transaction`
-6. Explain what happened and what the output means
+1. Activate the environment: `source scripts/activate.sh` (re-run this in every new terminal)
+2. Run `sccfm-cli status` to verify a profile is configured. If not, ask the user for region + token, then `sccfm-cli configure`.
+3. Discover the right command with `sccfm-cli --help` and drill down with `--help` on each subgroup.
+4. Run `--help` on the leaf command to see exact options.
+5. Run the command. When piping or using `--silent`, check `$?` for the real exit code.
+6. Use `--format json` when output needs to be parsed; use the `output=$(...)` pattern above to capture errors.
+7. If a command returns a transaction UID, offer to track it with `--wait` or `sccfm-cli transaction -t <uid>`.
+8. Explain what happened and what the output means.

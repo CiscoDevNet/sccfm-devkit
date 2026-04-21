@@ -16,6 +16,8 @@ source scripts/activate.sh
 ```
 This adds `.venv/bin` to PATH, making `ansible-playbook`, `ansible-doc`, `ansible-vault`, `build-ansible-collection`, `devkit`, `change-tokens`, etc. available directly. Do NOT use `poetry run` — use commands directly after activation.
 
+> **Important:** Activation only affects the current shell. **Every new terminal session needs to re-run** `source scripts/activate.sh`. If you see `command not found: ansible-playbook`, you forgot to activate.
+
 ### If the venv doesn't exist yet
 
 Run the full environment setup (installs pyenv, Python 3.12, creates venv, installs all deps):
@@ -339,12 +341,11 @@ if __name__ == "__main__":
 Help the user accomplish: **$ARGUMENTS**
 
 **Approach:**
-1. Activate the environment: `source scripts/activate.sh`
-2. Identify which module(s) or inventory features are needed
-3. Run `ansible-doc cisco.sccfm.<module>` to get exact parameters
-4. Check if the collection is installed; if not, build it
-5. Write or run playbooks following the standard patterns above
-4. Check if vault/credentials are set up; if not, help configure them
-5. Write or run the playbook, following the standard patterns above
-6. If writing a new playbook, place it in `sccfm-ansible/examples/`
-7. Explain the results and any next steps
+1. Activate the environment: `source scripts/activate.sh` (re-run in every new terminal)
+2. Confirm the collection is installed (`ansible-doc -l -t module cisco.sccfm` should list modules); if not, run `build-ansible-collection`.
+3. Check vault/credentials are set up; if not, help configure with `change-tokens`.
+4. Identify which module(s) or inventory features are needed.
+5. Run `ansible-doc cisco.sccfm.<module>` to get exact parameters — never guess.
+6. Write or run the playbook, following the standard patterns above.
+7. If writing a new playbook, place it in `sccfm-ansible/examples/`.
+8. Explain the results and any next steps.
