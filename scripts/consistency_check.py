@@ -1190,6 +1190,533 @@ def _is_cli_command(file: Path) -> bool:
     return file.is_relative_to(CLI_COMMANDS) and file.name == "command.py"
 
 
+# ── SDK API index (built once at import time if SDK is available) ─────────────
+
+def _build_sdk_api_index() -> dict[str, dict[str, frozenset[str]]]:
+    """Return {ApiClassName: {method_name: frozenset(param_names)}}.
+
+    Includes both the canonical method and the *_without_preload_content variant
+    since service files use the latter. Returns an empty dict when the SDK is
+    not installed (CI environments without the venv active).
+    """
+    try:
+        import importlib
+        import inspect
+        import pkgutil
+        import scc_firewall_manager_sdk.api as _sdk_api_pkg
+        from pathlib import Path as _Path
+
+        _SKIP = frozenset(
+            {
+                "self",
+                "_request_timeout",
+                "_request_auth",
+                "_content_type",
+                "_headers",
+                "_host_index",
+            }
+        )
+        _SKIP_SUFFIX = ("_with_http_info",)
+
+        api_dir = _Path(inspect.getfile(_sdk_api_pkg)).parent
+        index: dict[str, dict[str, frozenset[str]]] = {}
+        for _, mod_name, _ in pkgutil.iter_modules([str(api_dir)]):
+            if mod_name == "__init__":
+                continue
+            mod = importlib.import_module(f"scc_firewall_manager_sdk.api.{mod_name}")
+            for cls_name, cls in inspect.getmembers(mod, inspect.isclass):
+                if not cls_name.endswith("Api"):
+                    continue
+                index[cls_name] = {}
+                for mname, method in inspect.getmembers(cls, predicate=inspect.isfunction):
+                    if mname.startswith("_") or any(
+                        mname.endswith(s) for s in _SKIP_SUFFIX
+                    ):
+                        continue
+                    sig = inspect.signature(method)
+                    params = frozenset(p for p in sig.parameters if p not in _SKIP)
+                    index[cls_name][mname] = params
+        return index
+    except Exception:
+        return {}
+
+
+_SDK_API_INDEX: dict[str, dict[str, frozenset[str]]] = _build_sdk_api_index()
+
+
+def _sdk_params_for(api_class_name: str, method_name: str) -> frozenset[str] | None:
+    """Return allowed param names for an SDK API method, or None if unknown.
+
+    Tries the exact method name, then the *_without_preload_content variant,
+    and the inverse — so callers don't need to know which form to look up.
+    """
+    cls = _SDK_API_INDEX.get(api_class_name)
+    if cls is None:
+        return None
+    if method_name in cls:
+        return cls[method_name]
+    # Strip suffix and retry
+    bare = method_name.removesuffix("_without_preload_content")
+    if bare in cls:
+        return cls[bare]
+    # Add suffix and retry
+    with_suffix = method_name + "_without_preload_content"
+    if with_suffix in cls:
+        return cls[with_suffix]
+    return None
+
+
+# ── Check E: SDK API call kwarg names must match SDK method parameters ─────────
+
+def _collect_sdk_api_attr_types(tree: ast.AST) -> dict[str, str]:
+    """Return {self_attr_name: SdkApiClassName} from __init__ assignments.
+
+    Handles both:
+      self.foo_api = SomeApi(...)
+      self.foo_api = helper.some_api   ← indirect; we skip these (no class name)
+    """
+    result: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != "__init__":
+            continue
+        for stmt in ast.walk(node):
+            if not isinstance(stmt, ast.Assign):
+                continue
+            if len(stmt.targets) != 1:
+                continue
+            target = stmt.targets[0]
+            if not (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+            ):
+                continue
+            attr_name = target.attr
+            # RHS must be a direct instantiation: SomeApi(...)
+            if isinstance(stmt.value, ast.Call):
+                cls_name = _call_name(stmt.value.func)
+                if cls_name and cls_name.endswith("Api"):
+                    result[attr_name] = cls_name.split(".")[-1]
+    return result
+
+
+def check_sdk_api_call_kwargs(file: Path) -> list[Issue]:
+    """Check E — kwargs passed to SDK API calls must match the SDK method's params."""
+    if not _SDK_API_INDEX:
+        return []  # SDK not available in this environment
+
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+
+    api_attr_types = _collect_sdk_api_attr_types(tree)
+    if not api_attr_types:
+        return []
+
+    issues: list[Issue] = []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        # Pattern: self.<api_attr>.<method_name>(...)
+        if not (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Attribute)
+            and isinstance(func.value.value, ast.Name)
+            and func.value.value.id == "self"
+        ):
+            continue
+
+        api_attr = func.value.attr
+        method_name = func.attr
+        api_class_name = api_attr_types.get(api_attr)
+        if api_class_name is None:
+            continue
+
+        allowed = _sdk_params_for(api_class_name, method_name)
+        if allowed is None:
+            continue  # Unknown method — skip rather than false-positive
+
+        for kw in node.keywords:
+            if kw.arg is None:
+                continue  # **kwargs spread — skip
+            if kw.arg not in allowed:
+                issues.append(
+                    Issue(
+                        file=file,
+                        line=node.lineno,
+                        message=(
+                            f"SDK call {api_class_name}.{method_name}() "
+                            f"uses unknown kwarg '{kw.arg}' "
+                            f"(allowed: {sorted(allowed)})"
+                        ),
+                    )
+                )
+
+    return issues
+
+
+# ── Check A: str(optional or "") on non-optional str dataclass field ──────────
+
+_DATETIME_SUFFIXES = ("_date", "_time", "_at")
+_DATETIME_CONVERSION_CALLS = frozenset(
+    {"fromisoformat", "fromtimestamp", "utcfromtimestamp", "parse_datetime", "strptime"}
+)
+_SCCFM_CORE = ROOT / "sccfm_core"
+_SCCFM_SERVICES = ROOT / "sccfm_core" / "services"
+
+
+def _is_str_optional_or_call(node: ast.expr) -> bool:
+    """True for  str(x or "")  or  str(x or '')  patterns."""
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "str"):
+        return False
+    if not node.args:
+        return False
+    inner = node.args[0]
+    return (
+        isinstance(inner, ast.BoolOp)
+        and isinstance(inner.op, ast.Or)
+        and len(inner.values) == 2
+        and isinstance(inner.values[1], ast.Constant)
+        and inner.values[1].value == ""
+    )
+
+
+def _collect_dataclass_str_fields(tree: ast.AST) -> dict[str, frozenset[str]]:
+    """Return {ClassName: frozenset of field names typed plain `str`}."""
+    result: dict[str, frozenset[str]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        plain_str_fields: set[str] = set()
+        for item in node.body:
+            if not isinstance(item, ast.AnnAssign):
+                continue
+            if not isinstance(item.target, ast.Name):
+                continue
+            ann = item.annotation
+            # Accept bare `str` only — not `str | None`, not `Optional[str]`
+            if isinstance(ann, ast.Name) and ann.id == "str":
+                plain_str_fields.add(item.target.id)
+        if plain_str_fields:
+            result[node.name] = frozenset(plain_str_fields)
+    return result
+
+
+def _enclosing_class_name(tree: ast.AST, target_lineno: int) -> str | None:
+    """Return the name of the ClassDef that contains the given line."""
+    best: tuple[int, str] | None = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            if node.lineno <= target_lineno:
+                if best is None or node.lineno > best[0]:
+                    best = (node.lineno, node.name)
+    return best[1] if best else None
+
+
+def check_optional_str_coercion(file: Path) -> list[Issue]:
+    """Check A — flag str(x.get("key") or "") assigned to a non-optional `str` field."""
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+    plain_str_fields = _collect_dataclass_str_fields(tree)
+    if not plain_str_fields:
+        return []
+
+    issues: list[Issue] = []
+
+    def _check_pair(field_name: str, value_node: ast.expr, lineno: int) -> None:
+        if not _is_str_optional_or_call(value_node):
+            return
+        # Only flag fields that are actually typed as plain str in their dataclass
+        cls_name = _enclosing_class_name(tree, lineno)
+        if cls_name is None:
+            return
+        if field_name not in plain_str_fields.get(cls_name, frozenset()):
+            return
+        # Extract the JSON key from data.get("key")
+        inner_or = value_node.args[0]  # type: ignore[attr-defined]
+        get_node = inner_or.values[0]
+        json_key: str | None = None
+        if isinstance(get_node, ast.Call) and get_node.args:
+            json_key = _string_value(get_node.args[0])
+        key_label = f"'{json_key}'" if json_key else "an optional API field"
+        issues.append(
+            Issue(
+                file=file,
+                line=lineno,
+                message=(
+                    f"from_dict assigns optional API field {key_label} to non-optional str field "
+                    f"'{field_name}' — annotate as 'str | None' or document the empty-string "
+                    f"sentinel explicitly"
+                ),
+            )
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                _check_pair(node.targets[0].id, node.value, node.lineno)
+        elif isinstance(node, ast.keyword):
+            if node.arg and node.value is not None:
+                _check_pair(node.arg, node.value, getattr(node.value, "lineno", 1))
+
+    return issues
+
+
+# ── Check B: datetime field stored as str | None without parsing ──────────────
+
+def _is_str_optional_annotation(ann: ast.expr) -> bool:
+    """True for `str | None` or `Optional[str]`."""
+    # str | None  (BinOp with BitOr)
+    if isinstance(ann, ast.BinOp) and isinstance(ann.op, ast.BitOr):
+        parts = {ast.unparse(ann.left), ast.unparse(ann.right)}
+        return parts == {"str", "None"}
+    # Optional[str]
+    if isinstance(ann, ast.Subscript):
+        if ast.unparse(ann.value) == "Optional":
+            return ast.unparse(ann.slice) == "str"
+    return False
+
+
+def _from_dict_assigns_field_directly(tree: ast.AST, field_name: str) -> bool:
+    """True if any from_dict method assigns field_name via bare data.get() with no conversion."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != "from_dict":
+            continue
+        for child in ast.walk(node):
+            # keyword argument:  field_name=data.get("...")
+            if isinstance(child, ast.keyword) and child.arg == field_name:
+                val = child.value
+                if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute) and val.func.attr == "get":
+                    return True
+            # direct assignment:  field_name = data.get("...")
+            if isinstance(child, ast.Assign):
+                if (
+                    len(child.targets) == 1
+                    and isinstance(child.targets[0], ast.Name)
+                    and child.targets[0].id == field_name
+                ):
+                    val = child.value
+                    if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute) and val.func.attr == "get":
+                        return True
+    return False
+
+
+def check_datetime_as_str(file: Path) -> list[Issue]:
+    """Check B — flag datetime-named fields annotated str | None without ISO parsing."""
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+
+    issues: list[Issue] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if not isinstance(item, ast.AnnAssign):
+                continue
+            if not isinstance(item.target, ast.Name):
+                continue
+            field_name = item.target.id
+            suffix = next((s for s in _DATETIME_SUFFIXES if field_name.endswith(s)), None)
+            if suffix is None:
+                continue
+            if not _is_str_optional_annotation(item.annotation):
+                continue
+            if not _from_dict_assigns_field_directly(tree, field_name):
+                continue
+            issues.append(
+                Issue(
+                    file=file,
+                    line=item.lineno,
+                    message=(
+                        f"Field '{field_name}' looks like a datetime (name ends in '{suffix}') "
+                        f"but is stored as 'str | None' with no parsing — consider "
+                        f"'datetime | None' with explicit ISO-8601 parsing, or rename to make "
+                        f"the string intent clear"
+                    ),
+                    level="warning",
+                )
+            )
+    return issues
+
+
+# ── Check C: Ansible argument_spec vs DOCUMENTATION options ──────────────────
+
+_ANSIBLE_BASE_KEYS: frozenset[str] = frozenset({"api_token", "region"})
+
+
+def _extract_argument_spec_keys(tree: ast.AST) -> frozenset[str]:
+    """Return literal string keys from build_argument_spec()'s return dict (ignoring **spreads)."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != "build_argument_spec":
+            continue
+        for stmt in ast.walk(node):
+            if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Dict):
+                keys: set[str] = set()
+                for k in stmt.value.keys:
+                    if k is None:
+                        continue  # **spread — known base, skip
+                    val = _string_value(k)
+                    if val:
+                        keys.add(val)
+                return frozenset(keys)
+    return frozenset()
+
+
+def check_ansible_argument_spec(file: Path, metadata: AnsibleModuleMetadata) -> list[Issue]:
+    """Check C — flag mismatches between DOCUMENTATION options and argument_spec keys."""
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+
+    spec_keys = _extract_argument_spec_keys(tree)
+    if not spec_keys:
+        return []  # No build_argument_spec found — skip rather than false-positive
+
+    doc_keys = frozenset(metadata.option_lines) - _ANSIBLE_BASE_KEYS
+    spec_non_base = spec_keys - _ANSIBLE_BASE_KEYS
+
+    issues: list[Issue] = []
+
+    for opt in sorted(doc_keys - spec_non_base):
+        issues.append(
+            Issue(
+                file=file,
+                line=metadata.option_lines.get(opt, 1),
+                message=(
+                    f"DOCUMENTATION declares option '{opt}' but it is not in the module's "
+                    f"argument_spec (and is not a base option) — add it to argument_spec or "
+                    f"remove it from DOCUMENTATION"
+                ),
+                level="warning",
+            )
+        )
+
+    for key in sorted(spec_non_base - doc_keys):
+        issues.append(
+            Issue(
+                file=file,
+                line=1,
+                message=(
+                    f"argument_spec key '{key}' is not documented in DOCUMENTATION — "
+                    f"add an entry or remove the key"
+                ),
+                level="warning",
+            )
+        )
+
+    return issues
+
+
+# ── Check D: list_* / get_* service methods must have keyword-only limit/offset/query ──
+
+_LIST_STANDARD_PARAMS: dict[str, Any] = {"limit": 50, "offset": 0, "query": None}
+
+
+def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
+    """Check D — list_* and get_* methods on Service classes must use keyword-only
+    args with standard limit/offset/query parameters and defaults."""
+    service_files = [
+        f for f in files
+        if f.suffix == ".py" and f.is_relative_to(_SCCFM_SERVICES)
+    ]
+    if not service_files:
+        return []
+
+    issues: list[Issue] = []
+
+    for file in service_files:
+        tree = _safe_parse(file)
+        if tree is None:
+            continue
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            is_service = (
+                node.name.endswith("Service")
+                or any(
+                    (isinstance(b, ast.Name) and b.id.endswith("Service"))
+                    or (isinstance(b, ast.Attribute) and b.attr.endswith("Service"))
+                    for b in node.bases
+                )
+            )
+            if not is_service:
+                continue
+
+            for item in node.body:
+                if not isinstance(item, ast.FunctionDef):
+                    continue
+                if not (item.name.startswith("list_") or item.name.startswith("get_")):
+                    continue
+                if item.name.startswith("_"):
+                    continue
+
+                args = item.args
+                kwonly_names = [a.arg for a in args.kwonlyargs]
+                has_star = bool(args.kwonlyargs) or args.vararg is None and args.kwarg is None
+
+                # 1. keyword-only separator
+                if not args.kwonlyargs:
+                    issues.append(Issue(
+                        file=file,
+                        line=item.lineno,
+                        message=(
+                            f"list/get method '{item.name}' in '{node.name}' should use "
+                            f"keyword-only arguments (add '*' separator)"
+                        ),
+                        level="warning",
+                    ))
+                    continue  # remaining checks need kwonly args
+
+                # Build defaults map: kwonly params with defaults (right-aligned)
+                kw_defaults_raw = args.kw_defaults
+                n = len(args.kwonlyargs)
+                kw_defaults: dict[str, Any] = {}
+                for i, default_node in enumerate(kw_defaults_raw):
+                    if default_node is not None:
+                        param_name = args.kwonlyargs[i].arg
+                        kw_defaults[param_name] = (
+                            default_node.value
+                            if isinstance(default_node, ast.Constant)
+                            else ...  # non-literal default
+                        )
+
+                # 2. missing standard params
+                for param in ("limit", "offset", "query"):
+                    if param not in kwonly_names:
+                        issues.append(Issue(
+                            file=file,
+                            line=item.lineno,
+                            message=(
+                                f"list/get method '{item.name}' is missing parameter "
+                                f"'{param}' (present on all other list methods)"
+                            ),
+                            level="warning",
+                        ))
+
+                # 3. non-standard defaults
+                for param, expected in _LIST_STANDARD_PARAMS.items():
+                    if param not in kw_defaults:
+                        continue
+                    actual = kw_defaults[param]
+                    if actual is ... or actual != expected:
+                        issues.append(Issue(
+                            file=file,
+                            line=item.lineno,
+                            message=(
+                                f"list/get method '{item.name}' has non-standard default for "
+                                f"'{param}': {actual!r} (expected {expected!r})"
+                            ),
+                            level="warning",
+                        ))
+
+    return issues
+
+
 def run(
     files: list[Path],
     *,
@@ -1204,17 +1731,24 @@ def run(
         issues.extend(check_variable_naming(file))
         issues.extend(check_api_key_mapping(file))
 
+        if file.is_relative_to(_SCCFM_CORE):
+            issues.extend(check_optional_str_coercion(file))
+            issues.extend(check_datetime_as_str(file))
+            issues.extend(check_sdk_api_call_kwargs(file))
+
         if _is_ansible_module(file):
             metadata = _build_ansible_metadata(file)
             issues.extend(check_ansible_examples(file, metadata))
             issues.extend(check_ansible_return_contract(file, metadata))
             issues.extend(check_ansible_module_naming(file, metadata))
+            issues.extend(check_ansible_argument_spec(file, metadata))
 
         if _is_cli_command(file):
             metadata = _build_cli_metadata(file)
             issues.extend(check_cli_command_naming(file, metadata))
 
     issues.extend(check_api_mapping_consistency(files))
+    issues.extend(check_service_list_signatures(files))
     issues.extend(check_cross_device_cli_consistency(files))
     issues.extend(check_cross_device_ansible_consistency(files))
     issues.extend(check_cli_ansible_alignment(files))
