@@ -64,16 +64,15 @@ jobs:
       - name: Write job summary
         if: always()
         run: |
-          short_sha="${GITHUB_SHA::7}"
           error_count="${{ steps.consistency.outputs.error_count }}"
           warning_count="${{ steps.consistency.outputs.warning_count }}"
           issue_count="${{ steps.consistency.outputs.issue_count }}"
           echo "### Consistency Check" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "$issue_count" = "0" ]; then
-            echo "PR summary for commit \`$short_sha\`: no consistency issues." >> "$GITHUB_STEP_SUMMARY"
+            echo "No consistency issues found." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "PR summary for commit \`$short_sha\`: **$issue_count** consistency issue(s) found." >> "$GITHUB_STEP_SUMMARY"
+            echo "**$issue_count** consistency issue(s) found." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "- Errors: **$error_count**" >> "$GITHUB_STEP_SUMMARY"
             echo "- Warnings: **$warning_count**" >> "$GITHUB_STEP_SUMMARY"
@@ -96,7 +95,6 @@ jobs:
           CONSISTENCY_ERROR_COUNT: ${{ steps.consistency.outputs.error_count }}
           CONSISTENCY_WARNING_COUNT: ${{ steps.consistency.outputs.warning_count }}
           CONSISTENCY_ISSUE_COUNT: ${{ steps.consistency.outputs.issue_count }}
-          CONSISTENCY_SHA: ${{ github.sha }}
           CONSISTENCY_REPORT_PATH: consistency-report.txt
           CONSISTENCY_IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
         with:
@@ -104,7 +102,6 @@ jobs:
             const fs = require("fs");
 
             const marker = "<!-- consistency-check-comment -->";
-            const shortSha = (process.env.CONSISTENCY_SHA || "").slice(0, 7);
             const errorCount = Number(process.env.CONSISTENCY_ERROR_COUNT || "0");
             const warningCount = Number(process.env.CONSISTENCY_WARNING_COUNT || "0");
             const issueCount = Number(process.env.CONSISTENCY_ISSUE_COUNT || "0");
@@ -121,8 +118,8 @@ jobs:
 
             const summaryLine =
               issueCount === 0
-                ? `PR summary for commit \`${shortSha}\`: no consistency issues.`
-                : `PR summary for commit \`${shortSha}\`: **${issueCount}** consistency issue(s) found.`;
+                ? `No consistency issues found.`
+                : `**${issueCount}** consistency issue(s) found.`;
 
             const body = [
               marker,
