@@ -1,0 +1,36 @@
+---
+# Fetch a single access group by UID and verify its fields.
+
+- name: "CI: Get access group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached access group UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_group_uid"
+      register: cached_uid
+
+    - name: Get access group by UID
+      cisco.sccfm.get_access_group:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: result
+
+    - name: Assert access group fields are present
+      ansible.builtin.assert:
+        that:
+          - not result.changed
+          - result.access_group.uid == (cached_uid.content | b64decode | trim)
+          - result.access_group.name is defined
+          - result.access_group.entity_uid is defined
+        fail_msg: "Expected access group UID '{{ cached_uid.content | b64decode | trim }}' to be returned with name and entity_uid"

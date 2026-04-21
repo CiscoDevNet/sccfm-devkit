@@ -1,0 +1,85 @@
+---
+# Pre/post-test cleanup: remove the test access rule and the provisioned
+# access group.  Every step tolerates missing resources so both pre-clean
+# and post-clean succeed on a fresh device.
+
+- name: "CI: Pre-clean test access rule and access group"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # ── Access rule cleanup ──────────────────────────────────────
+
+    - name: Read cached rule UID (if present)
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+      failed_when: false
+
+    - name: Delete cached test access rule
+      cisco.sccfm.delete_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: delete_result
+      when: cached_uid.content is defined
+      failed_when:
+        - delete_result.failed is defined
+        - delete_result.failed
+        - "'not_found' not in (delete_result.msg | default('') | lower)"
+        - "'404' not in (delete_result.msg | default(''))"
+
+    - name: Remove cached rule UID file
+      ansible.builtin.file:
+        path: "/tmp/ci_access_rule_uid"
+        state: absent
+
+    # ── Access group cleanup (provisioned via CLI) ───────────────
+    # Must run BEFORE network object deletion — network objects
+    # cannot be deleted while referenced by an ACL.
+    # CI guarantees exactly one ASA matches asa_test_query.
+    # After API CRUD operations the device is typically NOT_SYNCED
+    # and CLI commands are rejected.  Tolerate the error — the next
+    # run's pre-clean will succeed once the device has synced.
+
+    - name: Remove provisioned test access group via CLI
+      cisco.sccfm.execute_asa_cli:
+        query: "{{ asa_test_query }}"
+        commands:
+          - "configure terminal"
+          - "no access-group {{ test_acl_name }} global"
+          - "clear configure access-list {{ test_acl_name }}"
+          - "end"
+      register: cli_result
+      failed_when: false
+
+    - name: Remove cached access group UID file
+      ansible.builtin.file:
+        path: "/tmp/ci_access_group_uid"
+        state: absent
+
+    # ── Network object cleanup ────────────────────────────────────
+    # Runs after ACL teardown so objects are no longer referenced.
+    # When the CLI teardown above was skipped (device NOT_SYNCED),
+    # objects are still associated and deletion will fail — that is
+    # expected; the next run's pre-clean will handle it.
+
+    - name: Delete source network object
+      cisco.sccfm.delete_network_object:
+        name: "{{ test_source_network }}"
+      register: src_delete
+      failed_when: false
+
+    - name: Delete destination network object
+      cisco.sccfm.delete_network_object:
+        name: "{{ test_destination_network }}"
+      register: dst_delete
+      failed_when: false

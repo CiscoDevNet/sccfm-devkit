@@ -1,0 +1,35 @@
+---
+# Update the test access rule's remark.
+
+- name: "CI: Update access rule"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+
+    - name: Update access rule remark
+      cisco.sccfm.update_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+        remark: "{{ updated_rule_remark }}"
+      register: update_result
+
+    - name: Assert rule was updated
+      ansible.builtin.assert:
+        that:
+          - update_result.changed
+          - update_result.access_rule.remark == updated_rule_remark
+        fail_msg: "Expected rule to be updated with remark '{{ updated_rule_remark }}'"
