@@ -20,6 +20,7 @@ action_groups:
     - edit_object_override
     - asa_ha_check
     - execute_asa_cli
+    - execute_ftd_cli
     - get_access_group
     - get_access_rule
     - get_object

@@ -1,0 +1,84 @@
+---
+# Execute show commands on cdFMC-managed FTD devices via SCCFM
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/execute_ftd_cli.yml
+#
+# Optionally pass a device UID to run UID-specific examples:
+#   ansible-playbook examples/execute_ftd_cli.yml \
+#     -e device_uid=<your-device-uid>
+#
+# NOTE: Only read-only show commands are supported.
+
+- name: Execute show commands on cdFMC-managed FTD devices
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  vars:
+    device_uid: ""
+
+  tasks:
+    - name: "Quick test: Show version on first available online FTD"
+      cisco.sccfm.execute_ftd_cli:
+        query: "connectivityState:ONLINE"
+        limit: 1
+        command: "show version"
+      register: quick_test_result
+
+    - name: Display quick test result
+      ansible.builtin.debug:
+        msg: |
+          SUCCESS! Device {{ quick_test_result.results[0].device_name }} responded:
+          {{ quick_test_result.results[0].response | default('No output returned') }}
+      when: quick_test_result.results is defined and quick_test_result.results | length > 0
+
+    - name: Show failover on branch FTDs
+      cisco.sccfm.execute_ftd_cli:
+        query: "name:branch-* AND connectivityState:ONLINE"
+        command: "show failover"
+      register: branch_results
+      ignore_errors: true
+
+    - name: Display branch results
+      ansible.builtin.debug:
+        msg: |
+          Device {{ item.device_name }}:
+          {{ item.response | default(item.error_msg | default('No output')) }}
+      loop: "{{ branch_results.results | default([]) }}"
+      loop_control:
+        label: "{{ item.device_name }}"
+      when: branch_results.results is defined and branch_results.results | length > 0
+
+    - name: "UID test: Execute command on specific FTD by UID"
+      cisco.sccfm.execute_ftd_cli:
+        uids:
+          - "{{ device_uid }}"
+        command: "show route"
+      register: uid_results
+      when: device_uid | length > 0
+
+    - name: Display UID-based execution results
+      ansible.builtin.debug:
+        msg: |
+          Device {{ uid_results.results[0].device_name }}:
+          {{ uid_results.results[0].response | default('No output returned') }}
+      when: uid_results.results is defined and uid_results.results | length > 0
+
+    - name: Execute on first 10 matching FTD devices
+      cisco.sccfm.execute_ftd_cli:
+        query: "connectivityState:ONLINE"
+        limit: 10
+        offset: 0
+        command: "show route"
+      register: paginated_results
+      ignore_errors: true
+
+    - name: Summary of execution
+      ansible.builtin.debug:
+        msg: "Executed show command on {{ paginated_results.results | length }} device(s)"
+      when: paginated_results.results is defined

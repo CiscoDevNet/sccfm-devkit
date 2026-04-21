@@ -13,6 +13,7 @@ from sccfm_core.services.inventory import (
     AsaUpgradeService,
     AsaUpgradeVersionService,
     AsaUserPasswordService,
+    FtdCommandLineService,
     InventoryService,
     ShunEntrySpec,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "AsaUpgradeService",
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
+    "FtdCommandLineService",
     "HealthService",
     "HealthStatus",
     "InventoryService",
