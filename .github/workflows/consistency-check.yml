@@ -41,7 +41,7 @@ jobs:
         run: poetry install --only build --no-interaction --no-root
 
       - name: Fetch pull request base
-        run: git fetch origin "${{ github.base_ref }}" --depth=1
+        run: git fetch origin "${{ github.base_ref }}"
 
       - name: Run consistency checks
         id: consistency
