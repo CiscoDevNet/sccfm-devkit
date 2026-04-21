@@ -1717,6 +1717,336 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
     return issues
 
 
+# ── Check F: Region vocabulary drift ─────────────────────────────────────────
+
+_CLI_CONFIGURE = ROOT / "sccfm_cli" / "commands" / "configure.py"
+_ANSIBLE_CONFIG = ROOT / "sccfm-ansible" / "plugins" / "module_utils" / "config.py"
+_RUNTIME_YML = ROOT / "sccfm-ansible" / "meta" / "runtime.yml"
+
+
+def _extract_regions_tuple(file: Path, var_name: str) -> tuple[frozenset[str], int]:
+    """Return (region_set, lineno) for a tuple/list literal assigned to var_name."""
+    tree = _safe_parse(file)
+    if tree is None:
+        return frozenset(), 1
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not (isinstance(target, ast.Name) and target.id == var_name):
+            continue
+        if isinstance(node.value, (ast.Tuple, ast.List)):
+            regions = {_string_value(elt) for elt in node.value.elts}
+            return frozenset(r for r in regions if r), node.lineno
+    return frozenset(), 1
+
+
+def check_region_vocabulary_drift(files: Sequence[Path]) -> list[Issue]:
+    """Check F — CLI _REGIONS and Ansible ALLOWED_REGIONS must be identical sets."""
+    touched = {f.resolve() for f in files}
+    relevant = {_CLI_CONFIGURE.resolve(), _ANSIBLE_CONFIG.resolve()}
+    if not (touched & relevant):
+        return []
+
+    cli_regions, cli_line = _extract_regions_tuple(_CLI_CONFIGURE, "_REGIONS")
+    ansible_regions, ansible_line = _extract_regions_tuple(_ANSIBLE_CONFIG, "ALLOWED_REGIONS")
+
+    if not cli_regions or not ansible_regions:
+        return []
+
+    issues: list[Issue] = []
+
+    only_cli = sorted(cli_regions - ansible_regions)
+    for r in only_cli:
+        issues.append(Issue(
+            file=_CLI_CONFIGURE,
+            line=cli_line,
+            message=(
+                f"Region '{r}' is in CLI _REGIONS but missing from Ansible ALLOWED_REGIONS "
+                f"— region vocabulary must be kept in sync"
+            ),
+        ))
+
+    only_ansible = sorted(ansible_regions - cli_regions)
+    for r in only_ansible:
+        issues.append(Issue(
+            file=_ANSIBLE_CONFIG,
+            line=ansible_line,
+            message=(
+                f"Region '{r}' is in Ansible ALLOWED_REGIONS but missing from CLI _REGIONS "
+                f"— region vocabulary must be kept in sync"
+            ),
+        ))
+
+    return issues
+
+
+# ── Check G: Ansible module contract ─────────────────────────────────────────
+
+def _extract_runtime_action_group(runtime_yml: Path) -> frozenset[str]:
+    """Return module names listed under cisco.sccfm.all in runtime.yml."""
+    if not runtime_yml.exists():
+        return frozenset()
+    content = runtime_yml.read_text(encoding="utf-8")
+    parsed = _safe_yaml_load(content)
+    if not isinstance(parsed, dict):
+        return frozenset()
+    action_groups = parsed.get("action_groups") or {}
+    members = action_groups.get("cisco.sccfm.all") or []
+    if not isinstance(members, list):
+        return frozenset()
+    return frozenset(str(m) for m in members)
+
+
+def _module_uses_helper(tree: ast.AST, helper_name: str) -> bool:
+    """True if the module calls helper_name() anywhere."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = _call_name(node.func)
+            if name == helper_name or (name and name.endswith("." + helper_name)):
+                return True
+    return False
+
+
+def _module_declares_check_mode(tree: ast.AST) -> bool:
+    """True if AnsibleModule(supports_check_mode=True) appears in the file."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node.func)
+        if name not in ("AnsibleModule", "ansible.module_utils.basic.AnsibleModule"):
+            continue
+        if _bool_keyword(node, "supports_check_mode"):
+            return True
+    return False
+
+
+def check_ansible_module_contract(file: Path) -> list[Issue]:
+    """Check G — new/edited Ansible modules must follow the shared module contract."""
+    if not _is_ansible_module(file):
+        return []
+
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+
+    issues: list[Issue] = []
+    module_name = file.stem
+
+    # Only check modules that use AnsibleModule at all
+    has_ansible_module_instantiation = any(
+        isinstance(node, ast.Call)
+        and _call_name(node.func) in ("AnsibleModule", "ansible.module_utils.basic.AnsibleModule")
+        for node in ast.walk(tree)
+    )
+    if not has_ansible_module_instantiation:
+        return []
+
+    if not _module_uses_helper(tree, "base_argument_spec"):
+        issues.append(Issue(
+            file=file,
+            line=1,
+            message=(
+                f"Ansible module '{module_name}' does not use base_argument_spec() — "
+                f"all standard modules should build on the shared argument spec"
+            ),
+            level="warning",
+        ))
+
+    if not _module_uses_helper(tree, "create_config"):
+        issues.append(Issue(
+            file=file,
+            line=1,
+            message=(
+                f"Ansible module '{module_name}' does not use create_config(module) — "
+                f"use the shared config helper for consistent auth/env handling"
+            ),
+            level="warning",
+        ))
+
+    if not _module_declares_check_mode(tree):
+        issues.append(Issue(
+            file=file,
+            line=1,
+            message=(
+                f"Ansible module '{module_name}' does not declare supports_check_mode=True "
+                f"in AnsibleModule()"
+            ),
+            level="warning",
+        ))
+
+    return issues
+
+
+def check_ansible_runtime_membership(files: Sequence[Path]) -> list[Issue]:
+    """Check G (runtime.yml) — modules in changed files must be in cisco.sccfm.all."""
+    if not _RUNTIME_YML.exists():
+        return []
+
+    action_group = _extract_runtime_action_group(_RUNTIME_YML)
+    issues: list[Issue] = []
+
+    for file in files:
+        if not _is_ansible_module(file) or not file.exists():
+            continue
+        module_name = file.stem
+        if module_name not in action_group:
+            issues.append(Issue(
+                file=file,
+                line=1,
+                message=(
+                    f"Ansible module '{module_name}' is not listed in the "
+                    f"cisco.sccfm.all action group in meta/runtime.yml — "
+                    f"add it so module_defaults inheritance works"
+                ),
+                level="warning",
+            ))
+
+    return issues
+
+
+# ── Check H: CLI JSON output contract ─────────────────────────────────────────
+
+_CANONICAL_JSON_KWARGS: frozenset[str] = frozenset({"indent", "ensure_ascii", "default"})
+
+
+def _json_dumps_call_issues(node: ast.Call, file: Path) -> list[Issue]:
+    """Return issues for a json.dumps() call that violates the output contract."""
+    issues: list[Issue] = []
+    kw_names = {kw.arg for kw in node.keywords if kw.arg}
+
+    if "indent" not in kw_names:
+        issues.append(Issue(
+            file=file,
+            line=node.lineno,
+            message=(
+                "json.dumps() called without indent=2 — CLI JSON output must be consistently "
+                "formatted with indent=2"
+            ),
+            level="warning",
+        ))
+
+    unknown = sorted(kw_names - _CANONICAL_JSON_KWARGS - {None})
+    for kw in unknown:
+        issues.append(Issue(
+            file=file,
+            line=node.lineno,
+            message=(
+                f"json.dumps() uses non-standard kwarg '{kw}' — "
+                f"CLI JSON output should only use indent/ensure_ascii/default"
+            ),
+            level="warning",
+        ))
+
+    return issues
+
+
+def check_cli_json_output_contract(file: Path) -> list[Issue]:
+    """Check H — CLI JSON output must use print() not console.print(), with standard kwargs."""
+    if not file.is_relative_to(CLI_COMMANDS):
+        return []
+
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+
+    issues: list[Issue] = []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node.func)
+        if name is None:
+            continue
+
+        # console.print(json.dumps(...)) or self.console.print(json.dumps(...))
+        if name in ("console.print", "self.console.print"):
+            if node.args:
+                arg = node.args[0]
+                if isinstance(arg, ast.Call) and _call_name(arg.func) == "json.dumps":
+                    issues.append(Issue(
+                        file=file,
+                        line=node.lineno,
+                        message=(
+                            "CLI JSON output uses console.print(json.dumps(...)) — "
+                            "use plain print(json.dumps(...)) for machine-readable JSON "
+                            "(Rich console can alter output encoding)"
+                        ),
+                        level="warning",
+                    ))
+                    issues.extend(_json_dumps_call_issues(arg, file))
+                    continue  # already reported the dumps issues
+
+        if name == "json.dumps":
+            issues.extend(_json_dumps_call_issues(node, file))
+
+    return issues
+
+
+# ── Check I: Inline pagination click options instead of shared factories ──────
+
+_SHARED_PAGINATION_FACTORIES = frozenset({"limit_option", "offset_option", "query_option"})
+_INLINE_PAGINATION_FLAGS: frozenset[str] = frozenset({"--limit", "--offset", "--query"})
+
+
+def _has_inline_pagination_option(tree: ast.AST) -> list[tuple[int, str]]:
+    """Return (lineno, flag) pairs for click.Option(['--limit'/'--offset'/'--query']) calls."""
+    hits: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node.func)
+        if name != "click.Option":
+            continue
+        if not node.args:
+            continue
+        flags_node = node.args[0]
+        if not isinstance(flags_node, (ast.List, ast.Tuple)):
+            continue
+        for elt in flags_node.elts:
+            flag = _string_value(elt)
+            if flag and flag in _INLINE_PAGINATION_FLAGS:
+                hits.append((node.lineno, flag))
+                break
+    return hits
+
+
+def check_inline_pagination_options(file: Path) -> list[Issue]:
+    """Check I — CLI list commands must use shared option factories, not inline click.Option."""
+    if not file.is_relative_to(CLI_COMMANDS):
+        return []
+
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+
+    # If the file already uses the shared factories, don't warn further
+    uses_factory = any(
+        isinstance(node, ast.Call) and _call_name(node.func) in _SHARED_PAGINATION_FACTORIES
+        for node in ast.walk(tree)
+    )
+    if uses_factory:
+        return []
+
+    hits = _has_inline_pagination_option(tree)
+    issues: list[Issue] = []
+    for lineno, flag in hits:
+        opt_name = flag.lstrip("-")
+        issues.append(Issue(
+            file=file,
+            line=lineno,
+            message=(
+                f"CLI command declares inline click.Option('{flag}') instead of using "
+                f"the shared {opt_name}_option() factory — "
+                f"use shared factories so pagination behavior and short flags stay consistent"
+            ),
+            level="warning",
+        ))
+    return issues
+
+
 def run(
     files: list[Path],
     *,
@@ -1743,15 +2073,24 @@ def run(
             issues.extend(check_ansible_module_naming(file, metadata))
             issues.extend(check_ansible_argument_spec(file, metadata))
 
+        if _is_ansible_module(file):
+            issues.extend(check_ansible_module_contract(file))
+
         if _is_cli_command(file):
             metadata = _build_cli_metadata(file)
             issues.extend(check_cli_command_naming(file, metadata))
+
+        if file.is_relative_to(CLI_COMMANDS):
+            issues.extend(check_cli_json_output_contract(file))
+            issues.extend(check_inline_pagination_options(file))
 
     issues.extend(check_api_mapping_consistency(files))
     issues.extend(check_service_list_signatures(files))
     issues.extend(check_cross_device_cli_consistency(files))
     issues.extend(check_cross_device_ansible_consistency(files))
     issues.extend(check_cli_ansible_alignment(files))
+    issues.extend(check_region_vocabulary_drift(files))
+    issues.extend(check_ansible_runtime_membership(files))
 
     issues.sort(key=lambda issue: (issue.file, issue.line, issue.message))
 
