@@ -1191,8 +1191,9 @@ def _build_sdk_api_index() -> dict[str, dict[str, frozenset[str]]]:
         import importlib
         import inspect
         import pkgutil
-        import scc_firewall_manager_sdk.api as _sdk_api_pkg
         from pathlib import Path as _Path
+
+        import scc_firewall_manager_sdk.api as _sdk_api_pkg
 
         _SKIP = frozenset(
             {
