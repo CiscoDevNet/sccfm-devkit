@@ -18,7 +18,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 try:
     import yaml as _yaml
@@ -37,26 +37,6 @@ _TRIPLE_ASSIGN_RE_TEMPLATE = r"^{name}\s*=\s*r?(?P<quote>'''|\"\"\")(?P<body>.*?
 _JINJA_REGISTER_REF_RE = re.compile(r"\b(?P<register>[A-Za-z_]\w*)\.(?P<key>[A-Za-z_]\w*)\b")
 _JINJA_REGISTER_INDEX_RE = re.compile(
     r"""\b(?P<register>[A-Za-z_]\w*)\[['"](?P<key>[A-Za-z_]\w*)['"]\]"""
-)
-
-_DOC_MODULE_PREFIXES = (
-    "create",
-    "delete",
-    "list",
-    "get",
-    "add",
-    "remove",
-    "update",
-    "change",
-    "check",
-    "clear",
-    "trigger",
-    "execute",
-    "show",
-    "apply",
-    "edit",
-    "deploy",
-    "onboard",
 )
 
 _SKIP_VAR_NAMES: frozenset[str] = frozenset(
@@ -127,17 +107,19 @@ _CLI_TO_ANSIBLE_OPTION_ALIASES: dict[str, str] = {
 @dataclass(frozen=True)
 class Issue:
     file: Path
-    line: int
+    line: int | None
     message: str
     level: str = "error"
 
     def as_annotation(self) -> str:
         rel = _display_path(self.file)
-        return f"::{self.level} file={rel},line={self.line}::{self.message}"
+        loc = f",line={self.line}" if self.line is not None else ""
+        return f"::{self.level} file={rel}{loc}::{self.message}"
 
     def as_text(self) -> str:
         rel = _display_path(self.file)
-        return f"{self.level.upper()}: {rel}:{self.line}: {self.message}"
+        loc = f":{self.line}" if self.line is not None else ""
+        return f"{self.level.upper()}: {rel}{loc}: {self.message}"
 
 
 @dataclass(frozen=True)
@@ -157,7 +139,7 @@ class MappingObservation:
 @dataclass(frozen=True)
 class CliCommandMetadata:
     command_name: str | None
-    command_name_line: int
+    command_name_line: int | None
     option_names: frozenset[str]
     json_keys: frozenset[str]
     operation_key: str | None
@@ -759,7 +741,7 @@ def check_ansible_return_contract(file: Path, metadata: AnsibleModuleMetadata) -
         issues.append(
             Issue(
                 file=file,
-                line=1,
+                line=None,
                 message=f"RETURN is missing documented key '{key}' emitted by module.exit_json",
             )
         )
@@ -784,7 +766,7 @@ def check_ansible_module_naming(file: Path, metadata: AnsibleModuleMetadata) -> 
         return [
             Issue(
                 file=file,
-                line=1,
+                line=None,
                 message="DOCUMENTATION block is missing 'module'",
             )
         ]
@@ -797,7 +779,7 @@ def check_ansible_module_naming(file: Path, metadata: AnsibleModuleMetadata) -> 
     ]
 
 
-def _extract_cli_command_name(tree: ast.AST) -> tuple[str | None, int]:
+def _extract_cli_command_name(tree: ast.AST) -> tuple[str | None, int | None]:
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef) or node.name != "name":
             continue
@@ -806,7 +788,7 @@ def _extract_cli_command_name(tree: ast.AST) -> tuple[str | None, int]:
                 value = _string_value(statement.value)
                 if value is not None:
                     return value, statement.lineno
-    return None, 1
+    return None, None
 
 
 def _extract_cli_option_names(tree: ast.AST) -> frozenset[str]:
@@ -847,7 +829,7 @@ def _build_cli_metadata(file: Path) -> CliCommandMetadata:
     if tree is None:
         return CliCommandMetadata(
             command_name=None,
-            command_name_line=1,
+            command_name_line=None,
             option_names=frozenset(),
             json_keys=frozenset(),
             operation_key=_cli_operation_key(file),
@@ -874,7 +856,7 @@ def check_cli_command_naming(file: Path, metadata: CliCommandMetadata) -> list[I
         return [
             Issue(
                 file=file,
-                line=1,
+                line=None,
                 message=f"CLI command in '{file.parent.name}' should expose name '{expected}'",
             )
         ]
@@ -1029,7 +1011,7 @@ def check_cli_ansible_alignment(changed_files: Sequence[Path]) -> list[Issue]:
                 issues.append(
                     Issue(
                         file=file,
-                        line=1,
+                        line=None,
                         message=(
                             f"CLI option '{option_name}' has no matching Ansible option in "
                             f"'{ansible_module.name}'"
@@ -1040,30 +1022,30 @@ def check_cli_ansible_alignment(changed_files: Sequence[Path]) -> list[Issue]:
     return issues
 
 
-def _paired_cli_by_operation() -> dict[tuple[str, str], Path]:
+def _paired_by_operation(
+    root_dir: Path,
+    glob_pattern: str,
+    operation_key_fn: Callable[[Path], str | None],
+    device_family_fn: Callable[[Path], str | None],
+) -> dict[tuple[str, str], Path]:
     mapping: dict[tuple[str, str], Path] = {}
-    for path in CLI_COMMANDS.rglob("command.py"):
-        operation = _cli_operation_key(path)
-        family = _cli_device_family(path)
-        if operation and family:
-            mapping[(operation, family)] = path
-    return mapping
-
-
-def _paired_ansible_by_operation() -> dict[tuple[str, str], Path]:
-    mapping: dict[tuple[str, str], Path] = {}
-    for path in ANSIBLE_MODULES.glob("*.py"):
+    for path in root_dir.glob(glob_pattern):
         if path.name == "__init__.py":
             continue
-        operation = _ansible_operation_key(path)
-        family = _ansible_device_family(path)
+        operation = operation_key_fn(path)
+        family = device_family_fn(path)
         if operation and family:
             mapping[(operation, family)] = path
     return mapping
 
 
 def check_cross_device_cli_consistency(changed_files: Sequence[Path]) -> list[Issue]:
-    paired = _paired_cli_by_operation()
+    paired = _paired_by_operation(
+        CLI_COMMANDS,
+        "**/command.py",
+        _cli_operation_key,
+        _cli_device_family,
+    )
     issues: list[Issue] = []
     for file in changed_files:
         if not file.is_relative_to(CLI_COMMANDS) or file.name != "command.py":
@@ -1086,7 +1068,7 @@ def check_cross_device_cli_consistency(changed_files: Sequence[Path]) -> list[Is
             issues.append(
                 Issue(
                     file=file,
-                    line=1,
+                    line=None,
                     message=(
                         f"Shared CLI option '{option_name}' is missing from paired "
                         f"{other_family.upper()} command '{counterpart.relative_to(ROOT)}'"
@@ -1102,7 +1084,7 @@ def check_cross_device_cli_consistency(changed_files: Sequence[Path]) -> list[Is
             issues.append(
                 Issue(
                     file=file,
-                    line=1,
+                    line=None,
                     message=(
                         f"JSON output key '{key}' is missing from paired "
                         f"{other_family.upper()} command '{counterpart.relative_to(ROOT)}'"
@@ -1114,7 +1096,12 @@ def check_cross_device_cli_consistency(changed_files: Sequence[Path]) -> list[Is
 
 
 def check_cross_device_ansible_consistency(changed_files: Sequence[Path]) -> list[Issue]:
-    paired = _paired_ansible_by_operation()
+    paired = _paired_by_operation(
+        ANSIBLE_MODULES,
+        "*.py",
+        _ansible_operation_key,
+        _ansible_device_family,
+    )
     issues: list[Issue] = []
     for file in changed_files:
         if not file.is_relative_to(ANSIBLE_MODULES) or file.name == "__init__.py":
@@ -1279,7 +1266,7 @@ def _collect_sdk_api_attr_types(tree: ast.AST) -> dict[str, str]:
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef) or node.name != "__init__":
             continue
-        for stmt in ast.walk(node):
+        for stmt in node.body:
             if not isinstance(stmt, ast.Assign):
                 continue
             if len(stmt.targets) != 1:
@@ -1360,10 +1347,8 @@ def check_sdk_api_call_kwargs(file: Path) -> list[Issue]:
 # ── Check A: str(optional or "") on non-optional str dataclass field ──────────
 
 _DATETIME_SUFFIXES = ("_date", "_time", "_at")
-_DATETIME_CONVERSION_CALLS = frozenset(
-    {"fromisoformat", "fromtimestamp", "utcfromtimestamp", "parse_datetime", "strptime"}
-)
 _SCCFM_CORE = ROOT / "sccfm_core"
+_SCCFM_CLI = ROOT / "sccfm_cli"
 _SCCFM_SERVICES = ROOT / "sccfm_core" / "services"
 
 
@@ -1599,7 +1584,7 @@ def check_ansible_argument_spec(file: Path, metadata: AnsibleModuleMetadata) -> 
         issues.append(
             Issue(
                 file=file,
-                line=1,
+                line=None,
                 message=(
                     f"argument_spec key '{key}' is not documented in DOCUMENTATION — "
                     f"add an entry or remove the key"
@@ -1657,7 +1642,6 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
 
                 args = item.args
                 kwonly_names = [a.arg for a in args.kwonlyargs]
-                has_star = bool(args.kwonlyargs) or args.vararg is None and args.kwarg is None
 
                 # 1. keyword-only separator
                 if not args.kwonlyargs:
@@ -1672,9 +1656,7 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
                     ))
                     continue  # remaining checks need kwonly args
 
-                # Build defaults map: kwonly params with defaults (right-aligned)
                 kw_defaults_raw = args.kw_defaults
-                n = len(args.kwonlyargs)
                 kw_defaults: dict[str, Any] = {}
                 for i, default_node in enumerate(kw_defaults_raw):
                     if default_node is not None:
@@ -1810,6 +1792,23 @@ def _module_uses_helper(tree: ast.AST, helper_name: str) -> bool:
     return False
 
 
+def _module_uses_config(tree: ast.AST) -> bool:
+    """True if the module uses create_config() OR constructs Config(region=module.params...)."""
+    if _module_uses_helper(tree, "create_config"):
+        return True
+    # Accept direct Config(region=module.params..., api_token=module.params...) as equivalent
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node.func)
+        if name not in ("Config", "config.Config"):
+            continue
+        kw_names = {kw.arg for kw in node.keywords if kw.arg}
+        if {"region", "api_token"} <= kw_names:
+            return True
+    return False
+
+
 def _module_declares_check_mode(tree: ast.AST) -> bool:
     """True if AnsibleModule(supports_check_mode=True) appears in the file."""
     for node in ast.walk(tree):
@@ -1823,6 +1822,30 @@ def _module_declares_check_mode(tree: ast.AST) -> bool:
     return False
 
 
+def _examples_use_shared_module_defaults(source: str) -> bool:
+    def _task_uses_module_defaults(task: dict[str, Any]) -> bool:
+        module_defaults = task.get("module_defaults")
+        if isinstance(module_defaults, dict) and "group/cisco.sccfm.all" in module_defaults:
+            return True
+
+        nested_tasks = task.get("tasks")
+        if not isinstance(nested_tasks, list):
+            return False
+        return any(
+            isinstance(nested_task, dict) and _task_uses_module_defaults(nested_task)
+            for nested_task in nested_tasks
+        )
+
+    example_tasks = _parse_example_tasks(source)
+    if any(_task_uses_module_defaults(task) for _, task in example_tasks):
+        return True
+
+    block = _extract_triple_quoted_assignment(source, "EXAMPLES")
+    if block is None:
+        return False
+    return "module_defaults" in block.body and "group/cisco.sccfm.all" in block.body
+
+
 def check_ansible_module_contract(file: Path) -> list[Issue]:
     """Check G — new/edited Ansible modules must follow the shared module contract."""
     if not _is_ansible_module(file):
@@ -1831,6 +1854,7 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
     tree = _safe_parse(file)
     if tree is None:
         return []
+    source = file.read_text(encoding="utf-8")
 
     issues: list[Issue] = []
     module_name = file.stem
@@ -1847,7 +1871,7 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
     if not _module_uses_helper(tree, "base_argument_spec"):
         issues.append(Issue(
             file=file,
-            line=1,
+            line=None,
             message=(
                 f"Ansible module '{module_name}' does not use base_argument_spec() — "
                 f"all standard modules should build on the shared argument spec"
@@ -1855,10 +1879,10 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
             level="warning",
         ))
 
-    if not _module_uses_helper(tree, "create_config"):
+    if not _module_uses_config(tree):
         issues.append(Issue(
             file=file,
-            line=1,
+            line=None,
             message=(
                 f"Ansible module '{module_name}' does not use create_config(module) — "
                 f"use the shared config helper for consistent auth/env handling"
@@ -1869,10 +1893,22 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
     if not _module_declares_check_mode(tree):
         issues.append(Issue(
             file=file,
-            line=1,
+            line=None,
             message=(
                 f"Ansible module '{module_name}' does not declare supports_check_mode=True "
                 f"in AnsibleModule()"
+            ),
+            level="warning",
+        ))
+
+    if not _examples_use_shared_module_defaults(source):
+        issues.append(Issue(
+            file=file,
+            line=None,
+            message=(
+                f"Ansible module '{module_name}' EXAMPLES does not show "
+                "module_defaults: group/cisco.sccfm.all usage — include one example so "
+                "shared defaults are documented"
             ),
             level="warning",
         ))
@@ -1895,7 +1931,7 @@ def check_ansible_runtime_membership(files: Sequence[Path]) -> list[Issue]:
         if module_name not in action_group:
             issues.append(Issue(
                 file=file,
-                line=1,
+                line=None,
                 message=(
                     f"Ansible module '{module_name}' is not listed in the "
                     f"cisco.sccfm.all action group in meta/runtime.yml — "
@@ -1907,45 +1943,39 @@ def check_ansible_runtime_membership(files: Sequence[Path]) -> list[Issue]:
     return issues
 
 
-# ── Check H: CLI JSON output contract ─────────────────────────────────────────
-
-_CANONICAL_JSON_KWARGS: frozenset[str] = frozenset({"indent", "ensure_ascii", "default"})
-
-
-def _json_dumps_call_issues(node: ast.Call, file: Path) -> list[Issue]:
-    """Return issues for a json.dumps() call that violates the output contract."""
-    issues: list[Issue] = []
-    kw_names = {kw.arg for kw in node.keywords if kw.arg}
-
-    if "indent" not in kw_names:
-        issues.append(Issue(
-            file=file,
-            line=node.lineno,
-            message=(
-                "json.dumps() called without indent=2 — CLI JSON output must be consistently "
-                "formatted with indent=2"
-            ),
-            level="warning",
-        ))
-
-    unknown = sorted(kw_names - _CANONICAL_JSON_KWARGS - {None})
-    for kw in unknown:
-        issues.append(Issue(
-            file=file,
-            line=node.lineno,
-            message=(
-                f"json.dumps() uses non-standard kwarg '{kw}' — "
-                f"CLI JSON output should only use indent/ensure_ascii/default"
-            ),
-            level="warning",
-        ))
-
-    return issues
+def _caught_exception_name(node: ast.AST | None) -> str | None:
+    if node is None or isinstance(node, ast.Tuple):
+        return None
+    name = _call_name(node)
+    if not name:
+        return None
+    return name.split(".")[-1]
 
 
-def check_cli_json_output_contract(file: Path) -> list[Issue]:
-    """Check H — CLI JSON output must use print() not console.print(), with standard kwargs."""
-    if not file.is_relative_to(CLI_COMMANDS):
+def _handler_uses_scc_api_error_conversion(handler: ast.ExceptHandler) -> bool:
+    return any(
+        isinstance(node, ast.Call) and _call_name(node.func) == "SccApiError.from_exception"
+        for node in ast.walk(handler)
+    )
+
+
+def _handler_fails_with_message(handler: ast.ExceptHandler) -> bool:
+    for node in ast.walk(handler):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = _call_name(node.func)
+        if call_name is None or not call_name.endswith("fail_json"):
+            continue
+        if any(keyword.arg == "msg" for keyword in node.keywords):
+            return True
+    return False
+
+
+# ── Check J: Ansible SDK error handling ──────────────────────────────────────
+
+def check_ansible_sdk_error_handling(file: Path) -> list[Issue]:
+    """Check J — generic Ansible exception handlers should use structured SDK errors."""
+    if not _is_ansible_module(file):
         return []
 
     tree = _safe_parse(file)
@@ -1953,34 +1983,26 @@ def check_cli_json_output_contract(file: Path) -> list[Issue]:
         return []
 
     issues: list[Issue] = []
-
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
+        if not isinstance(node, ast.ExceptHandler):
             continue
-        name = _call_name(node.func)
-        if name is None:
+        if _caught_exception_name(node.type) != "Exception":
+            continue
+        if _handler_uses_scc_api_error_conversion(node):
+            continue
+        if not _handler_fails_with_message(node):
             continue
 
-        # console.print(json.dumps(...)) or self.console.print(json.dumps(...))
-        if name in ("console.print", "self.console.print"):
-            if node.args:
-                arg = node.args[0]
-                if isinstance(arg, ast.Call) and _call_name(arg.func) == "json.dumps":
-                    issues.append(Issue(
-                        file=file,
-                        line=node.lineno,
-                        message=(
-                            "CLI JSON output uses console.print(json.dumps(...)) — "
-                            "use plain print(json.dumps(...)) for machine-readable JSON "
-                            "(Rich console can alter output encoding)"
-                        ),
-                        level="warning",
-                    ))
-                    issues.extend(_json_dumps_call_issues(arg, file))
-                    continue  # already reported the dumps issues
-
-        if name == "json.dumps":
-            issues.extend(_json_dumps_call_issues(node, file))
+        issues.append(Issue(
+            file=file,
+            line=node.lineno,
+            message=(
+                "Generic except Exception handler calls fail_json(msg=...) without "
+                "SccApiError.from_exception() — prefer structured ApiException/"
+                "SccApiError conversion"
+            ),
+            level="warning",
+        ))
 
     return issues
 
@@ -2047,12 +2069,234 @@ def check_inline_pagination_options(file: Path) -> list[Issue]:
     return issues
 
 
-def run(
-    files: list[Path],
-    *,
-    annotations: bool = False,
-    fail_on_warning: bool = False,
-) -> int:
+def _module_body_without_docstring(tree: ast.AST) -> list[ast.stmt]:
+    if not isinstance(tree, ast.Module):
+        return []
+    body = list(tree.body)
+    if body and isinstance(body[0], ast.Expr) and _string_value(body[0].value) is not None:
+        return body[1:]
+    return body
+
+
+def _has_future_annotations_import(tree: ast.AST) -> bool:
+    return any(
+        isinstance(stmt, ast.ImportFrom)
+        and stmt.module == "__future__"
+        and any(alias.name == "annotations" for alias in stmt.names)
+        for stmt in _module_body_without_docstring(tree)
+    )
+
+
+def _has_future_annotations_as_first_import(tree: ast.AST) -> bool:
+    for stmt in _module_body_without_docstring(tree):
+        if not isinstance(stmt, (ast.Import, ast.ImportFrom)):
+            continue
+        return (
+            isinstance(stmt, ast.ImportFrom)
+            and stmt.module == "__future__"
+            and any(alias.name == "annotations" for alias in stmt.names)
+        )
+    return False
+
+
+_LEGACY_TYPING_NAMES: frozenset[str] = frozenset(
+    {"List", "Dict", "Optional", "Tuple", "Set", "Union"}
+)
+_LEGACY_TYPING_REPLACEMENTS: dict[str, str] = {
+    "List": "list[...]",
+    "Dict": "dict[...]",
+    "Optional": "X | None",
+    "Tuple": "tuple[...]",
+    "Set": "set[...]",
+    "Union": "A | B",
+}
+_ANSIBLE_MODULE_TESTS = ANSIBLE_MODULES / "tests"
+_SCCFM_CORE_TESTS = _SCCFM_CORE / "tests"
+
+
+def _collect_legacy_typing_imports(
+    tree: ast.AST,
+) -> tuple[dict[str, tuple[str, int]], dict[str, int]]:
+    imported_names: dict[str, tuple[str, int]] = {}
+    typing_modules: dict[str, int] = {}
+
+    for node in _module_body_without_docstring(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "typing":
+            for alias in node.names:
+                if alias.name not in _LEGACY_TYPING_NAMES:
+                    continue
+                imported_names[alias.asname or alias.name] = (alias.name, node.lineno)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name != "typing":
+                    continue
+                typing_modules[alias.asname or alias.name] = node.lineno
+
+    return imported_names, typing_modules
+
+
+def _legacy_typing_name(
+    node: ast.AST,
+    imported_names: dict[str, tuple[str, int]],
+    typing_modules: dict[str, int],
+) -> str | None:
+    if not isinstance(node, ast.Subscript):
+        return None
+
+    if isinstance(node.value, ast.Name):
+        imported = imported_names.get(node.value.id)
+        return imported[0] if imported else None
+
+    if (
+        isinstance(node.value, ast.Attribute)
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id in typing_modules
+        and node.value.attr in _LEGACY_TYPING_NAMES
+    ):
+        return node.value.attr
+
+    return None
+
+
+def _annotation_nodes(tree: ast.AST) -> list[ast.AST]:
+    nodes: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AnnAssign):
+            nodes.append(node.annotation)
+        elif isinstance(node, ast.arg) and node.annotation is not None:
+            nodes.append(node.annotation)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.returns is not None:
+            nodes.append(node.returns)
+    return nodes
+
+
+# ── Check K: Legacy typing syntax ─────────────────────────────────────────────
+
+def check_legacy_typing_syntax(file: Path) -> list[Issue]:
+    """Check K — future-annotations files should use modern built-in generic syntax."""
+    if not (file.is_relative_to(_SCCFM_CORE) or file.is_relative_to(_SCCFM_CLI)):
+        return []
+
+    tree = _safe_parse(file)
+    if tree is None or not _has_future_annotations_import(tree):
+        return []
+
+    imported_names, typing_modules = _collect_legacy_typing_imports(tree)
+    if not imported_names and not typing_modules:
+        return []
+
+    issues: list[Issue] = []
+    imports_by_line: dict[int, set[str]] = defaultdict(set)
+    for legacy_name, lineno in imported_names.values():
+        imports_by_line[lineno].add(legacy_name)
+
+    for lineno, legacy_names in sorted(imports_by_line.items()):
+        display_names = ", ".join(sorted(legacy_names))
+        issues.append(Issue(
+            file=file,
+            line=lineno,
+            message=(
+                f"Legacy typing import(s) {display_names} used in a future-annotations file — "
+                "prefer built-in generics and '|' syntax"
+            ),
+            level="warning",
+        ))
+
+    seen_hits: set[tuple[int, str]] = set()
+    for annotation in _annotation_nodes(tree):
+        for node in ast.walk(annotation):
+            legacy_name = _legacy_typing_name(node, imported_names, typing_modules)
+            if legacy_name is None:
+                continue
+            lineno = getattr(node, "lineno", getattr(annotation, "lineno", 1))
+            hit = (lineno, legacy_name)
+            if hit in seen_hits:
+                continue
+            seen_hits.add(hit)
+            issues.append(Issue(
+                file=file,
+                line=lineno,
+                message=(
+                    f"Legacy typing annotation '{legacy_name}[...]' used in a future-annotations "
+                    f"file — use '{_LEGACY_TYPING_REPLACEMENTS[legacy_name]}' instead"
+                ),
+                level="warning",
+            ))
+
+    return issues
+
+
+# ── Check L: Missing future annotations import ───────────────────────────────
+
+def check_missing_future_annotations(file: Path) -> list[Issue]:
+    """Check L — shared Python surfaces should declare future annotations first."""
+    if not (
+        file.is_relative_to(_SCCFM_CORE)
+        or file.is_relative_to(_SCCFM_CLI)
+        or file.is_relative_to(ANSIBLE_MODULES)
+    ):
+        return []
+
+    tree = _safe_parse(file)
+    if tree is None:
+        return []
+    if _has_future_annotations_as_first_import(tree):
+        return []
+
+    return [
+        Issue(
+            file=file,
+            line=None,
+            message=(
+                "File does not declare 'from __future__ import annotations' as the first import"
+            ),
+            level="warning",
+        )
+    ]
+
+
+# ── Check M: Advisory test file parity ───────────────────────────────────────
+
+def check_test_file_parity(files: Sequence[Path]) -> list[Issue]:
+    """Check M — changed modules/services should have a matching test file."""
+    issues: list[Issue] = []
+
+    for file in files:
+        if file.suffix != ".py" or not file.exists():
+            continue
+        if _safe_parse(file) is None:
+            continue
+
+        expected_test: Path | None = None
+        message: str | None = None
+
+        if file.parent == ANSIBLE_MODULES and file.name != "__init__.py":
+            expected_test = _ANSIBLE_MODULE_TESTS / f"test_{file.stem}.py"
+            message = (
+                f"Ansible module '{file.name}' has no matching test file at "
+                f"'{expected_test.relative_to(ROOT)}'"
+            )
+        elif file.is_relative_to(_SCCFM_SERVICES) and file.name != "__init__.py":
+            expected_test = _SCCFM_CORE_TESTS / f"test_{file.stem}.py"
+            message = (
+                f"Core service '{file.relative_to(ROOT)}' has no matching test file at "
+                f"'{expected_test.relative_to(ROOT)}'"
+            )
+
+        if expected_test is None or message is None or expected_test.exists():
+            continue
+
+        issues.append(Issue(
+            file=file,
+            line=None,
+            message=message,
+            level="warning",
+        ))
+
+    return issues
+
+
+def collect_issues(files: Sequence[Path]) -> list[Issue]:
     issues: list[Issue] = []
 
     for file in files:
@@ -2060,11 +2304,15 @@ def run(
             continue
         issues.extend(check_variable_naming(file))
         issues.extend(check_api_key_mapping(file))
+        issues.extend(check_missing_future_annotations(file))
 
         if file.is_relative_to(_SCCFM_CORE):
             issues.extend(check_optional_str_coercion(file))
             issues.extend(check_datetime_as_str(file))
             issues.extend(check_sdk_api_call_kwargs(file))
+
+        if file.is_relative_to(_SCCFM_CORE) or file.is_relative_to(_SCCFM_CLI):
+            issues.extend(check_legacy_typing_syntax(file))
 
         if _is_ansible_module(file):
             metadata = _build_ansible_metadata(file)
@@ -2072,16 +2320,14 @@ def run(
             issues.extend(check_ansible_return_contract(file, metadata))
             issues.extend(check_ansible_module_naming(file, metadata))
             issues.extend(check_ansible_argument_spec(file, metadata))
-
-        if _is_ansible_module(file):
             issues.extend(check_ansible_module_contract(file))
+            issues.extend(check_ansible_sdk_error_handling(file))
 
         if _is_cli_command(file):
             metadata = _build_cli_metadata(file)
             issues.extend(check_cli_command_naming(file, metadata))
 
         if file.is_relative_to(CLI_COMMANDS):
-            issues.extend(check_cli_json_output_contract(file))
             issues.extend(check_inline_pagination_options(file))
 
     issues.extend(check_api_mapping_consistency(files))
@@ -2091,11 +2337,33 @@ def run(
     issues.extend(check_cli_ansible_alignment(files))
     issues.extend(check_region_vocabulary_drift(files))
     issues.extend(check_ansible_runtime_membership(files))
+    issues.extend(check_test_file_parity(files))
 
-    issues.sort(key=lambda issue: (issue.file, issue.line, issue.message))
+    issues.sort(key=lambda issue: (issue.file, issue.line or 0, issue.message))
+    return issues
 
+
+def _group_issues_by_file(issues: Sequence[Issue]) -> dict[Path, list[Issue]]:
+    by_file: dict[Path, list[Issue]] = {}
+    for issue in issues:
+        by_file.setdefault(issue.file, []).append(issue)
+    return by_file
+
+
+def _issue_counts(issues: Sequence[Issue]) -> tuple[int, int]:
     errors = sum(1 for issue in issues if issue.level == "error")
     warnings = sum(1 for issue in issues if issue.level == "warning")
+    return errors, warnings
+
+
+def run(
+    files: list[Path],
+    *,
+    annotations: bool = False,
+    fail_on_warning: bool = False,
+) -> int:
+    issues = collect_issues(files)
+    errors, warnings = _issue_counts(issues)
 
     if annotations:
         for issue in issues:
@@ -2113,22 +2381,17 @@ def run(
 
 
 def _print_readable(issues: list[Issue], files: list[Path]) -> None:
-    errors = sum(1 for i in issues if i.level == "error")
-    warnings = sum(1 for i in issues if i.level == "warning")
+    errors, warnings = _issue_counts(issues)
 
     if not issues:
         print(f"✓ No issues found across {len(files)} file(s).")
         return
 
-    # Group by file
-    by_file: dict[Path, list[Issue]] = {}
-    for issue in issues:
-        by_file.setdefault(issue.file, []).append(issue)
+    by_file = _group_issues_by_file(issues)
 
     for file, file_issues in by_file.items():
         rel = _display_path(file)
-        file_errors = sum(1 for i in file_issues if i.level == "error")
-        file_warnings = sum(1 for i in file_issues if i.level == "warning")
+        file_errors, file_warnings = _issue_counts(file_issues)
         parts = []
         if file_errors:
             parts.append(f"{file_errors} error(s)")
@@ -2137,7 +2400,8 @@ def _print_readable(issues: list[Issue], files: list[Path]) -> None:
         print(f"\n── {rel}  [{', '.join(parts)}]")
         for issue in file_issues:
             icon = "✖" if issue.level == "error" else "⚠"
-            print(f"   {icon}  line {issue.line:>4}  {issue.message}")
+            loc = f"line {issue.line:>4}" if issue.line is not None else "          "
+            print(f"   {icon}  {loc}  {issue.message}")
 
     print(f"\n{'─' * 60}")
     files_with_issues = len(by_file)
@@ -2176,7 +2440,13 @@ def main(argv: list[str] | None = None) -> None:
         print("No Python files to check.")
         sys.exit(0)
 
-    sys.exit(run(files, annotations=args.annotations, fail_on_warning=args.fail_on_warning))
+    sys.exit(
+        run(
+            files,
+            annotations=args.annotations,
+            fail_on_warning=args.fail_on_warning,
+        )
+    )
 
 
 if __name__ == "__main__":

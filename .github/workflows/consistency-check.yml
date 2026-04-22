@@ -48,17 +48,19 @@ jobs:
         continue-on-error: true
         run: |
           set +e
+          report_txt="consistency-report.txt"
           poetry run python scripts/consistency_check.py \
             --base "${{ github.base_ref }}" \
-            --fail-on-warning | tee consistency-report.txt
+            --fail-on-warning | tee "$report_txt"
           exit_code=${PIPESTATUS[0]}
-          counts=$(python -c "import pathlib, re; text = pathlib.Path('consistency-report.txt').read_text(encoding='utf-8'); match = re.search(r'^\\s*(\\d+) error\\(s\\)\\s+(\\d+) warning\\(s\\)\\s+across', text, re.MULTILINE); errors = int(match.group(1)) if match else 0; warnings = int(match.group(2)) if match else 0; print(f'{errors} {warnings} {errors + warnings}')")
+          counts=$(python -c "import pathlib, re; text = pathlib.Path('$report_txt').read_text(encoding='utf-8'); match = re.search(r'^\\s*(\\d+) error\\(s\\)\\s+(\\d+) warning\\(s\\)\\s+across', text, re.MULTILINE); errors = int(match.group(1)) if match else 0; warnings = int(match.group(2)) if match else 0; print(f'{errors} {warnings} {errors + warnings}')")
           read -r error_count warning_count issue_count <<< "$counts"
           {
             echo "exit_code=$exit_code"
             echo "error_count=$error_count"
             echo "warning_count=$warning_count"
             echo "issue_count=$issue_count"
+            echo "report_path=$report_txt"
           } >> "$GITHUB_OUTPUT"
 
       - name: Write job summary
@@ -95,7 +97,7 @@ jobs:
           CONSISTENCY_ERROR_COUNT: ${{ steps.consistency.outputs.error_count }}
           CONSISTENCY_WARNING_COUNT: ${{ steps.consistency.outputs.warning_count }}
           CONSISTENCY_ISSUE_COUNT: ${{ steps.consistency.outputs.issue_count }}
-          CONSISTENCY_REPORT_PATH: consistency-report.txt
+          CONSISTENCY_REPORT_PATH: ${{ steps.consistency.outputs.report_path }}
           CONSISTENCY_IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
         with:
           script: |
@@ -121,8 +123,6 @@ jobs:
                 ? `No consistency issues found.`
                 : `**${issueCount}** consistency issue(s) found — **${errorCount}** error(s), **${warningCount}** warning(s).`;
 
-            // Parse per-file counts from the checker output
-            // Header lines look like: ── path/to/file.py  [2 error(s), 1 warning(s)]
             const fileTableRows = [];
             const fileHeaderRe = /^──\s+(.+?)\s+\[([^\]]+)\]/gm;
             let match;
