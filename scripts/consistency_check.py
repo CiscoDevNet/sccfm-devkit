@@ -1179,6 +1179,7 @@ def _is_cli_command(file: Path) -> bool:
 
 # ── SDK API index (built once at import time if SDK is available) ─────────────
 
+
 def _build_sdk_api_index() -> dict[str, dict[str, frozenset[str]]]:
     """Return {ApiClassName: {method_name: frozenset(param_names)}}.
 
@@ -1216,9 +1217,7 @@ def _build_sdk_api_index() -> dict[str, dict[str, frozenset[str]]]:
                     continue
                 index[cls_name] = {}
                 for mname, method in inspect.getmembers(cls, predicate=inspect.isfunction):
-                    if mname.startswith("_") or any(
-                        mname.endswith(s) for s in _SKIP_SUFFIX
-                    ):
+                    if mname.startswith("_") or any(mname.endswith(s) for s in _SKIP_SUFFIX):
                         continue
                     sig = inspect.signature(method)
                     params = frozenset(p for p in sig.parameters if p not in _SKIP)
@@ -1254,6 +1253,7 @@ def _sdk_params_for(api_class_name: str, method_name: str) -> frozenset[str] | N
 
 
 # ── Check E: SDK API call kwarg names must match SDK method parameters ─────────
+
 
 def _collect_sdk_api_attr_types(tree: ast.AST) -> dict[str, str]:
     """Return {self_attr_name: SdkApiClassName} from __init__ assignments.
@@ -1354,7 +1354,9 @@ _SCCFM_SERVICES = ROOT / "sccfm_core" / "services"
 
 def _is_str_optional_or_call(node: ast.expr) -> bool:
     """True for  str(x or "")  or  str(x or '')  patterns."""
-    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "str"):
+    if not (
+        isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "str"
+    ):
         return False
     if not node.args:
         return False
@@ -1452,6 +1454,7 @@ def check_optional_str_coercion(file: Path) -> list[Issue]:
 
 # ── Check B: datetime field stored as str | None without parsing ──────────────
 
+
 def _is_str_optional_annotation(ann: ast.expr) -> bool:
     """True for `str | None` or `Optional[str]`."""
     # str | None  (BinOp with BitOr)
@@ -1474,7 +1477,11 @@ def _from_dict_assigns_field_directly(tree: ast.AST, field_name: str) -> bool:
             # keyword argument:  field_name=data.get("...")
             if isinstance(child, ast.keyword) and child.arg == field_name:
                 val = child.value
-                if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute) and val.func.attr == "get":
+                if (
+                    isinstance(val, ast.Call)
+                    and isinstance(val.func, ast.Attribute)
+                    and val.func.attr == "get"
+                ):
                     return True
             # direct assignment:  field_name = data.get("...")
             if isinstance(child, ast.Assign):
@@ -1484,7 +1491,11 @@ def _from_dict_assigns_field_directly(tree: ast.AST, field_name: str) -> bool:
                     and child.targets[0].id == field_name
                 ):
                     val = child.value
-                    if isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute) and val.func.attr == "get":
+                    if (
+                        isinstance(val, ast.Call)
+                        and isinstance(val.func, ast.Attribute)
+                        and val.func.attr == "get"
+                    ):
                         return True
     return False
 
@@ -1604,10 +1615,7 @@ _LIST_STANDARD_PARAMS: dict[str, Any] = {"limit": 50, "offset": 0, "query": None
 def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
     """Check D — list_* and get_* methods on Service classes must use keyword-only
     args with standard limit/offset/query parameters and defaults."""
-    service_files = [
-        f for f in files
-        if f.suffix == ".py" and f.is_relative_to(_SCCFM_SERVICES)
-    ]
+    service_files = [f for f in files if f.suffix == ".py" and f.is_relative_to(_SCCFM_SERVICES)]
     if not service_files:
         return []
 
@@ -1621,13 +1629,10 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
                 continue
-            is_service = (
-                node.name.endswith("Service")
-                or any(
-                    (isinstance(b, ast.Name) and b.id.endswith("Service"))
-                    or (isinstance(b, ast.Attribute) and b.attr.endswith("Service"))
-                    for b in node.bases
-                )
+            is_service = node.name.endswith("Service") or any(
+                (isinstance(b, ast.Name) and b.id.endswith("Service"))
+                or (isinstance(b, ast.Attribute) and b.attr.endswith("Service"))
+                for b in node.bases
             )
             if not is_service:
                 continue
@@ -1645,15 +1650,17 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
 
                 # 1. keyword-only separator
                 if not args.kwonlyargs:
-                    issues.append(Issue(
-                        file=file,
-                        line=item.lineno,
-                        message=(
-                            f"list/get method '{item.name}' in '{node.name}' should use "
-                            f"keyword-only arguments (add '*' separator)"
-                        ),
-                        level="warning",
-                    ))
+                    issues.append(
+                        Issue(
+                            file=file,
+                            line=item.lineno,
+                            message=(
+                                f"list/get method '{item.name}' in '{node.name}' should use "
+                                f"keyword-only arguments (add '*' separator)"
+                            ),
+                            level="warning",
+                        )
+                    )
                     continue  # remaining checks need kwonly args
 
                 kw_defaults_raw = args.kw_defaults
@@ -1670,15 +1677,17 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
                 # 2. missing standard params
                 for param in ("limit", "offset", "query"):
                     if param not in kwonly_names:
-                        issues.append(Issue(
-                            file=file,
-                            line=item.lineno,
-                            message=(
-                                f"list/get method '{item.name}' is missing parameter "
-                                f"'{param}' (present on all other list methods)"
-                            ),
-                            level="warning",
-                        ))
+                        issues.append(
+                            Issue(
+                                file=file,
+                                line=item.lineno,
+                                message=(
+                                    f"list/get method '{item.name}' is missing parameter "
+                                    f"'{param}' (present on all other list methods)"
+                                ),
+                                level="warning",
+                            )
+                        )
 
                 # 3. non-standard defaults
                 for param, expected in _LIST_STANDARD_PARAMS.items():
@@ -1686,15 +1695,17 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
                         continue
                     actual = kw_defaults[param]
                     if actual is ... or actual != expected:
-                        issues.append(Issue(
-                            file=file,
-                            line=item.lineno,
-                            message=(
-                                f"list/get method '{item.name}' has non-standard default for "
-                                f"'{param}': {actual!r} (expected {expected!r})"
-                            ),
-                            level="warning",
-                        ))
+                        issues.append(
+                            Issue(
+                                file=file,
+                                line=item.lineno,
+                                message=(
+                                    f"list/get method '{item.name}' has non-standard default for "
+                                    f"'{param}': {actual!r} (expected {expected!r})"
+                                ),
+                                level="warning",
+                            )
+                        )
 
     return issues
 
@@ -1742,30 +1753,35 @@ def check_region_vocabulary_drift(files: Sequence[Path]) -> list[Issue]:
 
     only_cli = sorted(cli_regions - ansible_regions)
     for r in only_cli:
-        issues.append(Issue(
-            file=_CLI_CONFIGURE,
-            line=cli_line,
-            message=(
-                f"Region '{r}' is in CLI _REGIONS but missing from Ansible ALLOWED_REGIONS "
-                f"— region vocabulary must be kept in sync"
-            ),
-        ))
+        issues.append(
+            Issue(
+                file=_CLI_CONFIGURE,
+                line=cli_line,
+                message=(
+                    f"Region '{r}' is in CLI _REGIONS but missing from Ansible ALLOWED_REGIONS "
+                    f"— region vocabulary must be kept in sync"
+                ),
+            )
+        )
 
     only_ansible = sorted(ansible_regions - cli_regions)
     for r in only_ansible:
-        issues.append(Issue(
-            file=_ANSIBLE_CONFIG,
-            line=ansible_line,
-            message=(
-                f"Region '{r}' is in Ansible ALLOWED_REGIONS but missing from CLI _REGIONS "
-                f"— region vocabulary must be kept in sync"
-            ),
-        ))
+        issues.append(
+            Issue(
+                file=_ANSIBLE_CONFIG,
+                line=ansible_line,
+                message=(
+                    f"Region '{r}' is in Ansible ALLOWED_REGIONS but missing from CLI _REGIONS "
+                    f"— region vocabulary must be kept in sync"
+                ),
+            )
+        )
 
     return issues
 
 
 # ── Check G: Ansible module contract ─────────────────────────────────────────
+
 
 def _extract_runtime_action_group(runtime_yml: Path) -> frozenset[str]:
     """Return module names listed under cisco.sccfm.all in runtime.yml."""
@@ -1869,49 +1885,57 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
         return []
 
     if not _module_uses_helper(tree, "base_argument_spec"):
-        issues.append(Issue(
-            file=file,
-            line=None,
-            message=(
-                f"Ansible module '{module_name}' does not use base_argument_spec() — "
-                f"all standard modules should build on the shared argument spec"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=None,
+                message=(
+                    f"Ansible module '{module_name}' does not use base_argument_spec() — "
+                    f"all standard modules should build on the shared argument spec"
+                ),
+                level="warning",
+            )
+        )
 
     if not _module_uses_config(tree):
-        issues.append(Issue(
-            file=file,
-            line=None,
-            message=(
-                f"Ansible module '{module_name}' does not use create_config(module) — "
-                f"use the shared config helper for consistent auth/env handling"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=None,
+                message=(
+                    f"Ansible module '{module_name}' does not use create_config(module) — "
+                    f"use the shared config helper for consistent auth/env handling"
+                ),
+                level="warning",
+            )
+        )
 
     if not _module_declares_check_mode(tree):
-        issues.append(Issue(
-            file=file,
-            line=None,
-            message=(
-                f"Ansible module '{module_name}' does not declare supports_check_mode=True "
-                f"in AnsibleModule()"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=None,
+                message=(
+                    f"Ansible module '{module_name}' does not declare supports_check_mode=True "
+                    f"in AnsibleModule()"
+                ),
+                level="warning",
+            )
+        )
 
     if not _examples_use_shared_module_defaults(source):
-        issues.append(Issue(
-            file=file,
-            line=None,
-            message=(
-                f"Ansible module '{module_name}' EXAMPLES does not show "
-                "module_defaults: group/cisco.sccfm.all usage — include one example so "
-                "shared defaults are documented"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=None,
+                message=(
+                    f"Ansible module '{module_name}' EXAMPLES does not show "
+                    "module_defaults: group/cisco.sccfm.all usage — include one example so "
+                    "shared defaults are documented"
+                ),
+                level="warning",
+            )
+        )
 
     return issues
 
@@ -1929,16 +1953,18 @@ def check_ansible_runtime_membership(files: Sequence[Path]) -> list[Issue]:
             continue
         module_name = file.stem
         if module_name not in action_group:
-            issues.append(Issue(
-                file=file,
-                line=None,
-                message=(
-                    f"Ansible module '{module_name}' is not listed in the "
-                    f"cisco.sccfm.all action group in meta/runtime.yml — "
-                    f"add it so module_defaults inheritance works"
-                ),
-                level="warning",
-            ))
+            issues.append(
+                Issue(
+                    file=file,
+                    line=None,
+                    message=(
+                        f"Ansible module '{module_name}' is not listed in the "
+                        f"cisco.sccfm.all action group in meta/runtime.yml — "
+                        f"add it so module_defaults inheritance works"
+                    ),
+                    level="warning",
+                )
+            )
 
     return issues
 
@@ -1973,6 +1999,7 @@ def _handler_fails_with_message(handler: ast.ExceptHandler) -> bool:
 
 # ── Check J: Ansible SDK error handling ──────────────────────────────────────
 
+
 def check_ansible_sdk_error_handling(file: Path) -> list[Issue]:
     """Check J — generic Ansible exception handlers should use structured SDK errors."""
     if not _is_ansible_module(file):
@@ -1993,16 +2020,18 @@ def check_ansible_sdk_error_handling(file: Path) -> list[Issue]:
         if not _handler_fails_with_message(node):
             continue
 
-        issues.append(Issue(
-            file=file,
-            line=node.lineno,
-            message=(
-                "Generic except Exception handler calls fail_json(msg=...) without "
-                "SccApiError.from_exception() — prefer structured ApiException/"
-                "SccApiError conversion"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=node.lineno,
+                message=(
+                    "Generic except Exception handler calls fail_json(msg=...) without "
+                    "SccApiError.from_exception() — prefer structured ApiException/"
+                    "SccApiError conversion"
+                ),
+                level="warning",
+            )
+        )
 
     return issues
 
@@ -2056,16 +2085,18 @@ def check_inline_pagination_options(file: Path) -> list[Issue]:
     issues: list[Issue] = []
     for lineno, flag in hits:
         opt_name = flag.lstrip("-")
-        issues.append(Issue(
-            file=file,
-            line=lineno,
-            message=(
-                f"CLI command declares inline click.Option('{flag}') instead of using "
-                f"the shared {opt_name}_option() factory — "
-                f"use shared factories so pagination behavior and short flags stay consistent"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=lineno,
+                message=(
+                    f"CLI command declares inline click.Option('{flag}') instead of using "
+                    f"the shared {opt_name}_option() factory — "
+                    f"use shared factories so pagination behavior and short flags stay consistent"
+                ),
+                level="warning",
+            )
+        )
     return issues
 
 
@@ -2172,6 +2203,7 @@ def _annotation_nodes(tree: ast.AST) -> list[ast.AST]:
 
 # ── Check K: Legacy typing syntax ─────────────────────────────────────────────
 
+
 def check_legacy_typing_syntax(file: Path) -> list[Issue]:
     """Check K — future-annotations files should use modern built-in generic syntax."""
     if not (file.is_relative_to(_SCCFM_CORE) or file.is_relative_to(_SCCFM_CLI)):
@@ -2192,15 +2224,17 @@ def check_legacy_typing_syntax(file: Path) -> list[Issue]:
 
     for lineno, legacy_names in sorted(imports_by_line.items()):
         display_names = ", ".join(sorted(legacy_names))
-        issues.append(Issue(
-            file=file,
-            line=lineno,
-            message=(
-                f"Legacy typing import(s) {display_names} used in a future-annotations file — "
-                "prefer built-in generics and '|' syntax"
-            ),
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=lineno,
+                message=(
+                    f"Legacy typing import(s) {display_names} used in a future-annotations file — "
+                    "prefer built-in generics and '|' syntax"
+                ),
+                level="warning",
+            )
+        )
 
     seen_hits: set[tuple[int, str]] = set()
     for annotation in _annotation_nodes(tree):
@@ -2213,20 +2247,23 @@ def check_legacy_typing_syntax(file: Path) -> list[Issue]:
             if hit in seen_hits:
                 continue
             seen_hits.add(hit)
-            issues.append(Issue(
-                file=file,
-                line=lineno,
-                message=(
-                    f"Legacy typing annotation '{legacy_name}[...]' used in a future-annotations "
-                    f"file — use '{_LEGACY_TYPING_REPLACEMENTS[legacy_name]}' instead"
-                ),
-                level="warning",
-            ))
+            issues.append(
+                Issue(
+                    file=file,
+                    line=lineno,
+                    message=(
+                        f"Legacy typing annotation '{legacy_name}[...]' used in a future-annotations "
+                        f"file — use '{_LEGACY_TYPING_REPLACEMENTS[legacy_name]}' instead"
+                    ),
+                    level="warning",
+                )
+            )
 
     return issues
 
 
 # ── Check L: Missing future annotations import ───────────────────────────────
+
 
 def check_missing_future_annotations(file: Path) -> list[Issue]:
     """Check L — shared Python surfaces should declare future annotations first."""
@@ -2257,6 +2294,7 @@ def check_missing_future_annotations(file: Path) -> list[Issue]:
 
 # ── Check M: Advisory test file parity ───────────────────────────────────────
 
+
 def check_test_file_parity(files: Sequence[Path]) -> list[Issue]:
     """Check M — changed modules/services should have a matching test file."""
     issues: list[Issue] = []
@@ -2286,12 +2324,14 @@ def check_test_file_parity(files: Sequence[Path]) -> list[Issue]:
         if expected_test is None or message is None or expected_test.exists():
             continue
 
-        issues.append(Issue(
-            file=file,
-            line=None,
-            message=message,
-            level="warning",
-        ))
+        issues.append(
+            Issue(
+                file=file,
+                line=None,
+                message=message,
+                level="warning",
+            )
+        )
 
     return issues
 
