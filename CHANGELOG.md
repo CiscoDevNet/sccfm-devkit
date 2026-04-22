@@ -1,3 +1,9 @@
+## v0.34.0 (2026-04-22)
+
+### Feat
+
+- **LH-106647**: add Ansible e2e test suite for FTD (#62)
+
 ## v0.33.0 (2026-04-21)
 
 ### Feat
