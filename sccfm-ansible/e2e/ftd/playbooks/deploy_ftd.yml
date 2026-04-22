@@ -1,0 +1,29 @@
+---
+# Deploy pending configuration changes to CI FTD devices.
+
+- name: "CI: Deploy FTD configuration changes"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Deploy configuration to CI FTD devices
+      cisco.sccfm.deploy_cdfmc_ftd:
+        query: "{{ ftd_test_query }}"
+        deployment_notes: "ci-e2e-ftd-deploy"
+      register: result
+
+    - name: Assert deploy result structure
+      ansible.builtin.assert:
+        that:
+          - result.device_count is defined
+        fail_msg: "Expected deploy result with device_count"
