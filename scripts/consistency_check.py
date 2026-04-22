@@ -2100,7 +2100,8 @@ def run(
     if annotations:
         for issue in issues:
             print(issue.as_annotation())
-        print(f"\n{errors} error(s), {warnings} warning(s) across {len(files)} file(s).")
+        files_with_issues = len({issue.file for issue in issues})
+        print(f"\n{errors} error(s), {warnings} warning(s) across {files_with_issues} file(s).")
     else:
         _print_readable(issues, files)
 
@@ -2139,7 +2140,8 @@ def _print_readable(issues: list[Issue], files: list[Path]) -> None:
             print(f"   {icon}  line {issue.line:>4}  {issue.message}")
 
     print(f"\n{'─' * 60}")
-    print(f"  {errors} error(s)  {warnings} warning(s)  across {len(files)} file(s).")
+    files_with_issues = len(by_file)
+    print(f"  {errors} error(s)  {warnings} warning(s)  across {files_with_issues} file(s).")
     print(f"{'─' * 60}")
 
 
