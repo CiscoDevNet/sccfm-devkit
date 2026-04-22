@@ -1,0 +1,235 @@
+name: Consistency Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - ".github/workflows/consistency-check.yml"
+      - "scripts/consistency_check.py"
+      - "sccfm_cli/**/*.py"
+      - "sccfm_core/**/*.py"
+      - "sccfm-ansible/plugins/**/*.py"
+
+jobs:
+  consistency:
+    name: PR Consistency Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: python -m pip install poetry
+
+      - name: Install checker dependencies
+        run: poetry install --only build --no-interaction --no-root
+
+      - name: Fetch pull request base
+        run: git fetch origin "${{ github.base_ref }}"
+
+      - name: Run consistency checks
+        id: consistency
+        continue-on-error: true
+        run: |
+          set +e
+          report_txt="consistency-report.txt"
+          poetry run python scripts/consistency_check.py \
+            --base "${{ github.base_ref }}" \
+            --fail-on-warning | tee "$report_txt"
+          exit_code=${PIPESTATUS[0]}
+          counts=$(python -c "import pathlib, re; text = pathlib.Path('$report_txt').read_text(encoding='utf-8'); match = re.search(r'^\\s*(\\d+) error\\(s\\)\\s+(\\d+) warning\\(s\\)\\s+across', text, re.MULTILINE); errors = int(match.group(1)) if match else 0; warnings = int(match.group(2)) if match else 0; print(f'{errors} {warnings} {errors + warnings}')")
+          read -r error_count warning_count issue_count <<< "$counts"
+          {
+            echo "exit_code=$exit_code"
+            echo "error_count=$error_count"
+            echo "warning_count=$warning_count"
+            echo "issue_count=$issue_count"
+            echo "report_path=$report_txt"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write job summary
+        if: always()
+        run: |
+          error_count="${{ steps.consistency.outputs.error_count }}"
+          warning_count="${{ steps.consistency.outputs.warning_count }}"
+          issue_count="${{ steps.consistency.outputs.issue_count }}"
+          echo "### Consistency Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$issue_count" = "0" ]; then
+            echo "No consistency issues found." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "**$issue_count** consistency issue(s) found." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Errors: **$error_count**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Warnings: **$warning_count**" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "<details><summary>Checker output</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            sed -n '1,200p' consistency-report.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Comment on pull request
+        if: always() && !github.event.pull_request.draft
+        continue-on-error: true
+        id: pr_comment
+        uses: actions/github-script@v9
+        env:
+          CONSISTENCY_EXIT_CODE: ${{ steps.consistency.outputs.exit_code }}
+          CONSISTENCY_ERROR_COUNT: ${{ steps.consistency.outputs.error_count }}
+          CONSISTENCY_WARNING_COUNT: ${{ steps.consistency.outputs.warning_count }}
+          CONSISTENCY_ISSUE_COUNT: ${{ steps.consistency.outputs.issue_count }}
+          CONSISTENCY_REPORT_PATH: ${{ steps.consistency.outputs.report_path }}
+          CONSISTENCY_IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        with:
+          script: |
+            const fs = require("fs");
+
+            const marker = "<!-- consistency-check-comment -->";
+            const errorCount = Number(process.env.CONSISTENCY_ERROR_COUNT || "0");
+            const warningCount = Number(process.env.CONSISTENCY_WARNING_COUNT || "0");
+            const issueCount = Number(process.env.CONSISTENCY_ISSUE_COUNT || "0");
+            const reportPath = process.env.CONSISTENCY_REPORT_PATH;
+            const isFork = process.env.CONSISTENCY_IS_FORK === "true";
+            const rawReport = fs.existsSync(reportPath)
+              ? fs.readFileSync(reportPath, "utf8").trim()
+              : "No checker output captured.";
+            const maxReportChars = 60000;
+            const clippedReport =
+              rawReport.length > maxReportChars
+                ? `${rawReport.slice(0, maxReportChars)}\n... output truncated ...`
+                : rawReport;
+
+            const summaryLine =
+              issueCount === 0
+                ? `No consistency issues found.`
+                : `**${issueCount}** consistency issue(s) found — **${errorCount}** error(s), **${warningCount}** warning(s).`;
+
+            const fileTableRows = [];
+            const fileHeaderRe = /^──\s+(.+?)\s+\[([^\]]+)\]/gm;
+            let match;
+            while ((match = fileHeaderRe.exec(rawReport)) !== null) {
+              const filePath = match[1].trim();
+              const counts = match[2];
+              const errMatch = counts.match(/(\d+)\s+error/);
+              const warnMatch = counts.match(/(\d+)\s+warning/);
+              const fe = errMatch ? Number(errMatch[1]) : 0;
+              const fw = warnMatch ? Number(warnMatch[1]) : 0;
+              fileTableRows.push(`| \`${filePath}\` | ${fe} | ${fw} |`);
+            }
+
+            const fileTable =
+              fileTableRows.length > 0
+                ? [
+                    "| File | Errors | Warnings |",
+                    "| --- | ---: | ---: |",
+                    ...fileTableRows,
+                  ].join("\n")
+                : "";
+
+            const body = [
+              marker,
+              "### Consistency Check",
+              "",
+              summaryLine,
+              ...(fileTable ? ["", fileTable] : []),
+              "",
+              "<details><summary>Checker output</summary>",
+              "",
+              "```text",
+              clippedReport,
+              "```",
+              "</details>",
+            ].join("\n");
+
+            if (isFork) {
+              core.warning(
+                "PR comment skipped because this pull request comes from a fork. " +
+                "GitHub restricts GITHUB_TOKEN to read-only on pull_request workflows from forks."
+              );
+              core.setOutput("comment_status", "skipped_fork");
+              return;
+            }
+
+            try {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+
+              const existing = comments.filter(
+                (comment) =>
+                  comment.user?.type === "Bot" &&
+                  typeof comment.body === "string" &&
+                  comment.body.includes(marker),
+              );
+
+              for (const comment of existing) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+                core.info(`Deleted stale consistency comment ${comment.id}.`);
+              }
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+              core.info(`Created consistency comment on PR #${context.issue.number}.`);
+              core.setOutput("comment_status", "created");
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              core.warning(`Failed to post PR comment: ${message}`);
+              core.setOutput("comment_status", "failed");
+              core.setOutput("comment_error", message);
+              throw error;
+            }
+
+      - name: Write comment status
+        if: always()
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          case "${{ steps.pr_comment.outputs.comment_status }}" in
+            created)
+              echo "PR comment was posted successfully." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            skipped_fork)
+              echo "PR comment was skipped because this PR comes from a fork and the workflow token is read-only." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            failed)
+              echo "PR comment failed: \`${{ steps.pr_comment.outputs.comment_error }}\`" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "PR comment status was not reported." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
+
+      - name: Fail if consistency issues were found
+        if: always() && steps.consistency.outputs.exit_code != '0'
+        run: |
+          echo "Consistency check failed with ${{ steps.consistency.outputs.issue_count }} issue(s)."
+          exit 1
