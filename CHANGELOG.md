@@ -1,3 +1,9 @@
+## v0.35.0 (2026-04-22)
+
+### Feat
+
+- add consistency check workflow and script for PR validation (#59)
+
 ## v0.34.0 (2026-04-22)
 
 ### Feat
