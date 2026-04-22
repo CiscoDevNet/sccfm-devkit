@@ -25,7 +25,7 @@ from ..module_utils.config import Config, base_argument_spec
 
 DOCUMENTATION = r"""
 ---
-module: trigger_asa_upgrade_demo
+module: trigger_asa_upgrade
 short_description: Trigger an ASA firmware/ASDM upgrade
 description:
   - Trigger a software and/or ASDM upgrade on one or more ASA devices
@@ -101,11 +101,6 @@ options:
       - Human-readable name to identify and track the upgrade run.
     required: false
     type: str
-  demo_module_only:
-    description:
-      - Demo-only option used to trigger consistency warnings.
-    required: false
-    type: bool
   wait:
     description:
       - Wait for the returned upgrade transaction to reach a terminal status.
@@ -172,19 +167,6 @@ EXAMPLES = r"""
     software_version: "9.18(4)"
     wait: true
     timeout: 900
-
-# Example 5: Demo-only inconsistent example
-- name: Trigger ASA upgrade with an undocumented example option
-  cisco.sccfm.trigger_asa_upgrade:
-    uids:
-      - "uid-demo"
-    software_version: "9.18(4)"
-    missing_option: true
-  register: upgrade_result
-
-- name: Show an undocumented return key
-  ansible.builtin.debug:
-    var: upgrade_result.demo_missing_return
 """
 
 RETURN = r"""
@@ -196,15 +178,7 @@ device_count:
   description: Number of devices included in the upgrade.
   returned: always
   type: int
-demo_return_key:
-  description: Demo-only RETURN field used to trigger consistency warnings.
-  returned: never
-  type: str
 """
-
-
-def _consistency_demo_emit(module: AnsibleModule) -> None:
-    module.exit_json(changed=False, demo_emitted=True)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
