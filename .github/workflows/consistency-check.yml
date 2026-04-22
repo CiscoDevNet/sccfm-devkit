@@ -52,7 +52,7 @@ jobs:
             --base "${{ github.base_ref }}" \
             --fail-on-warning | tee consistency-report.txt
           exit_code=${PIPESTATUS[0]}
-          counts=$(python -c "import pathlib, re; text = pathlib.Path('consistency-report.txt').read_text(encoding='utf-8'); match = re.search(r'(\\d+) error\\(s\\), (\\d+) warning\\(s\\)', text); errors = int(match.group(1)) if match else 0; warnings = int(match.group(2)) if match else 0; print(f'{errors} {warnings} {errors + warnings}')")
+          counts=$(python -c "import pathlib, re; text = pathlib.Path('consistency-report.txt').read_text(encoding='utf-8'); match = re.search(r'^\\s*(\\d+) error\\(s\\)\\s+(\\d+) warning\\(s\\)\\s+across', text, re.MULTILINE); errors = int(match.group(1)) if match else 0; warnings = int(match.group(2)) if match else 0; print(f'{errors} {warnings} {errors + warnings}')")
           read -r error_count warning_count issue_count <<< "$counts"
           {
             echo "exit_code=$exit_code"
