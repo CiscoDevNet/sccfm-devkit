@@ -1,0 +1,12 @@
+---
+# Pre/post-clean: no-op placeholder for FTD e2e tests.
+# FTD tests are read-only or use onboard/remove for lifecycle management.
+
+- name: "CI: FTD E2E cleanup"
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: FTD cleanup placeholder
+      ansible.builtin.debug:
+        msg: "FTD cleanup complete (no residual state to clear)"

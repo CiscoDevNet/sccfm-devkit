@@ -1,0 +1,30 @@
+---
+# List compatible versions with per-device breakdown for upgrade planning.
+
+- name: "CI: List compatible versions for upgrade"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List compatible versions with per-device detail
+      cisco.sccfm.list_ftd_compatible_versions:
+        query: "{{ ftd_test_query }}"
+        per_device: true
+      register: result
+
+    - name: Assert per-device version data returned
+      ansible.builtin.assert:
+        that:
+          - result.device_count > 0
+          - result.per_device is defined
+        fail_msg: "Expected per-device compatible version data for upgrade planning"
