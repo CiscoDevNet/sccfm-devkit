@@ -119,20 +119,38 @@ jobs:
             const summaryLine =
               issueCount === 0
                 ? `No consistency issues found.`
-                : `**${issueCount}** consistency issue(s) found.`;
+                : `**${issueCount}** consistency issue(s) found — **${errorCount}** error(s), **${warningCount}** warning(s).`;
+
+            // Parse per-file counts from the checker output
+            // Header lines look like: ── path/to/file.py  [2 error(s), 1 warning(s)]
+            const fileTableRows = [];
+            const fileHeaderRe = /^──\s+(.+?)\s+\[([^\]]+)\]/gm;
+            let match;
+            while ((match = fileHeaderRe.exec(rawReport)) !== null) {
+              const filePath = match[1].trim();
+              const counts = match[2];
+              const errMatch = counts.match(/(\d+)\s+error/);
+              const warnMatch = counts.match(/(\d+)\s+warning/);
+              const fe = errMatch ? Number(errMatch[1]) : 0;
+              const fw = warnMatch ? Number(warnMatch[1]) : 0;
+              fileTableRows.push(`| \`${filePath}\` | ${fe} | ${fw} |`);
+            }
+
+            const fileTable =
+              fileTableRows.length > 0
+                ? [
+                    "| File | Errors | Warnings |",
+                    "| --- | ---: | ---: |",
+                    ...fileTableRows,
+                  ].join("\n")
+                : "";
 
             const body = [
               marker,
               "### Consistency Check",
               "",
               summaryLine,
-              ...(issueCount === 0
-                ? []
-                : [
-                    "",
-                    `- Errors: **${errorCount}**`,
-                    `- Warnings: **${warningCount}**`,
-                  ]),
+              ...(fileTable ? ["", fileTable] : []),
               "",
               "<details><summary>Checker output</summary>",
               "",
