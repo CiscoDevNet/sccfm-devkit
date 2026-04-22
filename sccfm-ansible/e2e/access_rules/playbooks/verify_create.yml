@@ -1,0 +1,36 @@
+---
+# Fetch the created access rule by UID and verify its fields.
+
+- name: "CI: Verify created access rule"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+
+    - name: Get access rule by UID
+      cisco.sccfm.get_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: result
+
+    - name: Assert rule fields match creation values
+      ansible.builtin.assert:
+        that:
+          - not result.changed
+          - result.access_rule.uid == (cached_uid.content | b64decode | trim)
+          - result.access_rule.rule_action == test_rule.rule_action
+          - result.access_rule.remark == test_rule.remark
+        fail_msg: "Expected rule '{{ cached_uid.content | b64decode | trim }}' to have action '{{ test_rule.rule_action }}' and remark '{{ test_rule.remark }}'"

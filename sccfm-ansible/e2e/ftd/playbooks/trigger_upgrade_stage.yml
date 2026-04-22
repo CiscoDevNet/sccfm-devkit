@@ -1,0 +1,38 @@
+---
+# Stage an FTD upgrade (download + readiness check, no reboot).
+
+- name: "CI: Stage FTD upgrade"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Skip if upgrade version is not configured
+      ansible.builtin.meta: end_play
+      when: ftd_upgrade_software_version is not defined
+
+    - name: Stage upgrade on CI FTD devices
+      cisco.sccfm.trigger_ftd_upgrade:
+        query: "{{ ftd_test_query }}"
+        software_version: "{{ ftd_upgrade_software_version }}"
+        stage_upgrade: true
+        wait: true
+        timeout: 600
+        upgrade_name: "{{ ftd_upgrade_name | default('ci-e2e-ftd-upgrade-stage') }}"
+      register: result
+
+    - name: Assert upgrade was staged
+      ansible.builtin.assert:
+        that:
+          - result.device_count > 0
+          - result.transaction is defined
+        fail_msg: "Expected upgrade to be staged on at least one FTD device"

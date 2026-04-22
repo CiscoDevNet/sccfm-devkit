@@ -1,0 +1,8 @@
+---
+# Pre-onboarded FTD device on the CI tenant
+ftd_device_name: "ftd-7.4.2-172-1516"
+ftd_test_query: "name:ftd-7.4.2-172-1516 AND connectivityState:ONLINE"
+ftd_test_query_all: "name:ftd-7.4.2-172-1516"
+
+# For list_ftd_not_on_version -- fake version no device should be on
+ftd_not_on_version: "99.99.99"

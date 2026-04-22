@@ -1,0 +1,40 @@
+---
+# Attempt to fetch the deleted access rule and verify it no longer exists.
+
+- name: "CI: Verify access rule deletion"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+
+    - name: Attempt to get deleted access rule
+      cisco.sccfm.get_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+      register: get_result
+      failed_when: false
+
+    - name: Assert rule is not found
+      ansible.builtin.assert:
+        that:
+          - >
+            'not_found' in (get_result.msg | default('') | lower)
+            or 'not found' in (get_result.msg | default('') | lower)
+            or '404' in (get_result.msg | default(''))
+        fail_msg: >-
+          Expected a not-found response for rule
+          '{{ cached_uid.content | b64decode | trim }}',
+          got: {{ get_result.msg | default('(no msg)') }}

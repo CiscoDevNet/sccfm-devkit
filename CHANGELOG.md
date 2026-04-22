@@ -1,3 +1,21 @@
+## v0.34.0 (2026-04-22)
+
+### Feat
+
+- **LH-106647**: add Ansible e2e test suite for FTD (#62)
+
+## v0.33.0 (2026-04-21)
+
+### Feat
+
+- **LH-102404**: add FTD CLI execution for cdFMC-managed devices (#57)
+
+## v0.32.0 (2026-04-21)
+
+### Feat
+
+- **LH-106922**: access rules e2e (#56)
+
 ## v0.31.0 (2026-04-17)
 
 ### Feat

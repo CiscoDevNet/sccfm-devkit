@@ -9,7 +9,9 @@ action_groups:
     - change_asa_boot_image
     - change_asa_local_password
     - clear_asa_shun
+    - create_access_rule
     - create_network_group
+    - delete_access_rule
     - deploy_cdfmc_ftd
     - create_network_object
     - delete_network_group
@@ -18,7 +20,12 @@ action_groups:
     - edit_object_override
     - asa_ha_check
     - execute_asa_cli
+    - execute_ftd_cli
+    - get_access_group
+    - get_access_rule
     - get_object
+    - list_access_groups
+    - list_access_rules
     - list_asa_boot_registry
     - list_asa_compatible_versions
     - list_asa_disk_files
@@ -36,6 +43,7 @@ action_groups:
     - show_asa_shun
     - trigger_asa_upgrade
     - trigger_ftd_upgrade
+    - update_access_rule
     - update_network_group
     - update_network_object
     - update_object_default

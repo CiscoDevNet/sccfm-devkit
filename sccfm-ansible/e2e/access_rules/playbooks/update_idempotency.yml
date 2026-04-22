@@ -1,0 +1,37 @@
+---
+# Re-apply the same update and confirm the module is non-idempotent
+# (always reports changed=True).  The update_access_rule module/service
+# does not perform local diffing; it pushes the payload every time.
+
+- name: "CI: Update non-idempotency check"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read cached rule UID
+      ansible.builtin.slurp:
+        src: "/tmp/ci_access_rule_uid"
+      register: cached_uid
+
+    - name: Re-apply the same update
+      cisco.sccfm.update_access_rule:
+        uid: "{{ cached_uid.content | b64decode | trim }}"
+        remark: "{{ updated_rule_remark }}"
+      register: update_result
+
+    - name: Assert changed is still reported (non-idempotent module)
+      ansible.builtin.assert:
+        that:
+          - update_result.changed
+          - update_result.access_rule.remark == updated_rule_remark
+        fail_msg: "Expected changed=True on re-apply (module is non-idempotent)"

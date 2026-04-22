@@ -1,0 +1,29 @@
+---
+# CI guarantees exactly one onboarded ASA matches this query during the test
+# run.  The device is deleted afterward.
+asa_test_query: "name:ci-e2e-asa-* AND connectivityState:ONLINE"
+
+# Access group provisioning — a freshly onboarded ASA has no ACLs, so the
+# suite provisions a global access-group via CLI before running CRUD phases.
+test_acl_name: "ci-e2e-test-acl"
+
+# Access group query — the access groups API only supports:
+# entityUid, isShared, name, sharedAccessGroupUid, uid
+access_group_query: "name:{{ test_acl_name }}"
+
+# Access rule test data — named network objects for source/destination.
+# Protocol and port fields are omitted: the API requires source_port when
+# protocol is tcp, but the service-layer port builder does not produce valid
+# port objects yet.  Port coverage should be added once that is fixed.
+test_source_network: "ci-e2e-src-host"
+test_destination_network: "ci-e2e-dst-host"
+
+test_rule:
+  index: 1
+  rule_action: PERMIT
+  source_network: "{{ test_source_network }}"
+  destination_network: "{{ test_destination_network }}"
+  remark: "CI test rule - allow traffic"
+  active: true
+
+updated_rule_remark: "CI test rule - allow traffic (updated)"

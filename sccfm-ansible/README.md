@@ -20,6 +20,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - [Modules](#modules)
   - [cisco.sccfm.onboard_asa](#ciscosccfmonboard_asa)
   - [cisco.sccfm.execute_asa_cli](#ciscosccfmexecute_asa_cli)
+  - [cisco.sccfm.execute_ftd_cli](#ciscosccfmexecute_ftd_cli)
   - [cisco.sccfm.asa_ha_check](#ciscosccfmasa_ha_check)
   - [cisco.sccfm.change_asa_boot_image](#ciscosccfmchange_asa_boot_image)
 - [Ansible Vault Management](#ansible-vault-management)
@@ -43,6 +44,7 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - **Dynamic Inventory Plugin**: Automatically load SCCFM devices into Ansible inventory
 - **ASA Onboarding Module**: Onboard ASA devices to your SCCFM tenant
 - **ASA CLI Execution Module**: Execute CLI commands on ASA devices
+- **FTD CLI Execution Module**: Execute read-only show commands on cdFMC-managed FTD devices
 - **ASA HA Health Check Module**: Validate ASA failover health and common HA issues
 - **ASA Boot Image Module**: Change the configured next-boot ASA image
 - **Device Grouping**: Automatically group devices by type (ASA, CDFMC_MANAGED_FTD, etc.)
@@ -243,6 +245,12 @@ Execute CLI commands on ASA devices via SCCFM. Show commands require devices to 
 
 See [`examples/execute_asa_cli.yml`](examples/execute_asa_cli.yml) for usage, or run `ansible-doc cisco.sccfm.execute_asa_cli` for full parameter documentation.
 
+### cisco.sccfm.execute_ftd_cli
+
+Execute read-only `show` commands on cdFMC-managed FTD devices via SCCFM. The module resolves target devices from either a Lucene query or an explicit list of UIDs, then runs the command through the cdFMC bulk command proxy endpoint.
+
+See [`examples/execute_ftd_cli.yml`](examples/execute_ftd_cli.yml) for usage, or run `ansible-doc cisco.sccfm.execute_ftd_cli` for full parameter documentation.
+
 ### cisco.sccfm.asa_ha_check
 
 Run HA health checks on ASA failover devices via SCCFM. The module executes
@@ -388,6 +396,7 @@ See the `examples/` directory for complete working examples:
 - **`show_devices.yml`** - Display all devices from inventory
 - **`onboard_asas.yml`** - Onboard multiple ASA devices with vault passwords
 - **`execute_asa_cli.yml`** - Execute CLI commands on ASA devices
+- **`execute_ftd_cli.yml`** - Execute show commands on cdFMC-managed FTD devices
 - **`asa_ha_check.yml`** - Run HA health checks on ASA failover devices
 - **`change_asa_boot_image.yml`** - Change the configured ASA boot image
 - **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
