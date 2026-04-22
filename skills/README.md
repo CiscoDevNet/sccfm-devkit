@@ -27,6 +27,16 @@ Skills are tool-agnostic markdown files. Any AI agent that reads them gets the s
 
 Skills are auto-discovered via the `.claude/skills` symlink. When a user's request matches a skill's `when_to_use` criteria, the agent loads the skill file before responding.
 
+### Claude Code (or any agent reading `~/.claude/skills/`)
+
+If you have the repo cloned, the project-level `.claude/skills` symlink is enough. To install the skills **user-wide** so they're available outside this repo, run:
+
+```bash
+./scripts/install_skills.sh
+```
+
+This copies each skill into `~/.claude/skills/`. Use `--uninstall` to remove them, or pass a custom target directory as the first argument.
+
 ### Other agents
 
 Point your agent at the relevant `SKILL.md` file, or include it in your system prompt. The files are self-contained — no special tooling needed.
