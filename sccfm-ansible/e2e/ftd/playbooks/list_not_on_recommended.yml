@@ -1,0 +1,31 @@
+---
+# List FTD devices not on the Cisco-recommended version.
+
+- name: "CI: List FTD devices not on recommended version"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List FTD devices not on recommended version
+      cisco.sccfm.list_ftd_not_on_version:
+        query: "{{ ftd_test_query }}"
+        recommended: true
+      register: result
+
+    - name: Assert result structure is valid
+      ansible.builtin.assert:
+        that:
+          - result.device_count is defined
+          - result.matched_device_count is defined
+          - result.mode == "recommended"
+        fail_msg: "Expected valid recommended version check result"

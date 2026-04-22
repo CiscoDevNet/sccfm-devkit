@@ -1,0 +1,32 @@
+---
+# List FTD devices not running a specific version.
+
+- name: "CI: List FTD devices not on version"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: List FTD devices not on fake version
+      cisco.sccfm.list_ftd_not_on_version:
+        query: "{{ ftd_test_query }}"
+        version: "{{ ftd_not_on_version }}"
+      register: result
+
+    - name: Assert all CI devices are returned (none should be on fake version)
+      ansible.builtin.assert:
+        that:
+          - result.device_count > 0
+          - result.devices | length > 0
+          - result.devices[0].uid is defined
+          - result.devices[0].software_version is defined
+        fail_msg: "Expected all CI FTD devices to be not on version {{ ftd_not_on_version }}"
