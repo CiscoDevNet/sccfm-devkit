@@ -25,9 +25,7 @@ class PhaseCase:
     depends_on: tuple[str, ...] = ()
 
 
-DEPLOY_PHASES: Final[tuple[PhaseCase, ...]] = (
-    PhaseCase("deploy_ftd", "deploy_ftd.yml"),
-)
+DEPLOY_PHASES: Final[tuple[PhaseCase, ...]] = (PhaseCase("deploy_ftd", "deploy_ftd.yml"),)
 
 _phase_failed: set[str] = set()
 _phase_succeeded: set[str] = set()
