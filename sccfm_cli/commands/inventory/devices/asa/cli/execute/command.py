@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction, Device
@@ -80,7 +82,7 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
         assert script is not None
 
         asa_cli_service = AsaCommandLineService(config=config)
-        results: CdoTransaction | List[CdoCliResult] = asa_cli_service.execute_cli(
+        results: CdoTransaction | list[CdoCliResult] = asa_cli_service.execute_cli(
             device_uids=targets.device_uids,
             asa_commands=script.split("\n"),
         )
@@ -93,13 +95,13 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
 
     def _render_results(
         self,
-        results: List[CdoCliResult] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        results: list[CdoCliResult] | CdoTransaction,
+        uid_to_device: dict[str, Device],
         script: str,
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
-            self.print_failed_transaction_details(cdo_transaction=results, format="table")
+            self.print_failed_transaction_details(cdo_transaction=results, format=format)
             return
 
         render_cli_results(

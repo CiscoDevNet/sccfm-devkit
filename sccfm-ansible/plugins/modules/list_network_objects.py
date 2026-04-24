@@ -17,7 +17,7 @@ short_description: List network objects in SCC Firewall Manager
 description:
   - List network objects from your SCC Firewall Manager tenant.
   - Supports pagination via C(limit) and C(offset).
-  - Supports Lucene query filtering via C(query) (searchable fields: name, content).
+  - "Supports Lucene query filtering via C(query) (searchable fields: name, content)."
   - Only returns NETWORK_OBJECT and NETWORK_GROUP types.
 options:
   query:
@@ -95,7 +95,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_objects:
-  description: List of network objects returned by the API.
+  description:
+    - List of network objects returned by the API.
+    - Each item can include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), and C(literal).
   returned: success
   type: list
   elements: dict
@@ -106,12 +109,6 @@ network_objects:
     name:
       description: Name of the network object.
       type: str
-    description:
-      description: Description of the network object.
-      type: str
-    elements:
-      description: Elements associated with the object.
-      type: list
     labels:
       description: Labels attached to the object.
       type: list

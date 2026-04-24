@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence, cast
 
 import click
@@ -62,9 +63,10 @@ class ListAccessGroupCommand(BaseCommand):
             print_json(page.to_dict())
             return
 
-        self.console.print(
-            f"Showing {page.offset + 1}\u2013{page.offset + len(page.items)} of {page.count} access groups"
-        )
+        current_page = (page.offset // page.limit) + 1 if page.limit else 1
+        total_pages = max(1, math.ceil(page.count / page.limit)) if page.count and page.limit else 1
+        self.console.print(f"Number of entries:  {page.count}")
+        self.console.print(f"Page:               {current_page} / {total_pages}")
         table = Table(title="Access Groups", width=120)
         table.add_column("UID")
         table.add_column("Name")

@@ -14,7 +14,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.constants import FTD_DEVICE_TYPE_FILTER
+from sccfm_core.constants import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER
 from sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
 
 FMC_UID = "09590f30-8cb7-11f0-a508-8e9f8a6273f4"
@@ -166,7 +166,7 @@ def test_should_execute_cli_with_uids(
     mock_inventory.get_devices.assert_called_once_with(
         limit=1,
         offset=0,
-        query=f"(uid:{SCC_UID}) AND {FTD_DEVICE_TYPE_FILTER}",
+        query=f"(uid:{SCC_UID}) AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}",
     )
     mock_module_instance_uids.exit_json.assert_called_once()
     call_kwargs = mock_module_instance_uids.exit_json.call_args[1]

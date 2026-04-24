@@ -306,6 +306,19 @@ def run_module() -> None:
     recommended: bool = module.params.get("recommended", False)
     mode = "recommended" if recommended else "specified"
 
+    if module.check_mode is True:
+        result: dict[str, Any] = {
+            "changed": False,
+            "msg": "Check mode: FTD version compliance lookup would run against the selected devices.",
+            "mode": mode,
+            "devices": [],
+            "device_count": 0,
+            "matched_device_count": 0,
+        }
+        if recommended:
+            result["skipped"] = {}
+        module.exit_json(**result)
+
     try:
         all_devices = _fetch_devices(module)
         matched_device_count = len(all_devices)

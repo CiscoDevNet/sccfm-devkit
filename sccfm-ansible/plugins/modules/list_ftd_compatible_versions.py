@@ -162,6 +162,10 @@ device_count:
   description: Number of devices included in the query.
   returned: success (multi-device or per_device=true)
   type: int
+skipped:
+  description: FTD device UIDs skipped during eligibility checks, keyed by UID.
+  returned: success (check mode or when devices are skipped)
+  type: dict
 """
 
 
@@ -234,6 +238,19 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
         supports_check_mode=True,
     )
+
+    if module.check_mode is True:
+        output: dict[str, Any] = {
+            "changed": False,
+            "msg": "Check mode: compatible-version lookup would run against the selected FTD devices.",
+            "compatible_versions": [],
+            "common_versions": [],
+            "device_count": 0,
+            "skipped": {},
+        }
+        if module.params.get("per_device", False):
+            output["per_device"] = {}
+        module.exit_json(**output)
 
     config = create_config(module)
 

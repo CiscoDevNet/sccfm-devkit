@@ -100,7 +100,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_group:
-  description: The resulting network group state.
+  description:
+    - The resulting network group state.
+    - Returned keys include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), C(literals), and C(referenced_object_uids).
   returned: success
   type: dict
   contains:
@@ -110,12 +113,6 @@ network_group:
     name:
       description: Name of the network group.
       type: str
-    description:
-      description: Description of the network group.
-      type: str
-    elements:
-      description: Elements associated with the group.
-      type: list
     labels:
       description: Labels attached to the group.
       type: list

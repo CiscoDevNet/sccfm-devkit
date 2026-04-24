@@ -59,13 +59,13 @@ See instructions in the [INSTALL.md](INSTALL.md) file.
 
 **Build and install (recommended):**
 ```bash
-poetry run devkit
+devkit
 # then select "build-collection" from the menu
 ```
 
 Or directly:
 ```bash
-poetry run build-ansible-collection
+build-ansible-collection
 ```
 
 This will:
@@ -80,13 +80,13 @@ This will:
 The fastest way to configure your tokens, `.env`, vault, and region is with the devkit CLI:
 
 ```bash
-poetry run devkit
-# then select "setup-tokens" from the menu
+devkit
+# then select "change-tokens" from the menu
 ```
 
 Or run the token setup directly:
 ```bash
-poetry run setup-tokens
+change-tokens
 ```
 
 This will interactively:
@@ -101,7 +101,7 @@ This will interactively:
 
 You can also point the standalone command at a custom examples directory:
 ```bash
-poetry run setup-tokens --path /path/to/examples
+change-tokens --path /path/to/examples
 ```
 
 <details>
@@ -156,15 +156,15 @@ Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to m
 **Graph inventory:**
 ```bash
 export SCCFM_REGION=int
-export SCCFM_API_TOKEN=$(poetry run ansible-vault view ./examples/group_vars/all/vault.yml --vault-password-file ./examples/.vault_pass | grep sccfm_api_token | cut -d '"' -f2)
-poetry run ansible-inventory -i examples/inventory.sccfm.yml \
+export SCCFM_API_TOKEN=$(ansible-vault view ./examples/group_vars/all/vault.yml --vault-password-file ./examples/.vault_pass | grep sccfm_api_token | cut -d '"' -f2)
+ansible-inventory -i examples/inventory.sccfm.yml \
   --graph \
   --playbook-dir examples
 ```
 
 **Show all devices:**
 ```bash
-poetry run ansible-playbook \
+ansible-playbook \
 -i examples/inventory.sccfm.yml \
 examples/show_devices.yml \
 --vault-password-file examples/.vault_pass
@@ -172,14 +172,14 @@ examples/show_devices.yml \
 
 **Onboard ASA devices:**
 ```bash
-poetry run ansible-playbook onboard_asas.yml --vault-password-file .vault_pass
+ansible-playbook onboard_asas.yml --vault-password-file .vault_pass
 ```
 
 ### Test Inventory
 
 ```bash
-poetry run ansible-inventory -i inventory.sccfm.yml --list --vault-password-file .vault_pass
-poetry run ansible-inventory -i inventory.sccfm.yml --graph --vault-password-file .vault_pass
+ansible-inventory -i inventory.sccfm.yml --list --vault-password-file .vault_pass
+ansible-inventory -i inventory.sccfm.yml --graph --vault-password-file .vault_pass
 ```
 
 ### Host Variables

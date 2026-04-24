@@ -76,13 +76,20 @@ def test_should_display_managers_as_table(
     def fake_get_managers(
         self: InventoryService, *, limit: int, offset: int, query: str | None = None
     ) -> DevicePage:
-        return DevicePage(count=len(sample_managers), items=sample_managers)
+        return DevicePage(
+            count=len(sample_managers),
+            limit=limit,
+            offset=offset,
+            items=sample_managers,
+        )
 
     monkeypatch.setattr(InventoryService, "get_managers", fake_get_managers)
 
     result = cli_runner.invoke(cli, ["inventory", "manager", "list", "--offset", "1"])
 
     assert result.exit_code == 0
+    assert "Number of entries:" in result.output
+    assert "Page:" in result.output
     assert "Managers" in result.output
     for sample_manager in sample_managers:
         assert sample_manager.name in result.output

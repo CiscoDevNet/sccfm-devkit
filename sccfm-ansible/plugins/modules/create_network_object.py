@@ -108,7 +108,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_object:
-  description: The created network object, or the existing object if already present.
+  description:
+    - The created network object, or the existing object if already present.
+    - Returned keys include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), and C(literal).
   returned: success
   type: dict
   contains:
@@ -118,12 +121,6 @@ network_object:
     name:
       description: Name of the network object.
       type: str
-    description:
-      description: Description of the network object.
-      type: str
-    elements:
-      description: Elements associated with the object.
-      type: list
     labels:
       description: Labels attached to the object.
       type: list

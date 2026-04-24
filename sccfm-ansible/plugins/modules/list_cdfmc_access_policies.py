@@ -24,6 +24,16 @@ options:
       returned by the C(list_managers) module.
     required: true
     type: str
+  limit:
+    description: Maximum number of access policies to return.
+    required: false
+    type: int
+    default: 50
+  offset:
+    description: Pagination offset.
+    required: false
+    type: int
+    default: 0
   region:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
@@ -66,6 +76,8 @@ EXAMPLES = r"""
     - name: List access policies for a domain
       cisco.sccfm.list_cdfmc_access_policies:
         domain_uid: "e276abec-e0f2-11e3-8169-6d9ed49b625f"
+        limit: 50
+        offset: 0
 """
 
 RETURN = r"""
@@ -85,12 +97,22 @@ count:
   description: Number of access policies returned.
   returned: success
   type: int
+limit:
+  description: Maximum number of access policies requested.
+  returned: success
+  type: int
+offset:
+  description: Pagination offset requested.
+  returned: success
+  type: int
 """
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "domain_uid": {"type": "str", "required": True},
+        "limit": {"type": "int", "required": False, "default": 50},
+        "offset": {"type": "int", "required": False, "default": 0},
         **base_argument_spec(),
     }
 
@@ -101,20 +123,35 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    if module.check_mode:
-        module.exit_json(changed=False, access_policies=[], count=0)
+    limit = module.params["limit"]
+    offset = module.params["offset"]
+
+    if module.check_mode is True:
+        module.exit_json(
+            changed=False,
+            access_policies=[],
+            count=0,
+            limit=limit,
+            offset=offset,
+        )
         return
 
     config = create_config(module)
 
     try:
         service = CdfmcAccessPolicyService(config)
-        policies = service.get_access_policies(module.params["domain_uid"])
-        access_policies = [{"uid": p.uid, "name": p.name} for p in policies]
+        page = service.get_access_policies(
+            module.params["domain_uid"],
+            limit=limit,
+            offset=offset,
+        )
+        access_policies = [{"uid": p.uid, "name": p.name} for p in page.items]
         module.exit_json(
             changed=False,
             access_policies=access_policies,
-            count=len(access_policies),
+            count=page.count,
+            limit=page.limit,
+            offset=page.offset,
         )
     except ApiException as e:
         error = SccApiError.from_exception(e)

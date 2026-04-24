@@ -43,6 +43,7 @@ def build_device_type_filter(entity_types: Sequence[EntityType]) -> str:
 
 ASA_DEVICE_TYPE_FILTER = build_device_type_filter(ASA_ENTITY_TYPES)
 FTD_DEVICE_TYPE_FILTER = build_device_type_filter(FTD_ENTITY_TYPES)
+CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER = build_device_type_filter([EntityType.CDFMC_MANAGED_FTD])
 
 FTD_LICENSES = ["BASE", "CARRIER", "THREAT", "MALWARE", "URLFilter"]
 

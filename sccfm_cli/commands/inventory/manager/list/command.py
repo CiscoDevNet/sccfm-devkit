@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence, cast
 
 import click
@@ -48,7 +49,13 @@ class ManagersListCommand(BaseCommand):
             print_json(items_dict)
             return
 
+        limit = int(page.limit or len(page.items or []) or 1)
+        offset = int(page.offset or 0)
+        current_page = (offset // limit) + 1
+        total_pages = max(1, math.ceil(page.count / limit)) if page.count else 1
+
         self.console.print(f"Number of entries:  {page.count}")
+        self.console.print(f"Page:               {current_page} / {total_pages}")
         table = Table(title="Managers", width=120)
         table.add_column("UID")
         table.add_column("Name")

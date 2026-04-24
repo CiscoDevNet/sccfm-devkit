@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageService
 from sccfm_core.services.inventory.asa_boot_registry_service import (
     AsaBootRegistryService,
@@ -23,6 +25,7 @@ from sccfm_core.services.inventory.asa_user_password_service import (
 from sccfm_core.services.inventory.cdfmc_access_policy_service import (
     CdfmcAccessPolicyService,
     FmcAccessPolicy,
+    FmcAccessPolicyPage,
 )
 from sccfm_core.services.inventory.ftd_cli_service import FtdCommandLineService
 from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
@@ -50,6 +53,7 @@ __all__ = [
     "AsaUserPasswordService",
     "CdfmcAccessPolicyService",
     "FmcAccessPolicy",
+    "FmcAccessPolicyPage",
     "FtdCommandLineService",
     "FtdDeployService",
     "FtdOnboardService",

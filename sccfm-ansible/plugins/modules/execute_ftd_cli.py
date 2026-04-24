@@ -5,7 +5,7 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
-from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.ftd_cli_result import FtdBulkCliResult
 from sccfm_core.services.inventory.ftd_cli_service import (
     FtdCommandLineService,
@@ -183,13 +183,13 @@ def resolve_ftd_devices(
         page: DevicePage = inventory_service.get_devices(
             limit=len(uids),
             offset=0,
-            query=f"({uid_query}) AND {FTD_DEVICE_TYPE_FILTER}",
+            query=f"({uid_query}) AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}",
         )
     else:
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=f"({query}) AND {FTD_DEVICE_TYPE_FILTER}",
+            query=f"({query}) AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}",
         )
     return list(page.items or [])
 

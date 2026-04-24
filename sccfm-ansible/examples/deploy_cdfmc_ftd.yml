@@ -19,7 +19,7 @@
 #   ansible-playbook examples/deploy_cdfmc_ftd.yml \
 #     -e '{"device_uids":["uid-1"]}' \
 #     -e wait=true \
-#     -e timeout=3600
+#     -e deploy_timeout=3600
 #
 # Dry-run (check mode):
 #   ansible-playbook examples/deploy_cdfmc_ftd.yml \
@@ -41,7 +41,7 @@
     description: ""
     ignore_warnings: false
     wait: false
-    timeout: 3600
+    deploy_timeout: 3600
 
   tasks:
     - name: Validate that device UIDs are provided
@@ -58,7 +58,7 @@
         description: "{{ description if description | length > 0 else omit }}"
         ignore_warnings: "{{ ignore_warnings }}"
         wait: "{{ wait }}"
-        timeout: "{{ timeout }}"
+        timeout: "{{ deploy_timeout }}"
       register: deploy_result
 
     - name: Display deploy result

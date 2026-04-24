@@ -74,7 +74,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 object:
-  description: Full details of the object.
+  description:
+    - Full details of the object.
+    - Returned keys include C(uid), C(name), C(description), C(object_type),
+      C(default_value), C(overrides), and C(targets).
   returned: success
   type: dict
   contains:
@@ -83,9 +86,6 @@ object:
       type: str
     name:
       description: Name of the object.
-      type: str
-    description:
-      description: Description of the object.
       type: str
     object_type:
       description: Type of the object (e.g., NETWORK_OBJECT, URL_OBJECT).
@@ -105,7 +105,9 @@ object:
           description: Override value for that device.
           type: str
     targets:
-      description: List of devices the object is attached to.
+      description:
+        - List of devices the object is attached to.
+        - Each target can include C(id), C(display_name), and C(type).
       type: list
       elements: dict
       contains:
@@ -114,9 +116,6 @@ object:
           type: str
         display_name:
           description: Display name of the device.
-          type: str
-        type:
-          description: Device type.
           type: str
 """
 

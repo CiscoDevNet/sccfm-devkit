@@ -17,7 +17,7 @@ short_description: List network groups in SCC Firewall Manager
 description:
   - List network groups from your SCC Firewall Manager tenant.
   - Supports pagination via C(limit) and C(offset).
-  - Supports Lucene query filtering via C(query) (searchable fields: name, content).
+  - "Supports Lucene query filtering via C(query) (searchable fields: name, content)."
   - Only returns NETWORK_GROUP types.
 options:
   query:
@@ -95,7 +95,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_groups:
-  description: List of network groups returned by the API.
+  description:
+    - List of network groups returned by the API.
+    - Each item can include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), C(literals), and C(referenced_object_uids).
   returned: success
   type: list
   elements: dict
@@ -106,12 +109,6 @@ network_groups:
     name:
       description: Name of the network group.
       type: str
-    description:
-      description: Description of the network group.
-      type: str
-    elements:
-      description: Elements associated with the group.
-      type: list
     labels:
       description: Labels attached to the group.
       type: list

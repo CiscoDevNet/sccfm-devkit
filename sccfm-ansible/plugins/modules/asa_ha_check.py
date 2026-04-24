@@ -208,6 +208,14 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
+    if module.check_mode is True:
+        module.exit_json(
+            changed=False,
+            msg="Check mode: HA checks would run against the selected ASA devices.",
+            all_passed=True,
+            results=[],
+        )
+
     config = create_config(module)
 
     try:

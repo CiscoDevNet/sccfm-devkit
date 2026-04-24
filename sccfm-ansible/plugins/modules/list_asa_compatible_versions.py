@@ -235,6 +235,18 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
+    if module.check_mode is True:
+        output: dict[str, Any] = {
+            "changed": False,
+            "msg": "Check mode: compatible-version lookup would run against the selected ASA devices.",
+            "compatible_versions": [],
+            "common_versions": [],
+            "device_count": 0,
+        }
+        if module.params.get("per_device", False):
+            output["per_device"] = {}
+        module.exit_json(**output)
+
     config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")

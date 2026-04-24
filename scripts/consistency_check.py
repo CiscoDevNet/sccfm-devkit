@@ -102,6 +102,8 @@ _CLI_ANSIBLE_IGNORED_OPTIONS: frozenset[str] = frozenset(
 _CLI_TO_ANSIBLE_OPTION_ALIASES: dict[str, str] = {
     "device_uid": "uids",
     "device_uids": "uids",
+    "script": "commands",
+    "script_file": "commands",
 }
 
 

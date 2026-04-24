@@ -3,6 +3,7 @@ from __future__ import annotations
 from sccfm_core.constants import (
     ASA_DEVICE_TYPE_FILTER,
     ASA_ENTITY_TYPES,
+    CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER,
     FTD_DEVICE_TYPE_FILTER,
     FTD_ENTITY_TYPES,
     FTD_LICENSES,
@@ -32,6 +33,7 @@ __all__ = [
     "ApiClientFactory",
     "ASA_DEVICE_TYPE_FILTER",
     "ASA_ENTITY_TYPES",
+    "CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER",
     "FTD_DEVICE_TYPE_FILTER",
     "FTD_ENTITY_TYPES",
     "FTD_LICENSES",
