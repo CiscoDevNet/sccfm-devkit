@@ -184,7 +184,7 @@ def _camel_to_snake(name: str) -> str:
 def _safe_parse(file: Path) -> ast.AST | None:
     try:
         return ast.parse(file.read_text(encoding="utf-8"))
-    except SyntaxError:
+    except (OSError, SyntaxError):
         return None
 
 
@@ -1200,7 +1200,15 @@ def _git_changed_files(base: str = "main") -> list[Path]:
     for revision in revisions:
         try:
             result = subprocess.run(
-                ["git", "diff", "--name-only", revision, "--", "*.py"],
+                [
+                    "git",
+                    "diff",
+                    "--name-only",
+                    "--diff-filter=ACMRT",
+                    revision,
+                    "--",
+                    "*.py",
+                ],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -2442,10 +2450,9 @@ def check_test_file_parity(files: Sequence[Path]) -> list[Issue]:
 
 def collect_issues(files: Sequence[Path]) -> list[Issue]:
     issues: list[Issue] = []
+    existing_python_files = [file for file in files if file.exists() and file.suffix == ".py"]
 
-    for file in files:
-        if not file.exists() or file.suffix != ".py":
-            continue
+    for file in existing_python_files:
         issues.extend(check_variable_naming(file))
         issues.extend(check_api_key_mapping(file))
         issues.extend(check_missing_future_annotations(file))
@@ -2474,14 +2481,14 @@ def collect_issues(files: Sequence[Path]) -> list[Issue]:
         if file.is_relative_to(CLI_COMMANDS):
             issues.extend(check_inline_pagination_options(file))
 
-    issues.extend(check_api_mapping_consistency(files))
-    issues.extend(check_service_list_signatures(files))
-    issues.extend(check_cross_device_cli_consistency(files))
-    issues.extend(check_cross_device_ansible_consistency(files))
-    issues.extend(check_cli_ansible_alignment(files))
-    issues.extend(check_region_vocabulary_drift(files))
-    issues.extend(check_ansible_runtime_membership(files))
-    issues.extend(check_test_file_parity(files))
+    issues.extend(check_api_mapping_consistency(existing_python_files))
+    issues.extend(check_service_list_signatures(existing_python_files))
+    issues.extend(check_cross_device_cli_consistency(existing_python_files))
+    issues.extend(check_cross_device_ansible_consistency(existing_python_files))
+    issues.extend(check_cli_ansible_alignment(existing_python_files))
+    issues.extend(check_region_vocabulary_drift(existing_python_files))
+    issues.extend(check_ansible_runtime_membership(existing_python_files))
+    issues.extend(check_test_file_parity(existing_python_files))
 
     issues.sort(key=lambda issue: (issue.file, issue.line or 0, issue.message))
     return issues
