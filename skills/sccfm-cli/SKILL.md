@@ -91,7 +91,8 @@ If not configured, configure a profile:
 sccfm-cli configure --region <region> --api-token <token>
 ```
 
-Valid regions: `in`, `au`, `uae`, `us`, `eu`, `apj`, `int`
+Valid regions: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`.
+The legacy alias `aus` is accepted and normalized to `au`.
 
 Multiple profiles are supported:
 ```bash
@@ -102,7 +103,7 @@ sccfm-cli --profile prod status
 ### When the user has no profile configured
 
 If `sccfm-cli status` shows no profile, you MUST ask the user for:
-1. **Region** — which SCCFM region they use (show the valid options: `us`, `eu`, `apj`, `au`, `uae`, `in`, `int`)
+1. **Region** — which SCCFM region they use (show the valid options: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`; legacy `aus` is accepted and normalized to `au`)
 2. **API token** — their SCCFM API token (this is a bearer token from the SCC portal)
 
 Then run:

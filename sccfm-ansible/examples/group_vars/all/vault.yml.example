@@ -3,7 +3,7 @@
 # DO NOT commit the actual vault.yml unencrypted to version control!
 #
 # To create your own encrypted vault.yml:
-# 1. copy the ../../.vault_pass.example file: cp ../../.vault_pass_example ../../.vault_pass
+# 1. copy the ../../.vault_pass.example file: cp ../../.vault_pass.example ../../.vault_pass
 # 2. edit vault_pass with a password to encrypt
 # 3. Copy this file: cp vault.yml.example vault.yml.temp
 # 4. Edit vault.yml.temp with your actual secrets

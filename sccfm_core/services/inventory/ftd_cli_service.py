@@ -8,6 +8,7 @@ from typing import Any
 
 from scc_firewall_manager_sdk import Device
 
+from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC, FAST_POLLING_INTERVAL_SEC
 from sccfm_core.factories import ApiClientFactory
 from sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
 from sccfm_core.services.inventory.inventory_service import InventoryService
@@ -19,8 +20,6 @@ _TASK_STATUS_SUFFIX = "job/taskstatuses"
 _DOWNLOAD_SUFFIX = "operational/downloadreports"
 
 _TERMINAL_STATUSES = frozenset({"SUCCESS", "FAILED", "COMPLETED"})
-_DEFAULT_POLLING_INTERVAL_SEC = 5
-_DEFAULT_TIMEOUT_SEC = 300
 
 
 class FtdCommandLineService:
@@ -46,8 +45,8 @@ class FtdCommandLineService:
         devices: list[Device],
         command: str,
         *,
-        polling_interval_sec: int = _DEFAULT_POLLING_INTERVAL_SEC,
-        timeout_sec: int = _DEFAULT_TIMEOUT_SEC,
+        polling_interval_sec: int = FAST_POLLING_INTERVAL_SEC,
+        timeout_sec: int = DEFAULT_TRANSACTION_TIMEOUT_SEC,
         on_poll: Any | None = None,
     ) -> FtdBulkCliResult:
         """Run a single ``show`` command on one or more FTD devices.

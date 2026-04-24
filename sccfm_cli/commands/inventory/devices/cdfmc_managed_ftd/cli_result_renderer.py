@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from typing import Sequence
 
 from rich.console import Console
 from rich.table import Table
 
+from sccfm_cli.utils import print_json
 from sccfm_core.models.ftd_cli_result import FtdBulkCliResult
 
 
@@ -35,7 +35,7 @@ def _render_json(*, result: FtdBulkCliResult) -> None:
             for r in result.device_responses
         ],
     }
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    print_json(payload)
 
 
 def _render_table(*, console: Console, result: FtdBulkCliResult) -> None:

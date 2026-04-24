@@ -4,7 +4,7 @@ import json
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.console import Console
@@ -13,7 +13,9 @@ from rich.spinner import Spinner
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, ConnectivityState, Device
 
 from sccfm_cli.services import ConfigService
+from sccfm_cli.utils import print_json
 from sccfm_core import SccApiError
+from sccfm_core.constants import DEFAULT_POLLING_INTERVAL_SEC, DEFAULT_TRANSACTION_TIMEOUT_SEC
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
@@ -69,7 +71,7 @@ class BaseCommand(ABC):
             error = SccApiError.from_exception(e)
 
             if output_format == "json":
-                self.console.print(json.dumps(json.loads(e.body or "{}"), indent=2))
+                print_json(error.to_dict())
             else:
                 self.console.print(
                     "[yellow]Error executing operation using the SCC Firewall Manager API. "
@@ -101,15 +103,15 @@ class BaseCommand(ABC):
     def console(self) -> Console:
         return self._console
 
-    def filter_online_devices(self, devices: List[Device]) -> List[Device]:
+    def filter_online_devices(self, devices: list[Device]) -> list[Device]:
         """Return only devices with ``ONLINE`` connectivity state.
 
         Prints a warning for each skipped device so the operator knows
         which devices were excluded.  Raises :class:`click.ClickException`
         if *no* devices are online.
         """
-        online: List[Device] = []
-        offline: List[Device] = []
+        online: list[Device] = []
+        offline: list[Device] = []
         for device in devices:
             if device.connectivity_state == ConnectivityState.ONLINE:
                 online.append(device)
@@ -135,7 +137,7 @@ class BaseCommand(ABC):
         *,
         config: ConfigLike,
         transaction: CdoTransaction,
-        polling_interval_sec: int = 10,
+        polling_interval_sec: int = DEFAULT_POLLING_INTERVAL_SEC,
         spinner_text: str | None = None,
         **kwargs: Any,
     ) -> CdoTransaction:
@@ -170,7 +172,7 @@ class BaseCommand(ABC):
                     f"  [bold]Polling URL:[/bold] {transaction.transaction_polling_url}"
                 )
 
-        timeout_sec = cast(int, kwargs.get("timeout", 3600))
+        timeout_sec = cast(int, kwargs.get("timeout", DEFAULT_TRANSACTION_TIMEOUT_SEC))
         service = TransactionService(config=config)
 
         if silent:
@@ -205,7 +207,7 @@ class BaseCommand(ABC):
         self, cdo_transaction: CdoTransaction, format: str = "table"
     ) -> None:
         if format == "json":
-            self.console.print(json.dumps(cdo_transaction.to_dict(), indent=2, default=str))
+            print_json(cdo_transaction.to_dict())
         else:
             self.console.print("[yellow]The execution failed. Transaction Details:[/yellow]")
             self.console.print(
@@ -228,7 +230,7 @@ class BaseCommand(ABC):
     ) -> None:
         """Render a submitted (not-yet-completed) transaction."""
         if format == "json":
-            print(json.dumps(cdo_transaction.to_dict(), indent=2))
+            print_json(cdo_transaction.to_dict())
         else:
             self.console.print("[green]✓[/green] Transaction submitted.")
             self.console.print(f"[bold]Transaction UID:[/bold] {cdo_transaction.transaction_uid}")

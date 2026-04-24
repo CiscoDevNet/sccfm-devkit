@@ -14,6 +14,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
+from sccfm_core.constants import FTD_DEVICE_TYPE_FILTER
 from sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
 
 FMC_UID = "09590f30-8cb7-11f0-a508-8e9f8a6273f4"
@@ -54,6 +55,7 @@ def base_module_params_with_query() -> dict[str, Any]:
         "query": "name:test-*",
         "uids": None,
         "command": "show failover",
+        "commands": None,
         "limit": 50,
         "offset": 0,
         "region": "us",
@@ -67,6 +69,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
         "query": None,
         "uids": [SCC_UID],
         "command": "show version",
+        "commands": None,
         "limit": 50,
         "offset": 0,
         "region": "us",
@@ -126,6 +129,7 @@ def test_should_execute_cli_with_query(
     call_kwargs = mock_module_instance_query.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
     assert call_kwargs["command"] == "show failover"
+    assert call_kwargs["commands"] == ["show failover"]
     assert len(call_kwargs["results"]) == 1
     assert call_kwargs["results"][0]["is_error"] is False
     assert "Successfully executed" in call_kwargs["msg"]
@@ -162,12 +166,52 @@ def test_should_execute_cli_with_uids(
     mock_inventory.get_devices.assert_called_once_with(
         limit=1,
         offset=0,
-        query=f"(uid:{SCC_UID}) AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}",
+        query=f"(uid:{SCC_UID}) AND {FTD_DEVICE_TYPE_FILTER}",
     )
     mock_module_instance_uids.exit_json.assert_called_once()
     call_kwargs = mock_module_instance_uids.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
+    assert call_kwargs["commands"] == ["show failover"]
     assert len(call_kwargs["results"]) == 1
+
+
+@patch("plugins.modules.execute_ftd_cli.Config")
+@patch("plugins.modules.execute_ftd_cli.FtdCommandLineService")
+@patch("plugins.modules.execute_ftd_cli.InventoryService")
+@patch("plugins.modules.execute_ftd_cli.AnsibleModule")
+def test_should_accept_single_item_commands_alias(
+    mock_ansible_module_class: MagicMock,
+    mock_inventory_service_class: MagicMock,
+    mock_cli_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance_query: MagicMock,
+    sample_device: Device,
+    sample_result: FtdBulkCliResult,
+) -> None:
+    mock_module_instance_query.params["command"] = None
+    mock_module_instance_query.params["commands"] = ["show failover"]
+    mock_ansible_module_class.return_value = mock_module_instance_query
+
+    mock_inventory = MagicMock()
+    mock_inventory.get_devices.return_value = DevicePage(
+        count=1, limit=50, offset=0, items=[sample_device]
+    )
+    mock_inventory_service_class.return_value = mock_inventory
+
+    mock_cli = MagicMock()
+    mock_cli.execute_cli.return_value = sample_result
+    mock_cli_service_class.return_value = mock_cli
+
+    with pytest.raises(SystemExit):
+        execute_ftd_cli.run_module()
+
+    mock_cli.execute_cli.assert_called_once_with(
+        devices=[sample_device],
+        command="show failover",
+    )
+    call_kwargs = mock_module_instance_query.exit_json.call_args[1]
+    assert call_kwargs["command"] == "show failover"
+    assert call_kwargs["commands"] == ["show failover"]
 
 
 @patch("plugins.modules.execute_ftd_cli.Config")
@@ -325,6 +369,7 @@ def test_should_support_check_mode_without_executing_cli(
     call_kwargs = mock_module_instance_query.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
     assert call_kwargs["command"] == "show failover"
+    assert call_kwargs["commands"] == ["show failover"]
     assert call_kwargs["results"] == []
     assert call_kwargs["device_count"] == 1
     assert "Would execute" in call_kwargs["msg"]

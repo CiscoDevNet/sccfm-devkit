@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.services.object_management import NetworkGroupService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -60,7 +62,7 @@ options:
     required: false
     type: dict
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -212,6 +214,8 @@ def run_module() -> None:
             msg=f"Successfully created network group '{params['name']}'",
             network_group=result.to_dict(),
         )
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to create network group: {str(e)}")
 

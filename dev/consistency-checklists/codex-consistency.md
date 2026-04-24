@@ -128,7 +128,7 @@ Repeated renderer locations:
 - [ ] ASA device-targeted commands continue to use `AsaDeviceTargetCommand`
   and `asa_device_filter_params(...)`.
 - [ ] General FTD commands continue to use `FtdDeviceTargetCommand`
-  and `FTD_ENTITY_TYPES`.
+  and the canonical FTD device-type constants.
 - [ ] cdFMC-managed FTD commands continue to use
   `CdfmcFtdDeviceTargetCommand` and the stricter single-entity filter.
 - [ ] Validation semantics are preserved for each family:
@@ -490,19 +490,17 @@ Primary locations:
 - `sccfm-ansible/plugins/modules/trigger_ftd_upgrade.py`
 - `sccfm-ansible/e2e/**`
 
-## 25. Current drift watchlist
+## 25. Historical drift guards
 
-These are already-visible parity gaps or duplication hazards worth treating as
-follow-up review items.
+These are drift patterns that have already appeared in the repo. Review new PRs
+against them so fixed consistency issues do not reappear.
 
-- [ ] Region vocabulary is split today.
-  CLI configure uses `_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")`
-  in `sccfm_cli/commands/configure.py`, while Ansible and env docs use
-  `("int", "us", "eu", "apj", "aus", "uae", "in", "ci")` in
-  `sccfm-ansible/plugins/module_utils/config.py` and `.env.example`.
-- [ ] README command naming drifts from CLI naming in at least one place.
-  `README.md` advertises `inventory managers list`, but the actual CLI group
-  name is singular: `inventory manager list`.
+- [ ] Region vocabulary must stay centralized in `sccfm_core/constants.py`.
+  Public surfaces should advertise canonical `int, us, eu, apj, au, uae, in, ci`
+  values; legacy `aus` may be accepted only as an alias normalized to `au`.
+- [ ] README command names must match the live CLI tree.
+  For example, the inventory manager command is singular:
+  `inventory manager list`.
 - [ ] The device-target helper pattern exists in three near-duplicate forms:
   ASA, FTD, and cdFMC-managed FTD shared command helpers. Any logic change here
   is easy to apply to only one family.

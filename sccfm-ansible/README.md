@@ -142,7 +142,7 @@ rm group_vars/all/vault.yml.temp
 Edit `group_vars/all/vars.yml`:
 
 ```yaml
-sccfm_region: us  # Change to your region (us, eu, apj, aus, uae, in, or int)
+sccfm_region: us  # Change to your region (int, us, eu, apj, au, uae, in, or ci)
 ```
 
 </details>

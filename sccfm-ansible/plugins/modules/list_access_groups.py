@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.services.policy import AccessGroupService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -33,7 +35,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -60,6 +62,19 @@ EXAMPLES = r"""
 - name: Display access groups
   ansible.builtin.debug:
     var: result.access_groups
+
+# Using module_defaults (recommended)
+- name: List access groups with shared auth
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: List access groups
+      cisco.sccfm.list_access_groups:
+        limit: 100
 """
 
 RETURN = r"""
@@ -128,6 +143,8 @@ def run_module() -> None:
             limit=result.limit,
             offset=result.offset,
         )
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to list access groups: {str(e)}")
 

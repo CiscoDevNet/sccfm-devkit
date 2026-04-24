@@ -86,3 +86,27 @@ def test_should_allow_modification_of_existing_profile(
     assert updated_stored.api_token == new_token
 
     assert result2.exit_code == 0
+
+
+def test_should_normalize_legacy_region_aliases(cli_runner: CliRunner, config_path: Path) -> None:
+    """Configure should normalize case and legacy aliases to the canonical region value."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--profile",
+            "lab",
+            "configure",
+            "--region",
+            "AUS",
+            "--api-token",
+            "token-xyz",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    stored = ConfigService(path=config_path).load("lab")
+    assert stored is not None
+    assert stored.region == "au"

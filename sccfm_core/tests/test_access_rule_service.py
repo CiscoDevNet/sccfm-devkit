@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import Mock
 
@@ -141,7 +142,7 @@ class TestAccessRuleServiceCreate:
             lambda self, name: None,
         )
 
-        with pytest.raises(NotFoundError, match="Network object 'nonexistent' not found"):
+        with pytest.raises(NotFoundError, match="Network object with name 'nonexistent' not found"):
             service.create_access_rule(
                 access_group_uid="ag-uid-456",
                 entity_uid="device-uid-789",
@@ -156,6 +157,7 @@ class TestAccessRuleResponse:
         assert response.uid == "rule-uid-123"
         assert response.access_group_uid == "ag-uid-456"
         assert response.rule_action == "PERMIT"
+        assert response.created_date == datetime(2026, 1, 1, tzinfo=UTC)
         assert response.source_network == {
             "name": "web-servers",
             "uid": "net-uid-1",
@@ -165,6 +167,14 @@ class TestAccessRuleResponse:
         d = response.to_dict()
         assert d["uid"] == "rule-uid-123"
         assert d["rule_action"] == "PERMIT"
+        assert d["created_date"] == "2026-01-01T00:00:00Z"
+
+    def test_from_dict_preserves_missing_identifiers_as_none(self) -> None:
+        response = AccessRuleResponse.from_dict({"index": 0})
+
+        assert response.uid is None
+        assert response.access_group_uid is None
+        assert response.entity_uid is None
 
 
 SAMPLE_LIST_JSON: dict[str, Any] = {

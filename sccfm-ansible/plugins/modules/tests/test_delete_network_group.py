@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from plugins.modules import delete_network_group  # noqa: E402
+from scc_firewall_manager_sdk import ApiException
 
 from sccfm_core.errors import NotFoundError
 
@@ -181,6 +182,39 @@ def test_should_fail_on_generic_exception(
     call_kwargs = mock_module_instance.fail_json.call_args[1]
     assert "Failed to delete network group" in call_kwargs["msg"]
     assert "500 Internal Server Error" in call_kwargs["msg"]
+
+
+@patch("plugins.modules.delete_network_group.Config")
+@patch("plugins.modules.delete_network_group.NetworkGroupService")
+@patch("plugins.modules.delete_network_group.AnsibleModule")
+def test_should_return_structured_api_error(
+    mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance: MagicMock,
+) -> None:
+    """run_module should return structured error info when ApiException occurs."""
+    mock_ansible_module_class.return_value = mock_module_instance
+
+    api_error = ApiException(status=403, reason="Forbidden")
+    api_error.body = (
+        '{"errorMsg": "Access denied", "errorCode": "FORBIDDEN", '
+        '"details": {"resource": "network-group"}}'
+    )
+
+    mock_service = MagicMock()
+    mock_service.delete_network_group.side_effect = api_error
+    mock_service_class.return_value = mock_service
+
+    with pytest.raises(SystemExit):
+        delete_network_group.run_module()
+
+    mock_module_instance.fail_json.assert_called_once()
+    call_kwargs = mock_module_instance.fail_json.call_args[1]
+    assert call_kwargs["msg"] == "Access denied"
+    assert call_kwargs["error_code"] == "FORBIDDEN"
+    assert call_kwargs["error_details"] == {"resource": "network-group"}
+    assert call_kwargs["status_code"] == 403
 
 
 @patch("plugins.modules.delete_network_group.AnsibleModule")

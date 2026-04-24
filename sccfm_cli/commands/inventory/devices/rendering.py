@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import math
 from typing import Any, Sequence, cast
 
@@ -13,6 +12,8 @@ from scc_firewall_manager_sdk import DevicePage, EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
+from sccfm_cli.utils import print_json
+from sccfm_core import build_device_type_filter
 from sccfm_core.services import InventoryService
 
 
@@ -28,7 +29,7 @@ def render_device_page(
     if output_format == "json":
         items = page.items or []
         items_dict = [item.to_dict() for item in items]
-        console.print(json.dumps(items_dict, indent=2, default=str))
+        print_json(items_dict)
         return
 
     current_page = (offset // limit) + 1
@@ -56,14 +57,6 @@ def render_device_page(
     console.print(table)
 
 
-def _build_device_type_filter(entity_types: Sequence[EntityType]) -> str:
-    """Build a Lucene device-type filter from one or more entity types."""
-    if len(entity_types) == 1:
-        return f"deviceType:{entity_types[0].value}"
-    clause = " OR ".join(f"deviceType:{t.value}" for t in entity_types)
-    return f"({clause})"
-
-
 class DeviceListCommand(BaseCommand):
     """Reusable list command for a specific set of device types.
 
@@ -71,7 +64,7 @@ class DeviceListCommand(BaseCommand):
 
         AsaListCommand = DeviceListCommand(
             console,
-            entity_types=[EntityType.ASA],
+            entity_types=ASA_ENTITY_TYPES,
             spinner_text="Fetching ASA devices…",
             help_text="List ASA devices.",
         )
@@ -110,7 +103,7 @@ class DeviceListCommand(BaseCommand):
         config = self.get_profile(ctx=ctx, **kwargs)
         inventory_service = InventoryService(config)
 
-        device_type_filter = _build_device_type_filter(self._entity_types)
+        device_type_filter = build_device_type_filter(self._entity_types)
         effective_query = f"({query}) AND {device_type_filter}" if query else device_type_filter
 
         silent = ctx.obj.get("silent", False) if ctx.obj else False

@@ -1,4 +1,4 @@
-from typing import List
+from __future__ import annotations
 
 from scc_firewall_manager_sdk import (
     CdoCliResult,
@@ -7,6 +7,7 @@ from scc_firewall_manager_sdk import (
     CommandLineInterfaceApi,
 )
 
+from sccfm_core.constants import FAST_POLLING_INTERVAL_SEC
 from sccfm_core.factories import ApiClientFactory
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.transaction_service import TransactionService
@@ -23,11 +24,11 @@ class AsaCommandLineService:
 
     def execute_cli(
         self,
-        device_uids: List[str],
-        asa_commands: List[str],
+        device_uids: list[str],
+        asa_commands: list[str],
         *,
         wait: bool = True,
-    ) -> CdoTransaction | List[CdoCliResult]:
+    ) -> CdoTransaction | list[CdoCliResult]:
         validate_uids(device_uids)
         script = "\n".join(asa_commands)
         transaction: CdoTransaction = self.command_line_interface_api.execute_cli_command(
@@ -39,7 +40,8 @@ class AsaCommandLineService:
             return transaction
         completed_transaction: CdoTransaction = (
             self.transaction_service.wait_for_transaction_to_finish(
-                transaction_uid=transaction.transaction_uid, polling_interval_sec=3
+                transaction_uid=transaction.transaction_uid,
+                polling_interval_sec=FAST_POLLING_INTERVAL_SEC,
             )
         )
         if completed_transaction.cdo_transaction_status != CdoTransactionStatus.DONE:
@@ -48,12 +50,12 @@ class AsaCommandLineService:
             return completed_transaction
         if completed_transaction.entity_uid is None:
             raise ValueError("Execution UID missing from completed transaction.")
-        return self.get_cli_results(completed_transaction.entity_uid)
+        return self.get_cli_results(execution_uid=completed_transaction.entity_uid)
 
-    def get_cli_result(self, cli_result_uid: str) -> CdoCliResult:
+    def get_cli_result(self, *, cli_result_uid: str) -> CdoCliResult:
         return self.command_line_interface_api.get_cli_result(cli_result_uid=cli_result_uid)
 
-    def get_cli_results(self, execution_uid: str) -> List[CdoCliResult]:
+    def get_cli_results(self, *, execution_uid: str) -> list[CdoCliResult]:
         q = f"executionUid:{execution_uid}"
         results = self.command_line_interface_api.get_cli_results(q=q).items or []
         return list(results)

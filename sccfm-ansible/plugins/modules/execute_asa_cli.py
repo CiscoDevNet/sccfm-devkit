@@ -5,10 +5,10 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
-from sccfm_core import AsaCommandLineService, InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaCommandLineService, InventoryService, SccApiError
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -34,11 +34,18 @@ options:
     required: false
     type: list
     elements: str
+  command:
+    description:
+      - Single ASA CLI command to execute.
+      - Mutually exclusive with C(commands). Use C(commands) to run more than one command.
+    required: false
+    type: str
   commands:
     description:
       - List of ASA CLI commands to execute.
       - Commands are executed in order.
-    required: true
+      - Mutually exclusive with C(command).
+    required: false
     type: list
     elements: str
   limit:
@@ -56,7 +63,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -106,8 +113,7 @@ EXAMPLES = r"""
     - name: Show version on branch ASAs
       cisco.sccfm.execute_asa_cli:
         query: "name:branch-* AND connectivityState:ONLINE"
-        commands:
-          - "show version"
+        command: "show version"
 
 # Example 4: Use Ansible's lookup to read commands from a file (one command per line)
 - name: Execute commands from file
@@ -117,6 +123,19 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
+command:
+  description: The CLI script that was executed. Multiple commands are joined with newlines.
+  returned: success
+  type: str
+commands:
+  description: List of ASA CLI commands that were executed.
+  returned: success
+  type: list
+  elements: str
+device_count:
+  description: Number of target devices matched by the module.
+  returned: success
+  type: int
 results:
   description: List of CLI execution results per device.
   returned: success
@@ -151,11 +170,11 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "query": {"type": "str", "required": False},
         "uids": {"type": "list", "elements": "str", "required": False},
-        "commands": {"type": "list", "elements": "str", "required": True},
+        "command": {"type": "str", "required": False},
+        "commands": {"type": "list", "elements": "str", "required": False},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -170,7 +189,7 @@ def resolve_device_uids_from_query(
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"{query} AND deviceType:ASA",
+        query=f"{query} AND {ASA_DEVICE_TYPE_FILTER}",
     )
     return [device.uid for device in (page.items or [])]
 
@@ -185,24 +204,28 @@ def execute_cli_commands(
     return cli_service.execute_cli(device_uids=device_uids, asa_commands=commands)
 
 
+def _normalize_commands(module: AnsibleModule) -> list[str]:
+    command: str | None = module.params.get("command")
+    commands: list[str] | None = module.params.get("commands")
+    normalized = [command] if command else list(commands or [])
+    if not normalized:
+        module.fail_json(msg="Provide either 'command' or 'commands'.")
+    return normalized
+
+
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        mutually_exclusive=[["query", "uids"]],
-        required_one_of=[["query", "uids"]],
+        mutually_exclusive=[["query", "uids"], ["command", "commands"]],
+        required_one_of=[["query", "uids"], ["command", "commands"]],
+        supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")
-    commands: list[str] = module.params["commands"]
+    commands = _normalize_commands(module)
+    command_script = "\n".join(commands)
     limit: int = module.params["limit"]
     offset: int = module.params["offset"]
 
@@ -219,6 +242,17 @@ def run_module() -> None:
             )
             if not device_uids:
                 module.fail_json(msg="No devices found matching the specified query.")
+
+        if module.check_mode is True:
+            module.exit_json(
+                changed=True,
+                msg=f"Would execute CLI commands on {len(device_uids)} device(s)",
+                command=command_script,
+                commands=commands,
+                device_count=len(device_uids),
+                results=[],
+            )
+            return
 
         results: list[CdoCliResult] | CdoTransaction = execute_cli_commands(
             config=config,
@@ -238,6 +272,9 @@ def run_module() -> None:
         module.exit_json(
             changed=True,
             msg=f"Successfully executed CLI commands on {len(device_uids)} device(s)",
+            command=command_script,
+            commands=commands,
+            device_count=len(device_uids),
             results=results_data,
         )
 

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Mapping, cast
 
 import click
-from scc_firewall_manager_sdk import Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import Device, DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
-from sccfm_core import InventoryService
+from sccfm_cli.utils import print_json
+from sccfm_core import ASA_ENTITY_TYPES, InventoryService, build_device_type_filter
 from sccfm_core.types import ConfigLike
 
 _DEFAULT_DEVICE_NAME_HELP = "Device name to search for (supports wildcards like 'branch-*')."
@@ -119,9 +119,10 @@ class AsaDeviceTargetCommand(BaseCommand):
             ctx.fail(f"Provide only one of: {option_list}.")
 
     def _query_with_asa_device_type(self, query: str, *, wrap_query: bool) -> str:
+        device_type_filter = build_device_type_filter(ASA_ENTITY_TYPES)
         if wrap_query:
-            return f"({query}) AND deviceType:{EntityType.ASA.value}"
-        return f"{query} AND deviceType:{EntityType.ASA.value}"
+            return f"({query}) AND {device_type_filter}"
+        return f"{query} AND {device_type_filter}"
 
     def _resolve_query(self, filters: AsaDeviceFilters) -> str | None:
         if filters.device_name:
@@ -155,7 +156,7 @@ class AsaDeviceTargetCommand(BaseCommand):
         page = inventory_service.get_devices(
             limit=filters.limit,
             offset=filters.offset,
-            query=f"deviceType:{EntityType.ASA.value}",
+            query=build_device_type_filter(ASA_ENTITY_TYPES),
         )
         return cast(list[Device], page.items or [])
 
@@ -213,17 +214,14 @@ class AsaDeviceTargetCommand(BaseCommand):
                 }
                 for d in targets.devices
             ]
-            self.console.print(
-                json.dumps(
-                    {
-                        "operation": operation,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "matched_devices": len(targets.devices),
-                        "devices": payload,
-                    },
-                    indent=2,
-                )
+            print_json(
+                {
+                    "operation": operation,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "matched_devices": len(targets.devices),
+                    "devices": payload,
+                }
             )
             return
 

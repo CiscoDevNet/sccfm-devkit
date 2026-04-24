@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -20,6 +19,7 @@ from sccfm_cli.commands.inventory.options import (
     timeout_option,
     wait_option,
 )
+from sccfm_cli.utils import print_json
 from sccfm_core.services.inventory import (
     FtdUpgradeService,
     FtdUpgradeVersionService,
@@ -75,7 +75,7 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
             ),
             ftd_check_option(),
             wait_option(),
-            timeout_option(default=3600),
+            timeout_option(),
             format_option(),
             config_path_option(),
         ]
@@ -276,7 +276,7 @@ class FtdUpgradeTriggerCommand(FtdDeviceTargetCommand):
             ctx.exit(1)
 
     def _render_json(self, *, transaction: CdoTransaction) -> None:
-        print(json.dumps(transaction.to_dict(), indent=2, ensure_ascii=False, default=str))
+        print_json(transaction.to_dict())
 
     def _render_table(
         self,

@@ -11,10 +11,13 @@ from scc_firewall_manager_sdk import (
 )
 
 from sccfm_core import InventoryService, SccApiError
+from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
+from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.inventory import FtdDeployService
+from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, base_argument_spec
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -69,8 +72,20 @@ options:
     required: false
     type: bool
     default: false
+  wait:
+    description:
+      - Wait for the deployment transaction to complete before returning.
+    required: false
+    type: bool
+    default: false
+  timeout:
+    description:
+      - Maximum number of seconds to wait for completion when C(wait=true).
+    required: false
+    type: int
+    default: 3600
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -109,6 +124,22 @@ EXAMPLES = r"""
   cisco.sccfm.deploy_cdfmc_ftd:
     query: "name:branch-*"
     ignore_warnings: true
+    wait: true
+
+# Example 4: Using module_defaults (recommended)
+- name: Deploy cdFMC-managed FTD changes
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Deploy branch FTD changes
+      cisco.sccfm.deploy_cdfmc_ftd:
+        query: "name:branch-*"
+        deployment_notes: "Ticket-123: firewall policy update"
+        wait: true
 """
 
 RETURN = r"""
@@ -132,6 +163,12 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "deployment_notes": {"type": "str", "required": False},
         "description": {"type": "str", "required": False},
         "ignore_warnings": {"type": "bool", "required": False, "default": False},
+        "wait": {"type": "bool", "required": False, "default": False},
+        "timeout": {
+            "type": "int",
+            "required": False,
+            "default": DEFAULT_TRANSACTION_TIMEOUT_SEC,
+        },
         **base_argument_spec(),
     }
 
@@ -174,6 +211,13 @@ def _trigger_deploy(
     )
 
 
+def _is_failed_transaction(transaction: CdoTransaction) -> bool:
+    return transaction.cdo_transaction_status in {
+        CdoTransactionStatus.ERROR,
+        CdoTransactionStatus.CANCELLED,
+    }
+
+
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
@@ -182,14 +226,7 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     # Resolve device UIDs
     uids: list[str] | None = module.params.get("uids")
     query: str | None = module.params.get("query")
@@ -219,6 +256,8 @@ def run_module() -> None:
         deployment_notes: str | None = module.params.get("deployment_notes")
         description: str | None = module.params.get("description")
         ignore_warnings: bool = module.params.get("ignore_warnings", False)
+        wait_for_completion: bool = module.params.get("wait", False)
+        timeout: int = module.params.get("timeout", DEFAULT_TRANSACTION_TIMEOUT_SEC)
 
         transaction = _trigger_deploy(
             config=config,
@@ -228,9 +267,32 @@ def run_module() -> None:
             ignore_warnings=ignore_warnings,
         )
 
+        if wait_for_completion:
+            if transaction.transaction_uid is None:
+                module.fail_json(msg="Transaction UID missing from deploy response.")
+
+            transaction = TransactionService(config=config).wait_for_transaction_to_finish(
+                transaction_uid=transaction.transaction_uid,
+                timeout_sec=timeout,
+            )
+
+            if _is_failed_transaction(transaction):
+                module.fail_json(
+                    msg=(
+                        f"Deploy transaction {transaction.transaction_uid} failed with status: "
+                        f"{transaction.cdo_transaction_status}"
+                    ),
+                    device_count=len(device_uids),
+                    transaction=transaction.to_dict(),
+                )
+
         module.exit_json(
             changed=True,
-            msg=f"Deploy triggered on {len(device_uids)} device(s).",
+            msg=(
+                f"Deploy completed on {len(device_uids)} device(s)."
+                if wait_for_completion
+                else f"Deploy triggered on {len(device_uids)} device(s)."
+            ),
             device_count=len(device_uids),
             transaction=transaction.to_dict(),
         )
@@ -238,6 +300,8 @@ def run_module() -> None:
     except ApiException as e:
         error = SccApiError.from_exception(e)
         module.fail_json(**error.to_dict())
+    except TimeoutError as e:
+        module.fail_json(msg=str(e))
     except Exception as e:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
 

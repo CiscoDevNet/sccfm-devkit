@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import Any, Sequence, cast
 
@@ -7,14 +9,13 @@ from scc_firewall_manager_sdk import (
     AsaCreateOrUpdateInput,
     ConnectorType,
     Device,
-    EntityType,
     Labels,
 )
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
-from sccfm_core import InventoryService
+from sccfm_cli.utils import print_json, with_spinner
+from sccfm_core import ASA_ENTITY_TYPES, InventoryService, build_device_type_filter
 from sccfm_core.services.inventory import AsaOnboardService
 
 
@@ -139,7 +140,7 @@ class AsaOnboardCommand(BaseCommand):
         device: Device = asa_onboard_service.onboard_asa(asa_create_or_update_input=asa_input)
 
         if output_format == "json":
-            self.console.print(json.dumps(device.to_dict(), indent=2))
+            print_json(device.to_dict())
         else:
             self.console.print(f"[green]\u2713[/green] Successfully onboarded ASA: {device.name}")
             self.console.print(f"  UID: {device.uid}")
@@ -164,20 +165,16 @@ class AsaOnboardCommand(BaseCommand):
             device_data = None
             if exists and device_page.items:
                 device_data = device_page.items[0].to_dict()
-            self.console.print(
-                json.dumps(
-                    {
-                        "entity_type": "ASA device",
-                        "identifier": name,
-                        "operation": "onboard",
-                        "exists": exists,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "device": device_data,
-                    },
-                    indent=2,
-                    default=str,
-                )
+            print_json(
+                {
+                    "entity_type": "ASA device",
+                    "identifier": name,
+                    "operation": "onboard",
+                    "exists": exists,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "device": device_data,
+                }
             )
             return
 
@@ -232,7 +229,7 @@ class AsaOnboardCommand(BaseCommand):
     @staticmethod
     def _asa_name_query(name: str) -> str:
         """Build the inventory query for a named ASA device."""
-        return f"deviceType:{EntityType.ASA.value} AND name:{name}"
+        return f"{build_device_type_filter(ASA_ENTITY_TYPES)} AND name:{name}"
 
     @staticmethod
     def _validate_device_address(

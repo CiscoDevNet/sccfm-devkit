@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
@@ -12,7 +11,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.models.asa_shun_entry import AsaShunEntry, AsaShunInterfaceStats
 from sccfm_core.services.inventory.asa_shun_service import AsaShunService
 
@@ -82,8 +81,8 @@ class ShowShunCommand(AsaDeviceTargetCommand):
 
     def _render_entries(
         self,
-        results: Dict[str, List[AsaShunEntry]] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        results: dict[str, list[AsaShunEntry]] | CdoTransaction,
+        uid_to_device: dict[str, Device],
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -97,10 +96,10 @@ class ShowShunCommand(AsaDeviceTargetCommand):
 
     def _render_entries_json(
         self,
-        results: Dict[str, List[AsaShunEntry]],
-        uid_to_device: Dict[str, Device],
+        results: dict[str, list[AsaShunEntry]],
+        uid_to_device: dict[str, Device],
     ) -> None:
-        output: List[Dict[str, Any]] = []
+        output: list[dict[str, Any]] = []
         for device_uid, entries in results.items():
             output.append(
                 {
@@ -119,12 +118,12 @@ class ShowShunCommand(AsaDeviceTargetCommand):
                     ],
                 }
             )
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_entries_table(
         self,
-        results: Dict[str, List[AsaShunEntry]],
-        uid_to_device: Dict[str, Device],
+        results: dict[str, list[AsaShunEntry]],
+        uid_to_device: dict[str, Device],
     ) -> None:
         table = Table(title="Shun Entries", show_lines=True)
         table.add_column("Device Name")
@@ -159,8 +158,8 @@ class ShowShunCommand(AsaDeviceTargetCommand):
 
     def _render_statistics(
         self,
-        results: Dict[str, List[AsaShunInterfaceStats]] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        results: dict[str, list[AsaShunInterfaceStats]] | CdoTransaction,
+        uid_to_device: dict[str, Device],
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -174,10 +173,10 @@ class ShowShunCommand(AsaDeviceTargetCommand):
 
     def _render_stats_json(
         self,
-        results: Dict[str, List[AsaShunInterfaceStats]],
-        uid_to_device: Dict[str, Device],
+        results: dict[str, list[AsaShunInterfaceStats]],
+        uid_to_device: dict[str, Device],
     ) -> None:
-        output: List[Dict[str, Any]] = []
+        output: list[dict[str, Any]] = []
         for device_uid, stats in results.items():
             output.append(
                 {
@@ -193,12 +192,12 @@ class ShowShunCommand(AsaDeviceTargetCommand):
                     ],
                 }
             )
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_stats_table(
         self,
-        results: Dict[str, List[AsaShunInterfaceStats]],
-        uid_to_device: Dict[str, Device],
+        results: dict[str, list[AsaShunInterfaceStats]],
+        uid_to_device: dict[str, Device],
     ) -> None:
         table = Table(title="Shun Statistics", show_lines=True)
         table.add_column("Device Name")

@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from scc_firewall_manager_sdk import CdoTransaction, TransactionsApi
 
 from sccfm_core import ApiClientFactory
+from sccfm_core.constants import (
+    DEFAULT_POLLING_INTERVAL_SEC,
+    DEFAULT_TRANSACTION_TIMEOUT_SEC,
+)
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.types import ConfigLike
 
@@ -12,16 +18,16 @@ class TransactionService:
     def __init__(self, config: ConfigLike):
         self.transactions_api = TransactionsApi(ApiClientFactory().build(config=config))
 
-    def get_transaction(self, transaction_uid: str) -> CdoTransaction:
+    def get_transaction(self, *, transaction_uid: str) -> CdoTransaction:
         """Fetch and return the current transaction status by UID."""
         return self.transactions_api.get_transaction(transaction_uid=transaction_uid)
 
     def wait_for_transaction_to_finish(
         self,
         transaction_uid: str,
-        polling_interval_sec: int = 10,
-        timeout_sec: int = 300,
-        on_poll: Optional[Callable[[CdoTransaction], None]] = None,
+        polling_interval_sec: int = DEFAULT_POLLING_INTERVAL_SEC,
+        timeout_sec: int = DEFAULT_TRANSACTION_TIMEOUT_SEC,
+        on_poll: Callable[[CdoTransaction], None] | None = None,
     ) -> CdoTransaction:
         start_time = time.time()
         cdo_transaction: CdoTransaction = self.get_transaction(transaction_uid=transaction_uid)

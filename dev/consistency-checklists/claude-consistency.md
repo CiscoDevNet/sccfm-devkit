@@ -73,7 +73,7 @@
   - `--device-uids` is `multiple=True`.
   - `--device-name` supports wildcards (`branch-*`).
   - Default help text strings come from the `_DEFAULT_DEVICE_*_HELP` constants in each `shared.py`; do not duplicate strings inline.
-  - ASA filter automatically appends `EntityType.ASA`; FTD filter appends `FTD_ENTITY_TYPES` from `sccfm_core/constants.py`.
+  - ASA and FTD filters use the canonical device-type constants from `sccfm_core/constants.py`.
 - **Drift risks:** mutual-exclusion checks getting out of sync between ASA and FTD families.
 
 ### 2.4 Boolean / confirmation flags
@@ -241,7 +241,7 @@
 - **Canonical:** [sccfm-ansible/plugins/module_utils/config.py](sccfm-ansible/plugins/module_utils/config.py).
 - **Invariants:**
   - Frozen dataclass with `__post_init__` env fallback (`SCCFM_REGION`, `SCCFM_API_TOKEN`).
-  - Allowed regions: `int, us, eu, apj, aus, uae, in, ci`.
+  - Allowed regions: `int, us, eu, apj, au, uae, in, ci` (`aus` is a legacy alias normalized to `au`).
   - `base_argument_spec()` returns `region` + `api_token` (token has `no_log: True`).
   - `create_config(module)` wraps validation in try/except → `module.fail_json(msg=...)`.
 
@@ -464,7 +464,7 @@
 
 - **Canonical:** [sccfm_core/constants.py](sccfm_core/constants.py).
 - **Invariants:**
-  - `FTD_ENTITY_TYPES`, `FTD_LICENSES`, `FTDV_PERFORMANCE_TIERS`, etc. defined once.
+  - `ASA_ENTITY_TYPES`, `FTD_ENTITY_TYPES`, `FTD_LICENSES`, `FTDV_PERFORMANCE_TIERS`, etc. defined once.
   - No magic strings/lists in command/service code — import from `constants.py`.
   - SDK enums (`EntityType`, `CdoTransactionStatus`, …) referenced by enum, not stringly.
 

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
-from sccfm_core.errors import NotFoundError
+from scc_firewall_manager_sdk import ApiException
+
+from sccfm_core.errors import NotFoundError, SccApiError
 
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
@@ -123,9 +125,11 @@ def run_delete_with_idempotency(
     except NotFoundError:
         module.exit_json(
             changed=False,
-            msg=f"{entity_name} '{identifier}' not found — already absent.",
+            msg=f"{entity_name} with {identifier_type} '{identifier}' not found; already absent.",
             deleted_uid=None,
         )
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except ValueError as e:
         module.fail_json(msg=f"Invalid parameters: {str(e)}")
     except Exception as e:
@@ -151,6 +155,9 @@ def _handle_delete_check_mode(
             entity = get_by_name_fn(name)
     except NotFoundError:
         entity = None
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict(), deleted_uid=None)
+        return
     except Exception as e:
         module.fail_json(
             msg=f"Failed to check {entity_name.lower()} existence: {str(e)}",
@@ -165,9 +172,10 @@ def _handle_delete_check_mode(
             deleted_uid=entity.uid,
         )
     else:
+        identifier_type = "UID" if uid else "name"
         module.exit_json(
             changed=False,
-            msg=f"{entity_name} '{identifier}' not found — already absent.",
+            msg=f"{entity_name} with {identifier_type} '{identifier}' not found; already absent.",
             deleted_uid=None,
         )
 

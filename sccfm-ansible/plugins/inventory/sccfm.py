@@ -9,7 +9,7 @@ from ansible.utils.display import Display
 from scc_firewall_manager_sdk import Device
 
 from ..module_utils.builders import InventoryHostBuilder
-from ..module_utils.config import ALLOWED_REGIONS, Config
+from ..module_utils.config import Config
 from ..module_utils.loaders import InventoryLoader
 
 DOCUMENTATION = r"""
@@ -26,7 +26,7 @@ options:
     required: true
     choices: ["cisco.sccfm.sccfm"]
   region:
-    description: SCCFM region to target (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region to target (int, us, eu, apj, au, uae, in, or ci).
     env:
       - name: SCCFM_REGION
     required: true
@@ -101,10 +101,6 @@ class InventoryModule(BaseInventoryPlugin):
                 "SCCFM region is required. Set 'region' in the inventory file or "
                 "export SCCFM_REGION."
             )
-        if region not in ALLOWED_REGIONS:
-            raise AnsibleParserError(
-                f"Invalid region '{region}'. Valid values are: {', '.join(ALLOWED_REGIONS)}"
-            )
         if not api_token:
             raise AnsibleParserError(
                 "SCCFM api_token is required. Set 'api_token' in the inventory file "
@@ -116,7 +112,12 @@ class InventoryModule(BaseInventoryPlugin):
         group = cast(Optional[str], config_data.get("group") or "sccfm")
         group_by_device_type = bool(config_data.get("group_by_device_type", False))
 
-        config = Config(region=region, api_token=api_token)
+        try:
+            config = Config(region=region, api_token=api_token)
+        except ValueError as exc:
+            raise AnsibleParserError(str(exc)) from exc
+
+        region = config.region
         inventory_loader = InventoryLoader(config=config, limit=limit, query=query)
         devices: List[Device] = inventory_loader.load_devices()
 

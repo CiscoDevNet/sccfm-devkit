@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
@@ -15,7 +14,7 @@ from sccfm_cli.commands.inventory.devices.ftd.shared import (
     ftd_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from sccfm_core.services.inventory import FtdUpgradeVersionService
 
@@ -86,7 +85,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
     def _render_results(
         self,
         results: FtdGroupCompatibleVersions,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         format: str,
         show_per_device: bool,
     ) -> None:
@@ -109,7 +108,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
     def _render_json(
         self,
         results: FtdGroupCompatibleVersions,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         is_single: bool,
         show_per_device: bool,
     ) -> None:
@@ -139,12 +138,12 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
                         "compatible_versions": [_version_to_dict(v) for v in versions],
                     }
                 output["per_device"] = per_device
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_table(
         self,
         results: FtdGroupCompatibleVersions,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         is_single: bool,
         show_per_device: bool,
     ) -> None:
@@ -156,7 +155,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
     def _render_single_device_table(
         self,
         results: FtdGroupCompatibleVersions,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         uid = next(iter(uid_to_device))
         device = uid_to_device[uid]
@@ -174,7 +173,7 @@ class FtdUpgradeCompatibleVersionsCommand(FtdDeviceTargetCommand):
     def _render_group_table(
         self,
         results: FtdGroupCompatibleVersions,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         show_per_device: bool,
     ) -> None:
         device_count = len(results.per_device)

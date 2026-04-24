@@ -12,11 +12,11 @@ from scc_firewall_manager_sdk import (
     Labels,
 )
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.services.inventory import AsaOnboardService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -67,7 +67,7 @@ options:
     type: list
     elements: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -131,8 +131,8 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
-payload:
-  description: Structured payload matching the ASA onboarding API.
+device:
+  description: The existing or newly onboarded ASA device.
   returned: always
   type: dict
 """
@@ -153,8 +153,7 @@ def build_argument_spec() -> dict[str, dict[str, str | bool | list[str]]]:
         "ignore_certificate": {"type": "bool", "required": False, "default": False},
         "grouped_labels": {"type": "dict", "required": False},
         "ungrouped_labels": {"type": "list", "elements": "str", "required": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -186,14 +185,7 @@ def run_module() -> None:
         required_if=[("connector_type", "SDC", ["connector_name"])],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     params = module.params
     asa_create_or_update_input = build_asa_input(params)
     try:
@@ -216,7 +208,7 @@ def run_module() -> None:
             )
 
         asa_device = _onboard_asa(config, asa_create_or_update_input)
-        module.exit_json(changed=True, msg="Onboarded successfulyl", device=asa_device.to_dict())
+        module.exit_json(changed=True, msg="Onboarded successfully", device=asa_device.to_dict())
     except ApiException as e:
         error = SccApiError.from_exception(e)
         module.fail_json(**error.to_dict())
@@ -240,7 +232,9 @@ def _get_existing_device(
     try:
         inventory_service = InventoryService(config=config)
         device_page: DevicePage = inventory_service.get_devices(
-            limit=1, offset=0, query=f"deviceType:ASA AND name:{asa_create_or_update_input.name}"
+            limit=1,
+            offset=0,
+            query=f"{ASA_DEVICE_TYPE_FILTER} AND name:{asa_create_or_update_input.name}",
         )
         return device_page.items[0] if device_page.count > 0 else None
     except Exception as e:

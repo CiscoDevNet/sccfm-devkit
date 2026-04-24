@@ -41,18 +41,20 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from sccfm_core.constants import SCCFM_REGIONS
 from scripts.token_store import SavedToken, VaultTokenStore
 
-_REGIONS: dict[str, str] = {
+_REGION_DESCRIPTIONS: dict[str, str] = {
+    "int": "Internal (Staging)",
     "us": "United States",
     "eu": "Europe",
     "apj": "Asia Pacific & Japan",
     "au": "Australia",
     "uae": "UAE",
     "in": "India",
-    "int": "Internal (Staging)",
     "ci": "CI",
 }
+_REGIONS: dict[str, str] = {region: _REGION_DESCRIPTIONS[region] for region in SCCFM_REGIONS}
 
 _DEFAULT_EXAMPLES_PATH = "sccfm-ansible/examples"
 _ENV_EXAMPLE = ".env.example"
@@ -409,7 +411,7 @@ def _run_headless(
 
 # ── CLI entry point ──────────────────────────────────────────────
 
-_VALID_REGIONS = tuple(_REGIONS.keys())
+_VALID_REGIONS = tuple(_REGIONS)
 
 
 @click.command(

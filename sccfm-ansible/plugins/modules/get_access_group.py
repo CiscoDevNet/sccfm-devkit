@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.services.policy import AccessGroupService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -20,7 +22,7 @@ options:
     required: true
     type: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -48,6 +50,19 @@ EXAMPLES = r"""
 - name: Show access group name
   ansible.builtin.debug:
     msg: "Access group: {{ result.access_group.name }}"
+
+# Using module_defaults (recommended)
+- name: Get access group with shared auth
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Get access group
+      cisco.sccfm.get_access_group:
+        uid: "c6fa254e-db7a-447e-a58f-95df1e09c2af"
 """
 
 RETURN = r"""
@@ -95,6 +110,8 @@ def run_module() -> None:
         service = AccessGroupService(config=config)
         result = service.fetch_access_group(uid=uid)
         module.exit_json(changed=False, access_group=result.to_dict())
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to get access group: {str(e)}")
 

@@ -49,6 +49,7 @@ def base_module_params_with_query() -> dict[str, Any]:
     return {
         "query": "name:test-*",
         "uids": None,
+        "command": None,
         "commands": ["show version", "show running-config"],
         "limit": 50,
         "offset": 0,
@@ -63,6 +64,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
     return {
         "query": None,
         "uids": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890", "b2c3d4e5-f6a7-8901-bcde-f12345678901"],
+        "command": None,
         "commands": ["show version"],
         "limit": 50,
         "offset": 0,
@@ -123,6 +125,9 @@ def test_should_execute_cli_commands_with_query(
     mock_module_instance_query.exit_json.assert_called_once()
     call_kwargs = mock_module_instance_query.exit_json.call_args[1]
     assert call_kwargs["changed"] is True
+    assert call_kwargs["command"] == "show version\nshow running-config"
+    assert call_kwargs["commands"] == ["show version", "show running-config"]
+    assert call_kwargs["device_count"] == 1
     assert len(call_kwargs["results"]) == 1
     assert "Successfully executed CLI commands" in call_kwargs["msg"]
 
@@ -155,9 +160,43 @@ def test_should_execute_cli_commands_with_uids_without_inventory_lookup(
     mock_module_instance_uids.exit_json.assert_called_once()
     call_kwargs = mock_module_instance_uids.exit_json.call_args[1]
     assert call_kwargs["changed"] is True
+    assert call_kwargs["command"] == "show version"
+    assert call_kwargs["commands"] == ["show version"]
+    assert call_kwargs["device_count"] == 2
     assert len(call_kwargs["results"]) == 1
     # Verify the message includes the correct device count (2 UIDs provided)
     assert "2 device(s)" in call_kwargs["msg"]
+
+
+@patch("plugins.modules.execute_asa_cli.Config")
+@patch("plugins.modules.execute_asa_cli.AsaCommandLineService")
+@patch("plugins.modules.execute_asa_cli.AnsibleModule")
+def test_should_accept_single_command_alias(
+    mock_ansible_module_class: MagicMock,
+    mock_cli_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    mock_module_instance_uids: MagicMock,
+    sample_cli_result: CdoCliResult,
+) -> None:
+    """run_module should accept command as a single-command alias for commands."""
+    mock_module_instance_uids.params["command"] = "show version"
+    mock_module_instance_uids.params["commands"] = None
+    mock_ansible_module_class.return_value = mock_module_instance_uids
+
+    mock_cli = MagicMock()
+    mock_cli.execute_cli.return_value = [sample_cli_result]
+    mock_cli_service_class.return_value = mock_cli
+
+    with pytest.raises(SystemExit):
+        execute_asa_cli.run_module()
+
+    mock_cli.execute_cli.assert_called_once_with(
+        device_uids=mock_module_instance_uids.params["uids"],
+        asa_commands=["show version"],
+    )
+    call_kwargs = mock_module_instance_uids.exit_json.call_args[1]
+    assert call_kwargs["command"] == "show version"
+    assert call_kwargs["commands"] == ["show version"]
 
 
 @patch("plugins.modules.execute_asa_cli.Config")

@@ -10,7 +10,8 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core import FTD_ENTITY_TYPES, InventoryService, SccApiError
+from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.inventory import (
     FtdUpgradeService,
@@ -21,7 +22,7 @@ from sccfm_core.services.inventory.asa_upgrade_version_service import is_version
 from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import create_config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -106,7 +107,7 @@ options:
     type: int
     default: 3600
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -147,6 +148,21 @@ EXAMPLES = r"""
     software_version: "7.4.1"
     wait: true
     timeout: 3600
+
+# Example 4: Using module_defaults (recommended)
+- name: Trigger FTD upgrade
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Stage FTD upgrade for branch devices
+      cisco.sccfm.trigger_ftd_upgrade:
+        query: "name:branch-ftd-*"
+        software_version: "7.4.1"
+        stage_upgrade: true
 """
 
 RETURN = r"""
@@ -178,9 +194,12 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "ignore_maintenance_window": {"type": "bool", "required": False, "default": False},
         "upgrade_name": {"type": "str", "required": False},
         "wait": {"type": "bool", "required": False, "default": False},
-        "timeout": {"type": "int", "required": False, "default": 3600},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        "timeout": {
+            "type": "int",
+            "required": False,
+            "default": DEFAULT_TRANSACTION_TIMEOUT_SEC,
+        },
+        **base_argument_spec(),
     }
 
 
@@ -192,11 +211,10 @@ def resolve_device_uids_from_query(
 ) -> list[str]:
     """Resolve device UIDs from a Lucene query."""
     inventory_service = InventoryService(config=config)
-    type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"({query}) AND ({type_filter})",
+        query=f"({query}) AND {FTD_DEVICE_TYPE_FILTER}",
     )
     return [device.uid for device in (page.items or [])]
 
@@ -358,7 +376,7 @@ def run_module() -> None:
         ignore_maintenance_window: bool = module.params.get("ignore_maintenance_window", False)
         upgrade_name: str | None = module.params.get("upgrade_name")
         wait_for_completion: bool = module.params.get("wait", False)
-        timeout: int = module.params.get("timeout", 3600)
+        timeout: int = module.params.get("timeout", DEFAULT_TRANSACTION_TIMEOUT_SEC)
 
         transaction = _trigger_upgrade(
             config=config,

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
-from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
 
 from sccfm_cli.commands.inventory.devices.asa.shared import AsaDeviceTargetCommand
 from sccfm_cli.commands.inventory.options import (
@@ -15,8 +14,8 @@ from sccfm_cli.commands.inventory.options import (
     offset_option,
     query_option,
 )
-from sccfm_cli.utils import with_spinner
-from sccfm_core import InventoryService
+from sccfm_cli.utils import print_json, with_spinner
+from sccfm_core import ASA_ENTITY_TYPES, InventoryService, build_device_type_filter
 from sccfm_core.models.asa_boot_registry import AsaBootRegistry
 from sccfm_core.services.inventory.asa_boot_registry_service import AsaBootRegistryService
 from sccfm_core.types import ConfigLike
@@ -126,7 +125,7 @@ class AsaListBootRegistryCommand(AsaDeviceTargetCommand):
                     "boot_system_entries": boot.boot_system_entries,
                 }
             )
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_table(
         self,
@@ -167,12 +166,13 @@ class AsaListBootRegistryCommand(AsaDeviceTargetCommand):
         offset: int,
     ) -> list[Device]:
         inventory_service = InventoryService(config=config)
+        device_type_filter = build_device_type_filter(ASA_ENTITY_TYPES)
 
         if query:
             page: DevicePage = inventory_service.get_devices(
                 limit=limit,
                 offset=offset,
-                query=f"{query} AND deviceType:ASA",
+                query=f"{query} AND {device_type_filter}",
             )
             return cast(list[Device], page.items)
 
@@ -184,7 +184,7 @@ class AsaListBootRegistryCommand(AsaDeviceTargetCommand):
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=f"({combined}) AND deviceType:ASA",
+            query=f"({combined}) AND {device_type_filter}",
         )
         return cast(list[Device], page.items)
 

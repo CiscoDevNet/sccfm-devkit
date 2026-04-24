@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -9,7 +8,7 @@ from scc_firewall_manager_sdk import DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import inventory_list_params
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.services import InventoryService
 
 
@@ -46,7 +45,7 @@ class ManagersListCommand(BaseCommand):
         if output_format == "json":
             items = page.items or []
             items_dict = [item.to_dict() for item in items]
-            self.console.print(json.dumps(items_dict, indent=2, default=str))
+            print_json(items_dict)
             return
 
         self.console.print(f"Number of entries:  {page.count}")

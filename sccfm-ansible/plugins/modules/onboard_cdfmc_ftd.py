@@ -16,7 +16,7 @@ from sccfm_core import InventoryService, SccApiError
 from sccfm_core.services.inventory import FtdOnboardService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, base_argument_spec
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -67,7 +67,7 @@ options:
     type: list
     elements: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -117,6 +117,22 @@ EXAMPLES = r"""
     grouped_labels:
       environment:
         - prod
+
+# Example 4: Using module_defaults (recommended)
+- name: Onboard cdFMC-managed FTD
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Onboard branch FTD
+      cisco.sccfm.onboard_cdfmc_ftd:
+        name: "Branch FTD"
+        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+        licenses:
+          - BASE
 """
 
 RETURN = r"""
@@ -127,6 +143,10 @@ cli_key:
     - Can be passed directly to a subsequent SSH task.
   returned: success (changed=True)
   type: str
+device:
+  description: The newly onboarded cdFMC-managed FTD device.
+  returned: success
+  type: dict
 """
 
 
@@ -191,15 +211,7 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-        return
-
+    config: Config = create_config(module)
     name: str = module.params["name"]
     fmc_access_policy_uid: str = module.params["fmc_access_policy_uid"]
     licenses: list[str] = module.params["licenses"]

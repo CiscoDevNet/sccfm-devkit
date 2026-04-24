@@ -1,33 +1,25 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.shared_options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.commands.shared_options import (
+    config_path_option,
+    format_option,
+    limit_option,
+    offset_option,
+)
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.services.policy import AccessGroupListResponse, AccessGroupService
 
 
 def _access_group_list_params() -> list[click.Parameter]:
     return [
-        click.Option(
-            ["--limit"],
-            type=int,
-            default=50,
-            show_default=True,
-            help="Maximum number of results to return.",
-        ),
-        click.Option(
-            ["--offset"],
-            type=int,
-            default=0,
-            show_default=True,
-            help="Pagination offset.",
-        ),
+        limit_option(),
+        offset_option(),
         click.Option(
             ["--query"],
             default=None,
@@ -67,7 +59,7 @@ class ListAccessGroupCommand(BaseCommand):
 
     def _render_page(self, page: AccessGroupListResponse, output_format: str) -> None:
         if output_format == "json":
-            self.console.print(json.dumps(page.to_dict(), indent=2, default=str))
+            print_json(page.to_dict())
             return
 
         self.console.print(

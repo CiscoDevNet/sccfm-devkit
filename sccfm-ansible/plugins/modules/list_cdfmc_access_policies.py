@@ -25,7 +25,7 @@ options:
     required: true
     type: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -53,6 +53,19 @@ EXAMPLES = r"""
 - name: Show access policies
   ansible.builtin.debug:
     var: result.access_policies
+
+# Example 2: Using module_defaults (recommended)
+- name: List cdFMC access policies
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: List access policies for a domain
+      cisco.sccfm.list_cdfmc_access_policies:
+        domain_uid: "e276abec-e0f2-11e3-8169-6d9ed49b625f"
 """
 
 RETURN = r"""

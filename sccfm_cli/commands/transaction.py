@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -14,6 +13,7 @@ from sccfm_cli.commands.shared_options import (
     timeout_option,
     wait_option,
 )
+from sccfm_cli.utils import print_json
 from sccfm_core.services.transaction_service import TransactionService
 
 
@@ -39,7 +39,7 @@ class TransactionCommand(BaseCommand):
                 help="Transaction UID to inspect.",
             ),
             wait_option(),
-            timeout_option(default=3600),
+            timeout_option(),
             format_option(),
             config_path_option(),
         ]
@@ -64,7 +64,7 @@ class TransactionCommand(BaseCommand):
 
         failed = self.is_failed_transaction(transaction)
         if output_format == "json":
-            print(json.dumps(transaction.to_dict(), indent=2, ensure_ascii=False, default=str))
+            print_json(transaction.to_dict())
         elif not wait:
             # Only print details if we didn't wait (direct fetch).
             # For --wait, details were already printed during polling.

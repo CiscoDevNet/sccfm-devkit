@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Mapping, cast
 
@@ -9,6 +8,7 @@ from scc_firewall_manager_sdk import Device, DevicePage, EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
+from sccfm_cli.utils import print_json
 from sccfm_core import InventoryService
 from sccfm_core.types import ConfigLike
 
@@ -191,17 +191,14 @@ class CdfmcFtdDeviceTargetCommand(BaseCommand):
                 }
                 for d in targets.devices
             ]
-            self.console.print(
-                json.dumps(
-                    {
-                        "operation": operation,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "matched_devices": len(targets.devices),
-                        "devices": payload,
-                    },
-                    indent=2,
-                )
+            print_json(
+                {
+                    "operation": operation,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "matched_devices": len(targets.devices),
+                    "devices": payload,
+                }
             )
             return
 

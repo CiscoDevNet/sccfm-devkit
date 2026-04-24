@@ -6,11 +6,11 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
-from sccfm_core import AsaCommandLineService, InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaCommandLineService, InventoryService, SccApiError
 from sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -46,7 +46,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -74,6 +74,18 @@ EXAMPLES = r"""
     query: "name:branch-* AND connectivityState:ONLINE"
     region: "us"
     api_token: "{{ sccfm_api_token }}"
+
+- name: List local users with shared auth
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: List local users on branch ASAs
+      cisco.sccfm.list_asa_local_users:
+        query: "name:branch-* AND connectivityState:ONLINE"
 """
 
 RETURN = r"""
@@ -115,8 +127,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "uids": {"type": "list", "elements": "str", "required": False},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -129,7 +140,7 @@ def resolve_devices_from_query(
     """Return ``(uids, uid_to_name)`` for devices matching *query*."""
     inventory_service = InventoryService(config=config)
     page: DevicePage = inventory_service.get_devices(
-        limit=limit, offset=offset, query=f"{query} AND deviceType:ASA"
+        limit=limit, offset=offset, query=f"{query} AND {ASA_DEVICE_TYPE_FILTER}"
     )
     uids: list[str] = []
     names: dict[str, str] = {}
@@ -169,15 +180,10 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"]],
         required_one_of=[["query", "uids"]],
+        supports_check_mode=True,
     )
 
-    try:
-        config: Config = Config(
-            region=module.params.get("region") or "", api_token=module.params.get("api_token") or ""
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")
     limit: int = module.params.get("limit")
@@ -222,6 +228,7 @@ def run_module() -> None:
             msg=f"Successfully retrieved local users from {len(device_uids)} device(s)",
             results=results_data,
             asa_local_users=asa_local_users,
+            asa_local_users_json=json.dumps(asa_local_users, indent=2),
         )
 
     except ApiException as e:

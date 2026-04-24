@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from scc_firewall_manager_sdk.models.access_rule_create_input import AccessRuleCreateInput
@@ -22,9 +23,9 @@ from sccfm_core.types import ConfigLike
 class AccessRuleResponse:
     """Simplified response for access rule operations."""
 
-    uid: str
-    access_group_uid: str
-    entity_uid: str
+    uid: str | None
+    access_group_uid: str | None
+    entity_uid: str | None
     index: int
     is_active_rule: bool | None
     rule_action: str | None
@@ -37,15 +38,15 @@ class AccessRuleResponse:
     destination_port: dict[str, Any] | None
     log_settings: dict[str, Any] | None
     rule_configuration_text: str | None
-    created_date: str | None
-    updated_date: str | None
+    created_date: datetime | str | None
+    updated_date: datetime | str | None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AccessRuleResponse:
         return cls(
-            uid=str(data.get("uid") or ""),
-            access_group_uid=str(data.get("accessGroupUid") or ""),
-            entity_uid=str(data.get("entityUid") or ""),
+            uid=_optional_string(data.get("uid")),
+            access_group_uid=_optional_string(data.get("accessGroupUid")),
+            entity_uid=_optional_string(data.get("entityUid")),
             index=int(data.get("index", 0)),
             is_active_rule=data.get("isActiveRule"),
             rule_action=data.get("ruleAction"),
@@ -58,8 +59,8 @@ class AccessRuleResponse:
             destination_port=data.get("destinationPort"),
             log_settings=data.get("logSettings"),
             rule_configuration_text=data.get("ruleConfigurationText"),
-            created_date=data.get("createdDate"),
-            updated_date=data.get("updatedDate"),
+            created_date=_parse_iso_datetime(data.get("createdDate")),
+            updated_date=_parse_iso_datetime(data.get("updatedDate")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,8 +80,8 @@ class AccessRuleResponse:
             "destination_port": self.destination_port,
             "log_settings": self.log_settings,
             "rule_configuration_text": self.rule_configuration_text,
-            "created_date": self.created_date,
-            "updated_date": self.updated_date,
+            "created_date": _format_iso_datetime(self.created_date),
+            "updated_date": _format_iso_datetime(self.updated_date),
         }
 
 
@@ -110,6 +111,31 @@ class AccessRuleListResponse:
             "limit": self.limit,
             "offset": self.offset,
         }
+
+
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _format_iso_datetime(value: datetime | str | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    text = value.isoformat()
+    return f"{text[:-6]}Z" if text.endswith("+00:00") else text
 
 
 class AccessRuleService:
@@ -270,7 +296,7 @@ class AccessRuleService:
         """Resolve a network object name to (uid, name) tuple."""
         obj = self._network_object_service.get_network_object_by_name(name)
         if not obj:
-            raise NotFoundError(f"Network object '{name}' not found.")
+            raise NotFoundError(f"Network object with name '{name}' not found.")
         return obj.uid, obj.name
 
     def _resolve_source_network(self, name: str | None) -> SourceNetworkContent | None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -9,7 +8,7 @@ from rich.table import Table
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.objects.utils import check_object_exists
 from sccfm_cli.commands.shared_options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.services import NetworkObjectService
 from sccfm_core.services.policy import AccessRuleResponse, AccessRuleService
 
@@ -205,7 +204,7 @@ class CreateAccessRuleCommand(BaseCommand):
 
     def _render_check_result(self, result: dict[str, Any], output_format: str) -> None:
         if output_format == "json":
-            self.console.print(json.dumps(result, indent=2, default=str))
+            print_json(result)
             return
 
         if result["can_proceed"]:
@@ -227,7 +226,7 @@ class CreateAccessRuleCommand(BaseCommand):
 
     def _render_response(self, response: AccessRuleResponse, output_format: str) -> None:
         if output_format == "json":
-            self.console.print(json.dumps(response.to_dict(), indent=2, default=str))
+            print_json(response.to_dict())
             return
 
         table = Table(title="Access Rule", width=120)

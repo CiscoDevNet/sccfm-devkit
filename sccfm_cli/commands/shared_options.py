@@ -4,6 +4,8 @@ from pathlib import Path
 
 import click
 
+from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
+
 
 def format_option() -> click.Option:
     """Reusable --format option for output formatting."""
@@ -38,7 +40,7 @@ def wait_option() -> click.Option:
     )
 
 
-def timeout_option(default: int = 3600) -> click.Option:
+def timeout_option(default: int = DEFAULT_TRANSACTION_TIMEOUT_SEC) -> click.Option:
     """Reusable --timeout option (seconds) for transaction polling."""
     return click.Option(
         ["--timeout"],

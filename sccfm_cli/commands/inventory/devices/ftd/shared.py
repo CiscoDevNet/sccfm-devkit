@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Mapping, cast
 
 import click
-from scc_firewall_manager_sdk import Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import Device, DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
-from sccfm_core import FTD_ENTITY_TYPES, InventoryService
+from sccfm_cli.utils import print_json
+from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService
 from sccfm_core.types import ConfigLike
 
 _DEFAULT_DEVICE_NAME_HELP = "Device name to search for (supports wildcards like 'branch-*')."
@@ -117,10 +117,9 @@ class FtdDeviceTargetCommand(BaseCommand):
             ctx.fail(f"Provide only one of: {option_list}.")
 
     def _query_with_ftd_device_type(self, query: str, *, wrap_query: bool) -> str:
-        type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
         if wrap_query:
-            return f"({query}) AND ({type_filter})"
-        return f"{query} AND ({type_filter})"
+            return f"({query}) AND {FTD_DEVICE_TYPE_FILTER}"
+        return f"{query} AND {FTD_DEVICE_TYPE_FILTER}"
 
     def _resolve_query(self, filters: FtdDeviceFilters) -> str | None:
         if filters.device_name:
@@ -153,9 +152,8 @@ class FtdDeviceTargetCommand(BaseCommand):
             return cast(list[Device], page.items or [])
 
         if allow_no_filters:
-            type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
             page = inventory_service.get_devices(
-                limit=filters.limit, offset=filters.offset, query=type_filter
+                limit=filters.limit, offset=filters.offset, query=FTD_DEVICE_TYPE_FILTER
             )
             return cast(list[Device], page.items or [])
 
@@ -216,17 +214,14 @@ class FtdDeviceTargetCommand(BaseCommand):
                 }
                 for d in targets.devices
             ]
-            self.console.print(
-                json.dumps(
-                    {
-                        "operation": operation,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "matched_devices": len(targets.devices),
-                        "devices": payload,
-                    },
-                    indent=2,
-                )
+            print_json(
+                {
+                    "operation": operation,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "matched_devices": len(targets.devices),
+                    "devices": payload,
+                }
             )
             return
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
@@ -13,7 +12,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
 from sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
@@ -42,7 +41,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
                 help="The local ASA username whose password will be changed.",
             ),
             click.Option(
-                ["--password"],
+                ["--new-password", "--password"],
                 required=False,
                 default=None,
                 hide_input=True,
@@ -75,7 +74,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
             return
 
         username = cast(str, kwargs["username"])
-        new_password = cast(str | None, kwargs.get("password"))
+        new_password = cast(str | None, kwargs.get("new_password"))
         if not new_password:
             new_password = click.prompt("Password", hide_input=True)
 
@@ -95,7 +94,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
     def _render_results(
         self,
         results: dict[str, AsaPasswordChangeResult] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -110,7 +109,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
     def _render_json(
         self,
         results: dict[str, AsaPasswordChangeResult],
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         output: list[dict[str, str]] = []
         for device_uid, result in results.items():
@@ -123,12 +122,12 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
                     "message": result.message,
                 }
             )
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_table(
         self,
         results: dict[str, AsaPasswordChangeResult],
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         table = Table(show_lines=True)
         table.add_column("Device Name")

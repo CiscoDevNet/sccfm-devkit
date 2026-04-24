@@ -13,7 +13,7 @@ from sccfm_cli.commands.objects.utils import (
     check_referenced_objects_exist,
     validate_identifier,
 )
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService, NetworkObjectService
 from sccfm_core.services.object_management import (
@@ -70,14 +70,11 @@ class RemoveNetworkGroupMemberCommand(BaseCommand):
                     output_format=output_format,
                     emit=False,
                 )
-                self.console.print(
-                    json.dumps(
-                        {
-                            "target": group_check,
-                            "referenced_objects": ref_checks,
-                        },
-                        indent=2,
-                    )
+                print_json(
+                    {
+                        "target": group_check,
+                        "referenced_objects": ref_checks,
+                    }
                 )
                 return
 
@@ -123,7 +120,7 @@ class RemoveNetworkGroupMemberCommand(BaseCommand):
     ) -> None:
         response = result.network_group
         if output_format == "json":
-            self.console.print(json.dumps(response.to_dict(), indent=2, default=str))
+            print_json(response.to_dict())
             return
 
         if result.changed:

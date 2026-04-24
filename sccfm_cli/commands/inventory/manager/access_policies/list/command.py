@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -8,7 +7,7 @@ from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.services.inventory.cdfmc_access_policy_service import (
     CdfmcAccessPolicyService,
     FmcAccessPolicy,
@@ -47,9 +46,7 @@ class ListAccessPoliciesCommand(BaseCommand):
 
     def _render(self, policies: list[FmcAccessPolicy], output_format: str) -> None:
         if output_format == "json":
-            self.console.print(
-                json.dumps([{"uid": p.uid, "name": p.name} for p in policies], indent=2)
-            )
+            print_json([{"uid": p.uid, "name": p.name} for p in policies])
             return
 
         table = Table(title="FMC Access Policies", width=80)

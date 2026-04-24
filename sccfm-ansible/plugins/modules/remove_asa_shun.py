@@ -5,7 +5,7 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
-from sccfm_core import AsaShunService, InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaShunService, InventoryService, SccApiError
 
 from ..module_utils.config import base_argument_spec, create_config
 
@@ -67,7 +67,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, or in).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -164,6 +164,7 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"], ["source_ip", "source_ips"]],
         required_one_of=[["query", "uids"], ["source_ip", "source_ips"]],
+        supports_check_mode=True,
     )
 
     config = create_config(module)
@@ -181,6 +182,14 @@ def run_module() -> None:
 
     try:
         device_uids = _resolve_device_uids(module)
+
+        if module.check_mode is True:
+            module.exit_json(
+                changed=True,
+                msg=f"Would remove shun for {display_subject} on {len(device_uids)} device(s)",
+                results=[],
+            )
+            return
 
         service = AsaShunService(config=config)
         results: CdoTransaction | list[CdoCliResult] = service.remove_shun_entries(
@@ -221,7 +230,7 @@ def _resolve_device_uids(module: AnsibleModule) -> list[str]:
     page: DevicePage = inventory_service.get_devices(
         limit=module.params["limit"],
         offset=module.params["offset"],
-        query=f"({query}) AND deviceType:ASA",
+        query=f"({query}) AND {ASA_DEVICE_TYPE_FILTER}",
     )
     device_uids = [device.uid for device in (page.items or [])]
     if not device_uids:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import Any, Sequence, cast
 
@@ -12,7 +14,7 @@ from scc_firewall_manager_sdk import (
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core import FTD_LICENSES, FTDV_PERFORMANCE_TIERS, InventoryService
 from sccfm_core.services.inventory import FtdOnboardService
 
@@ -123,7 +125,7 @@ class FtdOnboardCommand(BaseCommand):
         cli_key = device.cd_fmc_info.cli_key if device.cd_fmc_info else None
 
         if output_format == "json":
-            self.console.print(json.dumps({"cli_key": cli_key}, indent=2))
+            print_json({"cli_key": cli_key})
         else:
             if cli_key:
                 self.console.print(cli_key)
@@ -149,20 +151,16 @@ class FtdOnboardCommand(BaseCommand):
             device_data = None
             if exists and device_page.items:
                 device_data = device_page.items[0].to_dict()
-            self.console.print(
-                json.dumps(
-                    {
-                        "entity_type": "cdFMC-managed FTD device",
-                        "identifier": name,
-                        "operation": "onboard",
-                        "exists": exists,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "device": device_data,
-                    },
-                    indent=2,
-                    default=str,
-                )
+            print_json(
+                {
+                    "entity_type": "cdFMC-managed FTD device",
+                    "identifier": name,
+                    "operation": "onboard",
+                    "exists": exists,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "device": device_data,
+                }
             )
             return
 

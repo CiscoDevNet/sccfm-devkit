@@ -5,12 +5,12 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
 from sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -66,7 +66,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -156,8 +156,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "new_password": {"type": "str", "required": True, "no_log": True},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -172,7 +171,7 @@ def resolve_device_uids_from_query(
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"{query} AND deviceType:ASA",
+        query=f"{query} AND {ASA_DEVICE_TYPE_FILTER}",
     )
     return [device.uid for device in (page.items or [])]
 
@@ -198,16 +197,10 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"]],
         required_one_of=[["query", "uids"]],
+        supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")
     username: str = module.params["username"]
@@ -227,6 +220,14 @@ def run_module() -> None:
             )
             if not device_uids:
                 module.fail_json(msg="No devices found matching the specified query.")
+
+        if module.check_mode is True:
+            module.exit_json(
+                changed=True,
+                msg=f"Would change password for user '{username}' on {len(device_uids)} device(s)",
+                results=[],
+            )
+            return
 
         password_service = AsaUserPasswordService(config=config)
         results = password_service.change_password(
