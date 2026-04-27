@@ -72,21 +72,41 @@ def test_should_list_access_policies_with_pagination(
     assert call_kwargs["offset"] == 5
 
 
+@patch("plugins.modules.list_cdfmc_access_policies.CdfmcAccessPolicyService")
 @patch("plugins.modules.list_cdfmc_access_policies.AnsibleModule")
-def test_should_return_empty_page_in_check_mode(
+def test_should_list_access_policies_in_check_mode(
     mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
     mock_module_instance: MagicMock,
 ) -> None:
     mock_module_instance.check_mode = True
     mock_ansible_module_class.return_value = mock_module_instance
 
+    policy = MagicMock()
+    policy.uid = "policy-1"
+    policy.name = "Default Access Policy"
+    page = MagicMock()
+    page.items = [policy]
+    page.count = 10
+    page.limit = 5
+    page.offset = 5
+
+    mock_service = MagicMock()
+    mock_service.get_access_policies.return_value = page
+    mock_service_class.return_value = mock_service
+
     with pytest.raises(SystemExit):
         list_cdfmc_access_policies.run_module()
 
+    mock_service.get_access_policies.assert_called_once_with(
+        "domain-1",
+        limit=5,
+        offset=5,
+    )
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
-    assert call_kwargs["access_policies"] == []
-    assert call_kwargs["count"] == 0
+    assert call_kwargs["access_policies"] == [{"uid": "policy-1", "name": "Default Access Policy"}]
+    assert call_kwargs["count"] == 10
     assert call_kwargs["limit"] == 5
     assert call_kwargs["offset"] == 5
 

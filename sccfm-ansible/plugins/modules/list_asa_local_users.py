@@ -183,15 +183,6 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    if module.check_mode is True:
-        module.exit_json(
-            changed=False,
-            msg="Check mode: local-user lookup would run against the selected ASA devices.",
-            results=[],
-            asa_local_users={},
-            asa_local_users_json="{}",
-        )
-
     config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")

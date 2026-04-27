@@ -236,15 +236,6 @@ def run_module() -> None:
     version: str = module.params["version"]
     _validate_version(module, version)
 
-    if module.check_mode is True:
-        module.exit_json(
-            changed=False,
-            msg="Check mode: ASA version compliance lookup would run against the selected devices.",
-            devices=[],
-            device_count=0,
-            matched_device_count=0,
-        )
-
     try:
         all_devices = _fetch_devices(module)
         matched_device_count = len(all_devices)

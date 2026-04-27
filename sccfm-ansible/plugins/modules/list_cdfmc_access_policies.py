@@ -126,16 +126,6 @@ def run_module() -> None:
     limit = module.params["limit"]
     offset = module.params["offset"]
 
-    if module.check_mode is True:
-        module.exit_json(
-            changed=False,
-            access_policies=[],
-            count=0,
-            limit=limit,
-            offset=offset,
-        )
-        return
-
     config = create_config(module)
 
     try:

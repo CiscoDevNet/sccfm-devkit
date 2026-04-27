@@ -215,20 +215,25 @@ def _serialize_results(
     if is_single and not show_per_device:
         uid = next(iter(results.per_device))
         versions = results.per_device[uid]
-        return {
+        single_output = {
             "compatible_versions": [_version_to_dict(v) for v in versions],
         }
+        if results.skipped:
+            single_output["skipped"] = dict(results.skipped)
+        return single_output
 
-    output: dict[str, Any] = {
+    group_output: dict[str, Any] = {
         "common_versions": [_version_to_dict(v) for v in results.common_versions],
         "device_count": len(results.per_device),
     }
     if show_per_device:
-        output["per_device"] = {
+        group_output["per_device"] = {
             uid: [_version_to_dict(v) for v in versions]
             for uid, versions in results.per_device.items()
         }
-    return output
+    if results.skipped:
+        group_output["skipped"] = dict(results.skipped)
+    return group_output
 
 
 def run_module() -> None:
@@ -238,19 +243,6 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
         supports_check_mode=True,
     )
-
-    if module.check_mode is True:
-        output: dict[str, Any] = {
-            "changed": False,
-            "msg": "Check mode: compatible-version lookup would run against the selected FTD devices.",
-            "compatible_versions": [],
-            "common_versions": [],
-            "device_count": 0,
-            "skipped": {},
-        }
-        if module.params.get("per_device", False):
-            output["per_device"] = {}
-        module.exit_json(**output)
 
     config = create_config(module)
 

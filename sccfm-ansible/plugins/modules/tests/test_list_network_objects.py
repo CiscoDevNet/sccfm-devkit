@@ -189,20 +189,30 @@ def test_should_fail_if_api_token_not_provided(
     assert "api_token is required" in call_kwargs["msg"]
 
 
+@patch("plugins.modules.list_network_objects.Config")
+@patch("plugins.modules.list_network_objects.NetworkObjectService")
 @patch("plugins.modules.list_network_objects.AnsibleModule")
 def test_should_support_check_mode(
     mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
     mock_module_instance: MagicMock,
+    sample_list_response: MagicMock,
 ) -> None:
-    """run_module should return empty results in check mode without calling the API."""
+    """Read-only modules should return real results in check mode."""
     mock_module_instance.check_mode = True
     mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_service = MagicMock()
+    mock_service.list_network_objects.return_value = sample_list_response
+    mock_service_class.return_value = mock_service
 
     with pytest.raises(SystemExit):
         list_network_objects.run_module()
 
     mock_module_instance.exit_json.assert_called_once()
+    mock_service.list_network_objects.assert_called_once_with(limit=50, offset=0, query=None)
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
-    assert call_kwargs["network_objects"] == []
-    assert call_kwargs["count"] == 0
+    assert len(call_kwargs["network_objects"]) == 2
+    assert call_kwargs["count"] == 2

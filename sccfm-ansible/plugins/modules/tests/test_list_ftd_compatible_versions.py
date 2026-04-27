@@ -64,6 +64,17 @@ def sample_group_versions() -> FtdGroupCompatibleVersions:
 
 
 @pytest.fixture
+def sample_group_versions_with_skipped(
+    sample_group_versions: FtdGroupCompatibleVersions,
+) -> FtdGroupCompatibleVersions:
+    return FtdGroupCompatibleVersions(
+        per_device=sample_group_versions.per_device,
+        common_versions=sample_group_versions.common_versions,
+        skipped={"skipped-device": "Unsupported device type"},
+    )
+
+
+@pytest.fixture
 def base_module_params_with_query() -> dict[str, Any]:
     return {
         "query": "name:test-*",
@@ -305,6 +316,30 @@ def test_should_include_per_device_when_flag_set(
     call_kwargs = mock_module_instance_uids.exit_json.call_args[1]
     assert "common_versions" in call_kwargs
     assert "per_device" in call_kwargs
+
+
+@patch("plugins.modules.list_ftd_compatible_versions.create_config")
+@patch("plugins.modules.list_ftd_compatible_versions.FtdUpgradeVersionService")
+@patch("plugins.modules.list_ftd_compatible_versions.AnsibleModule")
+def test_should_include_skipped_devices_when_present(
+    mock_ansible_module_class: MagicMock,
+    mock_upgrade_service_class: MagicMock,
+    _mock_create_config: MagicMock,
+    mock_module_instance_uids: MagicMock,
+    sample_group_versions_with_skipped: FtdGroupCompatibleVersions,
+) -> None:
+    """run_module should return skipped device reasons when the service provides them."""
+    mock_ansible_module_class.return_value = mock_module_instance_uids
+
+    mock_upgrade = MagicMock()
+    mock_upgrade.get_compatible_versions.return_value = sample_group_versions_with_skipped
+    mock_upgrade_service_class.return_value = mock_upgrade
+
+    with pytest.raises(SystemExit):
+        list_ftd_compatible_versions.run_module()
+
+    call_kwargs = mock_module_instance_uids.exit_json.call_args[1]
+    assert call_kwargs["skipped"] == {"skipped-device": "Unsupported device type"}
 
 
 @patch("plugins.modules.list_ftd_compatible_versions.AnsibleModule")

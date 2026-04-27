@@ -39,7 +39,7 @@
   - `click.ClickException`, `click.Abort`, `click.exceptions.Exit` re-raised untouched.
   - `KeyboardInterrupt` → `sys.exit(130)`.
   - Generic `Exception` → red `[red]Error: ...[/red]` then `sys.exit(-1)`.
-  - JSON error payloads use `json.dumps(..., indent=2)`.
+  - JSON error payloads use `print_json(...)` and include the original API error body when available.
 
 ---
 
@@ -93,7 +93,7 @@
   - [sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py](sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py)
   - All `objects/` and `policies/` list/get commands.
 - **Invariants:**
-  - JSON branch uses bare `print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))` — **not** `console.print` (Rich would re-process escapes).
+  - JSON branch uses `print_json(payload)` from `sccfm_cli/utils/json_output.py` — **not** `console.print` (Rich would re-process escapes).
   - Table branch uses `rich.table.Table(title=..., show_lines=True)` with explicit column styles (`cyan` for identifiers, `magenta`/`green` for state, `dim` for muted).
   - List renderers always emit `Number of entries:` and `Page: X / Y` before the table.
 - **Drift risks:** `console.print(json.dumps(...))` corrupting JSON for downstream tooling.
@@ -108,7 +108,7 @@
 ### 3.3 Stderr vs stdout discipline
 - **Invariants:**
   - Status/spinner/progress chatter goes to **stderr** (`stderr_console`), keeping stdout machine-parseable.
-  - JSON output goes to stdout via `print(...)`.
+  - JSON output goes to stdout via `print_json(...)`.
 - **Drift risks:** one command leaking spinner text to stdout corrupts downstream pipes.
 
 ### 3.4 Success / warning / error coloring
@@ -187,7 +187,7 @@
 ### 7.1 `TransactionService.wait_for_transaction_to_finish`
 - **Canonical:** [sccfm_core/services/transaction_service.py](sccfm_core/services/transaction_service.py)
 - **Invariants:**
-  - Default `polling_interval_sec=10`, `timeout_sec=300` (services); CLI overrides to `3600`.
+  - Default `polling_interval_sec=10`, `timeout_sec=3600` from `sccfm_core/constants.py`.
   - Terminal states: `DONE`, `ERROR`, `CANCELLED`.
   - Optional `on_poll(transaction)` callback before/after each poll.
   - Raises `TimeoutError` on timeout.
@@ -221,7 +221,7 @@
 ### 8.3 `report_check_targets`
 - **Canonical:** `inventory/devices/{asa,ftd}/shared.py`.
 - **Invariants:**
-  - JSON payload: `{ "operation": ..., "can_proceed": bool, "targets": [{"name","uid","device_type"}] }`.
+  - JSON payload: `{ "operation": ..., "can_proceed": bool, "reason": ..., "matched_devices": int, "devices": [{"name","uid","device_type"}] }`.
   - Table: identical columns across families.
   - Used by every `--check` / dry-run target preview.
 

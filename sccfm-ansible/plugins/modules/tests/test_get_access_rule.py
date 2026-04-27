@@ -71,26 +71,29 @@ def test_should_get_access_rule_successfully(
 @patch("plugins.modules.get_access_rule.Config")
 @patch("plugins.modules.get_access_rule.AccessRuleService")
 @patch("plugins.modules.get_access_rule.AnsibleModule")
-def test_should_return_empty_in_check_mode(
+def test_should_fetch_access_rule_in_check_mode(
     mock_ansible_module_class: MagicMock,
     mock_service_class: MagicMock,
     _mock_config_class: MagicMock,
     mock_module_instance: MagicMock,
 ) -> None:
-    """run_module should return empty dict in check mode without calling API."""
+    """Read-only modules should fetch the object in check mode."""
     mock_module_instance.check_mode = True
     mock_ansible_module_class.return_value = mock_module_instance
 
     mock_service = MagicMock()
+    response = MagicMock()
+    response.to_dict.return_value = {"uid": "rule-uid-123", "rule_action": "PERMIT"}
+    mock_service.fetch_access_rule.return_value = response
     mock_service_class.return_value = mock_service
 
     with pytest.raises(SystemExit):
         get_access_rule.run_module()
 
-    mock_service.fetch_access_rule.assert_not_called()
+    mock_service.fetch_access_rule.assert_called_once_with(uid="rule-uid-123")
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
-    assert call_kwargs["access_rule"] == {}
+    assert call_kwargs["access_rule"] == {"uid": "rule-uid-123", "rule_action": "PERMIT"}
 
 
 @patch("plugins.modules.get_access_rule.Config")

@@ -119,10 +119,6 @@ def run_module() -> None:
     config: Config = create_config(module)
     uid: str = module.params["uid"]
 
-    if module.check_mode:
-        module.exit_json(changed=False, access_rule={})
-        return
-
     try:
         service = AccessRuleService(config=config)
         result = service.fetch_access_rule(uid=uid)

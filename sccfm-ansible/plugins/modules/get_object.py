@@ -136,10 +136,6 @@ def run_module() -> None:
     config: Config = create_config(module)
     uid: str = module.params["uid"]
 
-    if module.check_mode:
-        module.exit_json(changed=False, object={})
-        return
-
     try:
         service = ObjectOverrideService(config=config)
         result = service.get_object(uid=uid)

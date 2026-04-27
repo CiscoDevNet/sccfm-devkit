@@ -135,9 +135,6 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    if module.check_mode:
-        module.exit_json(changed=False, access_rules=[], count=0, limit=0, offset=0)
-
     config: Config = create_config(module)
     params = module.params
 

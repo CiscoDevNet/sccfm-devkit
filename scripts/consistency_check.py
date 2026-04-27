@@ -463,6 +463,9 @@ def _extract_json_output_keys(tree: ast.AST) -> frozenset[str]:
             if call_name == "json.dumps" and node.args:
                 current = self.assignment_stack[-1]
                 keys.update(_resolve_key_set(node.args[0], current, function_return_keys))
+            if call_name and call_name.endswith("print_json") and node.args:
+                current = self.assignment_stack[-1]
+                keys.update(_resolve_key_set(node.args[0], current, function_return_keys))
             self.generic_visit(node)
 
     _JsonVisitor().visit(tree)

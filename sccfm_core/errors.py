@@ -23,6 +23,7 @@ class SccApiError:
     error_code: str | None = None
     details: dict[str, Any] | None = None
     status_code: int | None = None
+    api_error: dict[str, Any] | None = None
 
     @classmethod
     def from_exception(cls, exc: ApiException) -> SccApiError:
@@ -43,12 +44,16 @@ class SccApiError:
 
         if exc.body:
             try:
-                body = json.loads(exc.body)
+                raw_body = json.loads(exc.body)
+                if not isinstance(raw_body, dict):
+                    return cls(message=str(exc), status_code=status_code)
+                body: dict[str, Any] = raw_body
                 return cls(
-                    message=body.get("errorMsg", str(exc)),
-                    error_code=body.get("errorCode"),
+                    message=_extract_error_message(body=body, fallback=str(exc)),
+                    error_code=_extract_error_code(body=body),
                     details=body.get("details"),
                     status_code=status_code,
+                    api_error=body,
                 )
             except json.JSONDecodeError:
                 pass
@@ -61,12 +66,15 @@ class SccApiError:
         Returns:
             A dictionary with keys matching Ansible's fail_json() parameters.
         """
-        return {
+        payload: dict[str, Any] = {
             "msg": self.message,
             "error_code": self.error_code,
             "error_details": self.details,
             "status_code": self.status_code,
         }
+        if self.api_error is not None:
+            payload["api_error"] = self.api_error
+        return payload
 
     def __str__(self) -> str:
         """Human-readable format for CLI output."""
@@ -82,3 +90,44 @@ class NotFoundError(Exception):
     """Exception raised when a resource is not found."""
 
     pass
+
+
+def _extract_error_message(*, body: dict[str, Any], fallback: str) -> str:
+    error_msg = body.get("errorMsg")
+    if isinstance(error_msg, str) and error_msg:
+        return error_msg
+
+    first_message = _first_error_message(body)
+    if first_message is not None:
+        for key in ("description", "details", "message", "code", "errorCode"):
+            value = first_message.get(key)
+            if isinstance(value, str) and value:
+                return value
+
+    return fallback
+
+
+def _extract_error_code(*, body: dict[str, Any]) -> str | None:
+    error_code = body.get("errorCode")
+    if isinstance(error_code, str) and error_code:
+        return error_code
+
+    first_message = _first_error_message(body)
+    if first_message is None:
+        return None
+
+    for key in ("errorCode", "code"):
+        value = first_message.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _first_error_message(body: dict[str, Any]) -> dict[str, Any] | None:
+    messages = body.get("messages")
+    if messages is None and isinstance(body.get("error"), dict):
+        messages = body["error"].get("messages")
+    if not isinstance(messages, list) or not messages:
+        return None
+    first = messages[0]
+    return first if isinstance(first, dict) else None

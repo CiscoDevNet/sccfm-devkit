@@ -36,6 +36,46 @@ class TestFromException:
         assert error.error_code == "NOT_FOUND"
         assert error.details == {"deviceId": "123"}
         assert error.status_code == 404
+        assert error.api_error == {
+            "errorMsg": "Device not found",
+            "errorCode": "NOT_FOUND",
+            "details": {"deviceId": "123"},
+        }
+
+    def test_should_preserve_cisco_messages_schema(self) -> None:
+        """from_exception should preserve Cisco's category/messages/severity body."""
+        body = """
+        {
+          "category": "VALIDATION",
+          "messages": [
+            {
+              "code": "INVALID_COMMAND",
+              "description": "Only show commands are supported",
+              "severity": "ERROR"
+            }
+          ],
+          "severity": "ERROR"
+        }
+        """
+        exc = _create_mock_api_exception(status=400, body=body)
+
+        error = SccApiError.from_exception(exc)
+
+        assert error.message == "Only show commands are supported"
+        assert error.error_code == "INVALID_COMMAND"
+        assert error.details is None
+        assert error.status_code == 400
+        assert error.api_error == {
+            "category": "VALIDATION",
+            "messages": [
+                {
+                    "code": "INVALID_COMMAND",
+                    "description": "Only show commands are supported",
+                    "severity": "ERROR",
+                }
+            ],
+            "severity": "ERROR",
+        }
 
     def test_should_parse_json_body_with_missing_optional_fields(self) -> None:
         """from_exception should handle JSON body with only errorMsg."""
@@ -123,6 +163,27 @@ class TestToDict:
             "error_code": None,
             "error_details": None,
             "status_code": None,
+        }
+
+    def test_should_include_raw_api_error_when_available(self) -> None:
+        """to_dict should retain the original API error body for JSON callers."""
+        error = SccApiError(
+            message="Only show commands are supported",
+            error_code="INVALID_COMMAND",
+            status_code=400,
+            api_error={
+                "category": "VALIDATION",
+                "messages": [{"code": "INVALID_COMMAND"}],
+                "severity": "ERROR",
+            },
+        )
+
+        result = error.to_dict()
+
+        assert result["api_error"] == {
+            "category": "VALIDATION",
+            "messages": [{"code": "INVALID_COMMAND"}],
+            "severity": "ERROR",
         }
 
 

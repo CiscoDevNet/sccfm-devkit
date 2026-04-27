@@ -217,14 +217,6 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    if module.check_mode is True:
-        label = "statistics" if module.params["statistics"] else "entries"
-        module.exit_json(
-            changed=False,
-            msg=f"Check mode: shun {label} lookup would run against the selected ASA devices.",
-            results=[],
-        )
-
     config = create_config(module)
     statistics: bool = module.params["statistics"]
 
