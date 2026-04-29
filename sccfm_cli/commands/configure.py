@@ -10,8 +10,7 @@ from rich.console import Console
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.models import Config
 from sccfm_cli.services import ConfigService
-
-_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")
+from sccfm_core.constants import SCCFM_REGION_CHOICES, SCCFM_REGIONS, normalize_sccfm_region
 
 
 class ConfigureCommand(BaseCommand):
@@ -49,8 +48,8 @@ class ConfigureCommand(BaseCommand):
             ),
             GroupedOption(
                 ["--region"],
-                type=click.Choice(_REGIONS, case_sensitive=False),
-                help=("SCCFM region (in, au, uae, us, eu, apj, int for Cisco developers)"),
+                type=click.Choice(SCCFM_REGION_CHOICES, case_sensitive=False),
+                help=f"SCCFM region ({', '.join(SCCFM_REGIONS)})",
                 group=credential_group,
                 required=True,
             ),
@@ -69,6 +68,8 @@ class ConfigureCommand(BaseCommand):
         config_path = kwargs["config_path"]
 
         config_service = ConfigService(config_path)
-        config = Config(profile=profile, region=region.lower(), api_token=api_token)
+        normalized_region = normalize_sccfm_region(region)
+        assert normalized_region
+        config = Config(profile=profile, region=normalized_region, api_token=api_token)
         config_service.save(config)
         self.console.print(f"[green]Profile '{profile}' updated[/green]")

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Mapping, cast
 
 import click
-from scc_firewall_manager_sdk import Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import Device, DevicePage
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import limit_option, offset_option, query_option
-from sccfm_core import InventoryService
+from sccfm_cli.utils import print_json
+from sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService
 from sccfm_core.types import ConfigLike
 
 _DEFAULT_DEVICE_NAME_HELP = "Device name to search for (supports wildcards like 'branch-*')."
@@ -111,8 +111,8 @@ class CdfmcFtdDeviceTargetCommand(BaseCommand):
 
     def _query_with_ftd_device_type(self, query: str, *, wrap_query: bool) -> str:
         if wrap_query:
-            return f"({query}) AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}"
-        return f"{query} AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}"
+            return f"({query}) AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}"
+        return f"{query} AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}"
 
     def _resolve_query(self, filters: FtdDeviceFilters) -> str | None:
         if filters.device_name:
@@ -134,13 +134,13 @@ class CdfmcFtdDeviceTargetCommand(BaseCommand):
                 offset=filters.offset,
                 query=self._query_with_ftd_device_type(resolved_query, wrap_query=wrap_query),
             )
-            return cast(list[Device], page.items)
+            return cast(list[Device], page.items or [])
 
         uid_query = " OR ".join([f"uid:{uid}" for uid in filters.device_uids or ()])
         page = inventory_service.get_devices(
             limit=filters.limit, offset=filters.offset, query=uid_query
         )
-        return cast(list[Device], page.items)
+        return cast(list[Device], page.items or [])
 
     def resolve_ftd_targets_from_kwargs(
         self,
@@ -191,17 +191,14 @@ class CdfmcFtdDeviceTargetCommand(BaseCommand):
                 }
                 for d in targets.devices
             ]
-            self.console.print(
-                json.dumps(
-                    {
-                        "operation": operation,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "matched_devices": len(targets.devices),
-                        "devices": payload,
-                    },
-                    indent=2,
-                )
+            print_json(
+                {
+                    "operation": operation,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "matched_devices": len(targets.devices),
+                    "devices": payload,
+                }
             )
             return
 

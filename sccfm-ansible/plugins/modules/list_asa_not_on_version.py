@@ -4,9 +4,9 @@ import re
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 
 from ..module_utils.config import base_argument_spec, create_config
 
@@ -60,7 +60,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, or in).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -201,13 +201,13 @@ def _fetch_devices(module: AnsibleModule) -> list[Device]:
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=f"({query}) AND deviceType:{EntityType.ASA.value}",
+            query=f"({query}) AND {ASA_DEVICE_TYPE_FILTER}",
         )
     else:
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=f"deviceType:{EntityType.ASA.value}",
+            query=ASA_DEVICE_TYPE_FILTER,
         )
 
     return cast(list[Device], page.items or [])
@@ -230,6 +230,7 @@ def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"]],
+        supports_check_mode=True,
     )
 
     version: str = module.params["version"]

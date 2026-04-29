@@ -6,7 +6,7 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage, EntityType, FtdVersion
 
-from sccfm_core import FTD_ENTITY_TYPES, InventoryService, SccApiError
+from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from sccfm_core.services.inventory import FtdUpgradeVersionService
 
@@ -74,7 +74,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, or in).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -225,8 +225,6 @@ def _fetch_devices(module: AnsibleModule) -> list[Device]:
     limit: int = module.params["limit"]
     offset: int = module.params["offset"]
 
-    type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
-
     if uids:
         uid_query = " OR ".join(f"uid:{uid}" for uid in uids)
         page: DevicePage = inventory_service.get_devices(limit=len(uids), offset=0, query=uid_query)
@@ -234,13 +232,13 @@ def _fetch_devices(module: AnsibleModule) -> list[Device]:
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=f"({query}) AND ({type_filter})",
+            query=f"({query}) AND {FTD_DEVICE_TYPE_FILTER}",
         )
     else:
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=type_filter,
+            query=FTD_DEVICE_TYPE_FILTER,
         )
 
     return cast(list[Device], page.items or [])
@@ -299,6 +297,7 @@ def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"], ["version", "recommended"]],
+        supports_check_mode=True,
     )
 
     _validate_mode(module)

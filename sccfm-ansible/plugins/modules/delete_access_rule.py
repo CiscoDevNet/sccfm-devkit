@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core.errors import NotFoundError
+from sccfm_core.errors import NotFoundError, SccApiError
 from sccfm_core.services.policy import AccessRuleService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -23,7 +24,7 @@ options:
     required: true
     type: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -105,9 +106,11 @@ def run_module() -> None:
     except NotFoundError:
         module.exit_json(
             changed=False,
-            msg=f"Access rule '{uid}' not found (already absent)",
+            msg=f"Access rule with UID '{uid}' not found; already absent.",
             deleted_uid=None,
         )
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to delete access rule: {str(e)}")
 

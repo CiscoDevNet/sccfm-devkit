@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
@@ -12,7 +11,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core import AsaHaCheckReport, AsaHaCheckService
 
 
@@ -70,8 +69,8 @@ class AsaHaCheckCommand(AsaDeviceTargetCommand):
 
     def _render_results(
         self,
-        results: Dict[str, AsaHaCheckReport] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        results: dict[str, AsaHaCheckReport] | CdoTransaction,
+        uid_to_device: dict[str, Device],
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -85,10 +84,10 @@ class AsaHaCheckCommand(AsaDeviceTargetCommand):
 
     def _render_json(
         self,
-        results: Dict[str, AsaHaCheckReport],
-        uid_to_device: Dict[str, Device],
+        results: dict[str, AsaHaCheckReport],
+        uid_to_device: dict[str, Device],
     ) -> None:
-        output: List[Dict[str, Any]] = []
+        output: list[dict[str, Any]] = []
         for device_uid, report in results.items():
             all_passed = all(c.passed for c in report.checks)
             output.append(
@@ -116,12 +115,12 @@ class AsaHaCheckCommand(AsaDeviceTargetCommand):
                     ],
                 }
             )
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_table(
         self,
-        results: Dict[str, AsaHaCheckReport],
-        uid_to_device: Dict[str, Device],
+        results: dict[str, AsaHaCheckReport],
+        uid_to_device: dict[str, Device],
     ) -> None:
         for device_uid, report in results.items():
             device_name = uid_to_device[device_uid].name

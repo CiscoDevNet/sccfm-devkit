@@ -7,10 +7,10 @@ from scc_firewall_manager_sdk import (
     ApiException,
     CdoTransaction,
     DevicePage,
-    EntityType,
 )
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
 from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from sccfm_core.services.inventory import (
     AsaUpgradeService,
@@ -21,7 +21,7 @@ from sccfm_core.services.inventory import (
 from sccfm_core.services.transaction_service import TransactionService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, base_argument_spec
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -115,9 +115,9 @@ options:
         C(wait=true).
     required: false
     type: int
-    default: 300
+    default: 3600
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -166,7 +166,22 @@ EXAMPLES = r"""
       - "uid-1"
     software_version: "9.18(4)"
     wait: true
-    timeout: 900
+    timeout: 3600
+
+# Example 5: Using module_defaults (recommended)
+- name: Trigger ASA upgrade
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Stage ASA upgrade for branch devices
+      cisco.sccfm.trigger_asa_upgrade:
+        query: "name:branch-*"
+        software_version: "9.18(4)"
+        stage_upgrade: true
 """
 
 RETURN = r"""
@@ -194,7 +209,11 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "ignore_maintenance_window": {"type": "bool", "required": False, "default": False},
         "upgrade_name": {"type": "str", "required": False},
         "wait": {"type": "bool", "required": False, "default": False},
-        "timeout": {"type": "int", "required": False, "default": 300},
+        "timeout": {
+            "type": "int",
+            "required": False,
+            "default": DEFAULT_TRANSACTION_TIMEOUT_SEC,
+        },
         **base_argument_spec(),
     }
 
@@ -210,7 +229,7 @@ def resolve_device_uids_from_query(
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"({query}) AND deviceType:{EntityType.ASA.value}",
+        query=f"({query}) AND {ASA_DEVICE_TYPE_FILTER}",
     )
     return [device.uid for device in (page.items or [])]
 
@@ -391,14 +410,7 @@ def run_module() -> None:
         required_one_of=[["query", "uids"]],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     software_version: str | None = module.params.get("software_version")
     asdm_version: str | None = module.params.get("asdm_version")
 
@@ -462,7 +474,7 @@ def run_module() -> None:
         ignore_maintenance_window: bool = module.params.get("ignore_maintenance_window", False)
         upgrade_name: str | None = module.params.get("upgrade_name")
         wait_for_completion: bool = module.params.get("wait", False)
-        timeout: int = module.params.get("timeout", 300)
+        timeout: int = module.params.get("timeout", DEFAULT_TRANSACTION_TIMEOUT_SEC)
 
         transaction = _trigger_upgrade(
             config=config,

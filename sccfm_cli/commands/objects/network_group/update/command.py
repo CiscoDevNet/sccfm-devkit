@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -17,7 +16,7 @@ from sccfm_cli.commands.objects.utils import (
     validate_has_updates,
     validate_identifier,
 )
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.errors import NotFoundError
 from sccfm_core.services import NetworkGroupService
 from sccfm_core.services.object_management import NetworkGroupResponse
@@ -109,7 +108,7 @@ class UpdateNetworkGroupCommand(BaseCommand):
         output_format: str,
     ) -> None:
         if output_format == "json":
-            self.console.print(json.dumps(response.to_dict(), indent=2, default=str))
+            print_json(response.to_dict())
             return
 
         self.console.print("[green]✓[/green] Network group updated")

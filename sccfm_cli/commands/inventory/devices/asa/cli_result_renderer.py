@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import json
 from typing import Mapping, Sequence
 
 from rich.console import Console
 from rich.table import Table
 from scc_firewall_manager_sdk import CdoCliResult, Device
+
+from sccfm_cli.utils import print_json
 
 
 def render_cli_results(
@@ -29,9 +30,7 @@ def render_cli_results(
 
 def render_cli_results_json(*, results: Sequence[CdoCliResult]) -> None:
     results_data = [item.model_dump(mode="json") for item in results]
-    json_output = json.dumps(results_data, indent=2, ensure_ascii=False)
-    # Use print() instead of console.print() to avoid Rich processing escape sequences.
-    print(json_output)
+    print_json(results_data)
 
 
 def render_cli_results_table(

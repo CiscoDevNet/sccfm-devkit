@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -118,6 +119,7 @@ def test_should_return_parsed_local_users_with_query(
     kwargs = mock_module.exit_json.call_args.kwargs
     assert kwargs["changed"] is False
     assert kwargs["asa_local_users"] == {"asa-local-1": [{"user": "admin", "locked": "N"}]}
+    assert json.loads(kwargs["asa_local_users_json"]) == kwargs["asa_local_users"]
     assert "Successfully retrieved local users from 1 device(s)" in kwargs["msg"]
 
 
@@ -159,6 +161,7 @@ def test_should_resolve_uids_and_return_local_users(
     kwargs = mock_module.exit_json.call_args.kwargs
     assert kwargs["asa_local_users"]["asa-local-1"] == [{"user": "admin", "locked": "N"}]
     assert kwargs["asa_local_users"]["asa-local-2"] == [{"user": "ops", "locked": "Y"}]
+    assert json.loads(kwargs["asa_local_users_json"]) == kwargs["asa_local_users"]
     assert "Successfully retrieved local users from 2 device(s)" in kwargs["msg"]
 
 

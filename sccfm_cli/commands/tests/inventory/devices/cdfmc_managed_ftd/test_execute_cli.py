@@ -277,3 +277,51 @@ def test_check_mode_should_report_targets_without_executing_cli(
     assert payload["matched_devices"] == 1
     assert payload["devices"][0]["uid"] == "uid-ftd-1"
     assert payload["devices"][0]["device_type"] == "CDFMC_MANAGED_FTD"
+
+
+def test_check_mode_should_handle_empty_sdk_page_items(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    execute_called = {"called": False}
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        return DevicePage(count=0, items=None)
+
+    def fake_execute_cli(
+        self: FtdCommandLineService, *, devices: list[Device], command: str
+    ) -> FtdBulkCliResult:
+        execute_called["called"] = True
+        return _sample_result(command=command)
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(FtdCommandLineService, "execute_cli", fake_execute_cli)
+    monkeypatch.setattr(FtdCommandLineService, "__init__", _stub_ftd_cli_init)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "cdfmc-managed-ftd",
+            "cli",
+            "execute",
+            "--query",
+            "name:missing*",
+            "--check",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Command failed: {result.output}"
+    assert execute_called["called"] is False
+    payload = json.loads(result.output)
+    assert payload["can_proceed"] is False
+    assert payload["reason"] == "no_targets_matched"
+    assert payload["matched_devices"] == 0
+    assert payload["devices"] == []

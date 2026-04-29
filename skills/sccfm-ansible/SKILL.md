@@ -89,16 +89,18 @@ Three methods (in order of precedence):
    ```
 3. **Environment variables** — `SCCFM_REGION` and `SCCFM_API_TOKEN`
 
-Valid regions: `int`, `us`, `eu`, `apj`, `aus`, `uae`, `in`, `ci`
+Valid regions: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`
 
-> **Note:** The canonical list is `ALLOWED_REGIONS` in `sccfm-ansible/plugins/module_utils/config.py`. The CLI uses a slightly different set (`au` instead of `aus`, no `ci`).
+> **Note:** The canonical list is shared from `sccfm_core/constants.py` and normalized
+> through `sccfm-ansible/plugins/module_utils/config.py`. The legacy alias `aus`
+> is still accepted and normalized to `au`.
 
 ## First-time token and vault setup
 
 Before running any playbook, the user needs an API token and vault configured. If vault files don't exist yet, you MUST help the user set up.
 
 **Ask the user for:**
-1. **Region** — which SCCFM region they use (valid: `us`, `eu`, `apj`, `aus`, `uae`, `in`, `int`, `ci`)
+1. **Region** — which SCCFM region they use (valid: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`; legacy `aus` is accepted and normalized to `au`)
 2. **API token** — their SCCFM API token (bearer token from the SCC portal)
 3. **Vault password** — a password to encrypt sensitive values (only needed if `.vault_pass` doesn't exist)
 

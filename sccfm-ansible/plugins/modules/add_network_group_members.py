@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core.errors import NotFoundError
+from sccfm_core.errors import NotFoundError, SccApiError
 from sccfm_core.services.object_management import (
     NetworkGroupMemberMutationResult,
     NetworkGroupService,
@@ -45,7 +46,7 @@ options:
     type: list
     elements: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -79,11 +80,30 @@ EXAMPLES = r"""
     referenced_objects:
       - "22222222-2222-2222-2222-222222222222"
       - "33333333-3333-3333-3333-333333333333"
+
+# Example 3: Using module_defaults (recommended)
+- name: Add network group members
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Add web servers to group
+      cisco.sccfm.add_network_group_members:
+        name: web-servers
+        referenced_objects:
+          - web-server-01
+          - web-server-02
 """
 
 RETURN = r"""
 network_group:
-  description: The resulting network group state.
+  description:
+    - The resulting network group state.
+    - Returned keys include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), C(literals), and C(referenced_object_uids).
   returned: success
   type: dict
   contains:
@@ -93,12 +113,6 @@ network_group:
     name:
       description: Name of the network group.
       type: str
-    description:
-      description: Description of the network group.
-      type: str
-    elements:
-      description: Elements associated with the group.
-      type: list
     labels:
       description: Labels attached to the group.
       type: list
@@ -183,6 +197,8 @@ def run_module() -> None:
         )
     except NotFoundError as e:
         module.fail_json(msg=str(e))
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to add network group members: {str(e)}")
 

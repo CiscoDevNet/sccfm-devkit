@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.services.policy import AccessRuleService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -20,7 +22,7 @@ options:
     required: true
     type: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -117,14 +119,12 @@ def run_module() -> None:
     config: Config = create_config(module)
     uid: str = module.params["uid"]
 
-    if module.check_mode:
-        module.exit_json(changed=False, access_rule={})
-        return
-
     try:
         service = AccessRuleService(config=config)
         result = service.fetch_access_rule(uid=uid)
         module.exit_json(changed=False, access_rule=result.to_dict())
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to get access rule: {str(e)}")
 

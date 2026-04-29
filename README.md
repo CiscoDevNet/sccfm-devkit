@@ -22,17 +22,17 @@ Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcomin
 scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
 source scripts/activate.sh     # activates the project virtualenv
 sccfm-cli --help               # the main SCCFM CLI
-poetry run devkit              # interactive developer toolkit menu
+devkit                         # interactive developer toolkit menu
 ```
 
 `setup_environment.sh` keeps everything local to the repository: pyenv provides Python 3.12.4, `.venv/` hosts the runtime, and Poetry installs the project plus dev dependencies.
 
 ## Commands
 
-- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`in`, `au`, `uae`, `us`, `eu`, `apj`, `int`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) and stores it under `~/.sccfm-cli/` (override with `--config-path` or `SCCFM_CONFIG`).
-- `sccfm-cli status [--config-path PATH]`: Shows the current profile plus mock subsystem health using Rich tables.
+- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) and stores it under `~/.sccfm-cli/` (override with `--config-path` or `SCCFM_CONFIG`).
+- `sccfm-cli status [--config-path PATH]`: Shows the current profile plus SCCFM connectivity health using Rich tables.
 - `sccfm-cli inventory devices list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists device inventory with pagination and optional name filtering.
-- `sccfm-cli inventory managers list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
+- `sccfm-cli inventory manager list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
 - `sccfm-cli inventory devices asa change-boot-image --image-path disk0:/asa9xxx.bin ...`: Changes the configured ASA boot image for the next reload. The image must already exist on the device; the command does not upload or reboot. `--check` performs non-mutating validation of the image path and containing filesystem before any change.
 
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
@@ -41,10 +41,10 @@ Every command lives in `sccfm_cli/commands/` as a concrete implementation of the
 ## Ansible collection
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
-- Build and install the collection locally: `poetry run devkit build-collection`.
-- Set up tokens interactively: `poetry run devkit` and select **setup-tokens** (saves your API token, creates `.env`, `.vault_pass`, encrypts `group_vars/all/vault.yml`, and sets the region).
+- Build and install the collection locally: `build-ansible-collection`.
+- Set up tokens interactively: `devkit` and select **change-tokens** (saves your API token, creates `.env`, `.vault_pass`, encrypts `group_vars/all/vault.yml`, and sets the region).
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
-- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `aus`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
+- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
 
@@ -61,7 +61,7 @@ This presents an interactive selector with the following tasks:
 
 | Task | Description |
 |------|-------------|
-| **setup-tokens** | Set up SCCFM API tokens, .env, and Ansible Vault |
+| **change-tokens** | Set up SCCFM API tokens, .env, and Ansible Vault |
 | **build-collection** | Build the cisco.sccfm Ansible collection tarball |
 | **setup-env** | Bootstrap environment (pyenv, venv, Poetry deps) |
 | **test** | Run the test suite (pytest), with optional filter & verbose |
@@ -73,9 +73,10 @@ After a task completes you're returned to the menu — select **Exit** when done
 The underlying tools are still available directly if needed:
 
 ```bash
-poetry run pytest
-poetry run mypy sccfm_cli
-poetry run black .
+source scripts/activate.sh
+pytest
+mypy sccfm_cli
+black .
 ```
 
 See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expectations. The setup script also installs a local `git cz` alias that runs `./scripts/cz.sh commit` so you can use `git cz` for conventional commits with visible pre-commit output.
@@ -110,7 +111,8 @@ If tests fail with messages like `Usage: group inventory devices asa [OPTIONS] C
 ```bash
 poetry install  # Reinstall the package in editable mode
 find . -type d -name "__pycache__" -exec rm -rf {} +  # Clear all bytecode caches
-poetry run pytest  # Rerun tests
+source scripts/activate.sh
+pytest  # Rerun tests
 ```
 
 **Why this happens:** When you modify command structure or add new CLI commands, Python's `__pycache__` directories can retain old `.pyc` files that don't reflect your changes. Tests then run against the cached version instead of your updated source code.

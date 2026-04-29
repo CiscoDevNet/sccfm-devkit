@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -13,7 +12,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
 from sccfm_core.services import AsaBootImageService
 from sccfm_core.utils import validate_asa_image_path
@@ -157,7 +156,7 @@ class AsaChangeBootImageCommand(AsaDeviceTargetCommand):
                     "boot_system_entries_after": result.boot_system_entries_after,
                 }
             )
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        print_json(payload)
 
     def _render_table(
         self,

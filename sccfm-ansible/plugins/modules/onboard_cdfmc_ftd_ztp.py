@@ -15,7 +15,7 @@ from sccfm_core import InventoryService, SccApiError
 from sccfm_core.services.inventory import FtdZtpOnboardService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, base_argument_spec
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -66,7 +66,7 @@ options:
     required: false
     type: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -105,6 +105,23 @@ EXAMPLES = r"""
     fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
     admin_password: "{{ ftd_admin_password }}"
     device_group_uid: "abcd1234-0000-0000-0000-000000000001"
+
+# Example 3: Using module_defaults (recommended)
+- name: Onboard cdFMC-managed FTD with ZTP
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Onboard branch FTD through ZTP
+      cisco.sccfm.onboard_cdfmc_ftd_ztp:
+        name: "Branch FTD"
+        serial_number: "FTD1234567890"
+        licenses:
+          - BASE
+        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
 """
 
 RETURN = r"""
@@ -146,15 +163,7 @@ def run_module() -> None:
         supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-        return
-
+    config: Config = create_config(module)
     name: str = module.params["name"]
     serial_number: str = module.params["serial_number"]
     licenses: list[str] = module.params["licenses"]

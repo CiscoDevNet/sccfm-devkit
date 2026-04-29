@@ -4,6 +4,7 @@ requires_ansible: ">=2.15.0"
 action_groups:
   cisco.sccfm.all:
     - add_asa_shun
+    - add_network_group_members
     - add_object_override
     - apply_object_override_as_default
     - change_asa_boot_image
@@ -39,7 +40,9 @@ action_groups:
     - list_network_objects
     - onboard_asa
     - onboard_cdfmc_ftd
+    - onboard_cdfmc_ftd_ztp
     - remove_asa_shun
+    - remove_network_group_members
     - show_asa_shun
     - trigger_asa_upgrade
     - trigger_ftd_upgrade

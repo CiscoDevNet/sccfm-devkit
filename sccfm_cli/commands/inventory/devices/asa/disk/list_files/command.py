@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Sequence, cast
+from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
@@ -12,7 +11,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core import AsaDiskFileService
 from sccfm_core.models.asa_disk_file import AsaDiskFile
 
@@ -60,7 +59,7 @@ class AsaDiskListFilesCommand(AsaDeviceTargetCommand):
     def _render_results(
         self,
         results: dict[str, list[AsaDiskFile]] | CdoTransaction,
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
         format: str,
     ) -> None:
         if isinstance(results, CdoTransaction):
@@ -75,7 +74,7 @@ class AsaDiskListFilesCommand(AsaDeviceTargetCommand):
     def _render_json(
         self,
         results: dict[str, list[AsaDiskFile]],
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         output: list[dict[str, Any]] = []
         for device_uid, files in results.items():
@@ -91,12 +90,12 @@ class AsaDiskListFilesCommand(AsaDeviceTargetCommand):
                         "file_type": f.file_type.value,
                     }
                 )
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_table(
         self,
         results: dict[str, list[AsaDiskFile]],
-        uid_to_device: Dict[str, Device],
+        uid_to_device: dict[str, Device],
     ) -> None:
         table = Table(show_lines=True)
         table.add_column("Device Name")

@@ -5,7 +5,13 @@ from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import CdoCliResult, Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import (
+    CdoCliResult,
+    CdoTransaction,
+    Device,
+    DevicePage,
+    EntityType,
+)
 
 from sccfm_cli.cli import cli
 from sccfm_cli.models import Config
@@ -134,6 +140,61 @@ def test_should_display_cli_results_as_table(
         assert device.name in output_text
         if device.uid:
             assert device.uid in output_text
+
+
+def test_failed_transaction_should_honor_json_format(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+) -> None:
+    """ASA execute CLI should keep stdout machine-readable for transaction failures."""
+    failed_transaction = CdoTransaction(
+        transactionUid="txn-failed",
+        cdoTransactionStatus="ERROR",
+        errorMessage="Device unreachable",
+    )
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        return DevicePage(count=len(sample_devices), items=sample_devices)
+
+    def fake_execute_cli(
+        self: AsaCommandLineService, *, device_uids: list[str], asa_commands: list[str]
+    ) -> CdoTransaction:
+        return failed_transaction
+
+    def stub_asa_cli_init(self: AsaCommandLineService, config: Any) -> None:
+        return None
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaCommandLineService, "execute_cli", fake_execute_cli)
+    monkeypatch.setattr(AsaCommandLineService, "__init__", stub_asa_cli_init)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "cli",
+            "execute",
+            "-u",
+            "uid-1",
+            "--script",
+            "show version",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code != 0
+    payload = json.loads(result.output)
+    assert payload["transactionUid"] == "txn-failed"
+    assert payload["cdoTransactionStatus"] == "ERROR"
+    assert payload["errorMessage"] == "Device unreachable"
 
 
 def test_should_filter_devices_by_query_and_execute_cli_on_devices(

@@ -1,8 +1,9 @@
-from typing import Any, List
+from __future__ import annotations
+
+from typing import Any
 
 import click
 from rich.console import Console
-from scc_firewall_manager_sdk import EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.asa.change_boot_image import (
@@ -11,11 +12,11 @@ from sccfm_cli.commands.inventory.devices.asa.change_boot_image import (
 from sccfm_cli.commands.inventory.devices.asa.cli import AsaCliCommand
 from sccfm_cli.commands.inventory.devices.asa.disk import AsaDiskCommand
 from sccfm_cli.commands.inventory.devices.asa.ha_check import AsaHaCheckCommand
-from sccfm_cli.commands.inventory.devices.asa.list_asa_local_users.command import (
-    AsaListLocalUsersCommand,
-)
 from sccfm_cli.commands.inventory.devices.asa.list_boot_registry import (
     AsaListBootRegistryCommand,
+)
+from sccfm_cli.commands.inventory.devices.asa.list_local_users import (
+    AsaListLocalUsersCommand,
 )
 from sccfm_cli.commands.inventory.devices.asa.list_not_on_version import (
     AsaListNotOnVersionCommand,
@@ -26,19 +27,20 @@ from sccfm_cli.commands.inventory.devices.asa.smartlicense.command import Smartl
 from sccfm_cli.commands.inventory.devices.asa.upgrade import AsaUpgradeCommand
 from sccfm_cli.commands.inventory.devices.asa.user import AsaUserCommand
 from sccfm_cli.commands.inventory.devices.rendering import DeviceListCommand
+from sccfm_core import ASA_ENTITY_TYPES
 
 
 class AsaCommand(BaseCommand):
     def __init__(self, console: Console) -> None:
         super().__init__(console)
-        self._subcommands: List[BaseCommand] = [
+        self._subcommands: list[BaseCommand] = [
             AsaChangeBootImageCommand(console),
             AsaCliCommand(console),
             AsaDiskCommand(console),
             AsaHaCheckCommand(console),
             DeviceListCommand(
                 console,
-                entity_types=[EntityType.ASA],
+                entity_types=ASA_ENTITY_TYPES,
                 spinner_text="Fetching ASA devices from SCC Firewall Manager...",
                 help_text="List ASA devices.",
             ),

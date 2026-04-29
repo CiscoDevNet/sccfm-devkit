@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device, DevicePage, EntityType
+from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.ftd_cli_result import FtdBulkCliResult
 from sccfm_core.services.inventory.ftd_cli_service import (
     FtdCommandLineService,
@@ -13,7 +13,7 @@ from sccfm_core.services.inventory.ftd_cli_service import (
 )
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -44,8 +44,16 @@ options:
     description:
       - The show command to execute on the FTD devices.
       - Only show commands are supported (e.g. show version, show failover).
-    required: true
+      - Mutually exclusive with C(commands).
+    required: false
     type: str
+  commands:
+    description:
+      - Single-item list containing the show command to execute on the FTD devices.
+      - Mutually exclusive with C(command). FTD bulk execution supports one command per request.
+    required: false
+    type: list
+    elements: str
   limit:
     description:
       - Maximum number of devices to return when using C(query).
@@ -61,7 +69,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -116,6 +124,15 @@ command:
   description: The show command that was executed.
   returned: success
   type: str
+commands:
+  description: Single-item command list that was executed.
+  returned: success
+  type: list
+  elements: str
+device_count:
+  description: Number of target devices matched by the module.
+  returned: success
+  type: int
 results:
   description: List of CLI execution results per device.
   returned: success
@@ -144,11 +161,11 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "query": {"type": "str", "required": False},
         "uids": {"type": "list", "elements": "str", "required": False},
-        "command": {"type": "str", "required": True},
+        "command": {"type": "str", "required": False},
+        "commands": {"type": "list", "elements": "str", "required": False},
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -166,36 +183,45 @@ def resolve_ftd_devices(
         page: DevicePage = inventory_service.get_devices(
             limit=len(uids),
             offset=0,
-            query=f"({uid_query}) AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}",
+            query=f"({uid_query}) AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}",
         )
     else:
         page = inventory_service.get_devices(
             limit=limit,
             offset=offset,
-            query=f"{query} AND deviceType:{EntityType.CDFMC_MANAGED_FTD.value}",
+            query=f"({query}) AND {CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER}",
         )
     return list(page.items or [])
+
+
+def _normalize_command(module: AnsibleModule) -> str:
+    command: str | None = module.params.get("command")
+    commands: list[str] | None = module.params.get("commands")
+    if command:
+        return command
+    normalized_commands = list(commands or [])
+    if len(normalized_commands) != 1:
+        module.fail_json(
+            msg=(
+                "execute_ftd_cli accepts exactly one command. "
+                "Use 'command' or provide a single-item 'commands' list."
+            )
+        )
+    return normalized_commands[0]
 
 
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
         supports_check_mode=True,
-        mutually_exclusive=[["query", "uids"]],
-        required_one_of=[["query", "uids"]],
+        mutually_exclusive=[["query", "uids"], ["command", "commands"]],
+        required_one_of=[["query", "uids"], ["command", "commands"]],
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")
-    command: str = module.params["command"]
+    command = _normalize_command(module)
     limit: int = module.params["limit"]
     offset: int = module.params["offset"]
 
@@ -216,6 +242,7 @@ def run_module() -> None:
                 changed=False,
                 msg=f"Would execute '{normalized_command}' on {len(devices)} device(s).",
                 command=normalized_command,
+                commands=[normalized_command],
                 results=[],
                 device_count=len(devices),
             )
@@ -241,6 +268,8 @@ def run_module() -> None:
             changed=False,
             msg=f"Successfully executed '{command}' on {len(devices)} device(s)",
             command=result.command,
+            commands=[result.command],
+            device_count=len(devices),
             results=results_data,
         )
 

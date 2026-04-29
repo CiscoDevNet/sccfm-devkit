@@ -222,7 +222,7 @@ class TestNetworkGroupRemoveMemberCommand:
 
         assert result.exit_code == 0
         assert "Referenced object 'web-server-01' exists" in result.output
-        assert "Referenced object 'does-not-exist' not found" in result.output
+        assert "Referenced object 'does-not-exist' not found." in result.output
 
     def test_check_json_should_emit_single_payload_with_referenced_object_results(
         self,

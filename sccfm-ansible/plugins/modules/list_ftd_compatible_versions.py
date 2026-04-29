@@ -10,12 +10,12 @@ from scc_firewall_manager_sdk import (
     FtdVersion,
 )
 
-from sccfm_core import FTD_ENTITY_TYPES, InventoryService, SccApiError
+from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from sccfm_core.services.inventory import FtdUpgradeVersionService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import create_config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -68,7 +68,7 @@ options:
     type: bool
     default: false
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -123,6 +123,20 @@ EXAMPLES = r"""
   ansible.builtin.debug:
     msg: "Device {{ item.key }}: {{ item.value | length }} version(s)"
   loop: "{{ compat_versions.per_device | dict2items }}"
+
+# Example 4: Using module_defaults (recommended)
+- name: List FTD compatible versions
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Get compatible versions for branch FTDs
+      cisco.sccfm.list_ftd_compatible_versions:
+        query: "name:branch-*"
+      register: compat_versions
 """
 
 RETURN = r"""
@@ -148,6 +162,10 @@ device_count:
   description: Number of devices included in the query.
   returned: success (multi-device or per_device=true)
   type: int
+skipped:
+  description: FTD device UIDs skipped during eligibility checks, keyed by UID.
+  returned: success (check mode or when devices are skipped)
+  type: dict
 """
 
 
@@ -158,8 +176,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
         "per_device": {"type": "bool", "required": False, "default": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -171,11 +188,10 @@ def resolve_device_uids_from_query(
 ) -> list[str]:
     """Resolve device UIDs from a query. Returns empty list if no devices match."""
     inventory_service = InventoryService(config=config)
-    type_filter = " OR ".join(f"deviceType:{t.value}" for t in FTD_ENTITY_TYPES)
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"({query}) AND ({type_filter})",
+        query=f"({query}) AND {FTD_DEVICE_TYPE_FILTER}",
     )
     return [device.uid for device in (page.items or [])]
 
@@ -199,20 +215,25 @@ def _serialize_results(
     if is_single and not show_per_device:
         uid = next(iter(results.per_device))
         versions = results.per_device[uid]
-        return {
+        single_output = {
             "compatible_versions": [_version_to_dict(v) for v in versions],
         }
+        if results.skipped:
+            single_output["skipped"] = dict(results.skipped)
+        return single_output
 
-    output: dict[str, Any] = {
+    group_output: dict[str, Any] = {
         "common_versions": [_version_to_dict(v) for v in results.common_versions],
         "device_count": len(results.per_device),
     }
     if show_per_device:
-        output["per_device"] = {
+        group_output["per_device"] = {
             uid: [_version_to_dict(v) for v in versions]
             for uid, versions in results.per_device.items()
         }
-    return output
+    if results.skipped:
+        group_output["skipped"] = dict(results.skipped)
+    return group_output
 
 
 def run_module() -> None:
@@ -220,6 +241,7 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"]],
         required_one_of=[["query", "uids"]],
+        supports_check_mode=True,
     )
 
     config = create_config(module)

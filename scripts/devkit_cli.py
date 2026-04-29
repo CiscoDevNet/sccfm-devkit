@@ -2,8 +2,7 @@
 """Unified devkit CLI — interactive entry-point for all helper scripts.
 
 Usage:
-    poetry run devkit          # interactive menu
-    poetry run devkit --help   # show available commands
+    devkit          # interactive menu
 """
 
 from __future__ import annotations

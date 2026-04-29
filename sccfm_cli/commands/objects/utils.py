@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import uuid as uuid_mod
 from typing import Any, Callable, Literal, Protocol
 
 import click
 from rich.console import Console
+
+from sccfm_cli.utils import print_json
 
 
 class _HasUid(Protocol):
@@ -163,12 +164,7 @@ def check_object_exists(
         return result
 
     if output_format == "json":
-        console.print(
-            json.dumps(
-                result,
-                indent=2,
-            )
-        )
+        print_json(result)
         return result
 
     if can_proceed:
@@ -217,12 +213,7 @@ def check_referenced_objects_exist(
         return results
 
     if output_format == "json":
-        console.print(
-            json.dumps(
-                {"referenced_objects": results},
-                indent=2,
-            )
-        )
+        print_json({"referenced_objects": results})
         return results
 
     for item in results:
@@ -230,5 +221,5 @@ def check_referenced_objects_exist(
         if item["exists"]:
             console.print(f"[green]✓[/green] Referenced object '{ref}' exists (UID: {item['uid']})")
         else:
-            console.print(f"[yellow]![/yellow] Referenced object '{ref}' not found")
+            console.print(f"[yellow]![/yellow] Referenced object '{ref}' not found.")
     return results

@@ -136,5 +136,7 @@ class TestListAccessGroup:
         )
 
         assert result.exit_code == 0
+        assert "Number of entries:" in result.output
+        assert "Page:" in result.output
         assert "outside_access_in" in result.output
         assert "inside_access_out" in result.output

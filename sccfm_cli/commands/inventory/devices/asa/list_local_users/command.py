@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Sequence, cast
 
 import click
@@ -12,7 +11,7 @@ from sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils.spinner import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core import AsaCommandLineService
 from sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
 
@@ -92,7 +91,7 @@ class AsaListLocalUsersCommand(AsaDeviceTargetCommand):
             grouped[device_name] = rows_to_dicts(headers, rows)
 
         # Use print() to avoid Rich escape-sequence processing.
-        print(json.dumps(grouped, indent=2, ensure_ascii=False))
+        print_json(grouped)
 
     def _render_table(
         self,

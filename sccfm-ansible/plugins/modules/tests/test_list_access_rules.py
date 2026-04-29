@@ -62,22 +62,37 @@ def test_should_list_access_rules_successfully(
     assert call_kwargs["count"] == 2
 
 
+@patch("plugins.modules.list_access_rules.Config")
+@patch("plugins.modules.list_access_rules.AccessRuleService")
 @patch("plugins.modules.list_access_rules.AnsibleModule")
-def test_should_return_empty_in_check_mode(
+def test_should_read_access_rules_in_check_mode(
     mock_ansible_module_class: MagicMock,
+    mock_service_class: MagicMock,
+    _mock_config_class: MagicMock,
     mock_module_instance: MagicMock,
 ) -> None:
-    """run_module should return empty list in check mode."""
+    """Read-only modules should return real data in check mode."""
     mock_module_instance.check_mode = True
     mock_ansible_module_class.return_value = mock_module_instance
+
+    mock_result = MagicMock()
+    mock_result.items = [MagicMock()]
+    mock_result.items[0].to_dict.return_value = {"uid": "rule-1", "rule_action": "PERMIT"}
+    mock_result.count = 1
+    mock_result.limit = 50
+    mock_result.offset = 0
+    mock_service = MagicMock()
+    mock_service.list_access_rules.return_value = mock_result
+    mock_service_class.return_value = mock_service
 
     with pytest.raises(SystemExit):
         list_access_rules.run_module()
 
+    mock_service.list_access_rules.assert_called_once_with(query=None, limit=50, offset=0)
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is False
-    assert call_kwargs["access_rules"] == []
-    assert call_kwargs["count"] == 0
+    assert call_kwargs["access_rules"] == [{"uid": "rule-1", "rule_action": "PERMIT"}]
+    assert call_kwargs["count"] == 1
 
 
 @patch("plugins.modules.list_access_rules.Config")

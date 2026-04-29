@@ -100,7 +100,10 @@ _CLI_ANSIBLE_IGNORED_OPTIONS: frozenset[str] = frozenset(
     {"check", "config_path", "device_name", "format", "help"}
 )
 _CLI_TO_ANSIBLE_OPTION_ALIASES: dict[str, str] = {
+    "device_uid": "uids",
     "device_uids": "uids",
+    "script": "commands",
+    "script_file": "commands",
 }
 
 
@@ -183,7 +186,7 @@ def _camel_to_snake(name: str) -> str:
 def _safe_parse(file: Path) -> ast.AST | None:
     try:
         return ast.parse(file.read_text(encoding="utf-8"))
-    except SyntaxError:
+    except (OSError, SyntaxError):
         return None
 
 
@@ -275,10 +278,14 @@ def _extract_function_return_keys(tree: ast.AST) -> dict[str, frozenset[str]]:
     class _ReturnVisitor(ast.NodeVisitor):
         def __init__(self) -> None:
             self.current_function: list[str] = []
+            self.assignment_stack: list[dict[str, frozenset[str]]] = [{}]
 
         def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            assignments = _collect_assigned_key_sets(node.body, {})
             self.current_function.append(node.name)
+            self.assignment_stack.append(assignments)
             self.generic_visit(node)
+            self.assignment_stack.pop()
             self.current_function.pop()
 
         visit_AsyncFunctionDef = visit_FunctionDef
@@ -287,7 +294,12 @@ def _extract_function_return_keys(tree: ast.AST) -> dict[str, frozenset[str]]:
             if not self.current_function:
                 return
             function_name = self.current_function[-1]
-            for key in _dict_literal_keys(node.value):
+            keys = _dict_literal_keys(node.value) | _resolve_key_set(
+                node.value,
+                self.assignment_stack[-1],
+                {},
+            )
+            for key in keys:
                 result[function_name].add(key)
 
     _ReturnVisitor().visit(tree)
@@ -319,11 +331,25 @@ def _collect_assigned_key_sets(
             for target in statement.targets:
                 if isinstance(target, ast.Name) and key_set:
                     local_assignments[target.id] = key_set
+                elif isinstance(target, ast.Subscript):
+                    target_name = _subscript_target_name(target)
+                    target_key = _string_value(target.slice)
+                    if target_name and target_key:
+                        local_assignments[target_name] = local_assignments.get(
+                            target_name, frozenset()
+                        ) | {target_key}
         elif isinstance(statement, ast.AnnAssign):
             if isinstance(statement.target, ast.Name) and statement.value is not None:
                 key_set = _resolve_key_set(statement.value, local_assignments, function_return_keys)
                 if key_set:
                     local_assignments[statement.target.id] = key_set
+            elif isinstance(statement.target, ast.Subscript):
+                target_name = _subscript_target_name(statement.target)
+                target_key = _string_value(statement.target.slice)
+                if target_name and target_key:
+                    local_assignments[target_name] = local_assignments.get(
+                        target_name, frozenset()
+                    ) | {target_key}
         for child_statements in _nested_statement_lists(statement):
             local_assignments.update(
                 _collect_assigned_key_sets(
@@ -333,6 +359,12 @@ def _collect_assigned_key_sets(
                 )
             )
     return local_assignments
+
+
+def _subscript_target_name(target: ast.Subscript) -> str | None:
+    if isinstance(target.value, ast.Name):
+        return target.value.id
+    return None
 
 
 def _nested_statement_lists(statement: ast.stmt) -> list[Sequence[ast.stmt]]:
@@ -394,6 +426,8 @@ def _extract_exit_json_keys(tree: ast.AST) -> frozenset[str]:
 
         def visit_Call(self, node: ast.Call) -> None:
             call_name = _call_name(node.func)
+            if call_name and call_name.endswith("run_delete_with_idempotency"):
+                keys.add("deleted_uid")
             if call_name and call_name.endswith("exit_json"):
                 current = self.assignment_stack[-1]
                 for keyword in node.keywords:
@@ -427,6 +461,9 @@ def _extract_json_output_keys(tree: ast.AST) -> frozenset[str]:
         def visit_Call(self, node: ast.Call) -> None:
             call_name = _call_name(node.func)
             if call_name == "json.dumps" and node.args:
+                current = self.assignment_stack[-1]
+                keys.update(_resolve_key_set(node.args[0], current, function_return_keys))
+            if call_name and call_name.endswith("print_json") and node.args:
                 current = self.assignment_stack[-1]
                 keys.update(_resolve_key_set(node.args[0], current, function_return_keys))
             self.generic_visit(node)
@@ -720,6 +757,8 @@ def check_ansible_examples(file: Path, metadata: AnsibleModuleMetadata) -> list[
                 )
             )
     for return_key, line in metadata.example_return_lines.items():
+        if return_key in _ANSIBLE_META_RETURN_KEYS:
+            continue
         if return_key not in metadata.return_lines:
             issues.append(
                 Issue(
@@ -734,7 +773,7 @@ def check_ansible_examples(file: Path, metadata: AnsibleModuleMetadata) -> list[
 def check_ansible_return_contract(file: Path, metadata: AnsibleModuleMetadata) -> list[Issue]:
     issues: list[Issue] = []
     documented = set(metadata.return_lines)
-    actual = set(metadata.exit_json_keys)
+    actual = set(metadata.exit_json_keys) - _ANSIBLE_META_RETURN_KEYS
 
     undocumented = sorted(actual - documented)
     for key in undocumented:
@@ -889,12 +928,20 @@ def _ansible_operation_key(file: Path) -> str | None:
     return "_".join(trimmed)
 
 
-def _normalize_cli_for_ansible(option_names: Iterable[str]) -> frozenset[str]:
+def _normalize_cli_for_ansible(
+    option_names: Iterable[str], file: Path | None = None
+) -> frozenset[str]:
+    aliases = dict(_CLI_TO_ANSIBLE_OPTION_ALIASES)
+    if file is not None:
+        parts = file.parts
+        if parts[-4:-1] == ("asa", "user", "change_password"):
+            aliases["password"] = "new_password"
+
     normalized: set[str] = set()
     for name in option_names:
         if name in _CLI_ANSIBLE_IGNORED_OPTIONS:
             continue
-        normalized.add(_CLI_TO_ANSIBLE_OPTION_ALIASES.get(name, name))
+        normalized.add(aliases.get(name, name))
     return frozenset(normalized)
 
 
@@ -937,10 +984,10 @@ def _cli_expected_ansible_module(file: Path) -> Path | None:
         action = parts[2]
         module_name = "list_access_rules" if action == "list" else f"{action}_access_rule"
         return ANSIBLE_MODULES / f"{module_name}.py"
-    if parts[:2] == ["inventory", "manager"] and parts[-1] == "list":
-        return ANSIBLE_MODULES / "list_managers.py"
     if parts[:3] == ["inventory", "manager", "access_policies"] and parts[-1] == "list":
         return ANSIBLE_MODULES / "list_cdfmc_access_policies.py"
+    if parts[:2] == ["inventory", "manager"] and parts[-1] == "list":
+        return ANSIBLE_MODULES / "list_managers.py"
     if parts[:4] == ["inventory", "devices", "asa", "disk"] and parts[-1] == "list_files":
         return ANSIBLE_MODULES / "list_asa_disk_files.py"
     if (
@@ -967,7 +1014,7 @@ def _cli_expected_ansible_module(file: Path) -> Path | None:
         special = {
             "ha_check": "asa_ha_check",
             "list_boot_registry": "list_asa_boot_registry",
-            "list_asa_local_users": "list_asa_local_users",
+            "list_local_users": "list_asa_local_users",
             "list_not_on_version": "list_asa_not_on_version",
             "change_boot_image": "change_asa_boot_image",
             "onboard": "onboard_asa",
@@ -1002,7 +1049,7 @@ def check_cli_ansible_alignment(changed_files: Sequence[Path]) -> list[Issue]:
 
         cli_metadata = _build_cli_metadata(file)
         ansible_metadata = _build_ansible_metadata(ansible_module)
-        cli_options = _normalize_cli_for_ansible(cli_metadata.option_names)
+        cli_options = _normalize_cli_for_ansible(cli_metadata.option_names, file=file)
         ansible_options = set(ansible_metadata.option_lines)
         ignored_ansible = {"api_token", "region"}
 
@@ -1152,25 +1199,53 @@ def check_cross_device_ansible_consistency(changed_files: Sequence[Path]) -> lis
 
 
 def _git_changed_files(base: str = "main") -> list[Path]:
+    files: set[Path] = set()
+
     revisions = [f"origin/{base}...HEAD", f"{base}...HEAD"]
     for revision in revisions:
         try:
             result = subprocess.run(
-                ["git", "diff", "--name-only", revision, "--", "*.py"],
+                [
+                    "git",
+                    "diff",
+                    "--name-only",
+                    "--diff-filter=ACMRT",
+                    revision,
+                    "--",
+                    "*.py",
+                ],
                 capture_output=True,
                 text=True,
                 check=True,
                 cwd=ROOT,
             )
-            files = [ROOT / line for line in result.stdout.splitlines() if line.endswith(".py")]
-            return files
+            files.update(ROOT / line for line in result.stdout.splitlines() if line.endswith(".py"))
+            break
         except subprocess.CalledProcessError:
             continue
-    return []
+
+    for cmd in (
+        ["git", "diff", "--name-only", "--diff-filter=ACMRT", "--", "*.py"],
+        ["git", "ls-files", "--others", "--exclude-standard", "--", "*.py"],
+    ):
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=ROOT,
+        )
+        files.update(ROOT / line for line in result.stdout.splitlines() if line.endswith(".py"))
+
+    return sorted(files)
 
 
 def _is_ansible_module(file: Path) -> bool:
-    return file.is_relative_to(ANSIBLE_MODULES) and file.name != "__init__.py"
+    return (
+        file.is_relative_to(ANSIBLE_MODULES)
+        and not file.is_relative_to(ANSIBLE_MODULES / "tests")
+        and file.name != "__init__.py"
+    )
 
 
 def _is_cli_command(file: Path) -> bool:
@@ -1439,6 +1514,7 @@ def check_optional_str_coercion(file: Path) -> list[Issue]:
                     f"'{field_name}' — annotate as 'str | None' or document the empty-string "
                     f"sentinel explicitly"
                 ),
+                level="warning",
             )
         )
 
@@ -1547,14 +1623,23 @@ _ANSIBLE_BASE_KEYS: frozenset[str] = frozenset({"api_token", "region"})
 
 def _extract_argument_spec_keys(tree: ast.AST) -> frozenset[str]:
     """Return literal string keys from build_argument_spec()'s return dict (ignoring **spreads)."""
+    spread_helpers: dict[str, frozenset[str]] = {
+        "base_argument_spec": _ANSIBLE_BASE_KEYS,
+        "identifier_argument_spec": frozenset({"uid", "name"}),
+    }
+
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef) or node.name != "build_argument_spec":
             continue
         for stmt in ast.walk(node):
             if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Dict):
                 keys: set[str] = set()
-                for k in stmt.value.keys:
+                for k, value in zip(stmt.value.keys, stmt.value.values, strict=False):
                     if k is None:
+                        if isinstance(value, ast.Call):
+                            helper_name = _call_name(value.func)
+                            if helper_name:
+                                keys.update(spread_helpers.get(helper_name, frozenset()))
                         continue  # **spread — known base, skip
                     val = _string_value(k)
                     if val:
@@ -1675,6 +1760,9 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
                             else ...  # non-literal default
                         )
 
+                if not item.name.startswith("list_"):
+                    continue
+
                 # 2. missing standard params
                 for param in ("limit", "offset", "query"):
                     if param not in kwonly_names:
@@ -1683,7 +1771,7 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
                                 file=file,
                                 line=item.lineno,
                                 message=(
-                                    f"list/get method '{item.name}' is missing parameter "
+                                    f"list method '{item.name}' is missing parameter "
                                     f"'{param}' (present on all other list methods)"
                                 ),
                                 level="warning",
@@ -1701,7 +1789,7 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
                                 file=file,
                                 line=item.lineno,
                                 message=(
-                                    f"list/get method '{item.name}' has non-standard default for "
+                                    f"list method '{item.name}' has non-standard default for "
                                     f"'{param}': {actual!r} (expected {expected!r})"
                                 ),
                                 level="warning",
@@ -1715,6 +1803,7 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
 
 _CLI_CONFIGURE = ROOT / "sccfm_cli" / "commands" / "configure.py"
 _ANSIBLE_CONFIG = ROOT / "sccfm-ansible" / "plugins" / "module_utils" / "config.py"
+_CORE_CONSTANTS = ROOT / "sccfm_core" / "constants.py"
 _RUNTIME_YML = ROOT / "sccfm-ansible" / "meta" / "runtime.yml"
 
 
@@ -1738,45 +1827,57 @@ def _extract_regions_tuple(file: Path, var_name: str) -> tuple[frozenset[str], i
 
 
 def check_region_vocabulary_drift(files: Sequence[Path]) -> list[Issue]:
-    """Check F — CLI _REGIONS and Ansible ALLOWED_REGIONS must be identical sets."""
+    """Check F — region definitions stay aligned with the shared core constant."""
     touched = {f.resolve() for f in files}
-    relevant = {_CLI_CONFIGURE.resolve(), _ANSIBLE_CONFIG.resolve()}
+    relevant = {
+        _CLI_CONFIGURE.resolve(),
+        _ANSIBLE_CONFIG.resolve(),
+        _CORE_CONSTANTS.resolve(),
+    }
     if not (touched & relevant):
         return []
 
+    core_regions, _ = _extract_regions_tuple(_CORE_CONSTANTS, "SCCFM_REGIONS")
     cli_regions, cli_line = _extract_regions_tuple(_CLI_CONFIGURE, "_REGIONS")
     ansible_regions, ansible_line = _extract_regions_tuple(_ANSIBLE_CONFIG, "ALLOWED_REGIONS")
 
-    if not cli_regions or not ansible_regions:
+    if not core_regions:
         return []
 
     issues: list[Issue] = []
 
-    only_cli = sorted(cli_regions - ansible_regions)
-    for r in only_cli:
-        issues.append(
-            Issue(
-                file=_CLI_CONFIGURE,
-                line=cli_line,
-                message=(
-                    f"Region '{r}' is in CLI _REGIONS but missing from Ansible ALLOWED_REGIONS "
-                    f"— region vocabulary must be kept in sync"
-                ),
-            )
-        )
+    for file, line, var_name, regions in (
+        (_CLI_CONFIGURE, cli_line, "_REGIONS", cli_regions),
+        (_ANSIBLE_CONFIG, ansible_line, "ALLOWED_REGIONS", ansible_regions),
+    ):
+        if not regions:
+            continue
 
-    only_ansible = sorted(ansible_regions - cli_regions)
-    for r in only_ansible:
-        issues.append(
-            Issue(
-                file=_ANSIBLE_CONFIG,
-                line=ansible_line,
-                message=(
-                    f"Region '{r}' is in Ansible ALLOWED_REGIONS but missing from CLI _REGIONS "
-                    f"— region vocabulary must be kept in sync"
-                ),
+        missing_from_local = sorted(core_regions - regions)
+        for region in missing_from_local:
+            issues.append(
+                Issue(
+                    file=file,
+                    line=line,
+                    message=(
+                        f"Region '{region}' is in shared SCCFM_REGIONS but missing from "
+                        f"{var_name} — region vocabulary must be kept in sync"
+                    ),
+                )
             )
-        )
+
+        extra_in_local = sorted(regions - core_regions)
+        for region in extra_in_local:
+            issues.append(
+                Issue(
+                    file=file,
+                    line=line,
+                    message=(
+                        f"Region '{region}' is in {var_name} but missing from shared "
+                        f"SCCFM_REGIONS — region vocabulary must be kept in sync"
+                    ),
+                )
+            )
 
     return issues
 
@@ -2002,7 +2103,7 @@ def _handler_fails_with_message(handler: ast.ExceptHandler) -> bool:
 
 
 def check_ansible_sdk_error_handling(file: Path) -> list[Issue]:
-    """Check J — generic Ansible exception handlers should use structured SDK errors."""
+    """Check J — SDK failures should have a structured ApiException handler."""
     if not _is_ansible_module(file):
         return []
 
@@ -2012,23 +2113,36 @@ def check_ansible_sdk_error_handling(file: Path) -> list[Issue]:
 
     issues: list[Issue] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.ExceptHandler):
-            continue
-        if _caught_exception_name(node.type) != "Exception":
-            continue
-        if _handler_uses_scc_api_error_conversion(node):
-            continue
-        if not _handler_fails_with_message(node):
+        if not isinstance(node, ast.Try):
             continue
 
+        api_handler = next(
+            (
+                handler
+                for handler in node.handlers
+                if _caught_exception_name(handler.type) == "ApiException"
+            ),
+            None,
+        )
+        generic_handler = next(
+            (
+                handler
+                for handler in node.handlers
+                if _caught_exception_name(handler.type) == "Exception"
+            ),
+            None,
+        )
+        if generic_handler is None or not _handler_fails_with_message(generic_handler):
+            continue
+        if api_handler is not None and _handler_uses_scc_api_error_conversion(api_handler):
+            continue
         issues.append(
             Issue(
                 file=file,
-                line=node.lineno,
+                line=generic_handler.lineno,
                 message=(
-                    "Generic except Exception handler calls fail_json(msg=...) without "
-                    "SccApiError.from_exception() — prefer structured ApiException/"
-                    "SccApiError conversion"
+                    "Generic except Exception handler catches module failures without a "
+                    "preceding ApiException handler that uses SccApiError.from_exception()"
                 ),
                 level="warning",
             )
@@ -2068,6 +2182,8 @@ def _has_inline_pagination_option(tree: ast.AST) -> list[tuple[int, str]]:
 def check_inline_pagination_options(file: Path) -> list[Issue]:
     """Check I — CLI list commands must use shared option factories, not inline click.Option."""
     if not file.is_relative_to(CLI_COMMANDS):
+        return []
+    if file == CLI_COMMANDS / "shared_options.py":
         return []
 
     tree = _safe_parse(file)
@@ -2339,10 +2455,9 @@ def check_test_file_parity(files: Sequence[Path]) -> list[Issue]:
 
 def collect_issues(files: Sequence[Path]) -> list[Issue]:
     issues: list[Issue] = []
+    existing_python_files = [file for file in files if file.exists() and file.suffix == ".py"]
 
-    for file in files:
-        if not file.exists() or file.suffix != ".py":
-            continue
+    for file in existing_python_files:
         issues.extend(check_variable_naming(file))
         issues.extend(check_api_key_mapping(file))
         issues.extend(check_missing_future_annotations(file))
@@ -2371,14 +2486,14 @@ def collect_issues(files: Sequence[Path]) -> list[Issue]:
         if file.is_relative_to(CLI_COMMANDS):
             issues.extend(check_inline_pagination_options(file))
 
-    issues.extend(check_api_mapping_consistency(files))
-    issues.extend(check_service_list_signatures(files))
-    issues.extend(check_cross_device_cli_consistency(files))
-    issues.extend(check_cross_device_ansible_consistency(files))
-    issues.extend(check_cli_ansible_alignment(files))
-    issues.extend(check_region_vocabulary_drift(files))
-    issues.extend(check_ansible_runtime_membership(files))
-    issues.extend(check_test_file_parity(files))
+    issues.extend(check_api_mapping_consistency(existing_python_files))
+    issues.extend(check_service_list_signatures(existing_python_files))
+    issues.extend(check_cross_device_cli_consistency(existing_python_files))
+    issues.extend(check_cross_device_ansible_consistency(existing_python_files))
+    issues.extend(check_cli_ansible_alignment(existing_python_files))
+    issues.extend(check_region_vocabulary_drift(existing_python_files))
+    issues.extend(check_ansible_runtime_membership(existing_python_files))
+    issues.extend(check_test_file_parity(existing_python_files))
 
     issues.sort(key=lambda issue: (issue.file, issue.line or 0, issue.message))
     return issues

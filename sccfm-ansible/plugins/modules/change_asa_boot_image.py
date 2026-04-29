@@ -10,10 +10,9 @@ from scc_firewall_manager_sdk import (
     ConnectivityState,
     Device,
     DevicePage,
-    EntityType,
 )
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
 from sccfm_core.services.inventory import AsaBootImageService
 from sccfm_core.utils import validate_asa_image_path
@@ -69,7 +68,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -110,6 +109,20 @@ EXAMPLES = r"""
     # check_mode runs non-mutating pre-checks, including image path validation
     # on the device and containing-filesystem inspection.
   check_mode: true
+
+# Example 4: Using module_defaults (recommended)
+- name: Change ASA boot image
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Set boot image on branch ASAs
+      cisco.sccfm.change_asa_boot_image:
+        query: "name:branch-*"
+        image_path: "disk0:/asa9-18-4-smp-k8.bin"
 """
 
 RETURN = r"""
@@ -170,14 +183,14 @@ def _resolve_devices(
         page: DevicePage = inventory_service.get_devices(
             limit=max(limit, len(uids)),
             offset=0,
-            query=f"({uid_query}) AND deviceType:{EntityType.ASA.value}",
+            query=f"({uid_query}) AND {ASA_DEVICE_TYPE_FILTER}",
         )
         return list(page.items or [])
 
     page = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"({cast(str, query)}) AND deviceType:{EntityType.ASA.value}",
+        query=f"({cast(str, query)}) AND {ASA_DEVICE_TYPE_FILTER}",
     )
     return list(page.items or [])
 

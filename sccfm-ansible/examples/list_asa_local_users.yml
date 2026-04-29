@@ -1,5 +1,5 @@
 ---
-- hosts: all
+- hosts: localhost
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
@@ -25,4 +25,3 @@
     - name: Show ASA local users by query
       ansible.builtin.debug:
         msg: "{{ local_users_by_query.asa_local_users }}"
-

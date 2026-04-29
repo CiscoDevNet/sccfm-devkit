@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core.errors import NotFoundError
+from sccfm_core.errors import NotFoundError, SccApiError
 from sccfm_core.services.object_management import NetworkGroupResponse, NetworkGroupService
 
 from ..module_utils.config import (
@@ -64,7 +65,7 @@ options:
     required: false
     type: dict
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -123,7 +124,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_group:
-  description: The updated network group (or current state if unchanged).
+  description:
+    - The updated network group, or current state if unchanged.
+    - Returned keys include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), C(literals), and C(referenced_object_uids).
   returned: success
   type: dict
   contains:
@@ -133,12 +137,6 @@ network_group:
     name:
       description: Name of the network group.
       type: str
-    description:
-      description: Description of the network group.
-      type: str
-    elements:
-      description: Elements associated with the group.
-      type: list
     labels:
       description: Labels attached to the group.
       type: list
@@ -287,6 +285,8 @@ def run_module() -> None:
         )
     except NotFoundError as e:
         module.fail_json(msg=str(e))
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to update network group: {str(e)}")
 

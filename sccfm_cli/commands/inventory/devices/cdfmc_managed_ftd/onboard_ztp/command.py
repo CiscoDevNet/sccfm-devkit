@@ -15,7 +15,7 @@ from scc_firewall_manager_sdk import (
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core import FTD_LICENSES, InventoryService
 from sccfm_core.services.inventory import FtdZtpOnboardService
 
@@ -128,7 +128,7 @@ class FtdZtpOnboardCommand(BaseCommand):
 
         uid = device.uid
         if output_format == "json":
-            self.console.print(json.dumps({"uid": uid}, indent=2))
+            print_json({"uid": uid})
         else:
             if uid:
                 self.console.print(uid)
@@ -148,20 +148,16 @@ class FtdZtpOnboardCommand(BaseCommand):
 
         if output_format == "json":
             device_data = conflict.device.to_dict() if conflict is not None else None
-            self.console.print(
-                json.dumps(
-                    {
-                        "entity_type": "cdFMC-managed FTD device",
-                        "identifier": {"name": name, "serial_number": serial_number},
-                        "operation": "onboard-ztp",
-                        "exists": conflict is not None,
-                        "can_proceed": can_proceed,
-                        "reason": reason,
-                        "device": device_data,
-                    },
-                    indent=2,
-                    default=str,
-                )
+            print_json(
+                {
+                    "entity_type": "cdFMC-managed FTD device",
+                    "identifier": {"name": name, "serial_number": serial_number},
+                    "operation": "onboard-ztp",
+                    "exists": conflict is not None,
+                    "can_proceed": can_proceed,
+                    "reason": reason,
+                    "device": device_data,
+                }
             )
             return
 

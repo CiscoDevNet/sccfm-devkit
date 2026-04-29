@@ -40,6 +40,8 @@ def base_params() -> dict[str, Any]:
         "deployment_notes": None,
         "description": None,
         "ignore_warnings": False,
+        "wait": False,
+        "timeout": 3600,
         "region": "us",
         "api_token": "test-token",
     }
@@ -139,6 +141,114 @@ def test_should_pass_optional_params(
         description="Policy update",
         ignore_warnings=True,
     )
+
+
+@patch("plugins.modules.deploy_cdfmc_ftd.Config")
+@patch("plugins.modules.deploy_cdfmc_ftd.TransactionService")
+@patch("plugins.modules.deploy_cdfmc_ftd.FtdDeployService")
+@patch("plugins.modules.deploy_cdfmc_ftd.AnsibleModule")
+def test_should_wait_for_deploy_completion(
+    mock_ansible_cls: MagicMock,
+    mock_deploy_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should poll the deployment transaction and return the final transaction."""
+    mock_module.params["wait"] = True
+    mock_module.params["timeout"] = 900
+    mock_ansible_cls.return_value = mock_module
+
+    mock_deploy = MagicMock()
+    mock_deploy.deploy_single.return_value = CdoTransaction(transactionUid="txn-001")
+    mock_deploy_cls.return_value = mock_deploy
+
+    completed_transaction = CdoTransaction(transactionUid="txn-001", cdoTransactionStatus="DONE")
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = completed_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        deploy_cdfmc_ftd.run_module()
+
+    mock_txn.wait_for_transaction_to_finish.assert_called_once_with(
+        transaction_uid="txn-001",
+        timeout_sec=900,
+    )
+    kw = mock_module.exit_json.call_args[1]
+    assert "completed" in kw["msg"]
+    assert kw["transaction"]["cdoTransactionStatus"] == "DONE"
+
+
+@patch("plugins.modules.deploy_cdfmc_ftd.Config")
+@patch("plugins.modules.deploy_cdfmc_ftd.TransactionService")
+@patch("plugins.modules.deploy_cdfmc_ftd.FtdDeployService")
+@patch("plugins.modules.deploy_cdfmc_ftd.AnsibleModule")
+def test_should_fail_when_waited_deploy_transaction_fails(
+    mock_ansible_cls: MagicMock,
+    mock_deploy_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should fail when the deployment transaction ends in ERROR."""
+    mock_module.params["wait"] = True
+    mock_ansible_cls.return_value = mock_module
+
+    mock_deploy = MagicMock()
+    mock_deploy.deploy_single.return_value = CdoTransaction(transactionUid="txn-001")
+    mock_deploy_cls.return_value = mock_deploy
+
+    failed_transaction = CdoTransaction(
+        transactionUid="txn-001",
+        cdoTransactionStatus="ERROR",
+        errorMessage="Deploy failed",
+    )
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = failed_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        deploy_cdfmc_ftd.run_module()
+
+    mock_module.fail_json.assert_called_once()
+    kw = mock_module.fail_json.call_args[1]
+    assert "failed with status: ERROR" in kw["msg"]
+    assert kw["transaction"]["errorMessage"] == "Deploy failed"
+
+
+@patch("plugins.modules.deploy_cdfmc_ftd.Config")
+@patch("plugins.modules.deploy_cdfmc_ftd.TransactionService")
+@patch("plugins.modules.deploy_cdfmc_ftd.FtdDeployService")
+@patch("plugins.modules.deploy_cdfmc_ftd.AnsibleModule")
+def test_should_fail_when_wait_times_out(
+    mock_ansible_cls: MagicMock,
+    mock_deploy_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    """Wait mode should surface transaction timeout errors."""
+    mock_module.params["wait"] = True
+    mock_module.params["timeout"] = 30
+    mock_ansible_cls.return_value = mock_module
+
+    mock_deploy = MagicMock()
+    mock_deploy.deploy_single.return_value = CdoTransaction(transactionUid="txn-001")
+    mock_deploy_cls.return_value = mock_deploy
+
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.side_effect = TimeoutError(
+        "Transaction txn-001 did not complete within 30 seconds"
+    )
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        deploy_cdfmc_ftd.run_module()
+
+    mock_module.fail_json.assert_called_once()
+    kw = mock_module.fail_json.call_args[1]
+    assert "did not complete within 30 seconds" in kw["msg"]
 
 
 # ---------- Check mode ----------

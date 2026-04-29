@@ -1,33 +1,26 @@
 from __future__ import annotations
 
-import json
+import math
 from typing import Any, Sequence, cast
 
 import click
 from rich.table import Table
 
 from sccfm_cli.commands.base import BaseCommand
-from sccfm_cli.commands.shared_options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.commands.shared_options import (
+    config_path_option,
+    format_option,
+    limit_option,
+    offset_option,
+)
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.services.policy import AccessRuleListResponse, AccessRuleService
 
 
 def _access_rule_list_params() -> list[click.Parameter]:
     return [
-        click.Option(
-            ["--limit"],
-            type=int,
-            default=50,
-            show_default=True,
-            help="Maximum number of results to return.",
-        ),
-        click.Option(
-            ["--offset"],
-            type=int,
-            default=0,
-            show_default=True,
-            help="Pagination offset.",
-        ),
+        limit_option(),
+        offset_option(),
         click.Option(
             ["--query"],
             default=None,
@@ -67,12 +60,13 @@ class ListAccessRuleCommand(BaseCommand):
 
     def _render_page(self, page: AccessRuleListResponse, output_format: str) -> None:
         if output_format == "json":
-            self.console.print(json.dumps(page.to_dict(), indent=2, default=str))
+            print_json(page.to_dict())
             return
 
-        self.console.print(
-            f"Showing {page.offset + 1}\u2013{page.offset + len(page.items)} of {page.count} rules"
-        )
+        current_page = (page.offset // page.limit) + 1 if page.limit else 1
+        total_pages = max(1, math.ceil(page.count / page.limit)) if page.count and page.limit else 1
+        self.console.print(f"Number of entries:  {page.count}")
+        self.console.print(f"Page:               {current_page} / {total_pages}")
         table = Table(title="Access Rules", width=120)
         table.add_column("UID")
         table.add_column("Action")

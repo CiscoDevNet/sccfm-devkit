@@ -407,6 +407,8 @@ class TestListAccessRule:
         )
 
         assert result.exit_code == 0
+        assert "Number of entries:" in result.output
+        assert "Page:" in result.output
         assert "Access Rules" in result.output
 
 

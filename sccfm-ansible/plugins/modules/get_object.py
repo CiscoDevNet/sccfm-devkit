@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.services.object_management import ObjectOverrideService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -22,7 +24,7 @@ options:
     required: true
     type: str
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -72,7 +74,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 object:
-  description: Full details of the object.
+  description:
+    - Full details of the object.
+    - Returned keys include C(uid), C(name), C(description), C(object_type),
+      C(default_value), C(overrides), and C(targets).
   returned: success
   type: dict
   contains:
@@ -81,9 +86,6 @@ object:
       type: str
     name:
       description: Name of the object.
-      type: str
-    description:
-      description: Description of the object.
       type: str
     object_type:
       description: Type of the object (e.g., NETWORK_OBJECT, URL_OBJECT).
@@ -103,7 +105,9 @@ object:
           description: Override value for that device.
           type: str
     targets:
-      description: List of devices the object is attached to.
+      description:
+        - List of devices the object is attached to.
+        - Each target can include C(id), C(display_name), and C(type).
       type: list
       elements: dict
       contains:
@@ -112,9 +116,6 @@ object:
           type: str
         display_name:
           description: Display name of the device.
-          type: str
-        type:
-          description: Device type.
           type: str
 """
 
@@ -135,14 +136,12 @@ def run_module() -> None:
     config: Config = create_config(module)
     uid: str = module.params["uid"]
 
-    if module.check_mode:
-        module.exit_json(changed=False, object={})
-        return
-
     try:
         service = ObjectOverrideService(config=config)
         result = service.get_object(uid=uid)
         module.exit_json(changed=False, object=result.to_dict())
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to get object: {str(e)}")
 

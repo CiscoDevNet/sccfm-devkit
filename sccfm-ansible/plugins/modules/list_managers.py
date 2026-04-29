@@ -34,7 +34,7 @@ options:
     type: int
     default: 0
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -71,6 +71,19 @@ EXAMPLES = r"""
 - name: Get domain UID
   ansible.builtin.set_fact:
     domain_uid: "{{ result.managers[0].fmc_domain_uid }}"
+
+# Example 3: Using module_defaults (recommended)
+- name: List managers
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: List all managers
+      cisco.sccfm.list_managers:
+        limit: 50
 """
 
 RETURN = r"""
@@ -127,10 +140,6 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         supports_check_mode=True,
     )
-
-    if module.check_mode:
-        module.exit_json(changed=False, managers=[], count=0, limit=0, offset=0)
-        return
 
     config = create_config(module)
 

@@ -7,15 +7,14 @@ from scc_firewall_manager_sdk import (
     ApiException,
     AsaCompatibleVersion,
     DevicePage,
-    EntityType,
 )
 
-from sccfm_core import InventoryService, SccApiError
+from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
 from sccfm_core.services.inventory import AsaUpgradeVersionService
 from sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -70,7 +69,7 @@ options:
     type: bool
     default: false
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -125,6 +124,20 @@ EXAMPLES = r"""
   ansible.builtin.debug:
     msg: "Device {{ item.key }}: {{ item.value | length }} version(s)"
   loop: "{{ compat_versions.per_device | dict2items }}"
+
+# Example 4: Using module_defaults (recommended)
+- name: List ASA compatible versions
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Get compatible versions for branch ASAs
+      cisco.sccfm.list_asa_compatible_versions:
+        query: "name:branch-*"
+      register: compat_versions
 """
 
 RETURN = r"""
@@ -160,8 +173,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "limit": {"type": "int", "required": False, "default": 50},
         "offset": {"type": "int", "required": False, "default": 0},
         "per_device": {"type": "bool", "required": False, "default": False},
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        **base_argument_spec(),
     }
 
 
@@ -176,7 +188,7 @@ def resolve_device_uids_from_query(
     page: DevicePage = inventory_service.get_devices(
         limit=limit,
         offset=offset,
-        query=f"({query}) AND deviceType:{EntityType.ASA.value}",
+        query=f"({query}) AND {ASA_DEVICE_TYPE_FILTER}",
     )
     return [device.uid for device in (page.items or [])]
 
@@ -220,16 +232,10 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         mutually_exclusive=[["query", "uids"]],
         required_one_of=[["query", "uids"]],
+        supports_check_mode=True,
     )
 
-    try:
-        config = Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
-        module.fail_json(msg=str(e))
-
+    config: Config = create_config(module)
     query: str | None = module.params.get("query")
     uids: list[str] | None = module.params.get("uids")
     limit: int = module.params["limit"]

@@ -25,3 +25,5 @@ build_ignore:
 - .vscode
 - dist
 - ansible_collections
+- plugins/modules/tests
+- plugins/modules/tests/**

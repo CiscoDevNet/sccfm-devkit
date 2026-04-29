@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
+from scc_firewall_manager_sdk import ApiException
 
+from sccfm_core.errors import SccApiError
 from sccfm_core.services.object_management import NetworkObjectService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
@@ -46,7 +48,7 @@ options:
     required: false
     type: dict
   region:
-    description: SCCFM region (int, us, eu, apj, aus, uae, in, or ci).
+    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
     env:
@@ -106,7 +108,10 @@ EXAMPLES = r"""
 
 RETURN = r"""
 network_object:
-  description: The created network object, or the existing object if already present.
+  description:
+    - The created network object, or the existing object if already present.
+    - Returned keys include C(uid), C(name), C(description), C(elements),
+      C(labels), C(tags), C(object_type), and C(literal).
   returned: success
   type: dict
   contains:
@@ -116,12 +121,6 @@ network_object:
     name:
       description: Name of the network object.
       type: str
-    description:
-      description: Description of the network object.
-      type: str
-    elements:
-      description: Elements associated with the object.
-      type: list
     labels:
       description: Labels attached to the object.
       type: list
@@ -191,6 +190,8 @@ def run_module() -> None:
             msg=f"Successfully created network object '{name}'",
             network_object=result.to_dict(),
         )
+    except ApiException as e:
+        module.fail_json(**SccApiError.from_exception(e).to_dict())
     except Exception as e:
         module.fail_json(msg=f"Failed to create network object: {str(e)}")
 

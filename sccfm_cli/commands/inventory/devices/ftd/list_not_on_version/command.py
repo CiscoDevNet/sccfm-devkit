@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from typing import Any, Sequence, cast
@@ -14,7 +13,7 @@ from sccfm_cli.commands.inventory.devices.ftd.shared import (
     ftd_device_filter_params,
 )
 from sccfm_cli.commands.inventory.options import config_path_option, format_option
-from sccfm_cli.utils import with_spinner
+from sccfm_cli.utils import print_json, with_spinner
 from sccfm_core.services.inventory import FtdUpgradeVersionService
 
 _VERSION_RE = re.compile(r"^\d+\.\d+")
@@ -225,7 +224,7 @@ class FtdListNotOnVersionCommand(FtdDeviceTargetCommand):
             output["version"] = version
         if recommended and skipped:
             output["skipped"] = skipped
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print_json(output)
 
     def _render_table(
         self,

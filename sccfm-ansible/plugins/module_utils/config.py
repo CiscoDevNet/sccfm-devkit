@@ -4,10 +4,13 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from sccfm_core.constants import SCCFM_REGIONS, normalize_sccfm_region
+
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
 
-ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")
+ALLOWED_REGIONS = SCCFM_REGIONS
+ALLOWED_REGIONS_TEXT = ", ".join(ALLOWED_REGIONS)
 
 
 @dataclass(frozen=True)
@@ -23,7 +26,7 @@ class Config:
 
     def __post_init__(self) -> None:
         # Resolve from environment if not provided
-        resolved_region = self.region or os.getenv("SCCFM_REGION")
+        resolved_region = normalize_sccfm_region(self.region or os.getenv("SCCFM_REGION"))
         resolved_token = self.api_token or os.getenv("SCCFM_API_TOKEN")
 
         # Use object.__setattr__ since dataclass is frozen
@@ -40,14 +43,12 @@ class Config:
                 "authentication/"
             )
         if not self.region:
-            allowed = ", ".join(ALLOWED_REGIONS)
             raise ValueError(
                 f"region is required. Provide it via module parameter, module_defaults, or "
-                f"SCCFM_REGION environment variable. Allowed regions: {allowed}"
+                f"SCCFM_REGION environment variable. Allowed regions: {ALLOWED_REGIONS_TEXT}"
             )
         if self.region not in ALLOWED_REGIONS:
-            allowed = ", ".join(ALLOWED_REGIONS)
-            raise ValueError(f"SCCFM region must be one of: {allowed}")
+            raise ValueError(f"SCCFM region must be one of: {ALLOWED_REGIONS_TEXT}")
 
 
 def base_argument_spec() -> dict[str, dict[str, Any]]:
