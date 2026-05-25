@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Test configuration for Ansible module tests.
 
 This conftest sets up the module import structure so that pytest can import

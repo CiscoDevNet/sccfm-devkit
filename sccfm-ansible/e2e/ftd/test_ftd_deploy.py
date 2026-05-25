@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """CI integration tests for FTD configuration deployment.
 
 Tests deploy pending configuration changes to cdFMC-managed FTD devices.

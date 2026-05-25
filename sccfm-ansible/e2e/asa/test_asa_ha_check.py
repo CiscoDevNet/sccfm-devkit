@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """CI integration tests for ASA HA health checks.
 
 Each test exercises the asa_ha_check module against an HA-enabled ASA device.

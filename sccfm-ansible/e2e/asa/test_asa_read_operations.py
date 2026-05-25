@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """CI integration tests for ASA read-only operations.
 
 Each test exercises a read-only ASA module against CI-dedicated devices.
