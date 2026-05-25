@@ -28,6 +28,12 @@ repos:
     hooks:
       - id: commitizen
         stages: [commit-msg]
+  - repo: https://github.com/fsfe/reuse-tool
+    rev: v6.2.0
+    hooks:
+      - id: reuse-lint-file
+        types: [python]
+
   - repo: https://github.com/thlorenz/doctoc
     rev: v2.2.0
     hooks:
