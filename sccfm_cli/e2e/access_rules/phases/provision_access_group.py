@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sccfm_cli.e2e._profile import ProfileContext
 from sccfm_cli.e2e._runner import run_cli
+from sccfm_cli.e2e._sync import wait_for_synced
 from sccfm_cli.e2e.access_rules.phases.test_data import (
     ASA_TEST_QUERY,
     TEST_ACL_NAME,
@@ -43,7 +44,11 @@ def run(ctx: ProfileContext) -> None:
         )
 
     # Provision a global access-group via ASA CLI.  This must succeed —
-    # the read/CRUD phases assume the ACL exists.
+    # the read/CRUD phases assume the ACL exists.  Wait for SYNCED first,
+    # since the Ansible suite that ran before us may have left the device
+    # mid-sync, and the API rejects script pushes against NOT_SYNCED devices.
+    wait_for_synced(ctx, query=ASA_TEST_QUERY)
+
     provisioning_script = "\n".join(
         [
             "configure terminal",
