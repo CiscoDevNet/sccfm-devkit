@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for sccfm_core.services.inventory.asa_boot_registry_service — _parse_results."""
 
 from __future__ import annotations

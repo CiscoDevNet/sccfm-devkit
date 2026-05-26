@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Top-level conftest for E2E suite ordering.
 
 Suites that modify the ASA config (e.g. access_rules provisions an ACL via

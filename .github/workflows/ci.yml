@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction --with dev
 
+      - name: License headers
+        run: git ls-files '*.py' | xargs poetry run reuse lint-file
+
       - name: Lint
         run: |
           poetry run black --check .

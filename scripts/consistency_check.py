@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """PR consistency checker for sccfm-devkit.
 
 Checks only Python files modified in the PR by default and validates:
@@ -1198,8 +1203,32 @@ def check_cross_device_ansible_consistency(changed_files: Sequence[Path]) -> lis
     return issues
 
 
+def _has_substantive_changes(path: Path, revision: str) -> bool:
+    """Return True if the diff for path contains added/removed non-comment, non-blank lines."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", revision, "--", str(path)],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=ROOT,
+        )
+    except subprocess.CalledProcessError:
+        return True  # assume substantive if we can't tell
+    for line in result.stdout.splitlines():
+        if not line.startswith(("+", "-")):
+            continue
+        if line.startswith(("+++", "---")):
+            continue
+        content = line[1:].strip()
+        if content and not content.startswith("#"):
+            return True
+    return False
+
+
 def _git_changed_files(base: str = "main") -> list[Path]:
     files: set[Path] = set()
+    revision_used: str | None = None
 
     revisions = [f"origin/{base}...HEAD", f"{base}...HEAD"]
     for revision in revisions:
@@ -1220,6 +1249,7 @@ def _git_changed_files(base: str = "main") -> list[Path]:
                 cwd=ROOT,
             )
             files.update(ROOT / line for line in result.stdout.splitlines() if line.endswith(".py"))
+            revision_used = revision
             break
         except subprocess.CalledProcessError:
             continue
@@ -1236,6 +1266,9 @@ def _git_changed_files(base: str = "main") -> list[Path]:
             cwd=ROOT,
         )
         files.update(ROOT / line for line in result.stdout.splitlines() if line.endswith(".py"))
+
+    if revision_used is not None:
+        files = {f for f in files if _has_substantive_changes(f, revision_used)}
 
     return sorted(files)
 

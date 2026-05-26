@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the ``sccfm_cli transaction`` command."""
 
 from __future__ import annotations

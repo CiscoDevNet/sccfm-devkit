@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Shared helper for policy API operations.
 
 Provides common HTTP response handling used by AccessRuleService
