@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Integration tests for setup_tokens and vault-based token_store.
 
 Backs up touched files before running, and restores them afterward

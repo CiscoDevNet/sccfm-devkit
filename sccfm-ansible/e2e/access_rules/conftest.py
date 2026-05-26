@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Shared fixtures for Ansible e2e access rule integration tests."""
 
 from __future__ import annotations

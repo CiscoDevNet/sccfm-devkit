@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """CI integration tests for the access rule lifecycle.
 
 Tests run sequentially against a real SCCFM tenant. Each test maps to a

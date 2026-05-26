@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Dynamic sccfm-cli command tree built by introspecting the Click group.
 
 Any command added to sccfm-cli is automatically available in the devkit
