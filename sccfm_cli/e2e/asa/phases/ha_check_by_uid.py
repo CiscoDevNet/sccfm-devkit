@@ -1,4 +1,4 @@
-"""Discover a device UID via query, then re-run HA check using --device-uid."""
+"""Discover a device UID via query, then re-run HA check using --device-uids."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def run(ctx: ProfileContext) -> None:
         "devices",
         "asa",
         "ha-check",
-        "--device-uid",
+        "--device-uids",
         discovered_uid,
         "--format",
         "json",
