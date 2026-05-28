@@ -4,7 +4,8 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
 
 ## Structure
 
-- `run_e2e.sh`: installs the package (so `sccfm-cli` is on `$PATH`) and runs pytest with JUnit output for Jenkins.
+- `run_e2e.sh`: installs the package (so `sccfm-cli` is on `$PATH`) and runs pytest with JUnit output for Jenkins.  When `ASA_HOST` and `VASA_PASSWORD` are set, also onboards a CLI-dedicated vASA via `playbooks/onboard_vasa.yml` before pytest and removes it afterward via `playbooks/remove_vasa.yml`.
+- `playbooks/onboard_vasa.yml` / `playbooks/remove_vasa.yml`: Ansible playbooks that mirror their `sccfm-ansible/e2e/asa/` counterparts but use the `ci-e2e-cli-asa-` name prefix so the CLI suite owns its own device.  The shared-device approach (a single `ci-e2e-asa-*` vASA) leaves the device NOT_SYNCED after the Ansible suite mutates it, which then blocks ASA CLI script pushes from this suite.
 - `conftest.py`: top-level suite ordering (`objects` → `asa` → `access_rules` → `ftd`) plus the session-scoped `e2e_profile` fixture that decodes the Ansible vault and writes a temp `sccfm-cli` profile.
 - `_runner.py`: `run_cli(...)` subprocess wrapper — the analog of Ansible's `run_playbook()`.  Asserts on rc, parses `--format json` stdout, and supports `expect_failure` / `tolerate_any_rc` for idempotency and cleanup paths.
 - `_profile.py`: bootstraps credentials by shelling out to `ansible-vault view` and writing a temp profile via `ConfigService.save()`.  Reuses `examples/group_vars/all/vault.yml` from the Ansible suite — one source of truth.
@@ -39,12 +40,20 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
    poetry install --with dev
    ```
 
+3. (CI only) Provision a CLI-dedicated vASA and export `ASA_HOST` + `VASA_PASSWORD`.  `run_e2e.sh` will onboard it as `ci-e2e-cli-asa-<host>` and remove it on exit.  When these vars are unset the script skips onboarding and tests run against any existing `ci-e2e-cli-asa-*` device.
+
 ## Running
 
-Full suite:
+Full suite (no onboarding — uses an existing `ci-e2e-cli-asa-*` device):
 
 ```
 ./sccfm_cli/e2e/run_e2e.sh
+```
+
+Full suite with onboarding (CI flow):
+
+```
+ASA_HOST=10.0.0.42 VASA_PASSWORD=<pw> ./sccfm_cli/e2e/run_e2e.sh
 ```
 
 A single suite:

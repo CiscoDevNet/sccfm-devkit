@@ -1,0 +1,43 @@
+---
+# Remove the CI CLI-dedicated vASA from the SCCFM tenant.
+#
+# Mirrors sccfm-ansible/e2e/asa/playbooks/remove_vasa.yml but only
+# targets `ci-e2e-cli-asa-*` so it doesn't disturb the Ansible suite's
+# device.  Runs as post-test cleanup so stale device records don't
+# accumulate.  Uses the CDO REST API directly since there is no
+# delete_device module yet.
+
+- name: "CI: Remove CLI-dedicated vASA from SCCFM tenant"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../sccfm-ansible/examples/group_vars/all/vault.yml
+
+  vars:
+    sccfm_api_base: "https://ci.manage.security.cisco.com/api/rest"
+    asa_test_query_all: "name:ci-e2e-cli-asa-*"
+
+  tasks:
+    - name: Find CI CLI vASA devices
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices?limit=50&offset=0&q={{ asa_test_query_all | urlencode }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ sccfm_api_token }}"
+          Content-Type: "application/json"
+        status_code: [200]
+      register: device_list
+
+    - name: Delete each CI CLI vASA device
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ item.uid }}"
+        method: DELETE
+        headers:
+          Authorization: "Bearer {{ sccfm_api_token }}"
+          Content-Type: "application/json"
+        status_code: [200, 202, 204, 404]
+      loop: "{{ device_list.json['items'] | default([]) }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.uid }})"
+      when: device_list.json['items'] | default([]) | length > 0

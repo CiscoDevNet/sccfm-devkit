@@ -1,14 +1,25 @@
 """Test data for the asa/ e2e suite.
 
 Mirrors ``sccfm-ansible/e2e/asa/playbooks/vars/test_data.yml``.
+
+The default query targets a CLI-dedicated vASA (``ci-e2e-cli-asa-*``) so
+the suite doesn't fight the Ansible suite over the same device.  Override
+via ``SCCFM_E2E_ASA_QUERY`` when running locally against a single device.
 """
 
 from __future__ import annotations
 
 import os
 
-ASA_TEST_QUERY = "name:ci-e2e-asa-* AND connectivityState:ONLINE"
-ASA_TEST_QUERY_ALL = "name:ci-e2e-asa-*"
+_DEFAULT_ASA_NAME_PREFIX = os.environ.get("SCCFM_E2E_ASA_NAME_PREFIX", "ci-e2e-cli-asa-")
+ASA_TEST_QUERY = os.environ.get(
+    "SCCFM_E2E_ASA_QUERY",
+    f"name:{_DEFAULT_ASA_NAME_PREFIX}* AND connectivityState:ONLINE",
+)
+ASA_TEST_QUERY_ALL = os.environ.get(
+    "SCCFM_E2E_ASA_QUERY_ALL",
+    f"name:{_DEFAULT_ASA_NAME_PREFIX}*",
+)
 
 ASA_CLI_COMMANDS: tuple[str, ...] = (
     "show version",
