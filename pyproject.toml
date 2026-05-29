@@ -8,6 +8,7 @@ readme = "README.md"
 packages = [
     { include = "sccfm_cli" },
     { include = "sccfm_core" },
+    { include = "scripts" },
 ]
 
 [tool.poetry.dependencies]
@@ -23,6 +24,9 @@ sccfm-cli = "sccfm_cli.cli:cli"
 devkit = "scripts.devkit_cli:main"
 build-ansible-collection = "scripts.build_ansible_collection:main"
 change-tokens = "scripts.setup_tokens:main"
+generate-ansible-docs = "scripts.generate_ansible_docs:main"
+generate-cli-docs = "scripts.generate_cli_docs:main"
+check-doc-links = "scripts.check_doc_links:main"
 
 [tool.poetry.group.dev.dependencies]
 ansible-core = "^2.17.0"

@@ -38,6 +38,15 @@ devkit                         # interactive developer toolkit menu
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
 Every command lives in `sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
 
+Generated CLI reference docs can be previewed locally:
+
+```bash
+generate-cli-docs
+```
+
+The generated Markdown is written under `docs/cli/`.
+See [docs/README.md](docs/README.md) for generation details.
+
 ## Ansible collection
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
@@ -47,6 +56,7 @@ Every command lives in `sccfm_cli/commands/` as a concrete implementation of the
 - Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
+- Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](docs/README.md) for details.
 
 ## Development
 
@@ -63,6 +73,8 @@ This presents an interactive selector with the following tasks:
 |------|-------------|
 | **change-tokens** | Set up SCCFM API tokens, .env, and Ansible Vault |
 | **build-collection** | Build the cisco.sccfm Ansible collection tarball |
+| **generate-ansible-docs** | Generate Ansible reference docs from ansible-doc output |
+| **generate-cli-docs** | Generate CLI reference docs from Click help output |
 | **setup-env** | Bootstrap environment (pyenv, venv, Poetry deps) |
 | **test** | Run the test suite (pytest), with optional filter & verbose |
 | **lint** | Run mypy + flake8 |

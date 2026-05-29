@@ -65,6 +65,24 @@ def _run_build_collection() -> None:
         console.print(f"[red]Build failed with exit code {rc}[/red]")
 
 
+def _run_generate_ansible_docs() -> None:
+    """Generate Ansible documentation from ansible-doc metadata."""
+    from scripts.generate_ansible_docs import main as _generate_ansible_docs
+
+    rc = _generate_ansible_docs([])
+    if rc:
+        console.print(f"[red]Ansible docs generation failed with exit code {rc}[/red]")
+
+
+def _run_generate_cli_docs() -> None:
+    """Generate CLI documentation from Click help output."""
+    from scripts.generate_cli_docs import main as _generate_cli_docs
+
+    rc = _generate_cli_docs([])
+    if rc:
+        console.print(f"[red]CLI docs generation failed with exit code {rc}[/red]")
+
+
 def _run_setup_env() -> None:
     """Run the environment bootstrap (pyenv, venv, Poetry deps)."""
     root = _project_root()
@@ -385,6 +403,16 @@ _TASKS: list[tuple[str, str, Callable[[], None]]] = [
     ("run-cli", "Run an sccfm-cli command interactively", _run_cli_commands),
     ("run-ansible", "Run an Ansible example playbook", _run_ansible_examples),
     ("build-collection", "Build the cisco.sccfm Ansible collection tarball", _run_build_collection),
+    (
+        "generate-ansible-docs",
+        "Generate Ansible reference docs from ansible-doc output",
+        _run_generate_ansible_docs,
+    ),
+    (
+        "generate-cli-docs",
+        "Generate CLI reference docs from Click help output",
+        _run_generate_cli_docs,
+    ),
     ("setup-env", "Bootstrap environment (pyenv, venv, Poetry deps)", _run_setup_env),
     ("test", "Run the test suite (pytest)", _run_test),
     ("run-e2e", "Run Ansible e2e integration tests (real tenant)", _run_e2e),
