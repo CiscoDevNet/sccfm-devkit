@@ -14,9 +14,11 @@
   hosts: localhost
   gather_facts: false
 
-  vars_files:
-    - ../../../sccfm-ansible/examples/group_vars/all/vars.yml
-    - ../../../sccfm-ansible/examples/group_vars/all/vault.yml
+  # sccfm_region / sccfm_api_token are supplied by run_e2e.sh via
+  # -e "@${VARS_FILE}" -e "@${VAULT_FILE}".  Do NOT add vars_files here:
+  # those are loaded/decrypted at parse time before the -e overrides
+  # apply, which would force the default example files to exist and share
+  # the same vault password even when the runner points elsewhere.
 
   module_defaults:
     group/cisco.sccfm.all:
@@ -24,6 +26,18 @@
       api_token: "{{ sccfm_api_token }}"
 
   tasks:
+    # Onboarding here must agree with removal in remove_vasa.yml, whose
+    # delete endpoints are hard-coded to the CI host.  Guard *before*
+    # registering the device: onboarding in a non-ci region would leave a
+    # device that cleanup (which fail-fasts on the same check) cannot reach.
+    - name: Assert this is the CI region
+      ansible.builtin.assert:
+        that:
+          - (sccfm_region | default('')) == 'ci'
+        fail_msg: >-
+          vASA onboarding only supports the 'ci' region (removal is hard-coded
+          to the CI host); got sccfm_region='{{ sccfm_region | default('(unset)') }}'.
+
     - name: Validate required environment variables
       ansible.builtin.assert:
         that:

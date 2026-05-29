@@ -66,6 +66,8 @@ remove_cli_vasa() {
     poetry run ansible-playbook \
       "${PLAYBOOKS_DIR}/remove_vasa.yml" \
       --vault-password-file "${VAULT_PASS}" \
+      -e "@${VARS_FILE}" \
+      -e "@${VAULT_FILE}" \
       || echo "WARNING: vASA removal failed; continuing." >&2
   fi
 }
@@ -82,7 +84,9 @@ if [[ -n "${ASA_HOST:-}" && -n "${VASA_PASSWORD:-}" ]]; then
   echo "Onboarding CLI-dedicated vASA (ci-e2e-cli-asa-${ASA_HOST//[^a-zA-Z0-9]/-})..."
   poetry run ansible-playbook \
     "${PLAYBOOKS_DIR}/onboard_vasa.yml" \
-    --vault-password-file "${VAULT_PASS}"
+    --vault-password-file "${VAULT_PASS}" \
+    -e "@${VARS_FILE}" \
+    -e "@${VAULT_FILE}"
 else
   echo "ASA_HOST/VASA_PASSWORD not set; skipping vASA onboarding." \
        "Tests will use whatever devices already match ci-e2e-cli-asa-*."

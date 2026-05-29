@@ -17,5 +17,6 @@ def run(ctx: ProfileContext) -> None:
         profile=ctx.profile,
         config_path=ctx.config_path,
         expect_failure=True,
+        expected_error=("not found", "not_found", "404"),
         parse_json=False,
     )

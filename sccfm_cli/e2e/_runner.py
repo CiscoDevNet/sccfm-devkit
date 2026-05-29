@@ -67,6 +67,7 @@ def run_cli(
     config_path: Path,
     timeout: int = 300,
     expect_failure: bool = False,
+    expected_error: str | tuple[str, ...] | None = None,
     tolerate_any_rc: bool = False,
     parse_json: bool = True,
 ) -> CLIResult:
@@ -80,7 +81,12 @@ def run_cli(
 
     Set ``expect_failure=True`` to assert that rc != 0 (used by idempotency
     phases that re-create / re-delete and expect "already exists" / "not
-    found").  Set ``tolerate_any_rc=True`` for cleanup paths where a fresh
+    found").  Pair it with ``expected_error`` — a substring or tuple of
+    substrings, matched case-insensitively against stdout+stderr — so a
+    transient 401/500/config failure can't masquerade as the specific
+    "already exists" / "not found" rejection the phase is asserting.
+
+    Set ``tolerate_any_rc=True`` for cleanup paths where a fresh
     tenant has nothing to remove and rc != 0 is fine.
     """
     cmd: list[str] = [
@@ -128,6 +134,17 @@ def run_cli(
                 f"--- stdout ---\n{completed.stdout}\n"
                 f"--- stderr ---\n{completed.stderr}"
             )
+        if expected_error is not None:
+            needles = (expected_error,) if isinstance(expected_error, str) else expected_error
+            haystack = (completed.stdout + "\n" + completed.stderr).lower()
+            if not any(needle.lower() in haystack for needle in needles):
+                raise AssertionError(
+                    f"sccfm-cli failed (rc={completed.returncode}) but the output "
+                    f"did not contain any expected error marker {needles!r}: "
+                    f"{' '.join(cmd)}\n"
+                    f"--- stdout ---\n{completed.stdout}\n"
+                    f"--- stderr ---\n{completed.stderr}"
+                )
     elif completed.returncode != 0:
         raise AssertionError(
             f"sccfm-cli command failed (rc={completed.returncode}): {' '.join(cmd)}\n"

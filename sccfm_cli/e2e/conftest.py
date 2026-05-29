@@ -9,6 +9,7 @@ and anything else fall through to the end.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Final, Generator
 
@@ -44,10 +45,16 @@ def e2e_profile(tmp_path_factory: pytest.TempPathFactory) -> Generator[ProfileCo
     """Decode the Ansible vault and write a fresh ``e2e`` profile.
 
     Session-scoped so all four suites share the same temp profile and
-    state store.  The temp directory is cleaned by ``tmp_path_factory``;
-    tenant-side cleanup is each suite's ``cleanup`` phase.
+    state store.  The config holds the decrypted tenant API token, so the
+    temp directory is removed eagerly on teardown rather than relying on
+    ``tmp_path_factory`` retention (pytest keeps the last few runs by
+    default, which would leave a live token on disk).  Tenant-side cleanup
+    is each suite's ``cleanup`` phase.
     """
     config_dir: Path = tmp_path_factory.mktemp("sccfm-cli-e2e")
     ctx = bootstrap_profile(config_dir)
-    yield ctx
-    ctx.state.clear()
+    try:
+        yield ctx
+    finally:
+        ctx.state.clear()
+        shutil.rmtree(config_dir, ignore_errors=True)

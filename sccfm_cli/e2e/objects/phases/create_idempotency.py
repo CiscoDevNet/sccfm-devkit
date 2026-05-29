@@ -31,5 +31,6 @@ def run(ctx: ProfileContext) -> None:
             profile=ctx.profile,
             config_path=ctx.config_path,
             expect_failure=True,
+            expected_error=("already exists", "conflict"),
             parse_json=False,
         )
