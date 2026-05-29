@@ -28,7 +28,14 @@ def run(ctx: ProfileContext) -> None:
     )
     payload = get_json(result)
     rows = normalize_rows(payload)
-    # An entry row carries a source_ip / src_ip / source field.  Anything else
-    # in the payload is metadata (counts, headers) that should not be flagged.
-    entries = [row for row in rows if any(k in row for k in ("source_ip", "src_ip", "source"))]
+    # `shun show --format json` returns one row per device shaped like
+    # {device_uid, device_name, shun_entries: [...]}; the actual entries are
+    # nested under shun_entries, so flatten those rather than inspecting the
+    # device-level row keys.
+    entries = [
+        entry
+        for row in rows
+        for entry in row.get("shun_entries", [])
+        if isinstance(entry, dict)
+    ]
     assert not entries, f"Expected no shun entries after clear, got {entries!r}"

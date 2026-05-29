@@ -12,6 +12,8 @@ from sccfm_cli.e2e.asa.phases.test_data import ASA_TEST_QUERY, SHUN_TEST_SOURCE_
 
 
 def run(ctx: ProfileContext) -> None:
+    # --wait so the removal is committed before clear / verify_shun_cleared
+    # read device state; otherwise the lifecycle races the backend transaction.
     run_cli(
         "inventory",
         "devices",
@@ -22,8 +24,10 @@ def run(ctx: ProfileContext) -> None:
         ASA_TEST_QUERY,
         "--source-ip",
         SHUN_TEST_SOURCE_IP,
+        "--wait",
         "--format",
         "json",
         profile=ctx.profile,
         config_path=ctx.config_path,
+        timeout=600,
     )

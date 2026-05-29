@@ -21,5 +21,7 @@ def run(ctx: ProfileContext) -> None:
     args = ["inventory", "devices", "asa", "shun", "add", "--query", ASA_TEST_QUERY]
     for ip in SHUN_TEST_SOURCE_IPS:
         args += ["--source-ip", ip]
-    args += ["--format", "json"]
-    run_cli(*args, profile=ctx.profile, config_path=ctx.config_path)
+    # --wait so the entries are committed before show/remove/clear read them;
+    # without it the lifecycle races the backend transaction.
+    args += ["--wait", "--format", "json"]
+    run_cli(*args, profile=ctx.profile, config_path=ctx.config_path, timeout=600)
