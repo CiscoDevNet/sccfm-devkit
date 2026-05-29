@@ -33,9 +33,6 @@ def run(ctx: ProfileContext) -> None:
     # nested under shun_entries, so flatten those rather than inspecting the
     # device-level row keys.
     entries = [
-        entry
-        for row in rows
-        for entry in row.get("shun_entries", [])
-        if isinstance(entry, dict)
+        entry for row in rows for entry in row.get("shun_entries", []) if isinstance(entry, dict)
     ]
     assert not entries, f"Expected no shun entries after clear, got {entries!r}"
