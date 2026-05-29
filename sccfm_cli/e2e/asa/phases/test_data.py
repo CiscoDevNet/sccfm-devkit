@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Test data for the asa/ e2e suite.
 
 Mirrors ``sccfm-ansible/e2e/asa/playbooks/vars/test_data.yml``.

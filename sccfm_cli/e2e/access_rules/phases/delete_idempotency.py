@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Re-delete the rule: the API returns 404 so the CLI exits non-zero."""
 
 from __future__ import annotations

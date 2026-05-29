@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Cross-phase data store for the sccfm-cli e2e suite.
 
 Replaces the ``/tmp/ci_*_uid`` files used by the Ansible suite: a phase

@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Wait for an ASA device to reach SYNCED state.
 
 Phases that push CLI commands to an ASA (`shun add`, `cli execute`,

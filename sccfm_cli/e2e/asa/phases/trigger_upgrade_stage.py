@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Stage an ASA upgrade (download + readiness check, no reboot).
 
 Skipped unless ``SCCFM_E2E_ASA_UPGRADE_SOFTWARE_VERSION`` is set —

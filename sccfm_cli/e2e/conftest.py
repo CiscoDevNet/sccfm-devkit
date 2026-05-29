@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Top-level conftest for the sccfm-cli e2e suite.
 
 Suite ordering mirrors ``sccfm-ansible/e2e/conftest.py`` because the

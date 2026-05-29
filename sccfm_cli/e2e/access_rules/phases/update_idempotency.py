@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Re-apply the same update.
 
 The update path is non-idempotent at the service layer (it always pushes

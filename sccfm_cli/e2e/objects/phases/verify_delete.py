@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """List ci-test objects and groups: nothing should remain."""
 
 from __future__ import annotations

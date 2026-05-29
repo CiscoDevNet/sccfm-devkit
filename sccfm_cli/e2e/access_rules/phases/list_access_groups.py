@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """List access groups for the test ACL, retrying until CDO indexes it."""
 
 from __future__ import annotations

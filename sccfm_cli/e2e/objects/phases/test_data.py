@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Single source of truth for the objects/ suite test data.
 
 Mirrors ``sccfm-ansible/e2e/objects/playbooks/vars/test_data.yml``.

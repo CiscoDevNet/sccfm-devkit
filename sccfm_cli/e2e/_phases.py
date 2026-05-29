@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Phase orchestration shared by every e2e suite.
 
 A :class:`PhaseCase` binds a phase name to a Python callable (the phase

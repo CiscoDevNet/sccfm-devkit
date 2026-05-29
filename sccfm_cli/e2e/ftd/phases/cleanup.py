@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """FTD cleanup placeholder.
 
 FTD tests are read-only or use onboard/remove for lifecycle management,

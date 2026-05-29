@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Provision the source/dest objects and a global access-group on the ASA."""
 
 from __future__ import annotations

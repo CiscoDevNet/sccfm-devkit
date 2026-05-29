@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Attempt to fetch the deleted rule and confirm the not-found response."""
 
 from __future__ import annotations

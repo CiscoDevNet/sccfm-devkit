@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Re-run the same updates: PUT is idempotent at the API level so rc=0."""
 
 from __future__ import annotations

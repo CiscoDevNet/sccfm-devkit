@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Bootstrap a temporary sccfm-cli profile from the Ansible vault.
 
 The Ansible e2e suite already manages tenant credentials via

@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Fetch the cached access group by UID and stash its entity_uid."""
 
 from __future__ import annotations

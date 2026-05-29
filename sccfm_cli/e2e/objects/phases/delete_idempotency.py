@@ -1,3 +1,7 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Re-delete: the CLI must reject with non-zero rc (404 / not found)."""
 
 from __future__ import annotations
