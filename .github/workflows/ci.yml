@@ -35,6 +35,14 @@ jobs:
           poetry run isort --check-only .
           poetry run mypy sccfm_cli sccfm_core
 
+      - name: Generate docs
+        run: |
+          poetry run generate-cli-docs
+          poetry run generate-ansible-docs
+
+      - name: Check docs links
+        run: poetry run check-doc-links
+
       - name: Test
         run: poetry run pytest --color=yes
 
@@ -110,3 +118,59 @@ jobs:
           tag: ${{ steps.bump.outputs.new_tag }}
           artifacts: "dist/*.whl,dist/*.tar.gz"
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-docs:
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pipx and Poetry
+        run: |
+          python -m pip install --upgrade pip pipx
+          python -m pipx ensurepath
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev
+
+      - name: Generate docs
+        run: |
+          poetry run generate-cli-docs
+          poetry run generate-ansible-docs
+
+      - name: Check docs links
+        run: poetry run check-doc-links
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build Pages site
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

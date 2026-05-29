@@ -25,6 +25,14 @@ results/
 /.eggs/
 .poetry_cache/
 /pip-wheel-metadata/
+
+# Local Codex/agent runtime metadata
+.agents/
+
+# Generated documentation previews
+docs/ansible/
+docs/cli/
+
 # Vault password file (NEVER commit this!)
 **/.vault_pass
 

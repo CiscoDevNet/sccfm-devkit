@@ -195,6 +195,14 @@ Each device gets the following variables:
 
 ## Modules
 
+Generated module and inventory reference docs can be previewed locally. Generate them with:
+
+```bash
+generate-ansible-docs
+```
+
+The generated Markdown is written under `docs/ansible/`.
+
 ### cisco.sccfm.onboard_asa
 
 Onboard an ASA device to your SCCFM tenant.
