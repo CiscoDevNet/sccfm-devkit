@@ -39,7 +39,7 @@ SETUP_PHASES: Final[tuple[PhaseCase, ...]] = (
 READ_PHASES: Final[tuple[PhaseCase, ...]] = (
     PhaseCase("list_access_groups", list_access_groups.run, ("provision_access_group",)),
     PhaseCase("get_access_group", get_access_group.run, ("list_access_groups",)),
-    PhaseCase("list_access_rules", list_access_rules.run, ("list_access_groups",)),
+    PhaseCase("list_access_rules", list_access_rules.run, ("provision_access_group",)),
 )
 
 CRUD_PHASES: Final[tuple[PhaseCase, ...]] = (
