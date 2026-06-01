@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -104,11 +105,15 @@ def _list_plugins(project_root: Path, collection_path: Path, plugin_type: str) -
 
 def _render_page(fqcn: str, command: str, output: str) -> str:
     return (
-        f"{GENERATED_HEADER}\n\n# {fqcn}\n\n"
+        f"{_front_matter(fqcn)}{GENERATED_HEADER}\n\n# {fqcn}\n\n"
         "{% raw %}\n"
         f"```text\n$ {command}\n\n{output}\n```\n"
         "{% endraw %}\n"
     )
+
+
+def _front_matter(title: str) -> str:
+    return f"---\nlayout: page\ntitle: {json.dumps(title)}\n---\n\n"
 
 
 def _link(plugin_type: str, fqcn: str) -> str:
@@ -118,6 +123,7 @@ def _link(plugin_type: str, fqcn: str) -> str:
 
 def _render_index(modules: Sequence[str], inventory_plugins: Sequence[str]) -> str:
     lines = [
+        _front_matter("cisco.sccfm Ansible Reference").rstrip(),
         GENERATED_HEADER,
         "",
         "# cisco.sccfm Ansible Reference",

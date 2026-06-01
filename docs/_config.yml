@@ -1,0 +1,13 @@
+title: SCCFM Devkit Documentation
+description: Generated references for sccfm-cli and the cisco.sccfm Ansible collection.
+theme: minima
+markdown: kramdown
+
+kramdown:
+  input: GFM
+
+plugins:
+  - jekyll-default-layout
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-relative-links

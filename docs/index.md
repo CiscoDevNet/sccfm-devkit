@@ -1,3 +1,8 @@
+---
+layout: page
+title: SCCFM Devkit Documentation
+---
+
 # SCCFM Devkit Documentation
 
 These references are generated from the source code on every merge to `main`.

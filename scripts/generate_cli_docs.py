@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -49,6 +50,10 @@ def _command_text(path: Sequence[str]) -> str:
     return "sccfm-cli" if not path else "sccfm-cli " + " ".join(path)
 
 
+def _front_matter(title: str) -> str:
+    return f"---\nlayout: page\ntitle: {json.dumps(title)}\n---\n\n"
+
+
 def _help_output(path: Sequence[str]) -> str:
     result = CliRunner().invoke(
         cli,
@@ -66,11 +71,15 @@ def _help_output(path: Sequence[str]) -> str:
 
 def _render_page(path: Sequence[str], output: str) -> str:
     command = _command_text(path)
-    return f"{GENERATED_HEADER}\n\n# {command}\n\n```text\n$ {command} --help\n\n{output}\n```\n"
+    return (
+        f"{_front_matter(command)}{GENERATED_HEADER}\n\n"
+        f"# {command}\n\n```text\n$ {command} --help\n\n{output}\n```\n"
+    )
 
 
 def _render_index(paths: Sequence[tuple[str, ...]]) -> str:
     lines = [
+        _front_matter("sccfm-cli Reference").rstrip(),
         GENERATED_HEADER,
         "",
         "# sccfm-cli Reference",

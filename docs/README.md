@@ -1,3 +1,8 @@
+---
+layout: page
+title: Generated Documentation
+---
+
 # Generated Documentation
 
 The CLI and Ansible references are generated from source metadata:
@@ -28,8 +33,8 @@ generated links, scans generated text artifacts for terminal escape sequences, a
 the static docs site without publishing it. After CI succeeds on `main`, the Generated
 Docs workflow regenerates those folders and commits any changes back to `main`.
 
-GitHub Pages deployment is intentionally disabled for now. Re-add a deploy workflow when
-hosted docs are ready to go live.
+The Pages workflow publishes committed docs from `docs/` when `docs/**` changes on
+`main`.
 
 External links are intentionally not checked in CI to avoid release noise from unrelated
 remote outages.

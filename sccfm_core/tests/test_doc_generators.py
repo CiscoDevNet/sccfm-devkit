@@ -165,6 +165,18 @@ def test_ansible_docs_wrap_output_in_liquid_raw_tags() -> None:
     assert output in page
 
 
+def test_generated_docs_include_jekyll_front_matter() -> None:
+    cli_page = generate_cli_docs._render_page((), "Usage: sccfm-cli [OPTIONS]")
+    ansible_page = generate_ansible_docs._render_page(
+        "cisco.sccfm.sccfm",
+        "ansible-doc -t inventory cisco.sccfm.sccfm",
+        "Inventory docs",
+    )
+
+    assert cli_page.startswith('---\nlayout: page\ntitle: "sccfm-cli"\n---\n\n')
+    assert ansible_page.startswith('---\nlayout: page\ntitle: "cisco.sccfm.sccfm"\n---\n\n')
+
+
 def test_ansible_docs_normalize_temporary_source_paths(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     collection_path = tmp_path / "tmp-collection"

@@ -25,6 +25,8 @@ results/
 /.eggs/
 .poetry_cache/
 /pip-wheel-metadata/
+/_site/
+/.jekyll-cache/
 
 # Local Codex/agent runtime metadata
 .agents/
