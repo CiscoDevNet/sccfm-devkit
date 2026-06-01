@@ -120,11 +120,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-docs:
-    needs: lint-and-test
+    needs: [lint-and-test, release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
     environment:
@@ -133,6 +133,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Refresh branch
+        run: git pull --ff-only origin "${GITHUB_REF_NAME}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -156,6 +162,19 @@ jobs:
 
       - name: Check docs links
         run: poetry run check-doc-links
+
+      - name: Commit generated docs
+        run: |
+          if [ -z "$(git status --porcelain docs/cli docs/ansible)" ]; then
+            echo "Generated docs are up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.cisco.com"
+          git add docs/cli docs/ansible
+          git commit -m "docs: update generated references [skip ci]"
+          git push origin HEAD:"${GITHUB_REF_NAME}"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
