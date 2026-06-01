@@ -36,6 +36,8 @@
         that:
           - >
             (not delete_result.changed | default(false))
+            or ((delete_result.error_code | default('') | upper) == 'NOT_FOUND')
+            or ((delete_result.status_code | default(0) | int) == 404)
             or ('not_found' in (delete_result.msg | default('') | lower))
             or ('404' in (delete_result.msg | default('')))
         fail_msg: >-
