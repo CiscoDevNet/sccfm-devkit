@@ -25,9 +25,11 @@ The generated files are written to:
 
 Pull requests run the Docs workflow, which regenerates all docs, validates internal
 generated links, scans generated text artifacts for terminal escape sequences, and builds
-the GitHub Pages site without publishing it. After CI succeeds on `main`, the Generated
-Docs workflow regenerates those folders and commits any changes back to `main`; the Pages
-workflow publishes committed docs when `docs/**` changes.
+the static docs site without publishing it. After CI succeeds on `main`, the Generated
+Docs workflow regenerates those folders and commits any changes back to `main`.
+
+GitHub Pages deployment is intentionally disabled for now. Re-add a deploy workflow when
+hosted docs are ready to go live.
 
 External links are intentionally not checked in CI to avoid release noise from unrelated
 remote outages.
@@ -37,4 +39,4 @@ package should install `docs/man/man1/*.1` into its normal `man1` directory so `
 sccfm-cli` works without users editing `MANPATH`. Direct `pip` and `pipx` installs do
 not reliably install system man pages, especially inside virtual environments. Windows
 does not include `man` by default, so Windows users should use `sccfm-cli --help` or the
-published web docs.
+generated Markdown docs.
