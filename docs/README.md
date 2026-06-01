@@ -19,7 +19,7 @@ The generated files are written to:
 - `docs/cli/`
 - `docs/ansible/`
 
-Those folders are ignored by Git. Commit the code metadata that generates the docs, not the generated preview files.
-
-Docs are also generated and published from `main` by GitHub Actions so users can read them without installing the repo locally.
-CI checks internal generated links before publishing. External links are intentionally not checked in CI to avoid release noise from unrelated remote outages.
+On every merge to `main`, GitHub Actions regenerates those folders and commits any changes
+back to `main` before publishing the same generated files to GitHub Pages.
+CI checks internal generated links before committing or publishing. External links are
+intentionally not checked in CI to avoid release noise from unrelated remote outages.
