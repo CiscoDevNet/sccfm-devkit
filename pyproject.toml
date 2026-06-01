@@ -26,11 +26,14 @@ build-ansible-collection = "scripts.build_ansible_collection:main"
 change-tokens = "scripts.setup_tokens:main"
 generate-ansible-docs = "scripts.generate_ansible_docs:main"
 generate-cli-docs = "scripts.generate_cli_docs:main"
+generate-cli-man-docs = "scripts.generate_cli_man_docs:main"
 check-doc-links = "scripts.check_doc_links:main"
+check-doc-artifacts = "scripts.check_doc_artifacts:main"
 
 [tool.poetry.group.dev.dependencies]
 ansible-core = "^2.17.0"
 black = "^25.11.0"
+click-man = "^0.5.1"
 isort = "^7.0.0"
 mypy = "^1.18.2"
 pytest = "^9.0.1"
@@ -74,6 +77,8 @@ module = [
   "click.*",
   "click_option_group",
   "click_option_group.*",
+  "click_man",
+  "click_man.*",
   "rich",
   "rich.*",
   "scc_firewall_manager_sdk",

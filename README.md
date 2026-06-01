@@ -42,9 +42,11 @@ Generated CLI reference docs can be previewed locally:
 
 ```bash
 generate-cli-docs
+generate-cli-man-docs
 ```
 
-The generated Markdown is written under `docs/cli/`.
+The generated Markdown is written under `docs/cli/`; generated man pages are written
+under `docs/man/man1/`.
 See [docs/README.md](docs/README.md) for generation details.
 
 ## Ansible collection
@@ -75,6 +77,7 @@ This presents an interactive selector with the following tasks:
 | **build-collection** | Build the cisco.sccfm Ansible collection tarball |
 | **generate-ansible-docs** | Generate Ansible reference docs from ansible-doc output |
 | **generate-cli-docs** | Generate CLI reference docs from Click help output |
+| **generate-cli-man-docs** | Generate CLI man pages from Click metadata |
 | **setup-env** | Bootstrap environment (pyenv, venv, Poetry deps) |
 | **test** | Run the test suite (pytest), with optional filter & verbose |
 | **lint** | Run mypy + flake8 |
