@@ -199,6 +199,28 @@ def test_ansible_docs_normalize_temporary_source_paths(tmp_path: Path) -> None:
     assert "sccfm-ansible/plugins/modules/get_object.py" in normalized
 
 
+def test_ansible_docs_strip_terminal_control_sequences(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    collection_path = tmp_path / "tmp-collection"
+    temp_source = collection_path / "ansible_collections" / "cisco" / "sccfm"
+    output = (
+        f"> MODULE \x1b[1mcisco.sccfm.list_managers\x1b[0m "
+        f"({temp_source}/plugins/modules/list_managers.py)\n"
+        "\x1b[1mOPTIONS\x1b[0m"
+    )
+
+    cleaned = generate_ansible_docs._clean_ansible_doc_output(
+        output,
+        project_root,
+        collection_path,
+    )
+
+    assert "\x1b" not in cleaned
+    assert "MODULE cisco.sccfm.list_managers" in cleaned
+    assert "OPTIONS" in cleaned
+    assert "sccfm-ansible/plugins/modules/list_managers.py" in cleaned
+
+
 def test_ansible_docs_replace_default_directory(tmp_path: Path) -> None:
     docs_root = tmp_path / "ansible"
     default_docs_root = docs_root
