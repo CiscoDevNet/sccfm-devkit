@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI OBJECTS NETWORK-GROUP CREATE" "1" "2026-06-02" "0.36.0" "sccfm-cli objects network-group create Manual"
+.SH NAME
+sccfm-cli\-objects\-network-group\-create \- Create a network group.
+.SH SYNOPSIS
+.B sccfm-cli objects network-group create
+[OPTIONS]
+.SH DESCRIPTION
+Create a network group.
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-name TEXT
+The name of the object.  [required]
+.TP
+\fB\-r,\fP \-\-referenced\-object TEXT
+UID or name of an existing network object to include (repeatable).
+.TP
+\fB\-\-network\-literal\fP TEXT
+Inline network literal (IP, CIDR, or range; repeatable).
+.TP
+\fB\-\-url\-literal\fP TEXT
+Inline URL literal (repeatable).
+.TP
+\fB\-d,\fP \-\-description TEXT
+A human-readable description of the object.
+.TP
+\fB\-l,\fP \-\-labels TEXT
+Labels to attach to the object (can be specified multiple times).
+.TP
+\fB\-t,\fP \-\-tags TEXT
+Tags in key=value format (value can be comma-separated; repeatable).
+.TP
+\fB\-\-check\fP
+Run a preflight check without performing the operation.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

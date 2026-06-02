@@ -1,0 +1,24 @@
+.TH "SCCFM-CLI INVENTORY MANAGER ACCESS-POLICIES LIST" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory manager access-policies list Manual"
+.SH NAME
+sccfm-cli\-inventory\-manager\-access-policies\-list \- List FMC access policies for a given domain.
+.SH SYNOPSIS
+.B sccfm-cli inventory manager access-policies list
+[OPTIONS]
+.SH DESCRIPTION
+List FMC access policies for a given domain.
+.SH OPTIONS
+.TP
+\fB\-\-domain\-uid\fP TEXT
+The FMC domain UID (fmcDomainUid from `sccfm-cli inventory manager list`).  [required]
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

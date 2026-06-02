@@ -1,0 +1,48 @@
+.TH "SCCFM-CLI INVENTORY DEVICES CDFMC-MANAGED-FTD DEPLOY" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices cdfmc-managed-ftd deploy Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-cdfmc-managed-ftd\-deploy \- Deploy pending configuration changes to...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices cdfmc-managed-ftd deploy
+[OPTIONS]
+.SH DESCRIPTION
+Deploy pending configuration changes to one or more cdFMC-managed FTD devices.
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-device\-name TEXT
+Device name to search for (supports wildcards like 'branch-*').
+.TP
+\fB\-q,\fP \-\-query TEXT
+Filter devices by a Lucene query.
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uids TEXT
+List of device UIDs to deploy.
+.TP
+\fB\-\-deployment\-notes\fP TEXT
+Notes for the deployment.
+.TP
+\fB\-\-description\fP TEXT
+Human-readable description for the deployment.
+.TP
+\fB\-\-ignore\-warnings\fP
+Ignore warnings from pre-validation and proceed with the deployment.
+.TP
+\fB\-\-check\fP
+Run a preflight check without performing the operation.
+.TP
+\fB\-\-wait\fP / \-\-no\-wait
+Wait for the transaction to finish before returning.  [default: no-wait]
+.TP
+\fB\-\-timeout\fP INTEGER RANGE
+Maximum seconds to wait for the transaction to complete (used with --wait).  [default: 3600; x>=1]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

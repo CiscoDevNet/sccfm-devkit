@@ -1,0 +1,57 @@
+.TH "SCCFM-CLI POLICIES ACCESS-RULE CREATE" "1" "2026-06-02" "0.36.0" "sccfm-cli policies access-rule create Manual"
+.SH NAME
+sccfm-cli\-policies\-access-rule\-create \- Create an ASA access rule.
+.SH SYNOPSIS
+.B sccfm-cli policies access-rule create
+[OPTIONS]
+.SH DESCRIPTION
+Create an ASA access rule.
+.SH OPTIONS
+.TP
+\fB\-\-access\-group\-uid\fP TEXT
+UID of the access group.  [required]
+.TP
+\fB\-\-entity\-uid\fP TEXT
+UID of the device or manager.  [required]
+.TP
+\fB\-\-index\fP INTEGER
+Position of the rule in the ordered list.  [required]
+.TP
+\fB\-\-rule\-action\fP [permit|deny]
+Rule action.  [default: PERMIT]
+.TP
+\fB\-\-remark\fP TEXT
+Human-readable description of the rule.
+.TP
+\fB\-\-source\-network\fP TEXT
+Source network object name.
+.TP
+\fB\-\-destination\-network\fP TEXT
+Destination network object name.
+.TP
+\fB\-\-protocol\fP TEXT
+Protocol (e.g. tcp, udp, ip).
+.TP
+\fB\-\-source\-port\fP TEXT
+Source port or port range.
+.TP
+\fB\-\-destination\-port\fP TEXT
+Destination port or port range.
+.TP
+\fB\-\-log\-level\fP TEXT
+Log level.
+.TP
+\fB\-\-log\-interval\fP INTEGER
+Log interval in seconds.
+.TP
+\fB\-\-active\fP / \-\-inactive
+Whether the rule is active.
+.TP
+\fB\-\-check\fP
+Run a preflight check without performing the operation.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

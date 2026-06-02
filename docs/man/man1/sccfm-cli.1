@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI" "1" "2026-06-02" "0.36.0" "sccfm-cli Manual"
+.SH NAME
+sccfm-cli \- SCC Firewall Manager CLI
+.SH SYNOPSIS
+.B sccfm-cli
+[OPTIONS] COMMAND [ARGS]...
+.SH DESCRIPTION
+SCC Firewall Manager CLI
+.SH OPTIONS
+.TP
+\fB\-\-profile\fP TEXT
+Configuration profile to use  [default: default]
+.TP
+\fB\-\-silent\fP
+Suppress progress indicators (useful for piping output)
+.SH COMMANDS
+\fBconfigure\fP
+  Configure API connectivity.
+  See \fBsccfm-cli-configure(1)\fP for full documentation on the \fBconfigure\fP command.
+.PP
+\fBstatus\fP
+  Display the state of SCCFM subsystems.
+  See \fBsccfm-cli-status(1)\fP for full documentation on the \fBstatus\fP command.
+.PP
+\fBtransaction\fP
+  Check transaction status by UID.
+  See \fBsccfm-cli-transaction(1)\fP for full documentation on the \fBtransaction\fP command.
+.PP
+\fBinventory\fP
+  Browse SCC Firewall Management inventory.
+  See \fBsccfm-cli-inventory(1)\fP for full documentation on the \fBinventory\fP command.
+.PP
+\fBobjects\fP
+  Manage SCC Firewall Management objects.
+  See \fBsccfm-cli-objects(1)\fP for full documentation on the \fBobjects\fP command.
+.PP
+\fBpolicies\fP
+  Manage SCC Firewall Management policies.
+  See \fBsccfm-cli-policies(1)\fP for full documentation on the \fBpolicies\fP command.

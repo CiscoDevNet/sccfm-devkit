@@ -1,0 +1,21 @@
+.TH "SCCFM-CLI OBJECTS APPLY-OVERRIDE-AS-DEFAULT" "1" "2026-06-02" "0.36.0" "sccfm-cli objects apply-override-as-default Manual"
+.SH NAME
+sccfm-cli\-objects\-apply-override-as-default \- Apply an existing override value as the...
+.SH SYNOPSIS
+.B sccfm-cli objects apply-override-as-default
+[OPTIONS]
+.SH DESCRIPTION
+Apply an existing override value as the new default value of an object.
+.SH OPTIONS
+.TP
+\fB\-u,\fP \-\-uid TEXT
+The unique identifier (UID) of the object.
+.TP
+\fB\-\-target\-id\fP TEXT
+UID of the target device whose override value to apply as the new default.  [required]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

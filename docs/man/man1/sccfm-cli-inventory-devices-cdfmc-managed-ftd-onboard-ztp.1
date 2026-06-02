@@ -1,0 +1,36 @@
+.TH "SCCFM-CLI INVENTORY DEVICES CDFMC-MANAGED-FTD ONBOARD-ZTP" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-cdfmc-managed-ftd\-onboard-ztp \- Onboard a cdFMC-managed FTD device using...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp
+[OPTIONS]
+.SH DESCRIPTION
+Onboard a cdFMC-managed FTD device using Zero-Touch Provisioning (ZTP).
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-name TEXT
+Human-readable name for the FTD device.  [required]
+.TP
+\fB\-s,\fP \-\-serial\-number TEXT
+Serial number of the FTD device. When plugged in and connected to the Internet, the device will automatically register to this tenant.  [required]
+.TP
+\fB\-\-licenses\fP [BASE|CARRIER|THREAT|MALWARE|URLFilter]
+License(s) to apply to the device. Can be specified multiple times (e.g. --licenses BASE --licenses CARRIER).  [required]
+.TP
+\fB\-\-fmc\-access\-policy\-uid\fP TEXT
+UUID of the FMC access policy to apply to this device.  [required]
+.TP
+\fB\-\-admin\-password\fP TEXT
+Initial provisioning password for the device. Required for setup if a password has not already been set on the device.
+.TP
+\fB\-\-device\-group\-uid\fP TEXT
+UUID of the device group to assign this device to after registration.
+.TP
+\fB\-\-check\fP
+Run a preflight check without onboarding.
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]

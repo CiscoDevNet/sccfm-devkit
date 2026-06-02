@@ -1,0 +1,51 @@
+.TH "SCCFM-CLI POLICIES ACCESS-RULE UPDATE" "1" "2026-06-02" "0.36.0" "sccfm-cli policies access-rule update Manual"
+.SH NAME
+sccfm-cli\-policies\-access-rule\-update \- Update an ASA access rule.
+.SH SYNOPSIS
+.B sccfm-cli policies access-rule update
+[OPTIONS]
+.SH DESCRIPTION
+Update an ASA access rule.
+.SH OPTIONS
+.TP
+\fB\-\-uid\fP TEXT
+UID of the access rule to update.  [required]
+.TP
+\fB\-\-index\fP INTEGER
+New position of the rule in the ordered list.
+.TP
+\fB\-\-rule\-action\fP [permit|deny]
+Rule action.
+.TP
+\fB\-\-remark\fP TEXT
+Human-readable description of the rule.
+.TP
+\fB\-\-source\-network\fP TEXT
+Source network object name.
+.TP
+\fB\-\-destination\-network\fP TEXT
+Destination network object name.
+.TP
+\fB\-\-protocol\fP TEXT
+Protocol (e.g. tcp, udp, ip).
+.TP
+\fB\-\-source\-port\fP TEXT
+Source port or port range.
+.TP
+\fB\-\-destination\-port\fP TEXT
+Destination port or port range.
+.TP
+\fB\-\-log\-level\fP TEXT
+Log level.
+.TP
+\fB\-\-log\-interval\fP INTEGER
+Log interval in seconds.
+.TP
+\fB\-\-active\fP / \-\-inactive
+Whether the rule is active.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

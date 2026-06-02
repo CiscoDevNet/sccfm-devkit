@@ -1,0 +1,33 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA LIST-NOT-ON-VERSION" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa list-not-on-version Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-list-not-on-version \- List ASA devices that are NOT running a...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa list-not-on-version
+[OPTIONS]
+.SH DESCRIPTION
+List ASA devices that are NOT running a specific software version. Useful for identifying devices that still need upgrading to a target version.
+.SH OPTIONS
+.TP
+\fB\-\-version\fP TEXT
+Software version to exclude (e.g. '9.20(3)13'). Devices NOT on this version are listed.  [required]
+.TP
+\fB\-n,\fP \-\-device\-name TEXT
+Device name to search for (supports wildcards like 'branch-*').
+.TP
+\fB\-q,\fP \-\-query TEXT
+Lucene query to narrow the device search (combined with the version exclusion filter).
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uids TEXT
+List of device UIDs to query.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

@@ -1,0 +1,24 @@
+.TH "SCCFM-CLI OBJECTS ADD-OVERRIDE" "1" "2026-06-02" "0.36.0" "sccfm-cli objects add-override Manual"
+.SH NAME
+sccfm-cli\-objects\-add-override \- Add a device-specific override to an object.
+.SH SYNOPSIS
+.B sccfm-cli objects add-override
+[OPTIONS]
+.SH DESCRIPTION
+Add a device-specific override to an object.
+.SH OPTIONS
+.TP
+\fB\-u,\fP \-\-uid TEXT
+The unique identifier (UID) of the object.
+.TP
+\fB\-\-target\-id\fP TEXT
+UID of the target device for the override.  [required]
+.TP
+\fB\-\-override\-value\fP TEXT
+Literal override value (IP address, CIDR, range, or URL).  [required]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

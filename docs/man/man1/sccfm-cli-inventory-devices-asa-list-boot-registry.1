@@ -1,0 +1,30 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA LIST-BOOT-REGISTRY" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa list-boot-registry Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-list-boot-registry \- Show boot registry info (system image,...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa list-boot-registry
+[OPTIONS]
+.SH DESCRIPTION
+Show boot registry info (system image, config register, boot entries) for ASAs.
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-device\-name TEXT
+Device name(s) to search for (supports wildcards like 'branch-*').
+.TP
+\fB\-q,\fP \-\-query TEXT
+Filter devices by a Lucene query.
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uid TEXT
+Device UID(s) to query.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

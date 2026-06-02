@@ -1,0 +1,18 @@
+.TH "SCCFM-CLI OBJECTS SHOW" "1" "2026-06-02" "0.36.0" "sccfm-cli objects show Manual"
+.SH NAME
+sccfm-cli\-objects\-show \- Show the full details of an object,...
+.SH SYNOPSIS
+.B sccfm-cli objects show
+[OPTIONS]
+.SH DESCRIPTION
+Show the full details of an object, including its default value, overrides, and targets.
+.SH OPTIONS
+.TP
+\fB\-u,\fP \-\-uid TEXT
+The unique identifier (UID) of the object.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

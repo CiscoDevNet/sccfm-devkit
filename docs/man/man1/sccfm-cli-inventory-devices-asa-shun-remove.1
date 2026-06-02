@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA SHUN REMOVE" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa shun remove Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-shun\-remove \- Remove one or more shun entries from ASA...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa shun remove
+[OPTIONS]
+.SH DESCRIPTION
+Remove one or more shun entries from ASA devices. Repeat --source-ip to remove multiple IPs in a single transaction.
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-device\-name TEXT
+Device name to search for (supports wildcards like 'branch-*').
+.TP
+\fB\-q,\fP \-\-query TEXT
+Filter devices by a Lucene query.
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uids TEXT
+List of device UIDs to remove the shun from.
+.TP
+\fB\-\-source\-ip\fP TEXT
+Source IP to remove from the shun list. Repeat to remove multiple IPs in one transaction.  [required]
+.TP
+\fB\-\-check\fP
+Run a preflight check without performing the operation.
+.TP
+\fB\-\-wait\fP / \-\-no\-wait
+Wait for the transaction to finish before returning.  [default: no-wait]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

@@ -1,0 +1,24 @@
+.TH "SCCFM-CLI POLICIES ACCESS-GROUP LIST" "1" "2026-06-02" "0.36.0" "sccfm-cli policies access-group list Manual"
+.SH NAME
+sccfm-cli\-policies\-access-group\-list \- List ASA access groups.
+.SH SYNOPSIS
+.B sccfm-cli policies access-group list
+[OPTIONS]
+.SH DESCRIPTION
+List ASA access groups.
+.SH OPTIONS
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-\-query\fP TEXT
+Lucene query string to filter results.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

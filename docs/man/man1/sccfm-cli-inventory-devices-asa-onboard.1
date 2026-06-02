@@ -1,0 +1,45 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA ONBOARD" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa onboard Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-onboard \- Onboard an ASA device to SCC Firewall...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa onboard
+[OPTIONS]
+.SH DESCRIPTION
+Onboard an ASA device to SCC Firewall Manager.
+.SH OPTIONS
+.TP
+\fB\-\-name\fP TEXT
+Human-readable name for the ASA device.  [required]
+.TP
+\fB\-\-device\-address\fP TEXT
+Device address in the form host:port.
+.TP
+\fB\-\-username\fP TEXT
+Username used to authenticate with the device.
+.TP
+\fB\-\-password\fP TEXT
+Password used to authenticate with the device.
+.TP
+\fB\-\-connector\-type\fP [SDC|CDG]
+Connector type used to communicate with the device.
+.TP
+\fB\-\-connector\-name\fP TEXT
+Name of the Secure Device Connector (SDC) to use (required when connector-type is SDC).
+.TP
+\fB\-\-ignore\-certificate\fP
+Skip certificate validation when onboarding.
+.TP
+\fB\-\-grouped\-labels\fP TEXT
+Grouped labels in JSON format, e.g., '{"environment": ["prod", "us-west"]}
+.TP
+\fB\-\-ungrouped\-labels\fP TEXT
+Free-form labels to assign to the device (can be specified multiple times).
+.TP
+\fB\-\-check\fP
+Run a preflight check without onboarding.
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]

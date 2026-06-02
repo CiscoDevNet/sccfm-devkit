@@ -1,0 +1,30 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA HA-CHECK" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa ha-check Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-ha-check \- Run HA health checks on ASA failover pairs.
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa ha-check
+[OPTIONS]
+.SH DESCRIPTION
+Run HA health checks on ASA failover pairs. Verifies failover state, version parity, interface health, config sync, and unmonitored interfaces.
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-device\-name TEXT
+Device name to search for (supports wildcards like 'branch-*').
+.TP
+\fB\-q,\fP \-\-query TEXT
+Filter devices by a Lucene query.
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uids TEXT
+List of device UIDs to check.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

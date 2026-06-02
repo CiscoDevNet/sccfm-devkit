@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI INVENTORY DEVICES CDFMC-MANAGED-FTD ONBOARD" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices cdfmc-managed-ftd onboard Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-cdfmc-managed-ftd\-onboard \- Onboard a cdFMC-managed FTD device (non-ZTP).
+.SH SYNOPSIS
+.B sccfm-cli inventory devices cdfmc-managed-ftd onboard
+[OPTIONS]
+.SH DESCRIPTION
+Onboard a cdFMC-managed FTD device (non-ZTP).
+.SH OPTIONS
+.TP
+\fB\-n,\fP \-\-name TEXT
+Human-readable name for the FTD device.  [required]
+.TP
+\fB\-\-fmc\-access\-policy\-uid\fP TEXT
+UUID of the FMC access policy to apply to this device.  [required]
+.TP
+\fB\-\-licenses\fP [BASE|CARRIER|THREAT|MALWARE|URLFilter]
+License(s) to apply to the device. Can be specified multiple times (e.g. --licenses BASE --licenses CARRIER).  [required]
+.TP
+\fB\-\-virtual\fP
+Indicate that the FTD is a virtual device. Requires --performance-tier.
+.TP
+\fB\-\-performance\-tier\fP [FTDv5|FTDv10|FTDv20|FTDv30|FTDv50|FTDv100|FTDv]
+Performance tier of the FTDv (required when --virtual is set, e.g., FTDv5, FTDv10, FTDv20).
+.TP
+\fB\-\-grouped\-labels\fP TEXT
+Grouped labels in JSON format, e.g., '{"environment": ["prod", "us-west"]}'.
+.TP
+\fB\-\-ungrouped\-labels\fP TEXT
+Free-form labels to assign to the device (can be specified multiple times).
+.TP
+\fB\-\-check\fP
+Run a preflight check without onboarding.
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]

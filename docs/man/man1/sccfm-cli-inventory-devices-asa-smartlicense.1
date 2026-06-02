@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA SMARTLICENSE" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa smartlicense Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-smartlicense \- Apply Smart License using a Smart license...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa smartlicense
+[OPTIONS]
+.SH DESCRIPTION
+Apply Smart License using a Smart license token on ASA devices (the token must be valid and must have at least as many uses as there are devices).
+.SH OPTIONS
+.TP
+\fB\-q,\fP \-\-query TEXT
+Filter devices to smart license by a Lucene query.
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uids TEXT
+List of device UIDs to apply smart license to.
+.TP
+\fB\-\-check\fP
+Run a preflight check without performing the operation.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
+.TP
+\fB\-t,\fP \-\-token TEXT
+The smart license token for your virtual account, generated on https://software.cisco.com/clc
+.TP
+\fB\-\-throughput\-level\fP [100M|1G]
+The throughput level of your ASA (required only for virtual ASAs)
+.TP
+\fB\-\-feature\-tier\fP [standard]
+The feature tier of your ASA

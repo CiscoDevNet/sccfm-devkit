@@ -1,0 +1,24 @@
+.TH "SCCFM-CLI TRANSACTION" "1" "2026-06-02" "0.36.0" "sccfm-cli transaction Manual"
+.SH NAME
+sccfm-cli\-transaction \- Check transaction status by UID.
+.SH SYNOPSIS
+.B sccfm-cli transaction
+[OPTIONS]
+.SH DESCRIPTION
+Check transaction status by UID.
+.SH OPTIONS
+.TP
+\fB\-t,\fP \-\-transaction\-uid TEXT
+Transaction UID to inspect.  [required]
+.TP
+\fB\-\-wait\fP / \-\-no\-wait
+Wait for the transaction to finish before returning.  [default: no-wait]
+.TP
+\fB\-\-timeout\fP INTEGER RANGE
+Maximum seconds to wait for the transaction to complete (used with --wait).  [default: 3600; x>=1]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

@@ -1,0 +1,24 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA LIST" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa list Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-list \- List ASA devices.
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa list
+[OPTIONS]
+.SH DESCRIPTION
+List ASA devices.
+.SH OPTIONS
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-q,\fP \-\-query TEXT
+The query to execute. Use the Lucene Query Syntax to construct your query.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

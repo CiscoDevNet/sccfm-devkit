@@ -1,0 +1,27 @@
+.TH "SCCFM-CLI INVENTORY DEVICES ASA LIST-LOCAL-USERS" "1" "2026-06-02" "0.36.0" "sccfm-cli inventory devices asa list-local-users Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-asa\-list-local-users \- List local users on ASA devices.
+.SH SYNOPSIS
+.B sccfm-cli inventory devices asa list-local-users
+[OPTIONS]
+.SH DESCRIPTION
+List local users on ASA devices.
+.SH OPTIONS
+.TP
+\fB\-q,\fP \-\-query TEXT
+Filter devices by a Lucene query.
+.TP
+\fB\-l,\fP \-\-limit INTEGER RANGE
+Maximum records to return  [default: 50; 1<=x<=200]
+.TP
+\fB\-o,\fP \-\-offset INTEGER RANGE
+Pagination offset  [default: 0; x>=0]
+.TP
+\fB\-u,\fP \-\-device\-uids TEXT
+List of device UIDs to query.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

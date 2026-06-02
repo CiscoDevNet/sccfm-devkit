@@ -1,0 +1,24 @@
+.TH "SCCFM-CLI OBJECTS EDIT-OVERRIDE" "1" "2026-06-02" "0.36.0" "sccfm-cli objects edit-override Manual"
+.SH NAME
+sccfm-cli\-objects\-edit-override \- Edit the value of an existing override for...
+.SH SYNOPSIS
+.B sccfm-cli objects edit-override
+[OPTIONS]
+.SH DESCRIPTION
+Edit the value of an existing override for a specific target device.
+.SH OPTIONS
+.TP
+\fB\-u,\fP \-\-uid TEXT
+The unique identifier (UID) of the object.
+.TP
+\fB\-\-target\-id\fP TEXT
+UID of the target device whose override to edit.  [required]
+.TP
+\fB\-\-override\-value\fP TEXT
+The new override value (IP address, CIDR, range, or URL).  [required]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

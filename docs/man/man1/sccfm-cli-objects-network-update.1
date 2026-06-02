@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI OBJECTS NETWORK UPDATE" "1" "2026-06-02" "0.36.0" "sccfm-cli objects network update Manual"
+.SH NAME
+sccfm-cli\-objects\-network\-update \- Update a network object.
+.SH SYNOPSIS
+.B sccfm-cli objects network update
+[OPTIONS]
+.SH DESCRIPTION
+Update a network object.
+.SH OPTIONS
+.TP
+\fB\-u,\fP \-\-uid TEXT
+The unique identifier (UID) of the object.
+.TP
+\fB\-n,\fP \-\-name TEXT
+The name of the object (alternative to UID).
+.TP
+\fB\-\-new\-name\fP TEXT
+The new name for the object.
+.TP
+\fB\-v,\fP \-\-value TEXT
+The literal value (IP address, CIDR, or range).
+.TP
+\fB\-d,\fP \-\-description TEXT
+A human-readable description of the object.
+.TP
+\fB\-l,\fP \-\-labels TEXT
+Labels to attach to the object (can be specified multiple times).
+.TP
+\fB\-t,\fP \-\-tags TEXT
+Tags in key=value format (value can be comma-separated; repeatable).
+.TP
+\fB\-\-check\fP
+Run a preflight check without performing the operation.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).

@@ -1,0 +1,18 @@
+.TH "SCCFM-CLI CONFIGURE" "1" "2026-06-02" "0.36.0" "sccfm-cli configure Manual"
+.SH NAME
+sccfm-cli\-configure \- Configure API connectivity.
+.SH SYNOPSIS
+.B sccfm-cli configure
+[OPTIONS]
+.SH DESCRIPTION
+Configure API connectivity.
+.SH OPTIONS
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
+.TP
+\fB\-\-region\fP [int|us|eu|apj|au|uae|in|ci|aus]
+SCCFM region (int, us, eu, apj, au, uae, in, ci)  [required]
+.TP
+\fB\-\-api\-token\fP TEXT
+API token for the chosen region  [required]

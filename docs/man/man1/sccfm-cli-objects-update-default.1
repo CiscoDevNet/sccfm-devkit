@@ -1,0 +1,21 @@
+.TH "SCCFM-CLI OBJECTS UPDATE-DEFAULT" "1" "2026-06-02" "0.36.0" "sccfm-cli objects update-default Manual"
+.SH NAME
+sccfm-cli\-objects\-update-default \- Update the default content value of an...
+.SH SYNOPSIS
+.B sccfm-cli objects update-default
+[OPTIONS]
+.SH DESCRIPTION
+Update the default content value of an object, preserving all existing overrides.
+.SH OPTIONS
+.TP
+\fB\-u,\fP \-\-uid TEXT
+The unique identifier (UID) of the object.
+.TP
+\fB\-v,\fP \-\-value TEXT
+The new default value (IP address, CIDR, range, or URL).  [required]
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]
+.TP
+\fB\-\-config\-path\fP PATH
+Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
