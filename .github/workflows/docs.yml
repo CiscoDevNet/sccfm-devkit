@@ -42,6 +42,8 @@ jobs:
 
       - name: Build Pages site
         uses: actions/jekyll-build-pages@v1
+        env:
+          PAGES_DISABLE_NETWORK: "true"
         with:
           source: ./docs
           destination: ./_site
