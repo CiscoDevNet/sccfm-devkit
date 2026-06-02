@@ -83,6 +83,15 @@ def _run_generate_cli_docs() -> None:
         console.print(f"[red]CLI docs generation failed with exit code {rc}[/red]")
 
 
+def _run_generate_cli_man_docs() -> None:
+    """Generate CLI manual pages from Click metadata."""
+    from scripts.generate_cli_man_docs import main as _generate_cli_man_docs
+
+    rc = _generate_cli_man_docs([])
+    if rc:
+        console.print(f"[red]CLI man page generation failed with exit code {rc}[/red]")
+
+
 def _run_setup_env() -> None:
     """Run the environment bootstrap (pyenv, venv, Poetry deps)."""
     root = _project_root()
@@ -412,6 +421,11 @@ _TASKS: list[tuple[str, str, Callable[[], None]]] = [
         "generate-cli-docs",
         "Generate CLI reference docs from Click help output",
         _run_generate_cli_docs,
+    ),
+    (
+        "generate-cli-man-docs",
+        "Generate CLI man pages from Click metadata",
+        _run_generate_cli_man_docs,
     ),
     ("setup-env", "Bootstrap environment (pyenv, venv, Poetry deps)", _run_setup_env),
     ("test", "Run the test suite (pytest)", _run_test),
