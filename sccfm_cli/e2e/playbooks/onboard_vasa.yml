@@ -1,0 +1,60 @@
+---
+# Onboard a CI vASA dedicated to the sccfm-cli e2e suite.
+#
+# Mirrors sccfm-ansible/e2e/asa/playbooks/onboard_vasa.yml but uses the
+# `ci-e2e-cli-asa-` name prefix so the CLI suite has its own device and
+# doesn't fight the Ansible suite (whose mutations leave the shared
+# device NOT_SYNCED, blocking ASA CLI script pushes from this suite).
+#
+# Expected environment variables:
+#   ASA_HOST      — IP or hostname of the provisioned vASA (set by Jenkins)
+#   VASA_PASSWORD — password for the vASA admin user (set by Jenkins)
+
+- name: "CI: Onboard CLI-dedicated vASA to SCCFM tenant"
+  hosts: localhost
+  gather_facts: false
+
+  # sccfm_region / sccfm_api_token are supplied by run_e2e.sh via
+  # -e "@${VARS_FILE}" -e "@${VAULT_FILE}".  Do NOT add vars_files here:
+  # those are loaded/decrypted at parse time before the -e overrides
+  # apply, which would force the default example files to exist and share
+  # the same vault password even when the runner points elsewhere.
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    # Onboarding here must agree with removal in remove_vasa.yml, whose
+    # delete endpoints are hard-coded to the CI host.  Guard *before*
+    # registering the device: onboarding in a non-ci region would leave a
+    # device that cleanup (which fail-fasts on the same check) cannot reach.
+    - name: Assert this is the CI region
+      ansible.builtin.assert:
+        that:
+          - (sccfm_region | default('')) == 'ci'
+        fail_msg: >-
+          vASA onboarding only supports the 'ci' region (removal is hard-coded
+          to the CI host); got sccfm_region='{{ sccfm_region | default('(unset)') }}'.
+
+    - name: Validate required environment variables
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'ASA_HOST') | length > 0
+          - lookup('env', 'VASA_PASSWORD') | length > 0
+        fail_msg: "ASA_HOST and VASA_PASSWORD environment variables must be set"
+
+    - name: Onboard vASA device
+      cisco.sccfm.onboard_asa:
+        name: "ci-e2e-cli-asa-{{ lookup('env', 'ASA_HOST') | regex_replace('[^a-zA-Z0-9]', '-') }}"
+        device_address: "{{ lookup('env', 'ASA_HOST') }}:443"
+        username: admin
+        password: "{{ lookup('env', 'VASA_PASSWORD') }}"
+        connector_type: "{{ default_connector_type }}"
+        ignore_certificate: "{{ default_ignore_certificate }}"
+      register: onboard_result
+
+    - name: Show onboard result
+      ansible.builtin.debug:
+        var: onboard_result
