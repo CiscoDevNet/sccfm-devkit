@@ -31,9 +31,13 @@
       ansible.builtin.assert:
         that:
           - >
-            'not_found' in (get_result.msg | default('') | lower)
+            (get_result.error_code | default('') | upper) == 'NOT_FOUND'
+            or (get_result.status_code | default(0) | int) == 404
+            or 'not_found' in (get_result.msg | default('') | lower)
             or 'not found' in (get_result.msg | default('') | lower)
             or '404' in (get_result.msg | default(''))
+            or (get_result.error_code | default('')) | upper == 'NOT_FOUND'
+            or (get_result.status_code | default(0)) | int == 404
         fail_msg: >-
           Expected a not-found response for rule
           '{{ cached_uid.content | b64decode | trim }}',
