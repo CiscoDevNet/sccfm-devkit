@@ -7,8 +7,6 @@ title: "sccfm-cli inventory manager access-policies"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory manager access-policies
-
 ```text
 $ sccfm-cli inventory manager access-policies --help
 

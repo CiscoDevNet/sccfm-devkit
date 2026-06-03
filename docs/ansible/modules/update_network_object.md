@@ -7,8 +7,6 @@ title: "cisco.sccfm.update_network_object"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.update_network_object
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.update_network_object

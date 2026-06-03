@@ -7,8 +7,6 @@ title: "sccfm-cli"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli
-
 ```text
 $ sccfm-cli --help
 

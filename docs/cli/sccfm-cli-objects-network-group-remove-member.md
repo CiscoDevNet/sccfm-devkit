@@ -7,8 +7,6 @@ title: "sccfm-cli objects network-group remove-member"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network-group remove-member
-
 ```text
 $ sccfm-cli objects network-group remove-member --help
 

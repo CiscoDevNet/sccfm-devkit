@@ -7,8 +7,6 @@ title: "sccfm-cli objects network-group update"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network-group update
-
 ```text
 $ sccfm-cli objects network-group update --help
 

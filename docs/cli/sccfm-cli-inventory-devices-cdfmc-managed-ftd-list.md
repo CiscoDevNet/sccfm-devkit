@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices cdfmc-managed-ftd list"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices cdfmc-managed-ftd list
-
 ```text
 $ sccfm-cli inventory devices cdfmc-managed-ftd list --help
 

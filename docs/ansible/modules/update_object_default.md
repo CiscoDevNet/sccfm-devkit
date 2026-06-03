@@ -7,8 +7,6 @@ title: "cisco.sccfm.update_object_default"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.update_object_default
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.update_object_default

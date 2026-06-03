@@ -7,8 +7,6 @@ title: "cisco.sccfm.delete_access_rule"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.delete_access_rule
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.delete_access_rule

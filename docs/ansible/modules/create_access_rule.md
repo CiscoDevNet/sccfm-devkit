@@ -7,8 +7,6 @@ title: "cisco.sccfm.create_access_rule"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.create_access_rule
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.create_access_rule

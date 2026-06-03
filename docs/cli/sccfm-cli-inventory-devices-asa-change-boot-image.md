@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa change-boot-image"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa change-boot-image
-
 ```text
 $ sccfm-cli inventory devices asa change-boot-image --help
 

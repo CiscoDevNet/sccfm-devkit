@@ -7,8 +7,6 @@ title: "sccfm-cli transaction"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli transaction
-
 ```text
 $ sccfm-cli transaction --help
 

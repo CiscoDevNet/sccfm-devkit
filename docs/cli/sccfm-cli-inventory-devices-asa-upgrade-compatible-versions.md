@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa upgrade compatible-versions"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa upgrade compatible-versions
-
 ```text
 $ sccfm-cli inventory devices asa upgrade compatible-versions --help
 

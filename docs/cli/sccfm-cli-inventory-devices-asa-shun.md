@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa shun"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa shun
-
 ```text
 $ sccfm-cli inventory devices asa shun --help
 

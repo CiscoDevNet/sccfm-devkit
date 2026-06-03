@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp
-
 ```text
 $ sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp --help
 

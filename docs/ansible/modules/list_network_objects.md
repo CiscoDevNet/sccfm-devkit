@@ -7,8 +7,6 @@ title: "cisco.sccfm.list_network_objects"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.list_network_objects
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.list_network_objects

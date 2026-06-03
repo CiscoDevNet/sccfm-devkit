@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa onboard"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa onboard
-
 ```text
 $ sccfm-cli inventory devices asa onboard --help
 

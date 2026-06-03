@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa upgrade trigger"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa upgrade trigger
-
 ```text
 $ sccfm-cli inventory devices asa upgrade trigger --help
 

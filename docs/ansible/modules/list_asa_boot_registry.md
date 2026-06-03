@@ -7,8 +7,6 @@ title: "cisco.sccfm.list_asa_boot_registry"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.list_asa_boot_registry
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.list_asa_boot_registry

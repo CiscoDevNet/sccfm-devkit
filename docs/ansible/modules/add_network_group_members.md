@@ -7,8 +7,6 @@ title: "cisco.sccfm.add_network_group_members"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.add_network_group_members
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.add_network_group_members

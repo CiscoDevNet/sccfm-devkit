@@ -7,8 +7,6 @@ title: "sccfm-cli policies access-rule get"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli policies access-rule get
-
 ```text
 $ sccfm-cli policies access-rule get --help
 

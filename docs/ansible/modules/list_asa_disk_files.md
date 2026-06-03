@@ -7,8 +7,6 @@ title: "cisco.sccfm.list_asa_disk_files"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.list_asa_disk_files
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.list_asa_disk_files

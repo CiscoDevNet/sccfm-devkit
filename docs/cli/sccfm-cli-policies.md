@@ -7,8 +7,6 @@ title: "sccfm-cli policies"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli policies
-
 ```text
 $ sccfm-cli policies --help
 

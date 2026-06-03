@@ -7,8 +7,6 @@ title: "sccfm-cli objects edit-override"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects edit-override
-
 ```text
 $ sccfm-cli objects edit-override --help
 

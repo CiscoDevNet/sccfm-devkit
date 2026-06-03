@@ -7,8 +7,6 @@ title: "cisco.sccfm.sccfm"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.sccfm
-
 {% raw %}
 ```text
 $ ansible-doc -t inventory cisco.sccfm.sccfm

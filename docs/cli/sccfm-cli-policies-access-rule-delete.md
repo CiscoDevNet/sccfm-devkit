@@ -7,8 +7,6 @@ title: "sccfm-cli policies access-rule delete"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli policies access-rule delete
-
 ```text
 $ sccfm-cli policies access-rule delete --help
 

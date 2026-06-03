@@ -7,8 +7,6 @@ title: "sccfm-cli objects network"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network
-
 ```text
 $ sccfm-cli objects network --help
 

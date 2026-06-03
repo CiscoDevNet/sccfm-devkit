@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa smartlicense"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa smartlicense
-
 ```text
 $ sccfm-cli inventory devices asa smartlicense --help
 

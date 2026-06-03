@@ -7,8 +7,6 @@ title: "cisco.sccfm.onboard_asa"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.onboard_asa
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.onboard_asa

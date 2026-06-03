@@ -7,8 +7,6 @@ title: "cisco.sccfm.remove_network_group_members"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.remove_network_group_members
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.remove_network_group_members

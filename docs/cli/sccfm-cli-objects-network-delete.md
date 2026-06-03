@@ -7,8 +7,6 @@ title: "sccfm-cli objects network delete"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network delete
-
 ```text
 $ sccfm-cli objects network delete --help
 

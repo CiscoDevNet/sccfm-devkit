@@ -7,8 +7,6 @@ title: "sccfm-cli policies access-rule update"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli policies access-rule update
-
 ```text
 $ sccfm-cli policies access-rule update --help
 

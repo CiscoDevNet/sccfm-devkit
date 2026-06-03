@@ -7,8 +7,6 @@ title: "cisco.sccfm.show_asa_shun"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.show_asa_shun
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.show_asa_shun

@@ -7,8 +7,6 @@ title: "sccfm-cli objects network-group create"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network-group create
-
 ```text
 $ sccfm-cli objects network-group create --help
 

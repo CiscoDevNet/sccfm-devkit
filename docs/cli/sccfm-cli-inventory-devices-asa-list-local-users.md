@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa list-local-users"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa list-local-users
-
 ```text
 $ sccfm-cli inventory devices asa list-local-users --help
 

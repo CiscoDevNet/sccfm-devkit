@@ -7,8 +7,6 @@ title: "sccfm-cli objects apply-override-as-default"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects apply-override-as-default
-
 ```text
 $ sccfm-cli objects apply-override-as-default --help
 

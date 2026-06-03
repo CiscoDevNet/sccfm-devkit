@@ -7,8 +7,6 @@ title: "sccfm-cli status"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli status
-
 ```text
 $ sccfm-cli status --help
 

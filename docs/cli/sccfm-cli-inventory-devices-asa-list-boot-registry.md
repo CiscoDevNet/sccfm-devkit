@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa list-boot-registry"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa list-boot-registry
-
 ```text
 $ sccfm-cli inventory devices asa list-boot-registry --help
 

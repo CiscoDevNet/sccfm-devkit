@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa disk list-files"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa disk list-files
-
 ```text
 $ sccfm-cli inventory devices asa disk list-files --help
 

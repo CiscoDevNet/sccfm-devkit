@@ -7,8 +7,6 @@ title: "cisco.sccfm.get_access_rule"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.get_access_rule
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.get_access_rule

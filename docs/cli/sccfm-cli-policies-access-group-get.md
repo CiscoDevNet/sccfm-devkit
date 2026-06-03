@@ -7,8 +7,6 @@ title: "sccfm-cli policies access-group get"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli policies access-group get
-
 ```text
 $ sccfm-cli policies access-group get --help
 

@@ -7,8 +7,6 @@ title: "cisco.sccfm.trigger_asa_upgrade"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.trigger_asa_upgrade
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.trigger_asa_upgrade

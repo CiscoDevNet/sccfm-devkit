@@ -7,8 +7,6 @@ title: "cisco.sccfm.change_asa_boot_image"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.change_asa_boot_image
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.change_asa_boot_image

@@ -7,8 +7,6 @@ title: "cisco.sccfm.list_ftd_not_on_version"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.list_ftd_not_on_version
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.list_ftd_not_on_version

@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa user change-password"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa user change-password
-
 ```text
 $ sccfm-cli inventory devices asa user change-password --help
 

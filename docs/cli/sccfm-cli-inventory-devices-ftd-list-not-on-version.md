@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices ftd list-not-on-version"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices ftd list-not-on-version
-
 ```text
 $ sccfm-cli inventory devices ftd list-not-on-version --help
 

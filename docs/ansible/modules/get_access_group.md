@@ -7,8 +7,6 @@ title: "cisco.sccfm.get_access_group"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.get_access_group
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.get_access_group

@@ -7,8 +7,6 @@ title: "cisco.sccfm.asa_ha_check"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.asa_ha_check
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.asa_ha_check

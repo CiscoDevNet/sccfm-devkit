@@ -7,8 +7,6 @@ title: "sccfm-cli policies access-rule create"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli policies access-rule create
-
 ```text
 $ sccfm-cli policies access-rule create --help
 

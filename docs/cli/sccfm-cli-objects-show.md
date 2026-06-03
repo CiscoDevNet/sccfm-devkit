@@ -7,8 +7,6 @@ title: "sccfm-cli objects show"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects show
-
 ```text
 $ sccfm-cli objects show --help
 

@@ -7,8 +7,6 @@ title: "cisco.sccfm.get_object"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.get_object
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.get_object

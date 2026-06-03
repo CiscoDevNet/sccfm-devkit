@@ -7,8 +7,6 @@ title: "cisco.sccfm.onboard_cdfmc_ftd_ztp"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.onboard_cdfmc_ftd_ztp
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.onboard_cdfmc_ftd_ztp

@@ -7,8 +7,6 @@ title: "cisco.sccfm.deploy_cdfmc_ftd"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.deploy_cdfmc_ftd
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.deploy_cdfmc_ftd

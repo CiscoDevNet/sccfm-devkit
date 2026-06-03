@@ -7,8 +7,6 @@ title: "sccfm-cli inventory"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory
-
 ```text
 $ sccfm-cli inventory --help
 

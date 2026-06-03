@@ -7,8 +7,6 @@ title: "sccfm-cli inventory manager"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory manager
-
 ```text
 $ sccfm-cli inventory manager --help
 

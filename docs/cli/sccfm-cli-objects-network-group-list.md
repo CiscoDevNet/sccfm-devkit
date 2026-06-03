@@ -7,8 +7,6 @@ title: "sccfm-cli objects network-group list"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network-group list
-
 ```text
 $ sccfm-cli objects network-group list --help
 

@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices ftd"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices ftd
-
 ```text
 $ sccfm-cli inventory devices ftd --help
 

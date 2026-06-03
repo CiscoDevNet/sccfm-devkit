@@ -7,8 +7,6 @@ title: "sccfm-cli inventory devices asa upgrade"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli inventory devices asa upgrade
-
 ```text
 $ sccfm-cli inventory devices asa upgrade --help
 

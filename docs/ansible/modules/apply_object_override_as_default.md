@@ -7,8 +7,6 @@ title: "cisco.sccfm.apply_object_override_as_default"
 
 [Back to Ansible Reference](../index.html){:.doc-button}
 
-# cisco.sccfm.apply_object_override_as_default
-
 {% raw %}
 ```text
 $ ansible-doc -t module cisco.sccfm.apply_object_override_as_default

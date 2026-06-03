@@ -7,8 +7,6 @@ title: "sccfm-cli objects update-default"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects update-default
-
 ```text
 $ sccfm-cli objects update-default --help
 

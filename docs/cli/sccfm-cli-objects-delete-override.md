@@ -7,8 +7,6 @@ title: "sccfm-cli objects delete-override"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects delete-override
-
 ```text
 $ sccfm-cli objects delete-override --help
 

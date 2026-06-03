@@ -7,8 +7,6 @@ title: "sccfm-cli objects network-group add-member"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects network-group add-member
-
 ```text
 $ sccfm-cli objects network-group add-member --help
 

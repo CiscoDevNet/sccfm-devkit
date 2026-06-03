@@ -7,8 +7,6 @@ title: "sccfm-cli objects"
 
 [Back to CLI Reference](index.html){:.doc-button}
 
-# sccfm-cli objects
-
 ```text
 $ sccfm-cli objects --help
 
