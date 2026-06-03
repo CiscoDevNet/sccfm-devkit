@@ -118,7 +118,9 @@ def _list_plugins(project_root: Path, collection_path: Path, plugin_type: str) -
 
 def _render_page(fqcn: str, command: str, output: str) -> str:
     return (
-        f"{_front_matter(fqcn)}{GENERATED_HEADER}\n\n# {fqcn}\n\n"
+        f"{_front_matter(fqcn)}{GENERATED_HEADER}\n\n"
+        "[Back to Ansible Reference](../index.html){:.doc-button}\n\n"
+        f"# {fqcn}\n\n"
         "{% raw %}\n"
         f"```text\n$ {command}\n\n{output}\n```\n"
         "{% endraw %}\n"
@@ -136,7 +138,6 @@ def _link(plugin_type: str, fqcn: str) -> str:
 
 def _render_index(modules: Sequence[str], inventory_plugins: Sequence[str]) -> str:
     lines = [
-        _front_matter("cisco.sccfm Ansible Reference").rstrip(),
         GENERATED_HEADER,
         "",
         "# cisco.sccfm Ansible Reference",
@@ -150,7 +151,7 @@ def _render_index(modules: Sequence[str], inventory_plugins: Sequence[str]) -> s
     lines.extend(["", "## Modules", ""])
     lines.extend(_link("modules", name) for name in modules)
     lines.append("")
-    return "\n".join(lines)
+    return _front_matter("cisco.sccfm Ansible Reference") + "\n".join(lines)
 
 
 def _generate_files(project_root: Path, docs_root: Path) -> Mapping[Path, str]:

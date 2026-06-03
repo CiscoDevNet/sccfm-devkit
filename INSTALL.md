@@ -12,7 +12,9 @@ These are instructions to install the latest CLI and Ansible collection from Git
   - [Prerequisites](#prerequisites)
     - [Install Python 3.12 using Pyenv](#install-python-312-using-pyenv)
   - [Download the wheel](#download-the-wheel)
+  - [Install with pipx](#install-with-pipx)
   - [Install with pip](#install-with-pip)
+  - [Install CLI man pages](#install-cli-man-pages)
   - [Enable shell completion](#enable-shell-completion)
 - [Installing the Ansible collection](#installing-the-ansible-collection)
   - [Download the Ansible collection Bundle.](#download-the-ansible-collection-bundle)
@@ -46,13 +48,41 @@ pyenv global 3.12
 1. Navigate to the [GitHub Releases](https://github.com/cisco-lockhart/sccfm-devkit/releases) page for this project.
 2. Download the latest wheel asset named like `sccfm-<version>-py3-none-any.whl` to your local machine.
 
-### Install with pip
+### Install with pipx
+
+`pipx` is the recommended install method for the CLI today. It keeps the Python
+environment isolated while exposing `sccfm-cli` on your `PATH`.
 
 ```bash
-pip install /path/to/sccfm-<version>-py3-none-any.whl
+pipx install /path/to/sccfm-<version>-py3-none-any.whl
 ```
 
-Replace the path with where you saved the wheel. You can also install into a virtual environment if desired.
+### Install with pip
+
+Use `pip` when you are installing into an existing virtual environment:
+
+```bash
+python -m pip install /path/to/sccfm-<version>-py3-none-any.whl
+```
+
+Replace the path with where you saved the wheel.
+
+### Install CLI man pages
+
+Unix-style man pages are generated from the Click command metadata. If you are working
+from the repository, install or refresh them locally with:
+
+```bash
+source scripts/activate.sh
+install-cli-man-docs
+```
+
+The helper regenerates `docs/man/man1/*.1`, replaces previously installed
+`sccfm-cli*.1` pages in a user-level man directory, and verifies the install with
+`man -w sccfm-cli` when `man` is available.
+
+If the helper says the install directory is not in `manpath`, add the printed
+`MANPATH` export to your shell startup file.
 
 ### Enable shell completion
 Add one of the following lines to your shell startup file, then reload your shell (`source ~/.bashrc`, `source ~/.zshrc`, etc.). Note: the env var must match the CLI name (`_SCCFM_CLI_COMPLETE`). 

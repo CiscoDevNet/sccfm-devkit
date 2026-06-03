@@ -92,6 +92,15 @@ def _run_generate_cli_man_docs() -> None:
         console.print(f"[red]CLI man page generation failed with exit code {rc}[/red]")
 
 
+def _run_install_cli_man_docs() -> None:
+    """Install generated CLI manual pages into the user's man path."""
+    from scripts.install_cli_man_docs import main as _install_cli_man_docs
+
+    rc = _install_cli_man_docs([])
+    if rc:
+        console.print(f"[red]CLI man page installation failed with exit code {rc}[/red]")
+
+
 def _run_setup_env() -> None:
     """Run the environment bootstrap (pyenv, venv, Poetry deps)."""
     root = _project_root()
@@ -426,6 +435,11 @@ _TASKS: list[tuple[str, str, Callable[[], None]]] = [
         "generate-cli-man-docs",
         "Generate CLI man pages from Click metadata",
         _run_generate_cli_man_docs,
+    ),
+    (
+        "install-cli-man-docs",
+        "Install generated CLI man pages for local man lookup",
+        _run_install_cli_man_docs,
     ),
     ("setup-env", "Bootstrap environment (pyenv, venv, Poetry deps)", _run_setup_env),
     ("test", "Run the test suite (pytest)", _run_test),

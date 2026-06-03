@@ -39,9 +39,18 @@ The Pages workflow publishes committed docs from `docs/` when `docs/**` changes 
 External links are intentionally not checked in CI to avoid release noise from unrelated
 remote outages.
 
-Manual pages are generated for Unix-style package managers. A Homebrew, Debian, or RPM
-package should install `docs/man/man1/*.1` into its normal `man1` directory so `man
-sccfm-cli` works without users editing `MANPATH`. Direct `pip` and `pipx` installs do
-not reliably install system man pages, especially inside virtual environments. Windows
-does not include `man` by default, so Windows users should use `sccfm-cli --help` or the
-generated Markdown docs.
+Manual pages are generated for Unix-style package managers. A package installer can place
+`docs/man/man1/*.1` into its normal `man1` directory so `man sccfm-cli` works without
+users editing `MANPATH`. Direct `pip` and `pipx` installs do not reliably install system
+man pages, especially inside virtual environments.
+
+For local repository installs, run:
+
+```bash
+install-cli-man-docs
+```
+
+It regenerates the CLI man pages, replaces the installed `sccfm-cli*.1` files in a
+user-level man directory, and prints the `MANPATH` export to add if that directory is not
+already searched. Windows does not include `man` by default, so Windows users should use
+`sccfm-cli --help` or the generated Markdown docs.

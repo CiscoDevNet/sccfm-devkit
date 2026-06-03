@@ -73,13 +73,13 @@ def _render_page(path: Sequence[str], output: str) -> str:
     command = _command_text(path)
     return (
         f"{_front_matter(command)}{GENERATED_HEADER}\n\n"
+        "[Back to CLI Reference](index.html){:.doc-button}\n\n"
         f"# {command}\n\n```text\n$ {command} --help\n\n{output}\n```\n"
     )
 
 
 def _render_index(paths: Sequence[tuple[str, ...]]) -> str:
     lines = [
-        _front_matter("sccfm-cli Reference").rstrip(),
         GENERATED_HEADER,
         "",
         "# sccfm-cli Reference",
@@ -93,7 +93,7 @@ def _render_index(paths: Sequence[tuple[str, ...]]) -> str:
         page = _page_name(path)
         lines.append(f"- [{_command_text(path)}]({page}.html)")
     lines.append("")
-    return "\n".join(lines)
+    return _front_matter("sccfm-cli Reference") + "\n".join(lines)
 
 
 def _generate_files(docs_root: Path) -> Mapping[Path, str]:

@@ -10,7 +10,7 @@ Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcomin
 - [Commands](#commands)
 - [Ansible collection](#ansible-collection)
 - [Development](#development)
-- [Packaging for pip](#packaging-for-pip)
+- [CLI Installation](#cli-installation)
 - [Troubleshooting](#troubleshooting)
   - [Tests fail with "No such command" errors](#tests-fail-with-no-such-command-errors)
 
@@ -47,6 +47,13 @@ generate-cli-man-docs
 
 The generated Markdown is written under `docs/cli/`; generated man pages are written
 under `docs/man/man1/`.
+
+To install or refresh the CLI man pages for local `man sccfm-cli` lookup:
+
+```bash
+install-cli-man-docs
+```
+
 See [docs/README.md](docs/README.md) for generation details.
 
 ## Ansible collection
@@ -78,6 +85,7 @@ This presents an interactive selector with the following tasks:
 | **generate-ansible-docs** | Generate Ansible reference docs from ansible-doc output |
 | **generate-cli-docs** | Generate CLI reference docs from Click help output |
 | **generate-cli-man-docs** | Generate CLI man pages from Click metadata |
+| **install-cli-man-docs** | Install generated CLI man pages for local man lookup |
 | **setup-env** | Bootstrap environment (pyenv, venv, Poetry deps) |
 | **test** | Run the test suite (pytest), with optional filter & verbose |
 | **lint** | Run mypy + flake8 |
@@ -96,13 +104,22 @@ black .
 
 See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expectations. The setup script also installs a local `git cz` alias that runs `./scripts/cz.sh commit` so you can use `git cz` for conventional commits with visible pre-commit output.
 
-## Packaging for pip
+## CLI Installation
 
-Build a source distribution plus wheel using Poetry and install them with pip:
+For contributors, use the repository environment from [Getting started](#getting-started).
+
+For end users today, install a released wheel with `pipx` when possible. `pipx` keeps the
+CLI isolated while exposing `sccfm-cli` on `PATH`:
+
+```bash
+pipx install /path/to/sccfm-<version>-py3-none-any.whl
+```
+
+Installing into a virtual environment with `pip` is also supported:
 
 ```bash
 poetry build
-pip install dist/sccfm_cli-*.whl    # or `pip install dist/sccfm_cli-*.tar.gz`
+python -m pip install dist/sccfm-*.whl    # or `python -m pip install dist/sccfm-*.tar.gz`
 ```
 
 See `INSTALL.md` for installing a released wheel and enabling shell completion.

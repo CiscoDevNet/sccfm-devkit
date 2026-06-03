@@ -27,6 +27,7 @@ change-tokens = "scripts.setup_tokens:main"
 generate-ansible-docs = "scripts.generate_ansible_docs:main"
 generate-cli-docs = "scripts.generate_cli_docs:main"
 generate-cli-man-docs = "scripts.generate_cli_man_docs:main"
+install-cli-man-docs = "scripts.install_cli_man_docs:main"
 check-doc-links = "scripts.check_doc_links:main"
 check-doc-artifacts = "scripts.check_doc_artifacts:main"
 
