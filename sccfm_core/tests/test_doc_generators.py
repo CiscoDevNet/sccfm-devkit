@@ -189,6 +189,30 @@ def test_generated_docs_include_reference_back_links() -> None:
     assert "[Back to Ansible Reference](../index.html){:.doc-button}" in ansible_page
 
 
+def test_generated_indexes_include_home_back_links() -> None:
+    cli_index = generate_cli_docs._render_index(())
+    ansible_index = generate_ansible_docs._render_index((), ())
+
+    assert "[Back to Documentation Home](../index.html){:.doc-button}" in cli_index
+    assert "[Back to Documentation Home](../index.html){:.doc-button}" in ansible_index
+
+
+def test_generated_docs_do_not_duplicate_page_titles() -> None:
+    cli_page = generate_cli_docs._render_page((), "Usage: sccfm-cli [OPTIONS]")
+    cli_index = generate_cli_docs._render_index(())
+    ansible_page = generate_ansible_docs._render_page(
+        "cisco.sccfm.sccfm",
+        "ansible-doc -t inventory cisco.sccfm.sccfm",
+        "Inventory docs",
+    )
+    ansible_index = generate_ansible_docs._render_index((), ())
+
+    assert "\n# sccfm-cli\n" not in cli_page
+    assert "\n# sccfm-cli Reference\n" not in cli_index
+    assert "\n# cisco.sccfm.sccfm\n" not in ansible_page
+    assert "\n# cisco.sccfm Ansible Reference\n" not in ansible_index
+
+
 def test_generated_indexes_separate_front_matter_from_content() -> None:
     cli_index = generate_cli_docs._render_index(())
     ansible_index = generate_ansible_docs._render_index((), ())

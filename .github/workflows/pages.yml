@@ -41,6 +41,9 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Sync README include
+        run: python scripts/sync_docs_readme.py
+
       - name: Build Pages site
         uses: actions/jekyll-build-pages@v1
         env:

@@ -120,7 +120,6 @@ def _render_page(fqcn: str, command: str, output: str) -> str:
     return (
         f"{_front_matter(fqcn)}{GENERATED_HEADER}\n\n"
         "[Back to Ansible Reference](../index.html){:.doc-button}\n\n"
-        f"# {fqcn}\n\n"
         "{% raw %}\n"
         f"```text\n$ {command}\n\n{output}\n```\n"
         "{% endraw %}\n"
@@ -140,7 +139,7 @@ def _render_index(modules: Sequence[str], inventory_plugins: Sequence[str]) -> s
     lines = [
         GENERATED_HEADER,
         "",
-        "# cisco.sccfm Ansible Reference",
+        "[Back to Documentation Home](../index.html){:.doc-button}",
         "",
         "Generated from `ansible-doc` output.",
         "",

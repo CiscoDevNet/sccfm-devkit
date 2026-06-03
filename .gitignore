@@ -27,6 +27,7 @@ results/
 /pip-wheel-metadata/
 /_site/
 /.jekyll-cache/
+/docs/_includes/repository-readme.md
 
 # Local Codex/agent runtime metadata
 .agents/

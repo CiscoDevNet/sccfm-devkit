@@ -48,6 +48,7 @@ jobs:
 
       - name: Generate docs
         run: |
+          poetry run sync-docs-readme
           poetry run generate-cli-docs
           poetry run generate-cli-man-docs
           poetry run generate-ansible-docs

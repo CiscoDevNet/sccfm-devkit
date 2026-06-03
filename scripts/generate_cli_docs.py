@@ -74,7 +74,7 @@ def _render_page(path: Sequence[str], output: str) -> str:
     return (
         f"{_front_matter(command)}{GENERATED_HEADER}\n\n"
         "[Back to CLI Reference](index.html){:.doc-button}\n\n"
-        f"# {command}\n\n```text\n$ {command} --help\n\n{output}\n```\n"
+        f"```text\n$ {command} --help\n\n{output}\n```\n"
     )
 
 
@@ -82,7 +82,7 @@ def _render_index(paths: Sequence[tuple[str, ...]]) -> str:
     lines = [
         GENERATED_HEADER,
         "",
-        "# sccfm-cli Reference",
+        "[Back to Documentation Home](../index.html){:.doc-button}",
         "",
         "Generated from Click `--help` output.",
         "",

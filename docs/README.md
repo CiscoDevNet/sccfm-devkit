@@ -15,6 +15,7 @@ Generate local previews with:
 
 ```bash
 source scripts/activate.sh
+sync-docs-readme
 generate-cli-docs
 generate-cli-man-docs
 generate-ansible-docs
@@ -27,6 +28,7 @@ The generated files are written to:
 - `docs/cli/`
 - `docs/man/man1/`
 - `docs/ansible/`
+- `docs/_includes/repository-readme.md` (ignored locally; generated from the root `README.md`)
 
 Pull requests run the Docs workflow, which regenerates all docs, validates internal
 generated links, scans generated text artifacts for terminal escape sequences, and builds
