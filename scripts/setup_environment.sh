@@ -63,7 +63,17 @@ function configure_git_alias() {
   fi
 }
 
+function install_pre_commit_hooks() {
+  if ! git -C "${PROJECT_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Skipping pre-commit install (not a git repository)" >&2
+    return
+  fi
+  echo "Installing pre-commit hooks (pre-commit + commit-msg)"
+  pre-commit install --hook-type pre-commit --hook-type commit-msg
+}
+
 ensure_pyenv
 ensure_python
 create_venv
 configure_git_alias
+install_pre_commit_hooks
