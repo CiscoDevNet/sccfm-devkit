@@ -1,3 +1,9 @@
+## v0.37.0 (2026-06-04)
+
+### Feat
+
+- **hooks**: add pre-commit hooks for Python formatting and secret guarding (#77)
+
 ## v0.36.0 (2026-05-26)
 
 ### Feat
