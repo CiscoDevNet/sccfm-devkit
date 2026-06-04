@@ -132,4 +132,11 @@ Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_
 - **Backward compatibility**: Do not change existing command behavior unless clearly improving or fixing a bug; document changes in the PR description.
 - **No AI slop**: short, well-named methods only; no generated boilerplate.
 - **Line length**: 100 characters (`black` and `flake8` are configured accordingly).
+- **License header**: every `.py` file must start with the Apache-2.0 SPDX header (after a shebang, if present). `reuse` enforces this in pre-commit and CI:
+  ```python
+  # Copyright 2026 Cisco Systems, Inc. and its affiliates
+  #
+  # SPDX-License-Identifier: Apache-2.0
+  ```
+- **Secrets**: never read or commit `.env`, `.env.*`, `.vault_pass`, or real `vault.yml` files — use the `*.example` templates. Keep tracked `.envrc` files secret-free. `gitleaks` and `detect-private-key` block secrets in pre-commit.
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide.
