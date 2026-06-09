@@ -21,6 +21,11 @@ import json
 from typing import Any
 
 
+def json_text(payload: Any) -> str:
+    """Return `payload` using the canonical CLI JSON serialization contract."""
+    return json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+
+
 def print_json(payload: Any) -> None:
     """Emit `payload` as the canonical CLI JSON output.
 
@@ -28,4 +33,4 @@ def print_json(payload: Any) -> None:
     and `default=str` so callers can pass dicts, lists, dataclasses, or any
     payload that contains datetimes/UUIDs without further conversion.
     """
-    print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+    print(json_text(payload))
