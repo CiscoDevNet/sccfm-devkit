@@ -5,15 +5,10 @@
 from __future__ import annotations
 
 from sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageService
-from sccfm_core.services.inventory.asa_boot_registry_service import (
-    AsaBootRegistryService,
-)
+from sccfm_core.services.inventory.asa_boot_registry_service import AsaBootRegistryService
 from sccfm_core.services.inventory.asa_cli_service import AsaCommandLineService
 from sccfm_core.services.inventory.asa_disk_file_service import AsaDiskFileService
-from sccfm_core.services.inventory.asa_ha_check_service import (
-    AsaHaCheckReport,
-    AsaHaCheckService,
-)
+from sccfm_core.services.inventory.asa_ha_check_service import AsaHaCheckReport, AsaHaCheckService
 from sccfm_core.services.inventory.asa_onboard_service import AsaOnboardService
 from sccfm_core.services.inventory.asa_shun_service import AsaShunService, ShunEntrySpec
 from sccfm_core.services.inventory.asa_upgrade_service import AsaUpgradeService
@@ -23,15 +18,21 @@ from sccfm_core.services.inventory.asa_upgrade_version_service import (
     get_asdm_compatibility_info,
     is_version_downgrade,
 )
-from sccfm_core.services.inventory.asa_user_password_service import (
-    AsaUserPasswordService,
-)
+from sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
 from sccfm_core.services.inventory.cdfmc_access_policy_service import (
     CdfmcAccessPolicyService,
     FmcAccessPolicy,
     FmcAccessPolicyPage,
 )
 from sccfm_core.services.inventory.ftd_cli_service import FtdCommandLineService
+from sccfm_core.services.inventory.ftd_configure_manager_service import (
+    ConfigureManagerResult,
+    FtdConfigureManagerError,
+    FtdConfigureManagerService,
+    JumpHostSpec,
+    ReachabilityResult,
+    parse_jump_host,
+)
 from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
 from sccfm_core.services.inventory.ftd_onboard_service import FtdOnboardService
 from sccfm_core.services.inventory.ftd_upgrade_service import FtdUpgradeService
@@ -56,9 +57,15 @@ __all__ = [
     "AsaUpgradeVersionService",
     "AsaUserPasswordService",
     "CdfmcAccessPolicyService",
+    "ConfigureManagerResult",
     "FmcAccessPolicy",
     "FmcAccessPolicyPage",
     "FtdCommandLineService",
+    "FtdConfigureManagerError",
+    "FtdConfigureManagerService",
+    "JumpHostSpec",
+    "ReachabilityResult",
+    "parse_jump_host",
     "FtdDeployService",
     "FtdOnboardService",
     "FtdZtpOnboardService",

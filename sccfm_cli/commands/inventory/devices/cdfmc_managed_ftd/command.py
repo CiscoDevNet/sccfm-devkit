@@ -10,6 +10,9 @@ from scc_firewall_manager_sdk import EntityType
 
 from sccfm_cli.commands.base import BaseCommand
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.cli import FtdCliCommand
+from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.configure_manager import (
+    FtdConfigureManagerCommand,
+)
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.deploy import FtdDeployCommand
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.onboard import FtdOnboardCommand
 from sccfm_cli.commands.inventory.devices.cdfmc_managed_ftd.onboard_ztp import FtdZtpOnboardCommand
@@ -30,6 +33,7 @@ class CdfmcManagedFtdCommand(BaseCommand):
             FtdDeployCommand(console),
             FtdOnboardCommand(console),
             FtdZtpOnboardCommand(console),
+            FtdConfigureManagerCommand(console),
         ]
 
     @property
