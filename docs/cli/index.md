@@ -41,6 +41,7 @@ Generated from Click `--help` output.
 - [sccfm-cli inventory devices cdfmc-managed-ftd](sccfm-cli-inventory-devices-cdfmc-managed-ftd.html)
 - [sccfm-cli inventory devices cdfmc-managed-ftd cli](sccfm-cli-inventory-devices-cdfmc-managed-ftd-cli.html)
 - [sccfm-cli inventory devices cdfmc-managed-ftd cli execute](sccfm-cli-inventory-devices-cdfmc-managed-ftd-cli-execute.html)
+- [sccfm-cli inventory devices cdfmc-managed-ftd configure-manager](sccfm-cli-inventory-devices-cdfmc-managed-ftd-configure-manager.html)
 - [sccfm-cli inventory devices cdfmc-managed-ftd deploy](sccfm-cli-inventory-devices-cdfmc-managed-ftd-deploy.html)
 - [sccfm-cli inventory devices cdfmc-managed-ftd list](sccfm-cli-inventory-devices-cdfmc-managed-ftd-list.html)
 - [sccfm-cli inventory devices cdfmc-managed-ftd onboard](sccfm-cli-inventory-devices-cdfmc-managed-ftd-onboard.html)

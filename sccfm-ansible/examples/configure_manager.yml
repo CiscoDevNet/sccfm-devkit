@@ -1,0 +1,75 @@
+---
+# Complete cdFMC-managed FTD onboarding by registering the FTD over SSH.
+#
+# This is the final onboarding step: it SSHes into the FTD VM and runs the
+# "configure manager add ..." command (the cli_key) produced by onboarding,
+# which tells the FTD to phone home to the cdFMC and register.
+#
+# Unlike the other modules, configure_manager talks directly to the device over
+# SSH, so it does NOT use region/api_token. It needs the FTD's SSH credentials
+# (and, optionally, a jump host) instead. Keep device passwords in vault.
+#
+# Only works if the FTD is reachable on its SSH port (ftd_port, default 22) from
+# the host running this, or from the jump host when jump_host is set.
+#
+# The FTD sees the connection from the SSH client's source IP, so that IP must
+# be on the FTD ssh-access-list. With a jump host, that source is the jump
+# host's IP.
+#
+# USAGE:
+#   ansible-playbook examples/configure_manager.yml \
+#     -e ftd_host="203.0.113.10" \
+#     -e ftd_user="admin" \
+#     -e cli_key="configure manager add fmc.example.com <regkey> <natid>" \
+#     --vault-password-file examples/.vault_pass
+#
+# Through a jump host:
+#   ansible-playbook examples/configure_manager.yml \
+#     -e ftd_host="203.0.113.10" \
+#     -e ftd_user="admin" \
+#     -e jump_host="bastion@203.0.113.5:2222" \
+#     -e cli_key="configure manager add fmc.example.com <regkey> <natid>" \
+#     --vault-password-file examples/.vault_pass
+#
+# Vault keys expected (in group_vars/all/vault.yml):
+#   vault_ftd_password: "<ftd ssh password>"
+#   vault_jump_password: "<jump host password>"   # omit to use SSH key/agent
+
+- name: Register a cdFMC-managed FTD over SSH
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    ftd_host: ""
+    ftd_port: 22
+    ftd_user: "admin"
+    cli_key: ""
+    jump_host: ""
+    ssh_timeout: 30
+
+  tasks:
+    - name: Validate required inputs
+      ansible.builtin.assert:
+        that:
+          - ftd_host | length > 0
+          - cli_key | length > 0
+        fail_msg: >-
+          ftd_host and cli_key are required. Pass them with
+          -e ftd_host="203.0.113.10" and
+          -e cli_key="configure manager add fmc.example.com <regkey> <natid>"
+
+    - name: Configure manager on the FTD
+      cisco.sccfm.configure_manager:
+        ftd_host: "{{ ftd_host }}"
+        ftd_port: "{{ ftd_port }}"
+        ftd_user: "{{ ftd_user }}"
+        ftd_password: "{{ vault_ftd_password }}"
+        cli_key: "{{ cli_key }}"
+        jump_host: "{{ jump_host if jump_host | length > 0 else omit }}"
+        jump_password: "{{ vault_jump_password | default(omit) }}"
+        ssh_timeout: "{{ ssh_timeout }}"
+      register: configure_result
+
+    - name: Display result
+      ansible.builtin.debug:
+        msg: "{{ configure_result.msg }}"

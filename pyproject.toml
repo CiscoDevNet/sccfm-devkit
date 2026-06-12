@@ -18,6 +18,7 @@ rich = "^14.2.0"
 click-option-group = "^0.5.9"
 scc-firewall-manager-sdk = "^1.17.27"
 questionary = "^2.1.1"
+paramiko = "^3.5.0"
 
 [tool.poetry.scripts]
 sccfm-cli = "sccfm_cli.cli:cli"
@@ -89,6 +90,8 @@ module = [
   "pytest",
   "questionary",
   "questionary.*",
+  "paramiko",
+  "paramiko.*",
   "yaml",
 ]
 ignore_missing_imports = true
