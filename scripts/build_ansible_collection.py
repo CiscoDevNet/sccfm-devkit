@@ -7,9 +7,9 @@
 """Build script for Ansible collection."""
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
-import tomli
 import yaml
 
 
@@ -25,7 +25,7 @@ def main() -> int:
 
     # Read version from pyproject.toml
     with open(pyproject_path, "rb") as f:
-        pyproject = tomli.load(f)
+        pyproject = tomllib.load(f)
     version = pyproject["tool"]["poetry"]["version"]
     print(f"📦 Using version {version} from pyproject.toml")
 

@@ -13,10 +13,10 @@ tags:
 - firewall
 - cloud
 - collection
-repository: https://github.com/cisco-lockhart/sccfm-devkit
-documentation: https://github.com/cisco-lockhart/sccfm-devkit
-homepage: https://github.com/cisco-lockhart/sccfm-devkit
-issues: https://github.com/cisco-lockhart/sccfm-devkit/issues
+repository: https://github.com/CiscoDevNet/sccfm-devkit
+documentation: https://ciscodevnet.github.io/sccfm-devkit/
+homepage: https://github.com/CiscoDevNet/sccfm-devkit
+issues: https://github.com/CiscoDevNet/sccfm-devkit/issues
 build_ignore:
 - .venv
 - .pytest_cache
