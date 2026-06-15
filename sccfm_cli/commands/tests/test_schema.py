@@ -34,6 +34,8 @@ def test_schema_export_should_emit_machine_readable_command_tree(
     assert payload["version"] == _project_version()
     assert payload["generated_at"]
     assert _option(payload["global_options"], "profile")["default"] == "default"
+    assert _option(payload["global_options"], "profile")["scope"] == "global"
+    assert _option(payload["global_options"], "profile")["placement"] == "before_command_path"
 
     commands = _commands_by_name(payload)
     assert "sccfm-cli schema export" in commands
@@ -178,11 +180,38 @@ def test_schema_export_should_include_option_aliases_defaults_and_ranges(
     output_format = _option(trigger["options"], "format")
 
     assert wait["aliases"] == ["--wait", "--no-wait"]
+    assert wait["scope"] == "command"
+    assert wait["placement"] == "after_command_path"
     assert wait["default"] is False
     assert timeout["type"] == "integer"
     assert timeout["value_constraints"]["min"] == 1
     assert output_format["values"] == ["table", "json"]
     assert trigger["examples"][0] == "sccfm-cli inventory devices asa upgrade trigger --help"
+
+
+def test_schema_export_should_include_queryable_field_metadata(
+    cli_runner: CliRunner,
+) -> None:
+    result = cli_runner.invoke(cli, ["schema", "export"], prog_name="sccfm-cli")
+    assert result.exit_code == 0, result.output
+
+    commands = _commands_by_name(json.loads(result.output))
+    asa_list = commands["sccfm-cli inventory devices asa list"]
+    online_field = _field(asa_list["queryable_fields"], "connectivityState")
+    device_type_field = _field(asa_list["queryable_fields"], "deviceType")
+
+    assert online_field["values"]
+    assert "ONLINE" in online_field["values"]
+    assert "connectivityState:ONLINE" in online_field["examples"]
+    assert "online" in online_field["natural_language_aliases"]
+    assert "ASA" in device_type_field["values"]
+    assert asa_list["field_notes"] == [
+        (
+            "This command automatically adds its deviceType filter. Do not add a "
+            "deviceType clause unless the user explicitly asks for a different filter."
+        ),
+        "Translate 'online' to connectivityState:ONLINE.",
+    ]
 
 
 def test_schema_export_should_write_json_to_output_file(
@@ -275,6 +304,10 @@ def _project_version() -> str:
 
 def _option(options: list[dict[str, Any]], name: str) -> dict[str, Any]:
     return next(option for option in options if option["name"] == name)
+
+
+def _field(fields: list[dict[str, Any]], name: str) -> dict[str, Any]:
+    return next(field for field in fields if field["name"] == name)
 
 
 def _constraint(constraints: list[dict[str, Any]], constraint_type: str) -> dict[str, Any]:

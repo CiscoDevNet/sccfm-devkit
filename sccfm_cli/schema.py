@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import click
+from scc_firewall_manager_sdk import ConfigState, ConnectivityState, EntityType
 
 SCHEMA_VERSION = "1.0"
 
@@ -57,11 +58,71 @@ _OPTIONAL_DEVICE_SELECTOR_PATHS = {
 _NO_AUTH_NOTES = "No stored SCCFM profile is required."
 _PROFILE_AUTH_NOTES = "Requires a configured sccfm-cli profile containing region and API token."
 
+_DEVICE_QUERYABLE_FIELDS = [
+    {
+        "name": "name",
+        "type": "string",
+        "description": "Device name. Wildcards are accepted by the SCCFM Lucene query API.",
+        "examples": ["name:branch-*"],
+        "natural_language_aliases": ["named", "name", "called"],
+    },
+    {
+        "name": "uid",
+        "type": "string",
+        "description": "Device UID.",
+        "examples": ["uid:<device-uid>"],
+        "natural_language_aliases": ["uid", "id"],
+    },
+    {
+        "name": "deviceType",
+        "type": "choice",
+        "description": "SCCFM device type.",
+        "values": [member.value for member in EntityType],
+        "examples": ["deviceType:ASA"],
+        "natural_language_aliases": ["type", "device type", "asa", "ftd"],
+    },
+    {
+        "name": "connectivityState",
+        "type": "choice",
+        "description": "Device connectivity state. Use ONLINE for online devices.",
+        "values": [member.value for member in ConnectivityState],
+        "examples": ["connectivityState:ONLINE"],
+        "natural_language_aliases": ["online", "offline", "reachable", "unreachable"],
+    },
+    {
+        "name": "configState",
+        "type": "choice",
+        "description": "Device configuration sync state.",
+        "values": [member.value for member in ConfigState],
+        "examples": ["configState:SYNCED"],
+        "natural_language_aliases": ["synced", "not synced", "configuration state"],
+    },
+]
+
+_OBJECT_QUERYABLE_FIELDS = [
+    {
+        "name": "name",
+        "type": "string",
+        "description": "Object name. Wildcards are accepted by the SCCFM Lucene query API.",
+        "examples": ["name:web-*"],
+        "natural_language_aliases": ["named", "name", "called"],
+    },
+    {
+        "name": "content",
+        "type": "string",
+        "description": "Object content value, such as an IP address, CIDR, FQDN, or URL.",
+        "examples": ["content:10.0.0.0/24"],
+        "natural_language_aliases": ["contains", "content", "value"],
+    },
+]
+
 
 def build_cli_schema(root: click.Command, *, prog_name: str = "sccfm-cli") -> dict[str, Any]:
     """Return a JSON-serializable schema for the full Click command tree."""
     root_options = [
-        _option_schema(param) for param in root.params if isinstance(param, click.Option)
+        _option_schema(param, scope="global")
+        for param in root.params
+        if isinstance(param, click.Option)
     ]
     command_tree = [
         _command_schema(path=path, command=command, prog_name=prog_name)
@@ -100,7 +161,11 @@ def _command_schema(
     prog_name: str,
 ) -> dict[str, Any]:
     is_group = isinstance(command, click.Group)
-    options = [_option_schema(param) for param in command.params if isinstance(param, click.Option)]
+    options = [
+        _option_schema(param, scope="command")
+        for param in command.params
+        if isinstance(param, click.Option)
+    ]
     option_names = {option["name"] for option in options}
     mutates_sccfm = _mutates_sccfm(path=path, is_group=is_group)
     side_effects = _side_effects(path=path, mutates_sccfm=mutates_sccfm)
@@ -117,14 +182,65 @@ def _command_schema(
         "side_effects": side_effects,
         "auth": _auth(path=path, is_group=is_group),
         "bulk_file_format": None,
-        "queryable_fields": None,
-        "field_notes": None,
+        "queryable_fields": _queryable_fields(path=path, option_names=option_names),
+        "field_notes": _field_notes(path=path, option_names=option_names),
         "options": options,
         "option_groups": _option_constraint_groups(constraints),
         "constraints": constraints,
         "examples": _examples(path=path, command=command, prog_name=prog_name),
         "subcommands": sorted(command.commands) if isinstance(command, click.Group) else [],
     }
+
+
+def _queryable_fields(
+    *,
+    path: tuple[str, ...],
+    option_names: set[str],
+) -> list[dict[str, Any]] | None:
+    if "query" not in option_names:
+        return None
+    if _is_device_query_path(path):
+        return _DEVICE_QUERYABLE_FIELDS
+    if _is_object_query_path(path):
+        return _OBJECT_QUERYABLE_FIELDS
+    return None
+
+
+def _field_notes(
+    *,
+    path: tuple[str, ...],
+    option_names: set[str],
+) -> list[str] | None:
+    if "query" not in option_names:
+        return None
+    if _is_typed_device_query_path(path):
+        return [
+            (
+                "This command automatically adds its deviceType filter. Do not add a "
+                "deviceType clause unless the user explicitly asks for a different filter."
+            ),
+            "Translate 'online' to connectivityState:ONLINE.",
+        ]
+    if _is_device_query_path(path):
+        return [
+            "Use Lucene syntax for --query.",
+            "Translate 'online' to connectivityState:ONLINE.",
+        ]
+    if _is_object_query_path(path):
+        return ["Use Lucene syntax for --query."]
+    return None
+
+
+def _is_device_query_path(path: tuple[str, ...]) -> bool:
+    return len(path) >= 3 and path[:2] == ("inventory", "devices")
+
+
+def _is_typed_device_query_path(path: tuple[str, ...]) -> bool:
+    return len(path) >= 4 and path[:2] == ("inventory", "devices")
+
+
+def _is_object_query_path(path: tuple[str, ...]) -> bool:
+    return len(path) >= 3 and path[0] == "objects"
 
 
 def _package_version() -> str:
@@ -219,13 +335,15 @@ def _auth_requirements(*, path: tuple[str, ...], is_group: bool) -> dict[str, An
     }
 
 
-def _option_schema(option: click.Option) -> dict[str, Any]:
+def _option_schema(option: click.Option, *, scope: str) -> dict[str, Any]:
     option_type = _option_type(option)
     choices, value_constraints = _type_metadata(option.type)
     default, has_default = _default_value(option)
     return {
         "name": option.name or "",
         "flag": _preferred_flag(option),
+        "scope": scope,
+        "placement": "before_command_path" if scope == "global" else "after_command_path",
         "aliases": [*option.opts, *option.secondary_opts],
         "type": option_type,
         "required": bool(option.required),

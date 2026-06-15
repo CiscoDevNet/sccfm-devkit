@@ -30,7 +30,10 @@ results/
 /docs/_includes/repository-readme.md
 
 # Local Codex/agent runtime metadata
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/sccfm-cli
 
 # Vault password file (NEVER commit this!)
 **/.vault_pass

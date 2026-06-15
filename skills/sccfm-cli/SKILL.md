@@ -1,263 +1,503 @@
 ---
 name: sccfm-cli
-description: Interact with the SCC Firewall Manager CLI (sccfm-cli). Use when the user wants to run CLI commands, check device status, manage objects/policies, configure profiles, or perform any SCCFM operation from the terminal.
-when_to_use: When the user asks about running sccfm-cli commands, managing devices, checking inventory, creating objects, managing policies, upgrading firmware, executing ASA CLI, onboarding devices, or any SCCFM CLI operation.
-argument-hint: "[describe what you want to do]"
-allowed-tools: "Bash(sccfm-cli *) Bash(source scripts/activate.sh) Read Grep Glob"
+description: Use the customer-facing SCC Firewall Manager CLI by discovering the live schema, validating command metadata, and either executing or generating safe sccfm-cli commands without hardcoded command knowledge.
+when_to_use: When the user asks to use, install, configure, inspect, or generate commands for sccfm-cli or SCC Firewall Manager CLI workflows.
+argument-hint: "[describe the SCCFM CLI task]"
+allowed-tools: "Bash(command -v *) Bash(sccfm-cli *) Bash(source scripts/activate.sh) Bash(brew *) Bash(pipx *) Bash(jq *) Read Grep Glob"
 ---
 
-You are an expert operator of the `sccfm-cli` tool — the CLI for Cisco Security Cloud Control Firewall Manager (SCCFM). Your job is to help the user accomplish their goal using the CLI.
+# SCC Firewall Manager CLI
 
-## Environment activation (ONCE PER SESSION)
+Execute or generate `sccfm-cli` commands by dynamically discovering available
+operations from the CLI schema. All command knowledge comes from the schema. Do
+not hardcode command names, options, examples, or behavior.
 
-At the **start of your session**, activate the virtualenv a single time:
+This skill operates against customer SCC Firewall Manager environments. Optimize
+for customer safety first and convenience second.
+
+## Core Rules
+
+1. Treat every operation as customer-impacting until the schema proves otherwise.
+2. Prefer stopping over guessing. If command match, target identity, region,
+   profile, or safety class is ambiguous, ask the user or switch to
+   generate-only mode.
+3. Never improvise command names, flags, defaults, target lists, or file paths.
+4. Never ask the user to paste secrets into chat.
+5. Always use the schema's `readonly` flag.
+6. Use canonical schema values in generated commands.
+
+## Execution Modes
+
+Select one execution mode for each user request.
+
+### Mode 1: Execute
+
+Use this mode by default when the user asks you to perform the operation.
+
+- You may run the matched business command, subject to the safety rules in this
+  skill.
+- You may run schema discovery, readonly validation, or preflight commands when
+  needed.
+- If intent is ambiguous, default to Generate-Only.
+
+### Mode 2: Generate-Only
+
+Use this mode when the user says anything like "show me the command",
+"generate the command", "do not run it", "don't run it", "I will run it myself",
+or "command only".
+
+In Generate-Only mode:
+
+- Never execute the final business command.
+- You may still run schema export because command discovery depends on it.
+- You may run readonly validation or preflight commands unless the user
+  explicitly said not to run anything at all.
+- If the user forbids all command execution and no cached schema is available,
+  stop and explain that safe generation requires schema discovery.
+- If readonly validation or preflight is not allowed, mark the command as
+  `not validated against live state`.
+- Always return the exact command in a fenced `bash` block.
+- Never ask for mutating confirmation phrases because the agent is not executing
+  the command.
+
+## Safety Model
+
+Classify every matched command before execution.
+
+### Class A: Readonly, no local writes
+
+- `readonly: true`
+- The invocation does not write to a local file, profile, export destination, or
+  config path.
+
+These commands are safe to execute after validation.
+
+### Class B: Readonly, local-write/export side effects
+
+- `readonly: true`
+- `side_effects` or option metadata indicates a local write, export,
+  destination, output path, config path, or profile write.
+
+These commands do not mutate SCC Firewall Manager, but they still have side
+effects and may spill customer data. Require explicit user opt-in and an explicit
+destination path. Never rely on a schema default output location for exported
+customer data.
+
+### Class C: Mutating
+
+- `readonly: false`
+
+These commands may modify SCC Firewall Manager or a managed device. They require
+preflight where available, a plan, unambiguous targets, and explicit
+confirmation. Never execute them on a vague instruction.
+
+## Prerequisites
+
+### Platform
+
+The CLI is Python 3.12 based and supports normal Python installs on macOS,
+Linux, and Windows. Prefer macOS or Linux shells for direct agent operation; on
+Windows, use the documented Python install path or WSL when shell features are
+needed.
+
+### Step A: Resolve the CLI Binary
+
+Follow these checks in order:
+
+1. Run `command -v sccfm-cli`.
+   - If found, the invocation prefix is `sccfm-cli`.
+2. If you are inside this repository, the binary is not on `PATH`, and
+   `scripts/activate.sh` exists, run `source scripts/activate.sh` once for the
+   shell session, then resolve again. Do not use `poetry run`.
+3. Only install or perform setup when the user explicitly asks for it.
+4. Otherwise, stop and tell the user the CLI is not installed or not on `PATH`.
+
+Store the invocation prefix for the rest of the session. Do not switch
+invocation modes mid-session unless the user explicitly asks.
+
+#### Installing via Homebrew
+
+Only do this if the user explicitly asked for installation or setup.
+
+1. Verify `brew` is in `PATH`. If not, stop and tell the user to install
+   Homebrew.
+2. Use `brew search` or the project release docs to discover the exact
+   tap/formula.
+3. Install only the exact documented formula. Do not invent a Homebrew package
+   name.
+4. If no Homebrew formula is published for the release, say so and use the
+   documented wheel or `pipx` install path instead.
+
+### Step B: Verify Credentials
+
+This skill uses customer SCC Firewall Manager API-token/profile auth, not
+internal SystemDB tokens.
+
+Use the selected command's `auth` object:
+
+- If `auth.requires_profile` is false, skip profile verification.
+- If `auth.requires_profile` is true, verify a configured customer profile is
+  available before executing.
+- Profiles contain a region and API token. Tokens come from developer.cisco.com
+  or the SCC Firewall Manager UI.
+
+#### Secret Handling Rules
+
+1. Never ask the user to paste a token into chat.
+2. Never echo a token back to the user.
+3. Never log tokens or include them in final answers.
+4. Never use internal SystemDB credentials.
+5. If a profile is missing, guide the user to run the documented configuration
+   flow locally, or generate a validated configuration command with a placeholder
+   token.
+6. Only configure a profile yourself when the user explicitly provides a secure,
+   local mechanism for the token.
+
+#### Credential Verification Algorithm
+
+Before executing any command where `auth.requires_profile` is true:
+
+1. Determine the profile from the user's request, global options, or schema
+   defaults.
+2. Run a readonly profile/connectivity check only if the schema exposes one and
+   the selected execution mode allows validation.
+3. If validation succeeds, proceed with command construction.
+4. If no validation command is available, proceed only if a profile is already
+   configured or the user explicitly provides the profile name to use.
+5. If the profile is missing or invalid, stop and tell the user to configure a
+   customer SCC Firewall Manager API token locally.
+6. Do not ask for token contents, do not print token values, and do not retry
+   with alternate credentials unless the user explicitly selects them.
+
+AWS credentials and internal SystemDB tokens are out of scope for `sccfm-cli`.
+
+#### Canonical Region Mapping
+
+Normalize user-friendly region names before using them. The canonical values are
+the choices exposed by the schema for the region option.
+
+Common aliases:
+
+- United States or USA -> `us`
+- Europe -> `eu`
+- Asia Pacific/Japan -> `apj`
+- Australia or `aus` -> `au`
+- United Arab Emirates -> `uae`
+- India -> `in`
+- CI -> `ci`
+- integration or internal -> `int`
+
+Only use the normalized value if it is present in the schema choices. If the user
+supplies any other region string, say it is not recognized and show the valid
+schema choices.
+
+## Step 1: Discover Available Commands
+
+Export the schema once per session:
+
 ```bash
-source scripts/activate.sh
-```
-This adds `.venv/bin` to PATH, making `sccfm-cli` available directly. Do NOT use `poetry run`.
-
-> **Do not re-activate before every command.** Activation persists for the lifetime of the shell. Reuse the same terminal for subsequent `sccfm-cli` calls. Only re-run `source scripts/activate.sh` if you open a brand-new terminal, or if you see `command not found: sccfm-cli`.
-
-### If the venv doesn't exist yet
-
-Run the full environment setup (installs pyenv, Python 3.12, creates venv, installs all deps):
-```bash
-bash scripts/setup_environment.sh
-```
-Then activate:
-```bash
-source scripts/activate.sh
-```
-
-## Critical rules
-
-- ALWAYS activate the environment before running any command.
-- ALWAYS run `--help` before executing any command — never guess flags or arguments.
-- ALWAYS check `sccfm-cli status` before running commands to verify a profile is configured.
-- Use `--silent --format json` when output needs to be parsed or piped.
-- For mutating operations, always offer to track the transaction with `--wait` or `transaction`.
-
-## Discovering commands
-
-The CLI is self-documenting. ALWAYS use `--help` to discover the live command tree. Do NOT rely on hardcoded lists — they go stale.
-
-**Step 1: list top-level commands**
-```bash
-sccfm-cli --help
-```
-
-**Step 2: drill into a command group**
-```bash
-sccfm-cli <group> --help
-sccfm-cli <group> <subgroup> --help
-```
-
-**Step 3: get full options for a leaf command**
-```bash
-sccfm-cli <group> <subgroup> <command> --help
-```
-
-### Top-level groups (stable)
-
-These top-level groups exist and are unlikely to change:
-- `configure` — set up profile
-- `status` — show current profile and run health checks
-- `transaction` — track transaction by UID
-- `inventory` — devices and managers
-- `objects` — network objects, groups, overrides
-- `policies` — access groups and rules
-
-For everything below the top level, run `--help` to discover the current subcommands.
-
-### Bulk discovery
-
-To dump the full live tree at once:
-```bash
-sccfm-cli --help
-for grp in inventory objects policies; do
-  echo "=== $grp ===" && sccfm-cli $grp --help
-done
-```
-
-## Configuration
-
-Before using any command, the user must have a configured profile. Check with:
-```bash
-sccfm-cli status
-```
-
-If not configured, configure a profile:
-```bash
-sccfm-cli configure --region <region> --api-token <token>
-```
-
-Valid regions: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`.
-The legacy alias `aus` is accepted and normalized to `au`.
-
-Multiple profiles are supported:
-```bash
-sccfm-cli --profile prod configure --region us --api-token <token>
-sccfm-cli --profile prod status
-```
-
-### When the user has no profile configured
-
-If `sccfm-cli status` shows no profile, you MUST ask the user for:
-1. **Region** — which SCCFM region they use (show the valid options: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`; legacy `aus` is accepted and normalized to `au`)
-2. **API token** — their SCCFM API token (this is a bearer token from the SCC portal)
-
-Then run:
-```bash
-sccfm-cli configure --region <their-region> --api-token <their-token>
-```
-
-Do NOT guess or fabricate tokens. Do NOT proceed without a configured profile.
-
-### Full first-time setup (tokens + Ansible vault + .env)
-
-For a complete setup that configures the CLI profile, `.env`, and Ansible Vault in one step, use the `change-tokens` script:
-```bash
-# Interactive — prompts for region, token, vault password
-change-tokens
-
-# Headless — no prompts
-change-tokens --region us --api-token <token> --vault-password <password>
-```
-
-Or via the devkit menu:
-```bash
-devkit
-# select "change-tokens"
-```
-
-This creates/updates:
-- `~/.sccfm-cli/config.json` — CLI profile
-- `.env` — `SCCFM_REGION` and `SCCFM_API_TOKEN` env vars
-- `sccfm-ansible/examples/group_vars/all/vars.yml` — `sccfm_region`
-- `sccfm-ansible/examples/group_vars/all/vault.yml` — encrypted `sccfm_api_token`
-- `sccfm-ansible/examples/.vault_pass` — vault password file
-
-## Global options
-
-These are set **before** the command name:
-- `--profile TEXT` — select a configuration profile (default: `default`)
-- `--silent` — suppress spinners and progress output
-
-## Common command options
-
-These appear on many commands but not all — always check with `--help`:
-- `--format table|json` — output format (list/get commands)
-- `--config-path PATH` — override the config file location (envvar: `SCCFM_CONFIG`); per-command, not global
-- `--wait / --no-wait` — poll until transaction completes (mutating commands)
-- `--timeout INT` — max seconds to wait, x>=1 (default: 3600)
-- `-l / --limit INT` — results per page, 1–200 (default: 50)
-- `-o / --offset INT` — pagination offset, x>=0 (default: 0)
-- `-q / --query TEXT` — Lucene-syntax filter expression
-- `-t / --transaction-uid TEXT` — transaction UID (on `transaction` command)
-
-## Exit codes and error handling
-
-The CLI uses these exit codes — agents MUST check them, especially when piping output:
-
-| Exit code | Meaning |
-|-----------|---------|
-| `0` | Success |
-| `1` | Configuration error (e.g., profile not found) — stderr message tells you what to do |
-| `130` | User cancelled (Ctrl-C / `KeyboardInterrupt`) |
-| `255` | API or runtime error (e.g., 401 Unauthorized, network failure) |
-
-**Important gotchas:**
-- `--silent` suppresses the human-readable error message but **preserves the exit code**. Always check `$?` when using `--silent`.
-- `--silent --format json` on a failure prints `{}` to stdout with exit code `255`. Do NOT trust the JSON without checking the exit code.
-- Piping (`sccfm-cli ... | head`) returns the exit code of the LAST pipeline command, masking CLI failures. Use `set -o pipefail` or store the result in a variable first.
-- The `status` command exits `0` even when API connectivity check shows `FAIL` — always read the table output to verify health.
-
-**Recommended pattern for agents:**
-```bash
-output=$(sccfm-cli --silent inventory devices list --format json --limit 10)
-rc=$?
-if [ $rc -ne 0 ]; then
-  # Re-run without --silent to surface the error
-  sccfm-cli inventory devices list --format json --limit 10
-  exit $rc
-fi
-echo "$output" | jq '.items[].name'
-```
-
-## Working with output
-
-For machine-readable output, combine `--silent` and `--format json`:
-```bash
-sccfm-cli --silent inventory devices list --format json | jq '.items[].name'
-```
-Remember to check the exit code (see above).
-
-## Common workflows
-
-### Listing and filtering devices
-Most list commands support `--query`, `--limit`, and `--offset` for filtering and pagination:
-```bash
-sccfm-cli inventory devices list --query "deviceType:ASA" --limit 10 --format json
-sccfm-cli inventory devices asa list --query "name:branch-*"
+sccfm-cli schema export --format json
 ```
 
-### Executing commands on devices
-Device-targeting commands accept one of:
-- `--query` — filter expression (e.g., `"connectivityState:ONLINE"`)
-- `--device-name` — exact device name
-- `--device-uids` — comma-separated UIDs
+This is the only hardcoded command exception. It bootstraps schema discovery; all
+other command names, flags, options, examples, and behavior must come from the
+exported schema.
 
-### Managing objects
-Object commands use these targeting options:
-- `-n / --name` — object name (required for create)
-- `-v / --value` — IP, CIDR, or range
-- `-u / --uid` — object UID (for get/update/delete)
-- `-q / --query` — Lucene filter for list commands
-- `-d / --description` — object description
-- `-l / --labels` — labels (repeatable)
-- `-t / --tags` — key=value tags (repeatable)
+Parse the JSON output. The schema contains:
 
-### Transaction tracking
-Mutating operations return a transaction UID. Track it with:
-```bash
-sccfm-cli transaction --transaction-uid <uid>
+- `commands`: available leaf operations
+- `command`: full executable command text
+- `path`: command path segments
+- `description`: human-readable behavior
+- `readonly`: whether the command mutates SCC Firewall Manager
+- `side_effects`: local or remote side effects
+- `auth`: auth requirements
+- `option_groups`: inter-option constraints
+- `constraints`: validation and preflight constraints
+- `global_options`: flags that must appear before the command path
+- `options`: accepted flags, types, defaults, choices, and descriptions
+- `examples`: declared usage examples, if any
+
+Cache the schema in memory for the session. Do not re-export unless:
+
+- the user explicitly asks you to refresh it
+- the CLI binary or invocation prefix changed
+- the environment changed
+- a command is missing
+
+If schema export fails, stop and report the error. Do not guess what the CLI
+supports.
+
+## Step 2: Match User Intent Conservatively
+
+Derive the user's request into this structured shape before matching commands:
+
+- requested action
+- target object type
+- target identity or target list
+- region or profile
+- whether they asked to read, export, or modify
+
+Then match commands using this algorithm:
+
+1. Filter schema commands whose `command`, `path`, or `description` directly
+   match the requested action and object type.
+2. Prefer exact token matches in `path` over looser description matches.
+3. If the user names a concrete subtype and the schema has a subtype-specific
+   path segment for it, prefer that command over a generic command plus a
+   `deviceType` query.
+4. Reject any command whose safety category conflicts with the user's intent.
+5. If exactly one command remains, use it.
+6. If multiple plausible commands remain, show the candidates and ask the user
+   to choose.
+7. If no command matches, say so clearly and stop.
+
+Never guess between multiple commands. Fail closed on ambiguity.
+
+## Step 3: Build the Invocation
+
+Construct the command strictly from the matched schema entry.
+
+### Required Inputs
+
+1. Check every option where `required` is true.
+2. Gather values from the user's request.
+3. If a required value is missing, ask for it. Do not invent it.
+
+### Option Placement
+
+Build commands in this order:
+
+```text
+sccfm-cli <global options> <schema command path> <command options>
 ```
 
-Or use `--wait` on supported commands to poll until completion:
-```bash
-sccfm-cli inventory devices asa upgrade trigger --query "name:branch-*" --software-version 9.20 --wait --timeout 3600
+Global options come from the root schema's `global_options` list and must be
+placed before the command path. Command options come from the matched command's
+`options` list and must be placed after the command path.
+
+Never place a `global_options` flag after the leaf command. Click will reject it.
+
+### Option Groups
+
+Apply every `option_groups` entry and every `constraints` entry exactly as
+described in the schema. See "Parsing `option_groups`" below.
+
+### Output Format
+
+In Execute mode, pass JSON output only when the selected command schema declares
+an output format option whose values include `json`.
+
+In Generate-Only mode, omit JSON output unless the user explicitly requested it
+or the schema requires it.
+
+### Natural-Language Query Filters
+
+If the user describes a filter in natural language, such as "online ASAs" or
+"objects named web-*", build a `--query` value only from the matched command's
+`queryable_fields` and `field_notes` metadata.
+
+1. Match the user's words to field names, allowed values, aliases, or examples
+   declared in `queryable_fields`.
+2. Use the exact field spelling and value casing from the schema metadata.
+3. If `field_notes` says a command automatically adds a filter, do not duplicate
+   that filter in the generated query.
+4. If no schema-declared field matches the requested filter, ask the user for the
+   exact Lucene query instead of guessing.
+5. Never pass bare words like `online` as a query unless the schema explicitly
+   documents that form.
+
+### Region
+
+Always pass canonical region values from schema choices, not friendly aliases.
+
+### Optional Flags
+
+Only pass an optional flag if one of these is true:
+
+- the user explicitly requested it
+- it is required to satisfy a schema constraint
+- it is required for safe machine-readable execution in Execute mode
+
+Do not add optional flags because they seem convenient.
+
+### Sensitive and Risky Flags
+
+1. Never include API tokens in chat output.
+2. Do not pass diagnostic or verbose flags unless the user explicitly asked for
+   diagnostic output on a failed readonly command.
+3. Do not pass local output/export/config path options unless the user explicitly
+   asked for local writes and provided the destination path.
+4. Never rely on schema default output paths for customer data exports.
+
+### Target Identity Rules
+
+For Class C commands, require an explicit, unambiguous target selector before
+execution.
+
+- If the user gives a broad search, friendly name, or query and the schema
+  exposes a readonly lookup that can resolve the target set, run that lookup
+  first when allowed.
+- Present the resolved target or exact target count before asking for
+  confirmation.
+- Do not mutate based on vague wording like "all of them" unless the target set
+  has been enumerated and confirmed.
+
+### Bulk Input Rules
+
+If a command uses a file or list input for bulk work:
+
+1. Inspect the file before execution.
+2. Count non-empty targets.
+3. Surface duplicates or obviously malformed lines to the user.
+4. Tell the user the exact target count.
+5. Never create a bulk file for a mutating operation unless the user explicitly
+   asked you to.
+
+## Step 4: Execution Policy
+
+Apply these rules after selecting execution mode.
+
+### Class A: Readonly, No Local Writes
+
+In Execute mode, run the command after validation if:
+
+- the command match is unambiguous
+- region/profile is resolved
+- auth requirements are satisfied
+- all schema constraints are satisfied
+
+In Generate-Only mode, validate the invocation as far as the selected mode
+allows, then return the exact command.
+
+### Class B: Readonly, Local Writes or Exports
+
+In Execute mode, before executing:
+
+1. Confirm the user wants a local export or local write.
+2. Require an explicit destination path.
+3. State what will be written and where.
+4. Do not use schema defaults for file locations.
+
+In Generate-Only mode, require an explicit destination path before generating the
+command, then state what will be written locally if the user runs it.
+
+### Class C: Mutating Commands
+
+In Execute mode, never execute a mutating command immediately. Use this workflow:
+
+1. Validate the command match and canonical region/profile.
+2. Validate credentials using the command's `auth` metadata.
+3. Resolve targets to an unambiguous selector or exact target count.
+4. For bulk work, inspect the target list and present the exact count.
+5. If the schema exposes a preflight-only mode through a `check` option or a
+   `mode` constraint, run the preflight first and present the result.
+6. If no suitable preflight exists, say so explicitly and stop unless the user
+   explicitly approves proceeding without preflight.
+7. Present an execution plan containing:
+   - command path
+   - target selector or target count
+   - auth profile
+   - intended change
+   - preflight result, if available
+   - exact command that will be executed
+8. Require explicit confirmation before execution.
+
+In Generate-Only mode, validate as far as allowed, mark whether live preflight
+was performed, return the exact command, and do not execute it.
+
+#### Confirmation Rules for Mutating Commands
+
+These confirmation rules apply only in Execute mode.
+
+For any Class C command, require the user to send the exact confirmation phrase
+you provide. Use this format:
+
+```text
+EXECUTE sccfm-cli <schema command path> <target-summary>
 ```
 
-## Interactive discovery via devkit
+For bulk or broad-target mutations, require two confirmations:
 
-The `devkit` menu provides an interactive CLI runner that walks through the command tree and prompts for parameters:
-```bash
-devkit
-# select "run-cli"
-```
+1. A first confirmation that they want to proceed with the plan.
+2. A second message containing the exact `EXECUTE ...` phrase.
 
-## Architecture reference
+#### Red Lines for Mutating Commands
 
-If you need to understand how a command works internally:
-- **Entry point:** `sccfm_cli/cli.py` — builds the Click group with global options
-- **Commands:** `sccfm_cli/commands/` — each is a `BaseCommand` subclass
-- **Shared options:** `sccfm_cli/commands/shared_options.py` — reusable Click option factories
-- **Domain options:** `sccfm_cli/commands/inventory/options.py`, `sccfm_cli/commands/objects/options.py`
-- **Business logic:** `sccfm_core/services/` — shared with the Ansible collection
-- **SDK client:** `scc-firewall-manager-sdk` package
+Never execute a Class C command when any of these is true:
 
-Read the command source to understand available parameters when `--help` is insufficient.
+- the command match is ambiguous
+- the region or profile is ambiguous
+- the target is vague or unresolved
+- a bulk file has not been inspected
+- credentials are missing or would expose secrets in chat
+- the user gave a vague instruction like "fix it" or "do this everywhere"
+- you cannot state the exact intended change in one sentence
 
-## User request: $ARGUMENTS
+## Step 5: Parse and Present Results
 
-Help the user accomplish: **$ARGUMENTS**
+Parse JSON output when available and summarize only the data needed to answer the
+request.
 
-**Approach:**
-1. Activate the environment **once at the start of the session**: `source scripts/activate.sh`. Reuse the same terminal for subsequent commands — do not re-activate before every call.
-2. Run `sccfm-cli status` to verify a profile is configured. If not, ask the user for region + token, then `sccfm-cli configure`.
-3. Discover the right command with `sccfm-cli --help` and drill down with `--help` on each subgroup.
-4. Run `--help` on the leaf command to see exact options.
-5. Run the command. When piping or using `--silent`, check `$?` for the real exit code.
-6. Use `--format json` when output needs to be parsed; use the `output=$(...)` pattern above to capture errors.
-7. If a command returns a transaction UID, offer to track it with `--wait` or `sccfm-cli transaction -t <uid>`.
-8. Explain what happened and what the output means.
+### Result Presentation
+
+- For a single boolean or scalar answer, state it directly.
+- For small structured results, summarize the important fields.
+- For tabular results, use a markdown table when that improves clarity.
+- For exported data, confirm the output path and summarize what was written
+  without dumping sensitive data into chat unless the user explicitly asks.
+
+### Errors
+
+If the command exits non-zero:
+
+1. Report the failure clearly.
+2. Include useful stderr details when they do not expose secrets.
+3. Suggest the smallest corrective action.
+4. Do not retry automatically, especially for mutating commands.
+
+## Parsing `option_groups`
+
+Each item in `option_groups` defines an explicit constraint. Enforce the schema
+literally.
+
+### Mutually Exclusive Groups (`"mutually_exclusive": true`)
+
+The listed options cannot be used together.
+
+- If `required` is true, exactly one must be present.
+- Otherwise, at most one may be present.
+
+### Dependency Groups (`"dependent": true`)
+
+The listed options require another option named in `requires`.
+
+### Other Constraints
+
+Also enforce every entry in `constraints`, including required-any,
+required-unless, exactly-one-unless, value-prefix, dependent, conditional, and
+preflight mode constraints.
+
+### Validation Rules
+
+Before executing any command:
+
+1. Check every mutually exclusive group.
+2. Check every dependency group.
+3. Check every command constraint.
+4. If validation fails, explain the exact conflict and stop.
+5. Do not silently add missing options unless the user supplied the needed value.
+6. Do not silently remove conflicting flags.
+
+## Important Rules
+
+1. Never hardcode commands. All command knowledge comes from schema export.
+2. Never fabricate options. Only use options listed in the matched schema entry.
+3. Always pass canonical region values.
+4. Never ask the user to paste secrets into chat.
+5. Never guess between ambiguous commands or targets.
+6. Never rely on schema default export paths for customer data.
+7. Never execute a mutating command without the required confirmation workflow.
+8. If a command fails, report it clearly and stop. Do not auto-retry unless the
+   user explicitly asks.
+9. In Generate-Only mode, never execute the final business command.
