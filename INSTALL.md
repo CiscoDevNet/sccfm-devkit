@@ -1,8 +1,8 @@
 # Installation
 
-These are instructions to install the latest CLI and Ansible collection from Github releases. Eventually,
-- The `sccfm-cli` will be available on Pypi.org
-- The `sccfm-ansible` collection will be available on Ansible Galaxy.
+These are instructions to install the latest CLI and Python library from PyPI, plus the
+Ansible collection from GitHub releases. Eventually, the `cisco.sccfm` collection will be
+available on Ansible Galaxy.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -11,11 +11,12 @@ These are instructions to install the latest CLI and Ansible collection from Git
 - [Installing the CLI](#installing-the-cli)
   - [Prerequisites](#prerequisites)
     - [Install Python 3.12 using Pyenv](#install-python-312-using-pyenv)
-  - [Download the wheel](#download-the-wheel)
   - [Install with pipx](#install-with-pipx)
   - [Install with pip](#install-with-pip)
+  - [Install from GitHub Releases](#install-from-github-releases)
   - [Install CLI man pages](#install-cli-man-pages)
   - [Enable shell completion](#enable-shell-completion)
+- [Using the Python library](#using-the-python-library)
 - [Installing the Ansible collection](#installing-the-ansible-collection)
   - [Download the Ansible collection Bundle.](#download-the-ansible-collection-bundle)
   - [Install Ansible Collection](#install-ansible-collection)
@@ -26,7 +27,8 @@ These are instructions to install the latest CLI and Ansible collection from Git
 
 ## Installing the CLI
 
-Follow these steps to install the `sccfm` CLI from a released wheel and enable shell completion.
+Follow these steps to install the `sccfm` Python package, which provides the `sccfm-cli`
+command and the `sccfm_core` Python library.
 
 ### Prerequisites
 
@@ -43,18 +45,13 @@ pyenv install -s 3.12
 pyenv global 3.12
 ```
 
-### Download the wheel
-
-1. Navigate to the [GitHub Releases](https://github.com/cisco-lockhart/sccfm-devkit/releases) page for this project.
-2. Download the latest wheel asset named like `sccfm-<version>-py3-none-any.whl` to your local machine.
-
 ### Install with pipx
 
-`pipx` is the recommended install method for the CLI today. It keeps the Python
-environment isolated while exposing `sccfm-cli` on your `PATH`.
+`pipx` is the recommended install method for the CLI. It keeps the Python environment
+isolated while exposing `sccfm-cli` on your `PATH`.
 
 ```bash
-pipx install /path/to/sccfm-<version>-py3-none-any.whl
+pipx install sccfm
 ```
 
 ### Install with pip
@@ -62,10 +59,21 @@ pipx install /path/to/sccfm-<version>-py3-none-any.whl
 Use `pip` when you are installing into an existing virtual environment:
 
 ```bash
-python -m pip install /path/to/sccfm-<version>-py3-none-any.whl
+python -m pip install sccfm
 ```
 
-Replace the path with where you saved the wheel.
+### Install from GitHub Releases
+
+If you need an exact release artifact before PyPI is available, install the wheel from
+GitHub Releases:
+
+1. Navigate to the [GitHub Releases](https://github.com/CiscoDevNet/sccfm-devkit/releases) page for this project.
+2. Download the latest wheel asset named like `sccfm-<version>-py3-none-any.whl` to your local machine.
+3. Install the downloaded wheel:
+
+```bash
+pipx install /path/to/sccfm-<version>-py3-none-any.whl
+```
 
 ### Install CLI man pages
 
@@ -119,6 +127,28 @@ autoload -U compinit && compinit
 
 After sourcing, tab completion will work for all `sccfm` commands and options.
 
+## Using the Python library
+
+The same PyPI package exposes the typed `sccfm_core` library for Python automation:
+
+```python
+from dataclasses import dataclass
+
+from sccfm_core import InventoryService
+
+
+@dataclass(frozen=True)
+class Config:
+    region: str
+    api_token: str
+
+
+inventory = InventoryService(Config(region="us", api_token="..."))
+devices = inventory.get_devices(limit=10, offset=0, query=None)
+```
+
+The generated `scc-firewall-manager-sdk` remains the low-level SDK dependency.
+`sccfm_core` is the higher-level library used by the CLI and Ansible collection.
 
 ## Installing the Ansible collection
 
@@ -126,7 +156,7 @@ After sourcing, tab completion will work for all `sccfm` commands and options.
 
 ### Download the Ansible collection Bundle.
 
-1. Navigate to the [GitHub Releases](https://github.com/cisco-lockhart/sccfm-devkit/releases) page for this project.
+1. Navigate to the [GitHub Releases](https://github.com/CiscoDevNet/sccfm-devkit/releases) page for this project.
 2. Download the latest tar.gz asset, named like `cisco-sccfm-<version>.tar.gz`, to your local machine.
 
 ### Install Ansible Collection
@@ -137,7 +167,7 @@ ansible-galaxy collection install /path/to/cisco-sccfm-{version}.tar.gz
 ### Verify installation
 
 ```bash
-python -c "import sccfm_core; print('✅ Python package installed')"
+python -c "import sccfm_core; print('Python package installed')"
 ansible-galaxy collection list | grep cisco.sccfm
 ```
 
@@ -145,12 +175,15 @@ ansible-galaxy collection list | grep cisco.sccfm
 
 The fastest way to get going is to use the interactive devkit menu:
 
-```bash\npoetry run devkit\n# select "setup-tokens" from the menu\n```
+```bash
+devkit
+# select "change-tokens" from the menu
+```
 
 Or run the token setup directly:
 
 ```bash
-poetry run setup-tokens
+change-tokens
 ```
 
 This will prompt for your region, API token, and vault password, then create all the required files (.env, vars.yml, vault.yml).

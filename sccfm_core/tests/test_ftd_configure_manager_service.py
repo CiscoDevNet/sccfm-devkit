@@ -18,7 +18,9 @@ from sccfm_core.services.inventory import (
     JumpHostSpec,
 )
 from sccfm_core.services.inventory import ftd_configure_manager_service as svc_mod
-from sccfm_core.services.inventory import parse_jump_host
+from sccfm_core.services.inventory import (
+    parse_jump_host,
+)
 
 _CLI_KEY = "configure manager add DONTRESOLVE regkey123 natid456"
 _SUCCESS_CHUNKS = [b"\r\n> ", b"Manager successfully configured.\r\n> "]

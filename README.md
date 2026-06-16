@@ -1,8 +1,11 @@
-# sccfm-devkit ![CI](https://github.com/cisco-lockhart/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
+# sccfm-devkit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
-Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcoming Ansible collection. Shared business logic lives in `sccfm_core` so both the CLI and the collection can reuse the same inventory/health SDK integrations; the CLI remains in `sccfm_cli`.
+Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python package with the
+`sccfm-cli` command, a reusable `sccfm_core` automation library, and an Ansible
+collection. Shared business logic lives in `sccfm_core` so the CLI, Python scripts,
+and collection can reuse the same SDK integrations.
 
-**Documentation:** [Generated CLI and Ansible reference](https://cisco-lockhart.github.io/sccfm-devkit/)
+**Documentation:** [Generated CLI and Ansible reference](https://ciscodevnet.github.io/sccfm-devkit/)
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -10,6 +13,7 @@ Toolkit for interacting with SCC Firewall Manager (SCCFM): a CLI plus an upcomin
 
 - [Getting started](#getting-started)
 - [Commands](#commands)
+- [Python library](#python-library)
 - [Ansible collection](#ansible-collection)
 - [Development](#development)
 - [CLI Installation](#cli-installation)
@@ -57,6 +61,30 @@ install-cli-man-docs
 ```
 
 See [docs/README.md](docs/README.md) for generation details.
+
+## Python library
+
+Installing the `sccfm` package also exposes `sccfm_core`, a typed high-level Python
+automation library built on top of the generated `scc-firewall-manager-sdk`.
+
+```python
+from dataclasses import dataclass
+
+from sccfm_core import InventoryService
+
+
+@dataclass(frozen=True)
+class Config:
+    region: str
+    api_token: str
+
+
+inventory = InventoryService(Config(region="us", api_token="..."))
+devices = inventory.get_devices(limit=10, offset=0, query=None)
+```
+
+The package root exports the supported public service classes and response models through
+`sccfm_core.__all__`. Internal modules may change between releases.
 
 ## Ansible collection
 
@@ -110,21 +138,20 @@ See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expect
 
 For contributors, use the repository environment from [Getting started](#getting-started).
 
-For end users today, install a released wheel with `pipx` when possible. `pipx` keeps the
-CLI isolated while exposing `sccfm-cli` on `PATH`:
+For end users, install the published PyPI package with `pipx` when possible. `pipx`
+keeps the CLI isolated while exposing `sccfm-cli` on `PATH`:
 
 ```bash
-pipx install /path/to/sccfm-<version>-py3-none-any.whl
+pipx install sccfm
 ```
 
 Installing into a virtual environment with `pip` is also supported:
 
 ```bash
-poetry build
-python -m pip install dist/sccfm-*.whl    # or `python -m pip install dist/sccfm-*.tar.gz`
+python -m pip install sccfm
 ```
 
-See `INSTALL.md` for installing a released wheel and enabling shell completion.
+See `INSTALL.md` for installation options and shell completion.
 
 Key tooling:
 
