@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Build script for Ansible collection."""
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -20,8 +21,15 @@ def main() -> int:
     dist_dir = project_root / "dist"
     pyproject_path = project_root / "pyproject.toml"
     galaxy_path = collection_dir / "galaxy.yml"
+    license_src = project_root / "LICENSE"
+    license_dst = collection_dir / "LICENSE"
 
     print("🎭 Building Ansible collection...")
+
+    # Copy the root LICENSE into the collection so galaxy.yml's `license_file`
+    # resolves and the license ships in the tarball (Galaxy import requires it).
+    shutil.copyfile(license_src, license_dst)
+    print(f"📄 Copied LICENSE into {collection_dir.name}/")
 
     # Read version from pyproject.toml
     with open(pyproject_path, "rb") as f:
