@@ -4,3 +4,6 @@ examples/group_vars/all/vault.yml
 
 # Token setup outputs (secrets — never commit)
 **/.env
+
+# LICENSE is copied from the repo root at build time (see scripts/build_ansible_collection.py)
+LICENSE
