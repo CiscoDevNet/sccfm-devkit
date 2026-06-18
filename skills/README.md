@@ -19,13 +19,19 @@ Skills are tool-agnostic markdown files. Any AI agent that reads them gets the s
 | Skill | File | Use when... |
 |-------|------|-------------|
 | **sccfm-cli** | [sccfm-cli/SKILL.md](sccfm-cli/SKILL.md) | Running CLI commands, managing devices, objects, policies |
-| **sccfm-ansible** | [sccfm-ansible/SKILL.md](sccfm-ansible/SKILL.md) | Writing/running playbooks, managing Ansible vault, creating modules |
+| **sccfm-ansible** | [sccfm-ansible/SKILL.md](sccfm-ansible/SKILL.md) | Discovering `cisco.sccfm` modules with `ansible-doc`, writing/running playbooks, managing Ansible vault, creating modules |
 
 ## How agents use these
 
 ### VS Code Copilot / Claude
 
-Skills are auto-discovered via the `.claude/skills` symlink. When a user's request matches a skill's `when_to_use` criteria, the agent loads the skill file before responding.
+Skills are auto-discovered via the `.claude/skills` symlink. When a user's request matches a skill's `description`, the agent loads the skill file before responding.
+
+### Codex
+
+Skills are auto-discovered via `.agents/skills` symlinks. The symlinks point at
+the canonical files under `skills/`, so Claude and Codex read the same skill
+content.
 
 ### Claude Code (or any agent reading `~/.claude/skills/`)
 
@@ -53,9 +59,8 @@ The skill files are also useful as human-readable quick-reference guides for the
 ```yaml
 ---
 name: my-skill
-description: One-line description of what this skill covers.
-when_to_use: When the user asks about X, Y, or Z.
-argument-hint: "[describe what you want to do]"
+description: One-line description of what this skill covers and when to use it.
+allowed-tools: "Read Grep Glob"
 ---
 ```
 
