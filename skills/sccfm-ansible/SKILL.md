@@ -254,7 +254,6 @@ Construct automation strictly from the matched `ansible-doc` entry.
 4. Enforce `choices`, `type`, and `elements` exactly as documented.
 
 ### Natural-Language Filters and Queries
-
 If the user describes a filter in natural language, such as "online ASAs",
 "devices named branch-*", or "FTDs not on the recommended version", translate it
 only through documented Ansible options and discovered inventory variables.
@@ -265,8 +264,9 @@ only through documented Ansible options and discovered inventory variables.
    as `sccfm-cli`.
 3. If the docs describe only a narrow query behavior, such as a name filter,
    generate only that documented behavior.
-4. If the user wants filtering by inventory host metadata, first discover and
-   validate the inventory plugin docs, then use documented host variables only.
+4. If the user wants filtering by inventory host metadata, first discover the
+   inventory plugin docs, then verify host variables from generated docs or
+   source context; use only verified host variables.
 5. If no documented option or host variable supports the requested filter, ask
    for the exact supported filter or propose a readonly list/inventory step plus
    local post-filtering. Do not invent query fields or values.

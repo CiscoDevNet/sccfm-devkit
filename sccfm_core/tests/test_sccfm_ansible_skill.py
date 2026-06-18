@@ -51,6 +51,7 @@ def test_sccfm_ansible_skill_blocks_made_up_query_semantics() -> None:
     assert "Natural-Language Filters and Queries" in skill
     assert "Do not assume it accepts Lucene" in skill
     assert "Do not invent query fields or values" in skill
+    assert "verify host variables from generated docs or" in skill
     assert "Module parameters belong in YAML" in skill
 
 
