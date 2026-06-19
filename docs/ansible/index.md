@@ -23,6 +23,7 @@ Generated from `ansible-doc` output.
 - [cisco.sccfm.change_asa_boot_image](modules/change_asa_boot_image.html)
 - [cisco.sccfm.change_asa_local_password](modules/change_asa_local_password.html)
 - [cisco.sccfm.clear_asa_shun](modules/clear_asa_shun.html)
+- [cisco.sccfm.configure_manager](modules/configure_manager.html)
 - [cisco.sccfm.create_access_rule](modules/create_access_rule.html)
 - [cisco.sccfm.create_network_group](modules/create_network_group.html)
 - [cisco.sccfm.create_network_object](modules/create_network_object.html)
