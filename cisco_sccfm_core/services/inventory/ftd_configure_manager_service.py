@@ -15,6 +15,7 @@ import paramiko
 from cisco_sccfm_core.types import ConfigLike
 
 _PROMPT = ">"
+_CONFIRM_PROMPT = re.compile(r"Do you want to continue\[yes/no\]\s*:\s*$", re.MULTILINE)
 # The FTD confirms with a line like "Manager <fmc-host> successfully configured."
 # Match per line (not across the whole buffer): the interactive shell echoes the
 # typed "configure manager add ..." command back, so a buffer-wide search would
@@ -320,14 +321,22 @@ def _sanitize_manager_command_echo(output: str, command: str) -> str:
 
 
 def _read_until_prompt(channel: paramiko.Channel, timeout: int) -> str:
-    """Accumulate channel output until the FTD prompt reappears or time runs out."""
+    """Accumulate channel output until the FTD prompt reappears or time runs out.
+
+    Automatically responds ``yes`` to any ``[yes/no]:`` confirmation prompt so
+    interactive license-warning dialogs do not block the session.
+    """
     deadline = time.time() + timeout
     buffer = ""
+    confirmed = False
     while True:
         if channel.recv_ready():
             chunk: str = channel.recv(_RECV_CHUNK).decode(errors="replace")
             if chunk:
                 buffer += chunk
+                if not confirmed and _CONFIRM_PROMPT.search(buffer):
+                    channel.send("yes\n")
+                    confirmed = True
                 # Only stop when the prompt occupies its own line, so a banner or
                 # EULA line that merely ends in '>' (e.g. "... read the EULA -->")
                 # doesn't end the read before the real CLI prompt appears.
