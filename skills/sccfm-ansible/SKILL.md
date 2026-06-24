@@ -1,353 +1,499 @@
 ---
 name: sccfm-ansible
-description: Work with the cisco.sccfm Ansible collection — write playbooks, run modules, manage inventory, configure vault, and automate SCCFM device operations via Ansible.
-when_to_use: When the user asks about Ansible playbooks, modules, inventory, vault setup, or automating SCCFM operations with Ansible. Also when they mention cisco.sccfm, ansible-playbook, or want to create/run/debug playbooks for firewall management.
-argument-hint: "[describe what you want to automate]"
-allowed-tools: "Bash(ansible-playbook *) Bash(ansible-doc *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(devkit *) Bash(source scripts/activate.sh) Read Grep Glob Write Edit"
+description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules and inventory plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use when the user asks to use, install, configure, inspect, generate, run, or debug cisco.sccfm Ansible modules, inventory, vault, playbooks, or SCC Firewall Manager automation through Ansible. Do NOT use for sccfm-cli commands, Jira/Confluence work, architecture design, or non-Ansible tasks.
+allowed-tools: "Bash(command -v *) Bash(source scripts/activate.sh) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(devkit *) Bash(jq *) Read Grep Glob Write Edit"
 ---
 
-You are an expert on the `cisco.sccfm` Ansible collection for managing Cisco Security Cloud Control Firewall Manager. Your job is to help users write playbooks, run modules, manage secrets, and automate SCCFM operations.
+# SCC Firewall Manager Ansible Collection
 
-## Environment activation (ONCE PER SESSION)
+Generate or run `cisco.sccfm` Ansible automation by dynamically discovering the
+installed collection with `ansible-doc`. Treat `ansible-doc` JSON output as the
+schema for modules, inventory plugins, options, examples, return values, and
+secret handling. Do not hardcode module names, parameters, examples, choices, or
+behavior.
 
-At the **start of your session**, activate the virtualenv a single time:
-```bash
-source scripts/activate.sh
-```
-This adds `.venv/bin` to PATH, making `ansible-playbook`, `ansible-doc`, `ansible-vault`, `build-ansible-collection`, `devkit`, `change-tokens`, etc. available directly. Do NOT use `poetry run`.
+This skill operates against customer SCC Firewall Manager environments and
+managed devices. Optimize for customer safety first and convenience second.
 
-> **Do not re-activate before every command.** Activation persists for the lifetime of the shell. Reuse the same terminal for subsequent commands. Only re-run `source scripts/activate.sh` if you open a brand-new terminal, or if you see `command not found: ansible-playbook`.
+## Core Rules
 
-### If the venv doesn't exist yet
+1. Run `ansible-doc` before writing, running, or answering detailed questions
+   about any `cisco.sccfm` module or inventory plugin.
+2. Prefer stopping over guessing. If module match, target identity, region,
+   credentials, inventory, or safety class is ambiguous, ask the user or switch
+   to Generate-Only.
+3. Never improvise module names, parameters, defaults, target lists, inventory
+   files, vault paths, or output paths.
+4. Never ask the user to paste secrets into chat.
+5. Use Ansible Vault, environment variables, or existing local variable files
+   for secrets; never put API tokens or device passwords directly in playbooks.
+6. Treat any task as mutating unless `ansible-doc`, examples, and source context
+   prove it is read-only.
+7. Use fully qualified collection names, such as `cisco.sccfm.<module>`, in
+   playbooks.
 
-Run the full environment setup (installs pyenv, Python 3.12, creates venv, installs all deps):
-```bash
-bash scripts/setup_environment.sh
-```
-Then activate:
-```bash
-source scripts/activate.sh
-```
+## Execution Modes
 
-## Critical rules
+Select one execution mode for each user request.
 
-- ALWAYS activate the environment before running any command.
-- ALWAYS run `ansible-doc` before writing or answering questions about a module — never guess parameters.
-- ALWAYS support `check_mode` in new modules.
-- ALWAYS use `module_defaults: group/cisco.sccfm.all:` for auth — never hardcode tokens.
-- NEVER store secrets in plain text — use Ansible Vault.
+### Mode 1: Execute
 
-## How to discover modules
+Use this mode when the user asks you to perform the Ansible operation.
 
-The collection is self-documenting. ALWAYS use `ansible-doc` to get the exact parameters, types, and examples for any module before writing a playbook or answering questions about it.
+- You may run discovery, syntax checks, inventory checks, dry runs, and readonly
+  playbooks, subject to the safety rules below.
+- Never execute a mutating playbook immediately. Build a plan, run check mode
+  or another preflight when available, and require confirmation.
+- If credentials are missing or intent is ambiguous, default to Generate-Only.
 
-**Discovery pattern — use this every time:**
-```bash
-# List all available modules
-ansible-doc -l -t module cisco.sccfm 2>/dev/null || true
+### Mode 2: Generate-Only
 
-# Get full documentation for a specific module
-ansible-doc cisco.sccfm.<module_name>
+Use this mode when the user says anything like "show me the playbook",
+"generate the playbook", "show me the command", "do not run it", "don't run
+it", "I will run it myself", or "command only".
 
-# Get the inventory plugin documentation
-ansible-doc -t inventory cisco.sccfm.sccfm
-```
+In Generate-Only mode:
 
-**List modules from source (no collection install needed):**
-```bash
-ls sccfm-ansible/plugins/modules/*.py | grep -v __init__ | sed 's|.*/||;s|\.py$||' | sort
-```
+- Never execute the final business playbook or inventory query.
+- You may still run `ansible-doc` because discovery depends on it.
+- You may run local syntax checks on generated playbooks when no live
+  credentials are required and the user did not forbid all execution.
+- If the user forbids all command execution and no cached `ansible-doc` schema
+  is available, stop and explain that safe generation requires module
+  discovery.
+- Always return exact commands or playbook snippets in fenced code blocks.
+- Mark generated automation as `not validated against live state` when live
+  preflight was not allowed or credentials were unavailable.
 
-## Collection installation
+## Safety Model
 
-For local development, the collection must be built and installed:
-```bash
-build-ansible-collection
-```
-Or via the interactive menu:
-```bash
-devkit
-# select "build-collection"
-```
+Classify the playbook or command before execution. Ansible does not expose the
+same explicit `readonly` schema field as `sccfm-cli`, so classify from
+`ansible-doc` descriptions, examples, options, return docs, and source only when
+needed. If classification is unclear, use Class C.
 
-For forced reinstall after code changes:
-```bash
-ansible-galaxy collection install ./sccfm-ansible --force
-```
+### Class A: Readonly, no local writes
 
-## Authentication
+Use Class A only when the matched module or inventory action is clearly
+read-only and the invocation does not write local files.
 
-Three methods (in order of precedence):
+Signals include:
 
-1. **Module parameters** — explicit `region` and `api_token` per task
-2. **Module defaults** (recommended) — set once per play:
-   ```yaml
-   module_defaults:
-     group/cisco.sccfm.all:
-       region: "{{ sccfm_region }}"
-       api_token: "{{ sccfm_api_token }}"
+- `ansible-doc` describes list, get, show, inspect, validate, or health-check
+  behavior.
+- The task does not create, update, delete, onboard, deploy, trigger, clear,
+  execute arbitrary device commands, change credentials, or change managed
+  device state.
+- The command does not redirect output to a file and does not use modules such
+  as local copy/template/file/write operations.
+
+These commands are safe to execute after discovery and credential validation.
+
+### Class B: Readonly, local-write/export side effects
+
+Use Class B when the operation is read-only against SCCFM but writes local data.
+
+Examples include saving inventory output, writing reports, creating local
+playbook artifacts, or exporting customer data to a path. Require explicit user
+opt-in and an explicit destination path before executing. Never rely on a
+default path for customer data.
+
+### Class C: Mutating SCCFM or managed devices
+
+Use Class C when the operation may modify SCCFM, a managed device, local
+credential state, or any deployment/upgrade workflow.
+
+Signals include:
+
+- `ansible-doc` describes creating, updating, deleting, adding, removing,
+  onboarding, deploying, triggering, clearing, applying, editing, executing CLI
+  commands, changing passwords, changing boot images, or changing defaults.
+- The task writes SCCFM objects, device configuration, licensing/deployment
+  state, shun state, object overrides, access rules, local users, firmware, or
+  credentials.
+- The source or docs are unclear.
+
+Class C requires a plan, preflight when possible, and explicit confirmation
+before execution.
+
+## Prerequisites
+
+### Step A: Resolve Ansible and the Collection
+
+Follow these checks in order:
+1. Run `command -v ansible-doc`.
+2. If you are inside this repository, `ansible-doc` is missing, and
+   `scripts/activate.sh` exists, run `source scripts/activate.sh` once for the
+   shell session, then resolve again. Do not use `poetry run`.
+3. Run discovery:
+
+   ```bash
+   ansible-doc -j -l -t module cisco.sccfm
    ```
-3. **Environment variables** — `SCCFM_REGION` and `SCCFM_API_TOKEN`
 
-Valid regions: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`
+4. If discovery fails and you are inside this repository, run both commands,
+   then rerun discovery:
 
-> **Note:** The canonical list is shared from `sccfm_core/constants.py` and normalized
-> through `sccfm-ansible/plugins/module_utils/config.py`. The legacy alias `aus`
-> is still accepted and normalized to `au`.
+   ```bash
+   build-ansible-collection
+   ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
+   ```
 
-## First-time token and vault setup
+5. If discovery succeeds and you are inside this repository, compare discovered
+   module FQCNs with `sccfm-ansible/plugins/modules/*.py` only to detect a stale
+   installed collection. If source modules are missing from `ansible-doc`, build
+   and install the generated tarball as above, then rerun discovery. Do not use source filenames as the module schema.
+6. If you are outside this repository, install or modify local Ansible state only
+   when the user explicitly asks for setup. Otherwise, stop and explain that the
+   `cisco.sccfm` collection is not installed.
 
-Before running any playbook, the user needs an API token and vault configured. If vault files don't exist yet, you MUST help the user set up.
+Re-discover if the virtualenv, collection install, or branch changes.
 
-**Ask the user for:**
-1. **Region** — which SCCFM region they use (valid: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, `ci`; legacy `aus` is accepted and normalized to `au`)
-2. **API token** — their SCCFM API token (bearer token from the SCC portal)
-3. **Vault password** — a password to encrypt sensitive values (only needed if `.vault_pass` doesn't exist)
+### Step B: Discover Runtime Schema
 
-Do NOT guess or fabricate tokens. Do NOT proceed without valid credentials.
+Export the module list once per session:
 
-**Recommended: use the `change-tokens` script** (sets up everything in one step):
 ```bash
-# Interactive — prompts for region, token, vault password
-change-tokens
-
-# Headless — no prompts
-change-tokens --region us --api-token <token> --vault-password <password>
+ansible-doc -j -l -t module cisco.sccfm
 ```
 
-Or via the devkit menu:
+For a matched module, fetch full JSON docs:
+
 ```bash
-devkit
-# select "change-tokens"
+ansible-doc -j cisco.sccfm.<module_name>
 ```
 
-This creates/updates:
-- `.env` — `SCCFM_REGION` and `SCCFM_API_TOKEN` env vars
-- `~/.sccfm-cli/config.json` — CLI profile
-- `sccfm-ansible/examples/group_vars/all/vars.yml` — `sccfm_region`
-- `sccfm-ansible/examples/group_vars/all/vault.yml` — encrypted `sccfm_api_token`
-- `sccfm-ansible/examples/.vault_pass` — vault password file (chmod 600)
-
-## Ansible Vault for secrets
-
-Secrets (API tokens, device passwords) should ALWAYS be encrypted with Ansible Vault.
-
-**Manual vault commands** (if not using `change-tokens`):
+For dynamic inventory work, list inventory plugins, then fetch the matched plugin docs:
 ```bash
-# Create encrypted vault
-ansible-vault create examples/group_vars/all/vault.yml --vault-password-file examples/.vault_pass
-
-# Edit existing vault
-ansible-vault edit examples/group_vars/all/vault.yml --vault-password-file examples/.vault_pass
-
-# View vault contents
-ansible-vault view examples/group_vars/all/vault.yml --vault-password-file examples/.vault_pass
+ansible-doc -j -l -t inventory cisco.sccfm
+ansible-doc -j -t inventory <inventory_plugin_fqcn>
 ```
 
-**Vault structure** (what goes inside vault.yml):
+Parse the JSON output. Use these fields as the schema:
+
+- module or plugin FQCN
+- short description and description
+- `doc.options`: parameter names, types, required flags, defaults, choices,
+  `elements`, `env`, and `no_log`
+- examples
+- return values
+- plugin type and inventory options
+
+Cache the discovered JSON in memory for the session. Do not use stale docs after
+building or reinstalling the collection.
+
+If discovery fails, stop and report the error. Do not guess what the collection
+supports.
+
+The discovery commands above are the only hardcoded bootstrap commands. They are
+the Ansible equivalent of schema export: all module, inventory plugin,
+parameter, example, and return-value knowledge must come from the discovered
+`ansible-doc` JSON.
+
+### Step C: Verify Credentials Without Exposing Secrets
+
+Use the matched docs to identify credential options. Most modules support
+`region` and `api_token`; inventory docs expose their own auth options.
+
+Rules:
+
+1. Prefer `module_defaults: group/cisco.sccfm.all:` for module auth.
+2. Prefer Ansible Vault for API tokens and device passwords.
+3. Environment variables are acceptable when `ansible-doc` documents them, such
+   as `SCCFM_REGION` and `SCCFM_API_TOKEN`.
+4. Never ask for token or password contents in chat.
+5. Never print decrypted vault contents.
+6. Never write real secrets to tracked files.
+7. If credentials are missing, generate the playbook with placeholders or tell
+   the user which local setup command to run.
+8. Use Write/Edit only for non-secret playbook, inventory, vars template, or
+   documentation artifacts.
+
+Use `change-tokens` for local credential setup only when the user explicitly
+asks for it. It configures `.env`, CLI profile state, Ansible vars, and encrypted
+vault files.
+
+## Step 1: Match User Intent Conservatively
+
+Derive the user's request into this structured shape before matching modules:
+
+- requested action
+- target object or device type
+- target identity, query, inventory group, or host pattern
+- desired state or operation
+- region
+- whether they asked to read, export, or modify
+- whether they want a playbook, an ad hoc command, inventory output, or a dry run
+
+Then match modules using this algorithm:
+
+1. Filter the discovered module list by exact tokens in FQCN, short
+   description, and description.
+2. Fetch full docs for every plausible candidate.
+3. Reject candidates whose documented behavior conflicts with the user's intent.
+4. Prefer modules whose documented action and object type both match exactly.
+5. Use the inventory plugin only for inventory/discovery requests.
+6. If exactly one candidate remains, use it.
+7. If multiple plausible candidates remain, show the candidates and ask the user
+   to choose.
+8. If no candidate matches, say so clearly and stop.
+
+Never choose between ambiguous modules by vibe. Ask or stop.
+
+## Step 2: Build the Playbook or Command
+
+Construct automation strictly from the matched `ansible-doc` entry.
+
+### Required Inputs
+
+1. Check every option where `required` is true.
+2. Gather values from the user's request, inventory variables, group vars, or
+   existing variable files.
+3. If a required value is missing, ask for it or leave a clear placeholder in
+   Generate-Only mode.
+4. Enforce `choices`, `type`, and `elements` exactly as documented.
+
+### Natural-Language Filters and Queries
+If the user describes a filter in natural language, such as "online ASAs",
+"devices named branch-*", or "FTDs not on the recommended version", translate it
+only through documented Ansible options and discovered inventory variables.
+
+1. Use only options exposed by the matched `ansible-doc` entry.
+2. If an option named `query` exists, read its current description before using
+   it. Do not assume it accepts Lucene, field:value filters, or the same syntax
+   as `sccfm-cli`.
+3. If the docs describe only a narrow query behavior, such as a name filter,
+   generate only that documented behavior.
+4. If the user wants filtering by inventory host metadata, first discover the
+   inventory plugin docs, then verify host variables from generated docs or
+   source context; use only verified host variables.
+5. If no documented option or host variable supports the requested filter, ask
+   for the exact supported filter or propose a readonly list/inventory step plus
+   local post-filtering. Do not invent query fields or values.
+
+### Auth Pattern
+
+For SCCFM modules, prefer this shape when `region` and `api_token` are supported:
+
 ```yaml
-sccfm_api_token: "your-api-token"
-vault_asa_device_name_password: "device-password"
+module_defaults:
+  group/cisco.sccfm.all:
+    region: "{{ sccfm_region }}"
+    api_token: "{{ sccfm_api_token }}"
 ```
 
-**Plain variables** go in `group_vars/all/vars.yml`:
-```yaml
-sccfm_region: us
-default_asa_username: admin
-default_connector_type: CDG
+Do not repeat `region` or `api_token` inside each task unless the user asks for a
+self-contained snippet or the docs require task-local values.
+
+### Play Targets
+
+Use `hosts: localhost` and `gather_facts: false` for SCCFM API operations unless
+the user specifically wants to target hosts from the dynamic inventory.
+
+### Ansible Command Shape
+
+Build commands in this shape:
+
+```text
+ansible-playbook [ansible CLI options] <playbook.yml>
+ansible-inventory -i <inventory.yml> [ansible inventory options]
 ```
 
-## Dynamic inventory plugin
+Module parameters belong in YAML under `cisco.sccfm.<module_name>`. Inventory
+plugin options belong in the inventory YAML file. Never turn module or inventory
+plugin parameters into `ansible-playbook` CLI flags unless Ansible itself
+documents that flag.
 
-The `cisco.sccfm.sccfm` inventory plugin auto-discovers SCCFM devices.
+For inventory-driven tasks:
 
-**Inventory file** (`inventory.sccfm.yml`):
-```yaml
-plugin: cisco.sccfm.sccfm
-region: "{{ lookup('env', 'SCCFM_REGION') }}"
-api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
-group_by_device_type: true
-```
+1. Discover the inventory plugin docs.
+2. Build an inventory file with only options documented by the plugin.
+3. Validate it with `ansible-inventory` before running playbooks when
+   credentials are available.
 
-**Test inventory:**
+### Secret Parameters
+
+For every option where `no_log: true` is documented, or whose name or description indicates a token, password, key, or secret:
+
+- Use a vault variable, environment lookup, or placeholder.
+- Do not place real values in generated artifacts.
+- Do not print resolved values.
+
+## Step 3: Validate Before Execution
+
+Run validation appropriate to the selected mode and safety class.
+
+### Always Safe Validation
+
+These do not contact SCCFM:
+
 ```bash
-ansible-inventory -i examples/inventory.sccfm.yml --graph --playbook-dir examples
-ansible-inventory -i examples/inventory.sccfm.yml --list --playbook-dir examples
+ansible-doc -j -l -t module cisco.sccfm
+ansible-doc -j cisco.sccfm.<module_name>
+ansible-playbook --syntax-check <playbook.yml>
 ```
 
-**Host variables** available on each device:
-- `sccfm_uid`, `sccfm_name`, `sccfm_region`
-- `sccfm_device_type`, `sccfm_connectivity_state`, `sccfm_config_state`
-- `sccfm_software_version`
+Use `--syntax-check` on generated playbooks whenever a playbook file exists and
+the user did not forbid local validation.
 
-## Playbook patterns
+### Inventory Validation
 
-### Standard playbook structure
-All playbooks targeting SCCFM modules run on `localhost` with `gather_facts: false`:
+When credentials are available and the user requested inventory behavior:
 
-```yaml
----
-- name: Descriptive play name
-  hosts: localhost
-  gather_facts: false
-
-  module_defaults:
-    group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
-
-  tasks:
-    - name: Descriptive task name
-      cisco.sccfm.<module_name>:
-        param1: value1
-      register: result
-
-    - name: Display result
-      ansible.builtin.debug:
-        var: result
-```
-
-### Running playbooks
 ```bash
-# With vault
-ansible-playbook examples/<playbook>.yml --vault-password-file examples/.vault_pass
-
-# With extra variables
-ansible-playbook examples/<playbook>.yml --vault-password-file examples/.vault_pass -e "target_version=9.20(3)13"
-
-# Dry run (check mode)
-ansible-playbook examples/<playbook>.yml --vault-password-file examples/.vault_pass --check
-
-# Or run interactively via devkit
-devkit
-# select "run-ansible"
+ansible-inventory -i <inventory.yml> --graph --playbook-dir <playbook_dir>
+ansible-inventory -i <inventory.yml> --list --playbook-dir <playbook_dir>
 ```
 
-### Device targeting patterns
-Modules that operate on devices accept these filtering parameters:
-- `query` — filter expression (e.g., `"connectivityState:ONLINE AND name:branch-*"`)
-- `uids` — list of device UIDs
-- `limit` / `offset` — pagination
+If credentials are missing, validate only the file shape and mark it as not
+validated against live SCCFM.
 
-## Existing examples
+### Check Mode
 
-Reference playbooks are in `sccfm-ansible/examples/`. List them:
+For Class C playbooks, run check mode before execution whenever the matched
+module supports it and credentials are available:
+
 ```bash
-ls sccfm-ansible/examples/*.yml | sed 's|.*/||' | sort
+ansible-playbook -i <inventory> <playbook.yml> --check
 ```
 
-## Testing
+If `ansible-doc` does not expose check-mode support, inspect the module source
+only when you are in this repository. Look for `supports_check_mode=True` and a
+real `module.check_mode` path. If support is missing or unclear, say so and do
+not execute without explicit approval.
 
-### Unit tests
-Module unit tests live in `sccfm-ansible/plugins/modules/tests/`:
-```bash
-pytest sccfm-ansible/plugins/modules/tests/ -v
+## Step 4: Execution Policy
+
+Apply these rules after selecting execution mode.
+
+### Class A: Readonly, No Local Writes
+
+In Execute mode, run the playbook or inventory command after validation if:
+
+- the module or inventory match is unambiguous
+- region and credentials are available
+- required options are satisfied
+- the operation is documented as read-only
+
+In Generate-Only mode, return the exact playbook and command, and state whether
+it was syntax-checked or live-validated.
+
+### Class B: Readonly, Local Writes or Exports
+
+In Execute mode, before executing:
+
+1. Confirm the user wants the local write/export.
+2. Require an explicit destination path.
+3. State what will be written and where.
+4. Do not use schema or example defaults for customer data paths.
+
+In Generate-Only mode, require an explicit destination path before generating the
+write/export command or playbook.
+
+### Class C: Mutating SCCFM or Managed Devices
+
+In Execute mode, never execute immediately. Use this workflow:
+
+1. Validate the module match, region, credentials, and all required options.
+2. Resolve targets to an unambiguous host pattern, UID, object identifier, or
+   exact target count.
+3. Run `ansible-playbook --syntax-check`.
+4. Run `ansible-playbook --check` when supported and credentials are available.
+5. If check mode is unavailable or not meaningful, say so explicitly and stop
+   unless the user approves proceeding without it.
+6. Present an execution plan containing:
+   - module FQCN
+   - region
+   - inventory or host pattern
+   - target selector or target count
+   - intended change
+   - check-mode/preflight result
+   - exact command that will be executed
+7. Require explicit confirmation before execution.
+
+In Generate-Only mode, validate as far as allowed, mark whether syntax check and
+live preflight were performed, return the exact playbook/command, and do not
+execute the mutating playbook.
+
+#### Confirmation Rules for Mutating Playbooks
+
+These confirmation rules apply only in Execute mode.
+
+For any Class C playbook, require the user to send the exact confirmation phrase
+you provide:
+
+```text
+EXECUTE cisco.sccfm <module-fqcn> <target-summary>
 ```
 
-### E2E integration tests
-End-to-end tests in `sccfm-ansible/e2e/` run actual playbooks against a live environment:
-```bash
-# Via the runner script (checks vault setup, installs collection, runs pytest)
-bash sccfm-ansible/e2e/run_e2e.sh
+For production, deployment, upgrade, credential, or bulk mutations, require two
+confirmations:
 
-# Or via devkit
-devkit
-# select "run-e2e"
-```
+1. A first confirmation that they want to proceed with the plan.
+2. A second message containing the exact `EXECUTE ...` phrase.
 
-## Architecture reference
+#### Red Lines for Mutating Playbooks
 
-If you need to understand how a module works internally:
-- **Modules:** `sccfm-ansible/plugins/modules/` — each is a standalone Ansible module
-- **Module utils:** `sccfm-ansible/plugins/module_utils/` — shared helpers:
-  - `config.py` — `Config` dataclass, `base_argument_spec()`, `identifier_argument_spec()`, `create_config()`
-  - `operations.py` — `run_delete_with_idempotency()`, `fetch_object_by_identifier()`, `fields_need_update()`
-  - `loaders/inventory_loader.py` — `InventoryLoader` with auto-pagination
-  - `builders/inventory_host_builder.py` — `InventoryHostBuilder` for dynamic inventory
-- **Business logic:** `sccfm_core/services/` — shared with the CLI
-- **Unit tests:** `sccfm-ansible/plugins/modules/tests/`
-- **E2E tests:** `sccfm-ansible/e2e/`
+Never execute Class C automation when any of these is true:
 
-Use `ansible-doc` first, then read module source if you need deeper parameter details.
+- the module match is ambiguous
+- region or credentials are ambiguous
+- targets are vague or unresolved
+- a bulk target list has not been inspected
+- required parameters are missing
+- secrets would be exposed in chat or committed to disk
+- check mode is unavailable and the user has not explicitly accepted that risk
+- the user gave a vague instruction like "fix it" or "do this everywhere"
+- you cannot state the exact intended change in one sentence
 
-## Writing new modules
+## Step 5: Parse and Present Results
 
-Every module follows this exact structure. Read an existing module as a template (e.g., `create_access_rule.py` for mutating, `list_network_objects.py` for read-only).
+Parse JSON output when available, using Ansible's JSON callback when useful, and
+summarize only what answers the request.
 
-### Required structure
+Result rules:
 
-```python
-from __future__ import annotations
+- For a scalar answer, state it directly.
+- For small structured results, summarize important fields.
+- For tabular results, use a markdown table when it improves clarity.
+- For exported files, confirm the path and summarize what was written without
+  dumping customer data unless the user explicitly asks.
+- For failures, report the useful Ansible error details without exposing
+  secrets, suggest the smallest corrective action, and do not auto-retry
+  mutating tasks.
 
-from typing import Any
+## Development Changes
 
-from ansible.module_utils.basic import AnsibleModule
+When modifying or adding Ansible modules in this repository:
 
-from sccfm_core.services.<domain> import <Service>
+1. Read the matched module source and its tests.
+2. Keep all module functions typed.
+3. Use `base_argument_spec()` for shared `region` and `api_token` auth.
+4. Set `supports_check_mode=True` on every module.
+5. Implement a meaningful `module.check_mode` path for mutating modules.
+6. Keep secrets marked `no_log=True`.
+7. Run `build-ansible-collection` after changes that affect docs or installed
+   module behavior.
+8. Verify with `ansible-doc -j cisco.sccfm.<module_name>`.
+9. Run targeted module tests, then broader tests based on risk:
 
-from ..module_utils.config import Config, base_argument_spec, create_config
+   ```bash
+   pytest sccfm-ansible/plugins/modules/tests/ -v
+   ```
 
-DOCUMENTATION = r"""..."""
-EXAMPLES = r"""..."""
-RETURN = r"""..."""
+10. Run live e2e tests only when credentials and a suitable sandbox are
+    available.
 
+## Important Rules
 
-def build_argument_spec() -> dict[str, dict[str, Any]]:
-    return {
-        "my_param": {"type": "str", "required": True},
-        **base_argument_spec(),
-    }
-
-
-def run_module() -> None:
-    module = AnsibleModule(
-        argument_spec=build_argument_spec(),
-        supports_check_mode=True,
-    )
-    config: Config = create_config(module)
-
-    try:
-        service = Service(config=config)
-
-        if module.check_mode:
-            module.exit_json(changed=True, msg="Would perform action")
-            return
-
-        result = service.do_thing(...)
-        module.exit_json(changed=True, msg="Success", data=result.to_dict())
-    except Exception as e:
-        module.fail_json(msg=f"Failed to perform action: {str(e)}")
-
-
-def main() -> None:
-    run_module()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### Key patterns
-
-- **Read-only modules:** `changed=False` always. Check mode returns empty results.
-- **Mutating modules:** `changed=True` on success. Check mode returns `changed=True` with empty/stub data.
-- **Idempotent deletes:** Use `run_delete_with_idempotency()` — handles `NotFoundError` → `changed=False`.
-- **Idempotent updates:** Use `fields_need_update()` — skips update if nothing changed.
-- **Object lookups:** Use `fetch_object_by_identifier()` with `identifier_argument_spec()`.
-- **All modules** must use `base_argument_spec()` to merge `region` + `api_token` params.
-- **All modules** must set `supports_check_mode=True`.
-- Follow Python type hints strictly (project requirement).
-
-## User request: $ARGUMENTS
-
-Help the user accomplish: **$ARGUMENTS**
-
-**Approach:**
-1. Activate the environment **once at the start of the session**: `source scripts/activate.sh`. Reuse the same terminal for subsequent commands — do not re-activate before every call.
-2. Confirm the collection is installed (`ansible-doc -l -t module cisco.sccfm` should list modules); if not, run `build-ansible-collection`.
-3. Check vault/credentials are set up; if not, help configure with `change-tokens`.
-4. Identify which module(s) or inventory features are needed.
-5. Run `ansible-doc cisco.sccfm.<module>` to get exact parameters — never guess.
-6. Write or run the playbook, following the standard patterns above.
-7. If writing a new playbook, place it in `sccfm-ansible/examples/`.
-8. Explain the results and any next steps.
+1. Never hardcode modules. All module knowledge comes from `ansible-doc`.
+2. Never fabricate options. Only use parameters listed in the matched docs.
+3. Always use FQCNs.
+4. Always protect secrets with Vault, environment lookups, or placeholders.
+5. Never guess between ambiguous modules, targets, or regions.
+6. Never rely on default local output paths for customer data.
+7. Never execute mutating automation without the confirmation workflow.
+8. Use check mode for mutating automation whenever the module supports it.
+9. If a command fails, report it clearly and stop. Do not auto-retry unless the
+   user explicitly asks.
+10. In Generate-Only mode, never execute the final business playbook.
