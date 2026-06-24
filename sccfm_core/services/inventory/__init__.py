@@ -35,6 +35,7 @@ from sccfm_core.services.inventory.ftd_configure_manager_service import (
 )
 from sccfm_core.services.inventory.ftd_deploy_service import FtdDeployService
 from sccfm_core.services.inventory.ftd_onboard_service import FtdOnboardService
+from sccfm_core.services.inventory.ftd_register_service import FtdRegisterService
 from sccfm_core.services.inventory.ftd_upgrade_service import FtdUpgradeService
 from sccfm_core.services.inventory.ftd_upgrade_version_service import (
     FtdUpgradeVersionService,
@@ -68,6 +69,7 @@ __all__ = [
     "parse_jump_host",
     "FtdDeployService",
     "FtdOnboardService",
+    "FtdRegisterService",
     "FtdZtpOnboardService",
     "FtdUpgradeService",
     "FtdUpgradeVersionService",
