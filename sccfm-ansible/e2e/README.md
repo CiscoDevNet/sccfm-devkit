@@ -1,3 +1,15 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Ansible E2E Integration Tests](#ansible-e2e-integration-tests)
+  - [Structure](#structure)
+  - [Why This Shape](#why-this-shape)
+  - [Running](#running)
+  - [FTD registration inputs](#ftd-registration-inputs)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Ansible E2E Integration Tests
 
 This directory contains the tenant-backed integration tests for the Ansible collection.
@@ -9,6 +21,8 @@ This directory contains the tenant-backed integration tests for the Ansible coll
 - `objects/playbooks/*.yml`: focused playbooks for each phase so failures are isolated and easy to read in Jenkins.
 - `objects/playbooks/vars/test_data.yml`: shared test data used across all lifecycle phases.
 - `objects/conftest.py`: shared playbook execution and session cleanup logic.
+- `ftd/test_ftd_registration.py`: complete cdFMC-managed FTD registration through
+  `onboard_cdfmc_ftd`, direct SSH `configure_manager`, and an `ONLINE` state check.
 
 ## Why This Shape
 
@@ -25,3 +39,18 @@ Run the full integration suite with:
 ```
 
 JUnit output is written to `results/ci-ansible-tests.xml` for Jenkins to ingest.
+
+## FTD registration inputs
+
+The registration phases are skipped unless CI provides a pristine, unregistered
+FTD and all required values:
+
+- `FTD_HOST`, `FMC_ACCESS_POLICY_UID`, and `FTD_PERFORMANCE_TIER`
+- `SCCFM_FTD_PASSWORD` through a secret environment binding
+
+Optional overrides are `FTD_USER` (default `admin`), `FTD_PORT` (default `22`),
+`FTD_JUMP_HOST`, `SCCFM_JUMP_PASSWORD`, and `FTD_SSH_TIMEOUT`. Ansible and CLI
+must use separate FTD VMs because deleting the SCCFM record does not clear the
+manager configuration on the appliance. CI also sets
+`SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1` so missing inputs fail the job instead of
+silently skipping the registration phases.

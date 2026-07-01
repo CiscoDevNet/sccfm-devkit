@@ -1,12 +1,100 @@
 ---
-# Pre/post-clean: no-op placeholder for FTD e2e tests.
-# FTD tests are read-only or use onboard/remove for lifecycle management.
+# Remove only a reserved registration-test device. The existing fixed FTD
+# fixture is deliberately outside the allowed name prefixes.
 
-- name: "CI: FTD E2E cleanup"
+- name: "CI: Remove registration-test FTD"
   hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  vars:
+    ftd_registration_cleanup_surface: >-
+      {{ ftd_cleanup_surface | default('ansible', true) }}
+    ftd_registration_cleanup_patterns:
+      ansible: '^ci-e2e-ansible-ftd-[A-Za-z0-9-]+$'
+      cli: '^ci-e2e-cli-ftd-[A-Za-z0-9-]+$'
+    sccfm_api_base: >-
+      {{ 'https://ci.manage.security.cisco.com/api/rest'
+         if (sccfm_region | lower) == 'ci'
+         else 'https://api.' ~ (sccfm_region | lower) ~ '.security.cisco.com/firewall' }}
+    ftd_registration_cleanup_query: >-
+      deviceType:CDFMC_MANAGED_FTD AND name:"{{ ftd_registration_name }}"
+
   tasks:
-    - name: FTD cleanup placeholder
-      ansible.builtin.debug:
-        msg: "FTD cleanup complete (no residual state to clear)"
+    - name: Clean the configured registration-test FTD
+      when: ftd_registration_host | length > 0
+      block:
+        - name: Validate the reserved device name before deletion
+          ansible.builtin.assert:
+            that:
+              - ftd_registration_cleanup_surface in ['ansible', 'cli']
+              - >-
+                ftd_registration_name is match(
+                  ftd_registration_cleanup_patterns.get(
+                    ftd_registration_cleanup_surface,
+                    '(?!)'
+                  )
+                )
+            fail_msg: >-
+              Refusing {{ ftd_registration_cleanup_surface }} FTD cleanup for unsafe
+              device name '{{ ftd_registration_name }}'.
+
+        - name: Find the registration-test FTD
+          ansible.builtin.uri:
+            url: >-
+              {{ sccfm_api_base }}/v1/inventory/devices?limit=50&offset=0&q={{
+              ftd_registration_cleanup_query | urlencode }}
+            method: GET
+            headers:
+              Authorization: "Bearer {{ sccfm_api_token }}"
+              Content-Type: "application/json"
+            status_code: [200]
+          register: registration_devices
+          no_log: true
+
+        - name: Delete each matching cdFMC-managed FTD
+          ansible.builtin.uri:
+            url: >-
+              {{ sccfm_api_base }}/v1/inventory/devices/ftds/cdfmcManaged/{{ item.uid }}/delete
+            method: POST
+            headers:
+              Authorization: "Bearer {{ sccfm_api_token }}"
+              Content-Type: "application/json"
+            status_code: [200, 202, 204, 404]
+          loop: >-
+            {{
+              registration_devices.json['items']
+              | default([])
+              | selectattr('name', 'equalto', ftd_registration_name)
+              | list
+            }}
+          loop_control:
+            label: "{{ item.name }} ({{ item.uid }})"
+          no_log: true
+
+        - name: Wait for the registration-test FTD record to disappear
+          ansible.builtin.uri:
+            url: >-
+              {{ sccfm_api_base }}/v1/inventory/devices?limit=50&offset=0&q={{
+              ftd_registration_cleanup_query | urlencode }}
+            method: GET
+            headers:
+              Authorization: "Bearer {{ sccfm_api_token }}"
+              Content-Type: "application/json"
+            status_code: [200]
+          register: remaining_registration_devices
+          until: >-
+            (
+              remaining_registration_devices.json['items']
+              | default([])
+              | selectattr('name', 'equalto', ftd_registration_name)
+              | list
+              | length
+            ) == 0
+          retries: "{{ ftd_cleanup_poll_retries }}"
+          delay: "{{ ftd_registration_poll_delay }}"
+          no_log: true

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# CI environment setup for Amazon Linux 2.
+# CI environment setup for Linux Jenkins agents.
 #
-# Uses system packages (yum) and pyenv (from git) to build Python,
-# then Poetry for project dependencies.  No Homebrew needed.
+# Uses pyenv when the agent can install build dependencies. On unprivileged
+# container agents it falls back to uv's prebuilt, user-space Python.
 #
 # For local macOS development, use setup_environment.sh instead.
 
@@ -11,24 +11,68 @@ set -euo pipefail
 PYTHON_VERSION="3.12.4"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${PROJECT_ROOT}/.venv"
+PYTHON_BIN=""
+
+can_run_as_root() {
+  [[ "$(id -u)" -eq 0 ]] || command -v sudo >/dev/null 2>&1
+}
+
+run_as_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+    return
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+    return
+  fi
+  echo "No root or sudo access is available."
+  return 127
+}
 
 install_system_packages() {
-  if ! command -v yum >/dev/null 2>&1; then
-    echo "This script requires yum (Amazon Linux 2)." >&2
-    exit 1
+  if ! can_run_as_root; then
+    echo "Cannot install build dependencies; using a prebuilt Python instead."
+    return 1
   fi
 
   echo "Installing system build dependencies..."
-  sudo yum groupinstall -y 'Development Tools'
-  sudo yum install -y \
-    bzip2-devel \
-    libffi-devel \
-    openssl11-devel \
-    readline-devel \
-    sqlite-devel \
-    xz-devel \
-    zlib-devel \
-    git
+  if command -v yum >/dev/null 2>&1; then
+    run_as_root yum groupinstall -y 'Development Tools' || return 1
+    run_as_root yum install -y \
+      bzip2-devel \
+      libffi-devel \
+      openssl11-devel \
+      readline-devel \
+      sqlite-devel \
+      xz-devel \
+      zlib-devel \
+      git || return 1
+    return
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    run_as_root apt-get update || return 1
+    run_as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      build-essential \
+      curl \
+      git \
+      libbz2-dev \
+      libffi-dev \
+      liblzma-dev \
+      libncursesw5-dev \
+      libreadline-dev \
+      libsqlite3-dev \
+      libssl-dev \
+      tk-dev \
+      uuid-dev \
+      xz-utils \
+      zlib1g-dev || return 1
+    return
+  fi
+
+  echo "No supported package manager found; using a prebuilt Python instead."
+  return 1
 }
 
 setup_pyenv() {
@@ -83,18 +127,44 @@ build_python() {
   fi
 }
 
-create_venv() {
-  local python_bin
-  python_bin="$(pyenv root)/versions/${PYTHON_VERSION}/bin/python3"
+setup_pyenv_python() {
+  setup_pyenv
+  build_python
+  PYTHON_BIN="$(pyenv root)/versions/${PYTHON_VERSION}/bin/python3"
+}
 
-  if [[ ! -x "${python_bin}" ]]; then
+setup_prebuilt_python() {
+  local uv_bin_dir="${HOME}/.local/bin"
+  export PATH="${uv_bin_dir}:${PATH}"
+
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "Installing uv for user-space Python management..."
+    curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/install.sh \
+      | env UV_UNMANAGED_INSTALL="${uv_bin_dir}" sh
+  fi
+
+  echo "Installing prebuilt Python ${PYTHON_VERSION}..."
+  uv python install "${PYTHON_VERSION}"
+  PYTHON_BIN="$(uv python find "${PYTHON_VERSION}")"
+}
+
+prepare_python() {
+  if install_system_packages; then
+    setup_pyenv_python
+  else
+    setup_prebuilt_python
+  fi
+}
+
+create_venv() {
+  if [[ -z "${PYTHON_BIN}" || ! -x "${PYTHON_BIN}" ]]; then
     echo "Python ${PYTHON_VERSION} binary not found." >&2
     exit 1
   fi
 
   if [[ ! -d "${VENV_DIR}" ]]; then
     echo "Creating virtualenv at ${VENV_DIR}"
-    "${python_bin}" -m venv "${VENV_DIR}"
+    "${PYTHON_BIN}" -m venv "${VENV_DIR}"
   fi
 
   # shellcheck source=/dev/null
@@ -119,9 +189,7 @@ configure_git_alias() {
   fi
 }
 
-install_system_packages
-setup_pyenv
-build_python
+prepare_python
 create_venv
 configure_git_alias
 

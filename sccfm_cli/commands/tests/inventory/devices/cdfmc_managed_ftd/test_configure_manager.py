@@ -141,6 +141,44 @@ class TestSuccessfulConfigure:
         assert result.exit_code == 0, f"Command failed: {result.output}"
         assert captured["password"] == "from-env"
 
+    def test_should_read_cli_key_from_env(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("SCCFM_FTD_CLI_KEY", _CLI_KEY)
+        monkeypatch.setattr(FtdConfigureManagerService, "__init__", _stub_service_init)
+
+        captured: dict[str, Any] = {}
+
+        def fake_configure(
+            self: FtdConfigureManagerService, **kwargs: Any
+        ) -> ConfigureManagerResult:
+            captured.update(kwargs)
+            return ConfigureManagerResult(
+                host=kwargs["host"], success=True, output="", message="ok"
+            )
+
+        monkeypatch.setattr(FtdConfigureManagerService, "configure_manager", fake_configure)
+        args = [
+            "inventory",
+            "devices",
+            "cdfmc-managed-ftd",
+            "configure-manager",
+            "--ftd-host",
+            "10.0.0.5",
+            "--ftd-user",
+            "admin",
+            "--ftd-password",
+            "password",
+        ]
+
+        result = cli_runner.invoke(cli, args)
+
+        assert result.exit_code == 0, f"Command failed: {result.output}"
+        assert captured["cli_key"] == _CLI_KEY
+
 
 class TestFailure:
     def test_should_fail_when_ftd_rejects(

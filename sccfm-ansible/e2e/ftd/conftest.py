@@ -20,7 +20,22 @@ EXAMPLES_DIR = FTD_DIR.parent.parent / "examples"
 VAULT_PASS = EXAMPLES_DIR / ".vault_pass"
 
 
-def run_playbook(name: str) -> subprocess.CompletedProcess[str]:
+def _cleanup_timeout() -> int:
+    """Allow the cleanup playbook to finish its configured polling window."""
+    retries = int(os.getenv("FTD_CLEANUP_RETRIES", "60"))
+    delay = int(os.getenv("FTD_REGISTRATION_DELAY", "10"))
+    return max(900, (retries * delay) + 120)
+
+
+def _decode_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def run_playbook(name: str, timeout: int = 600) -> subprocess.CompletedProcess[str]:
     """Run a playbook from the playbooks/ directory and return the result.
 
     Raises AssertionError with the full Ansible output on failure.
@@ -48,13 +63,13 @@ def run_playbook(name: str) -> subprocess.CompletedProcess[str]:
     ]
     try:
         result = subprocess.run(
-            cmd, env=env, capture_output=True, text=True, timeout=600, check=False
+            cmd, env=env, capture_output=True, text=True, timeout=timeout, check=False
         )
     except subprocess.TimeoutExpired as exc:
         raise AssertionError(
             f"Playbook '{name}' timed out after {exc.timeout} seconds:\n"
-            f"--- stdout ---\n{exc.stdout or ''}\n"
-            f"--- stderr ---\n{exc.stderr or ''}"
+            f"--- stdout ---\n{_decode_output(exc.stdout)}\n"
+            f"--- stderr ---\n{_decode_output(exc.stderr)}"
         ) from exc
 
     if result.returncode != 0:
@@ -70,8 +85,8 @@ def run_playbook(name: str) -> subprocess.CompletedProcess[str]:
 def lifecycle_cleanup() -> Generator[None, None, None]:
     """Pre-clean before tests, and always clean up after -- even on failure."""
     try:
-        run_playbook("cleanup.yml")
+        run_playbook("cleanup.yml", timeout=_cleanup_timeout())
     except AssertionError as e:
         pytest.exit(f"Pre-test cleanup failed, aborting suite: {e}", returncode=1)
     yield
-    run_playbook("cleanup.yml")
+    run_playbook("cleanup.yml", timeout=_cleanup_timeout())
