@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sccfm"
-version = "0.38.0"
+version = "0.37.0"
 description = "Cisco SCC Firewall Manager CLI and Python automation library"
 authors = ["Cisco Security Cloud Control Firewall Manager Team"]
 license = "Apache-2.0"

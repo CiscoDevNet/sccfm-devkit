@@ -24,7 +24,6 @@ Commands:
   inventory    Browse SCC Firewall Management inventory.
   objects      Manage SCC Firewall Management objects.
   policies     Manage SCC Firewall Management policies.
-  schema       Export machine-readable command metadata.
   status       Display the state of SCCFM subsystems.
   transaction  Check transaction status by UID.
 ```

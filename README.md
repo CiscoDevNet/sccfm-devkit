@@ -1,7 +1,3 @@
-> [!IMPORTANT]
-> This repository has moved to [CiscoDevNet/sccfm-devkit](https://github.com/CiscoDevNet/sccfm-devkit).
-> The old [cisco-lockhart/sccfm-devkit](https://github.com/cisco-lockhart/sccfm-devkit) repository is archived and read-only; use the new repository for development, issues, and pull requests.
-
 # sccfm-devkit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
 Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python package with the

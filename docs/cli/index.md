@@ -86,7 +86,5 @@ Generated from Click `--help` output.
 - [sccfm-cli policies access-rule get](sccfm-cli-policies-access-rule-get.html)
 - [sccfm-cli policies access-rule list](sccfm-cli-policies-access-rule-list.html)
 - [sccfm-cli policies access-rule update](sccfm-cli-policies-access-rule-update.html)
-- [sccfm-cli schema](sccfm-cli-schema.html)
-- [sccfm-cli schema export](sccfm-cli-schema-export.html)
 - [sccfm-cli status](sccfm-cli-status.html)
 - [sccfm-cli transaction](sccfm-cli-transaction.html)
