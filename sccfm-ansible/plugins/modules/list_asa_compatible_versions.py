@@ -13,10 +13,10 @@ from scc_firewall_manager_sdk import (
     DevicePage,
 )
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
-from sccfm_core.services.inventory import AsaUpgradeVersionService
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
+from cisco_sccfm_core.services.inventory import AsaUpgradeVersionService
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

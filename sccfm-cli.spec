@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['/Users/siwarrie/workspace/cdo/sccfm-api-cli/sccfm_cli/cli.py'],
+    ['/Users/siwarrie/workspace/cdo/sccfm-api-cli/cisco_sccfm_cli/cli.py'],
     pathex=[],
     binaries=[],
     datas=[],

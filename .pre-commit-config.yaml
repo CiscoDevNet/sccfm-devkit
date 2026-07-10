@@ -31,8 +31,8 @@ repos:
         args:
           - --config-file=pyproject.toml
           - --strict
-          - sccfm_cli
-          - sccfm_core
+          - cisco_sccfm_cli
+          - cisco_sccfm_core
         pass_filenames: false
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.27.0

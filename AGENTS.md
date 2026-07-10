@@ -1,6 +1,6 @@
 # sccfm-devkit
 
-Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python CLI (`sccfm-cli`) plus a `cisco.sccfm` Ansible collection. Shared business logic lives in `sccfm_core`; the CLI entry points are in `sccfm_cli`; Ansible plugins are in `sccfm-ansible/`.
+Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python CLI (`sccfm-cli`) plus a `cisco.sccfm` Ansible collection. Shared business logic lives in `cisco_sccfm_core`; the CLI entry points are in `cisco_sccfm_cli`; Ansible plugins are in `sccfm-ansible/`.
 
 ## Agent skills (read these FIRST)
 
@@ -14,11 +14,11 @@ This repository ships skill files that document how to interact with the CLI and
 
 ## Dev environment tips
 
-- **Python version**: Use Python 3.12 (managed by pyenv; `scripts/setup_environment.sh` installs it automatically).
+- **Python version**: Use Python 3.12 (managed by pyenv; `cisco_sccfm_scripts/setup_environment.sh` installs it automatically).
 - **Virtual env**:
   ```bash
-  scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps, pre-commit hooks
-  source scripts/activate.sh     # activates the project virtualenv
+  cisco_sccfm_scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps, pre-commit hooks
+  source cisco_sccfm_scripts/activate.sh     # activates the project virtualenv
   ```
 - **direnv (recommended)**: Install direnv so the venv activates automatically on `cd`:
   ```bash
@@ -39,14 +39,14 @@ This repository ships skill files that document how to interact with the CLI and
 - Use `questionary` for user prompts.
 - Add virtualenv scripts.
 - **Type hints are mandatory.** Every function and method must be fully typed. `mypy --strict` is enforced.
-- **No long methods.** The code should be structured so it can be easily extended. Use the command pattern for each command; one file per command under `sccfm_cli/commands/`.
-- Each external library (e.g., the `scc-firewall-manager-sdk`) must be isolated in a separate services directory under `sccfm_core/services/`, not in CLI or Ansible modules directly.
+- **No long methods.** The code should be structured so it can be easily extended. Use the command pattern for each command; one file per command under `cisco_sccfm_cli/commands/`.
+- Each external library (e.g., the `scc-firewall-manager-sdk`) must be isolated in a separate services directory under `cisco_sccfm_core/services/`, not in CLI or Ansible modules directly.
 - Humans will be extending this code; do not generate AI slop.
 
 ### Quick run examples
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 
 # Configure credentials once
 sccfm-cli configure --region us --api-token <YOUR_TOKEN>
@@ -75,13 +75,13 @@ Credentials are also stored under `~/.sccfm-cli/` after running `sccfm-cli confi
 ## Testing instructions
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 pytest                          # full unit test suite
 pytest -k "test_inventory"      # filter by name
 coverage run -m pytest && coverage report
 ```
 
-- Unit tests live alongside source: `sccfm_cli/tests/`, `sccfm_core/tests/`, `sccfm-ansible/` (excluding `e2e/`).
+- Unit tests live alongside source: `cisco_sccfm_cli/tests/`, `cisco_sccfm_core/tests/`, `sccfm-ansible/` (excluding `e2e/`).
 - Tests marked `ci` require a live SCCFM tenant and run only in CI.
 - **Test the CLI against a real SCCFM tenant** using a DevNet sandbox:
   Visit [https://devnetsandbox.cisco.com/DevNet](https://devnetsandbox.cisco.com/DevNet) to book a related sandbox.
@@ -119,12 +119,12 @@ Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_
 - **Conventional commits** are enforced via Commitizen and pre-commit hooks:
   ```bash
   pre-commit install && pre-commit install --hook-type commit-msg
-  git cz    # or: ./scripts/cz.sh commit
+  git cz    # or: ./cisco_sccfm_scripts/cz.sh commit
   ```
   CI will fail on non-compliant commit messages.
 - **Security**: Never commit real credentials, tokens, or secrets. Use placeholders and document required env vars. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
-- New commands go in `sccfm_cli/commands/` as a `BaseCommand` subclass, registered in `sccfm_cli/cli.py`.
-- New SDK integrations go in `sccfm_core/services/`.
+- New commands go in `cisco_sccfm_cli/commands/` as a `BaseCommand` subclass, registered in `cisco_sccfm_cli/cli.py`.
+- New SDK integrations go in `cisco_sccfm_core/services/`.
 - Every behavior change must be accompanied by tests.
 
 ## Contribution conventions

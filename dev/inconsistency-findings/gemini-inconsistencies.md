@@ -15,7 +15,7 @@ Confidence levels and Severities mirror the previous reports. This report explic
 
 *   **Status**: Confirmed mismatch
 *   **Mechanism**: §3.4 — Success/warning/error coloring uses Rich markup.
-*   **Code Perspective**: Scripts in `scripts/` (e.g., `build_ansible_collection.py`, `validate_regex.py`) duplicate output logic using bare `print()` and hardcoded unicode instead of leveraging the repo's established `rich.console.Console` tools.
+*   **Code Perspective**: Scripts in `cisco_sccfm_scripts/` (e.g., `build_ansible_collection.py`, `validate_regex.py`) duplicate output logic using bare `print()` and hardcoded unicode instead of leveraging the repo's established `rich.console.Console` tools.
 *   **User Perspective**: Contributors and CI operators experience a jarring UI context switch. The polished CLI uses consistent colors and spinners, while dev scripts feel ad-hoc, untyped, and messy.
 *   **Recommendation**: Standardize the scripts to use standard `rich` console rendering.
 
@@ -23,7 +23,7 @@ Confidence levels and Severities mirror the previous reports. This report explic
 
 *   **Status**: Structural inconsistency
 *   **Mechanism**: §1.1/§1.3 — `_dispatch()` error funnel
-*   **Code Perspective**: `sccfm_cli/commands/base.py` calls `sys.exit(-1)` directly. This anti-pattern bypasses Click's `AppContext` teardown hooks and makes unit testing the CLI exit flows needlessly difficult.
+*   **Code Perspective**: `cisco_sccfm_cli/commands/base.py` calls `sys.exit(-1)` directly. This anti-pattern bypasses Click's `AppContext` teardown hooks and makes unit testing the CLI exit flows needlessly difficult.
 *   **User Perspective**: Hard process exits can leave terminal states (like hidden cursors from spinners) corrupted or resources un-cleaned if interrupted. Users expect graceful teardowns.
 *   **Recommendation**: Replace `sys.exit()` with `raise click.exceptions.Exit(...)` inside the base dispatcher.
 
@@ -33,7 +33,7 @@ Confidence levels and Severities mirror the previous reports. This report explic
 *   **Mechanism**: §10
 *   **Code Perspective**: Domain services (`network_group_service.py`) raise `ValueError` for bad inputs. The CLI layer does not trap `ValueError` cleanly, blurring the lines between a bug (unhandled exception) and a user error (validation failure).
 *   **User Perspective**: When a user provides invalid input that slips past `click` limits, they are hit with a raw Python stack trace instead of a styled `[red]Error: ...[/red]` message. This severely damages trust in the tool's stability.
-*   **Recommendation**: Introduce a semantic `ValidationError` subclass inside `sccfm_core/errors.py` and trap it properly.
+*   **Recommendation**: Introduce a semantic `ValidationError` subclass inside `cisco_sccfm_core/errors.py` and trap it properly.
 
 ### 4. Over-reliance on `**kwargs` and `cast()` in `click` handlers
 

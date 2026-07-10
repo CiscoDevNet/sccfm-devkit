@@ -18,7 +18,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
+from cisco_sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
 
 UID_1 = "11111111-1111-4111-8111-111111111111"
 UID_2 = "22222222-2222-4222-8222-222222222222"

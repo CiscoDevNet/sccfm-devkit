@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from sccfm_core.constants import SCCFM_REGIONS, normalize_sccfm_region
+from cisco_sccfm_core.constants import SCCFM_REGIONS, normalize_sccfm_region
 
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
