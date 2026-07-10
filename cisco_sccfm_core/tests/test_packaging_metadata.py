@@ -33,3 +33,10 @@ def test_published_packages_use_cisco_prefix() -> None:
     }
     assert script_targets
     assert all(target.startswith("cisco_sccfm_") for target in script_targets)
+
+
+def test_pyinstaller_spec_uses_repository_relative_entrypoint() -> None:
+    spec = (PROJECT_ROOT / "sccfm-cli.spec").read_text(encoding="utf-8")
+
+    assert "['cisco_sccfm_cli/cli.py']" in spec
+    assert "/Users/" not in spec
