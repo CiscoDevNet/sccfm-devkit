@@ -1,9 +1,9 @@
 # sccfm-devkit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
-Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python package with the
-`sccfm-cli` command, a reusable `cisco_sccfm_core` automation library, and an Ansible
-collection. Shared business logic lives in `cisco_sccfm_core` so the CLI, Python scripts,
-and collection can reuse the same SDK integrations.
+Toolkit for interacting with Security Cloud Control Firewall Manager (SCCFM): a Python
+package with the `sccfm-cli` command, a reusable `cisco_sccfm_core` automation library,
+and an Ansible collection. Shared business logic lives in `cisco_sccfm_core` so the CLI,
+Python scripts, and collection can reuse the same SDK integrations.
 
 **Documentation:** [Generated CLI and Ansible reference](https://ciscodevnet.github.io/sccfm-devkit/)
 
@@ -179,3 +179,7 @@ pytest  # Rerun tests
 **Why this happens:** When you modify command structure or add new CLI commands, Python's `__pycache__` directories can retain old `.pyc` files that don't reflect your changes. Tests then run against the cached version instead of your updated source code.
 
 **Prevention:** After modifying command registrations or CLI structure, always reinstall the package and clear caches before running tests.
+
+## License
+
+Distributed under the Apache 2.0 License. See [LICENSE](LICENSE) for more information.
