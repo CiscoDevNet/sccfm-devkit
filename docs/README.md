@@ -14,7 +14,7 @@ The CLI and Ansible references are generated from source metadata:
 Generate local previews with:
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 sync-docs-readme
 generate-cli-docs
 generate-cli-man-docs

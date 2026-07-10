@@ -18,8 +18,8 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.constants import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER
-from sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
+from cisco_sccfm_core.constants import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER
+from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
 
 FMC_UID = "09590f30-8cb7-11f0-a508-8e9f8a6273f4"
 SCC_UID = "d4e5f6a7-b8c9-0123-def4-567890abcdef"

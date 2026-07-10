@@ -8,10 +8,10 @@ before approving the change.
 
 Survey basis:
 - Date: 2026-04-21
-- CLI command files: 69 `command.py` files under `sccfm_cli/commands/`
-- CLI command tests: 53 tests under `sccfm_cli/commands/tests/`
-- Core service/helper files: 28 files under `sccfm_core/services/`
-- Core tests: 20 tests under `sccfm_core/tests/`
+- CLI command files: 69 `command.py` files under `cisco_sccfm_cli/commands/`
+- CLI command tests: 53 tests under `cisco_sccfm_cli/commands/tests/`
+- Core service/helper files: 28 files under `cisco_sccfm_core/services/`
+- Core tests: 20 tests under `cisco_sccfm_core/tests/`
 - Ansible modules: 47 files under `sccfm-ansible/plugins/modules/`
 - Ansible module tests: 34 tests under `sccfm-ansible/plugins/modules/tests/`
 - Example playbooks: 32 playbooks under `sccfm-ansible/examples/` excluding inventory
@@ -25,13 +25,13 @@ How to use:
 ## 1. Cross-surface feature parity
 
 - [ ] Inventory/device features are reviewed across all three layers:
-  `sccfm_core/services/inventory/*`, `sccfm_cli/commands/inventory/devices/**`,
+  `cisco_sccfm_core/services/inventory/*`, `cisco_sccfm_cli/commands/inventory/devices/**`,
   and `sccfm-ansible/plugins/modules/*`.
 - [ ] Object-management features are reviewed across all three layers:
-  `sccfm_core/services/object_management/*`, `sccfm_cli/commands/objects/**`,
+  `cisco_sccfm_core/services/object_management/*`, `cisco_sccfm_cli/commands/objects/**`,
   and matching Ansible modules.
 - [ ] Policy features are reviewed across all three layers:
-  `sccfm_core/services/policy/*`, `sccfm_cli/commands/policies/**`,
+  `cisco_sccfm_core/services/policy/*`, `cisco_sccfm_cli/commands/policies/**`,
   and matching Ansible modules.
 - [ ] User-facing feature changes also review the mirror surfaces:
   tests, example playbooks, e2e playbooks, `README.md`, `INSTALL.md`,
@@ -62,8 +62,8 @@ High-value repeated families:
   instead of relying on untyped `kwargs`.
 
 Primary locations:
-- `sccfm_cli/commands/base.py`
-- `sccfm_cli/cli.py`
+- `cisco_sccfm_cli/commands/base.py`
+- `cisco_sccfm_cli/cli.py`
 - Group commands such as `inventory/command.py`, `objects/command.py`,
   `policies/command.py`, `inventory/devices/asa/command.py`,
   `inventory/devices/ftd/command.py`,
@@ -88,9 +88,9 @@ Primary locations:
   referenced-object and literal options.
 
 Primary locations:
-- `sccfm_cli/commands/shared_options.py`
-- `sccfm_cli/commands/inventory/options.py`
-- `sccfm_cli/commands/objects/options.py`
+- `cisco_sccfm_cli/commands/shared_options.py`
+- `cisco_sccfm_cli/commands/inventory/options.py`
+- `cisco_sccfm_cli/commands/objects/options.py`
 
 ## 4. CLI progress, spinner, and silent-mode behavior
 
@@ -103,9 +103,9 @@ Primary locations:
   leaves stdout clean for machine-readable output.
 
 Primary locations:
-- `sccfm_cli/utils/spinner.py`
-- `sccfm_cli/commands/base.py`
-- Many CLI handlers under `sccfm_cli/commands/**/command.py`
+- `cisco_sccfm_cli/utils/spinner.py`
+- `cisco_sccfm_cli/commands/base.py`
+- Many CLI handlers under `cisco_sccfm_cli/commands/**/command.py`
 
 ## 5. JSON vs table rendering contracts
 
@@ -119,8 +119,8 @@ Primary locations:
   already expects them.
 
 Repeated renderer locations:
-- `sccfm_cli/commands/inventory/devices/rendering.py`
-- `sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py`
+- `cisco_sccfm_cli/commands/inventory/devices/rendering.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py`
 - Per-command `_render_*` methods in object, policy, inventory, and upgrade commands
 
 ## 6. Device-target selection helpers
@@ -136,9 +136,9 @@ Repeated renderer locations:
 - [ ] `--check` target reporting stays aligned across ASA and FTD families.
 
 Primary locations:
-- `sccfm_cli/commands/inventory/devices/asa/shared.py`
-- `sccfm_cli/commands/inventory/devices/ftd/shared.py`
-- `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/ftd/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/shared.py`
 
 ## 7. CLI preflight and check-mode semantics
 
@@ -151,12 +151,12 @@ Primary locations:
   access rules, ASA image validation, and device-target checks.
 
 Primary locations:
-- `sccfm_cli/commands/objects/utils.py`
-- `sccfm_cli/commands/objects/**/command.py`
-- `sccfm_cli/commands/policies/access_rule/create/command.py`
-- `sccfm_cli/commands/inventory/devices/asa/change_boot_image/command.py`
-- `sccfm_cli/commands/inventory/devices/asa/shared.py`
-- `sccfm_cli/commands/inventory/devices/ftd/shared.py`
+- `cisco_sccfm_cli/commands/objects/utils.py`
+- `cisco_sccfm_cli/commands/objects/**/command.py`
+- `cisco_sccfm_cli/commands/policies/access_rule/create/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/change_boot_image/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/ftd/shared.py`
 
 ## 8. Async transaction handling
 
@@ -169,9 +169,9 @@ Primary locations:
 - [ ] Failure states remain `DONE` vs `ERROR` vs `CANCELLED` consistently.
 
 Primary locations:
-- `sccfm_cli/commands/base.py`
-- `sccfm_core/services/transaction_service.py`
-- `sccfm_core/models/cdo_transaction_status.py`
+- `cisco_sccfm_cli/commands/base.py`
+- `cisco_sccfm_core/services/transaction_service.py`
+- `cisco_sccfm_core/models/cdo_transaction_status.py`
 - Upgrade, deploy, onboard, shun, HA-check, disk, CLI execution commands/modules
 
 ## 9. Config, auth, region, and environment handling
@@ -187,8 +187,8 @@ Primary locations:
   `SCCFM_API_TOKEN`, `SCCFM_REGION`, `SCCFM_CONFIG`.
 
 Primary locations:
-- `sccfm_cli/services/config_service.py`
-- `sccfm_cli/commands/configure.py`
+- `cisco_sccfm_cli/services/config_service.py`
+- `cisco_sccfm_cli/commands/configure.py`
 - `sccfm-ansible/plugins/module_utils/config.py`
 - `sccfm-ansible/plugins/inventory/sccfm.py`
 - `.env.example`
@@ -200,14 +200,14 @@ Primary locations:
 - [ ] SDK integrations still build clients through `ApiClientFactory().build(config)`.
 - [ ] Service constructors remain thin and side-effect free.
 - [ ] Public service methods stay small and typed.
-- [ ] Cross-surface logic belongs in `sccfm_core`, not duplicated in CLI or Ansible.
+- [ ] Cross-surface logic belongs in `cisco_sccfm_core`, not duplicated in CLI or Ansible.
 
 Primary locations:
-- `sccfm_core/factories/api_client_factory.py`
-- `sccfm_core/services/inventory/*`
-- `sccfm_core/services/object_management/*`
-- `sccfm_core/services/policy/*`
-- `sccfm_core/services/transaction_service.py`
+- `cisco_sccfm_core/factories/api_client_factory.py`
+- `cisco_sccfm_core/services/inventory/*`
+- `cisco_sccfm_core/services/object_management/*`
+- `cisco_sccfm_core/services/policy/*`
+- `cisco_sccfm_core/services/transaction_service.py`
 
 ## 11. Raw-response helpers and custom response dataclasses
 
@@ -219,13 +219,13 @@ Primary locations:
 - [ ] Any new raw SDK workaround is centralized instead of repeated.
 
 Primary locations:
-- `sccfm_core/services/object_management/object_api_helper.py`
-- `sccfm_core/services/policy/policy_api_helper.py`
-- `sccfm_core/services/object_management/network_object_service.py`
-- `sccfm_core/services/object_management/network_group_service.py`
-- `sccfm_core/services/object_management/object_override_service.py`
-- `sccfm_core/services/policy/access_group_service.py`
-- `sccfm_core/services/policy/access_rule_service.py`
+- `cisco_sccfm_core/services/object_management/object_api_helper.py`
+- `cisco_sccfm_core/services/policy/policy_api_helper.py`
+- `cisco_sccfm_core/services/object_management/network_object_service.py`
+- `cisco_sccfm_core/services/object_management/network_group_service.py`
+- `cisco_sccfm_core/services/object_management/object_override_service.py`
+- `cisco_sccfm_core/services/policy/access_group_service.py`
+- `cisco_sccfm_core/services/policy/access_rule_service.py`
 
 ## 12. Identifier resolution and query-building utilities
 
@@ -238,9 +238,9 @@ Primary locations:
 - [ ] ASA image path validation stays centralized via `validate_asa_image_path(...)`.
 
 Primary locations:
-- `sccfm_core/services/object_management/utils.py`
-- `sccfm_core/utils/validation.py`
-- `sccfm_cli/commands/objects/utils.py`
+- `cisco_sccfm_core/services/object_management/utils.py`
+- `cisco_sccfm_core/utils/validation.py`
+- `cisco_sccfm_cli/commands/objects/utils.py`
 
 ## 13. Parser/model/service/test clusters
 
@@ -289,13 +289,13 @@ Primary parser/model clusters:
 - [ ] Shared list families continue to reuse `DeviceListCommand` where appropriate.
 
 Primary locations:
-- `sccfm_core/services/inventory/inventory_service.py`
-- `sccfm_cli/commands/inventory/devices/rendering.py`
-- `sccfm_cli/commands/inventory/devices/list/command.py`
-- `sccfm_cli/commands/inventory/manager/list/command.py`
-- `sccfm_cli/commands/inventory/devices/asa/command.py`
-- `sccfm_cli/commands/inventory/devices/ftd/command.py`
-- `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/command.py`
+- `cisco_sccfm_core/services/inventory/inventory_service.py`
+- `cisco_sccfm_cli/commands/inventory/devices/rendering.py`
+- `cisco_sccfm_cli/commands/inventory/devices/list/command.py`
+- `cisco_sccfm_cli/commands/inventory/manager/list/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/ftd/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/command.py`
 - `sccfm-ansible/plugins/modules/list_managers.py`
 - `sccfm-ansible/plugins/inventory/sccfm.py`
 
@@ -311,15 +311,15 @@ Primary locations:
 
 Primary locations:
 - ASA:
-  `sccfm_core/services/inventory/asa_upgrade_service.py`,
-  `sccfm_core/services/inventory/asa_upgrade_version_service.py`,
-  `sccfm_cli/commands/inventory/devices/asa/upgrade/**`,
+  `cisco_sccfm_core/services/inventory/asa_upgrade_service.py`,
+  `cisco_sccfm_core/services/inventory/asa_upgrade_version_service.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/upgrade/**`,
   `sccfm-ansible/plugins/modules/list_asa_compatible_versions.py`,
   `sccfm-ansible/plugins/modules/trigger_asa_upgrade.py`
 - FTD:
-  `sccfm_core/services/inventory/ftd_upgrade_service.py`,
-  `sccfm_core/services/inventory/ftd_upgrade_version_service.py`,
-  `sccfm_cli/commands/inventory/devices/ftd/upgrade/**`,
+  `cisco_sccfm_core/services/inventory/ftd_upgrade_service.py`,
+  `cisco_sccfm_core/services/inventory/ftd_upgrade_version_service.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/ftd/upgrade/**`,
   `sccfm-ansible/plugins/modules/list_ftd_compatible_versions.py`,
   `sccfm-ansible/plugins/modules/trigger_ftd_upgrade.py`
 
@@ -332,14 +332,14 @@ Primary locations:
 - [ ] Post-submit transaction handling stays aligned with the rest of the async family.
 
 Primary locations:
-- `sccfm_core/services/inventory/asa_onboard_service.py`
-- `sccfm_core/services/inventory/ftd_onboard_service.py`
-- `sccfm_core/services/inventory/ftd_ztp_onboard_service.py`
-- `sccfm_core/services/inventory/ftd_deploy_service.py`
-- `sccfm_cli/commands/inventory/devices/asa/onboard/command.py`
-- `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/onboard/command.py`
-- `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/onboard_ztp/command.py`
-- `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/deploy/command.py`
+- `cisco_sccfm_core/services/inventory/asa_onboard_service.py`
+- `cisco_sccfm_core/services/inventory/ftd_onboard_service.py`
+- `cisco_sccfm_core/services/inventory/ftd_ztp_onboard_service.py`
+- `cisco_sccfm_core/services/inventory/ftd_deploy_service.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/onboard/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/onboard/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/onboard_ztp/command.py`
+- `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/deploy/command.py`
 - Matching Ansible modules and tests
 
 ## 17. Object CRUD and override families
@@ -352,10 +352,10 @@ Primary locations:
 - [ ] Override add/edit/delete/show/apply/update-default flows stay aligned.
 
 Primary locations:
-- `sccfm_core/services/object_management/network_object_service.py`
-- `sccfm_core/services/object_management/network_group_service.py`
-- `sccfm_core/services/object_management/object_override_service.py`
-- `sccfm_cli/commands/objects/**`
+- `cisco_sccfm_core/services/object_management/network_object_service.py`
+- `cisco_sccfm_core/services/object_management/network_group_service.py`
+- `cisco_sccfm_core/services/object_management/object_override_service.py`
+- `cisco_sccfm_cli/commands/objects/**`
 - `sccfm-ansible/plugins/modules/*network_object*.py`
 - `sccfm-ansible/plugins/modules/*network_group*.py`
 - `sccfm-ansible/plugins/modules/*object_override*.py`
@@ -371,10 +371,10 @@ Primary locations:
   the underlying `to_dict()` payloads.
 
 Primary locations:
-- `sccfm_core/services/policy/access_group_service.py`
-- `sccfm_core/services/policy/access_rule_service.py`
-- `sccfm_cli/commands/policies/access_group/**`
-- `sccfm_cli/commands/policies/access_rule/**`
+- `cisco_sccfm_core/services/policy/access_group_service.py`
+- `cisco_sccfm_core/services/policy/access_rule_service.py`
+- `cisco_sccfm_cli/commands/policies/access_group/**`
+- `cisco_sccfm_cli/commands/policies/access_rule/**`
 - `sccfm-ansible/plugins/modules/list_access_groups.py`
 - `sccfm-ansible/plugins/modules/get_access_group.py`
 - `sccfm-ansible/plugins/modules/list_access_rules.py`
@@ -425,8 +425,8 @@ Primary locations:
 - [ ] If behavior is workflow-level, an e2e playbook/test should be considered.
 
 Main test locations:
-- CLI: `sccfm_cli/commands/tests/**`
-- Core: `sccfm_core/tests/**`
+- CLI: `cisco_sccfm_cli/commands/tests/**`
+- Core: `cisco_sccfm_core/tests/**`
 - Ansible unit: `sccfm-ansible/plugins/modules/tests/**`
 - Ansible e2e: `sccfm-ansible/e2e/**`
 
@@ -438,9 +438,9 @@ Main test locations:
 - [ ] Setup/lint/test/build workflows stay aligned between scripts and docs.
 
 Primary locations:
-- `scripts/devkit_cli.py`
-- `scripts/cli_commands.py`
-- `scripts/setup_environment.sh`
+- `cisco_sccfm_scripts/devkit_cli.py`
+- `cisco_sccfm_scripts/cli_commands.py`
+- `cisco_sccfm_scripts/setup_environment.sh`
 - `README.md`
 - `CONTRIBUTING.md`
 - `INSTALL.md`
@@ -456,14 +456,14 @@ Primary locations:
   barrel file by accident.
 
 Primary locations:
-- `sccfm_cli/**/__init__.py`
-- `sccfm_core/__init__.py`
-- `sccfm_core/factories/__init__.py`
-- `sccfm_core/parsers/__init__.py`
-- `sccfm_core/services/inventory/__init__.py`
-- `sccfm_core/services/object_management/__init__.py`
-- `sccfm_core/services/policy/__init__.py`
-- `sccfm_core/utils/__init__.py`
+- `cisco_sccfm_cli/**/__init__.py`
+- `cisco_sccfm_core/__init__.py`
+- `cisco_sccfm_core/factories/__init__.py`
+- `cisco_sccfm_core/parsers/__init__.py`
+- `cisco_sccfm_core/services/inventory/__init__.py`
+- `cisco_sccfm_core/services/object_management/__init__.py`
+- `cisco_sccfm_core/services/policy/__init__.py`
+- `cisco_sccfm_core/utils/__init__.py`
 
 ## 24. Repeated Ansible helper shapes and e2e workflow families
 
@@ -495,7 +495,7 @@ Primary locations:
 These are drift patterns that have already appeared in the repo. Review new PRs
 against them so fixed consistency issues do not reappear.
 
-- [ ] Region vocabulary must stay centralized in `sccfm_core/constants.py`.
+- [ ] Region vocabulary must stay centralized in `cisco_sccfm_core/constants.py`.
   Public surfaces should advertise canonical `int, us, eu, apj, au, uae, in, ci`
   values; legacy `aus` may be accepted only as an alias normalized to `au`.
 - [ ] README command names must match the live CLI tree.

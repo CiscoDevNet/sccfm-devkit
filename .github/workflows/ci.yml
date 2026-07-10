@@ -40,7 +40,7 @@ jobs:
         run: |
           poetry run black --check .
           poetry run isort --check-only .
-          poetry run mypy sccfm_cli sccfm_core
+          poetry run mypy cisco_sccfm_cli cisco_sccfm_core
 
       - name: Test
         run: poetry run pytest --color=yes

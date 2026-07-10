@@ -9,10 +9,10 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
-from sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
+from cisco_sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

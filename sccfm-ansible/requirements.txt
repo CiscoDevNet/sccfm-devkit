@@ -4,5 +4,5 @@
 # Core dependencies
 scc-firewall-manager-sdk>=1.17.27
 paramiko>=3.5.0
-# Note: sccfm includes both sccfm_cli and sccfm_core
+# Note: cisco-sccfm-devkit includes both cisco_sccfm_cli and cisco_sccfm_core
 # For local development, use: poetry install from parent directory

@@ -36,9 +36,9 @@ Perspective lens used here:
 Status: Confirmed mismatch plus structural inconsistency
 
 Validated facts:
-- `sccfm_cli/commands/configure.py` defines `_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")`.
+- `cisco_sccfm_cli/commands/configure.py` defines `_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")`.
 - `sccfm-ansible/plugins/module_utils/config.py` defines `ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")`.
-- `sccfm_core/constants.py` has no shared region constant.
+- `cisco_sccfm_core/constants.py` has no shared region constant.
 - Several Ansible module docs still advertise `(int, us, eu, apj, aus, uae, or in)` and omit `ci`.
 - CLI configure uses `click.Choice(..., case_sensitive=False)` and stores `region.lower()`.
 - Ansible `Config.__post_init__` validates `self.region` by exact membership with no lowercasing step.
@@ -54,14 +54,14 @@ User perspective:
 - Users can be told one region name in docs, enter another in the CLI, and then see Ansible reject the same value or casing.
 
 Primary affected files:
-- `sccfm_cli/commands/configure.py`
+- `cisco_sccfm_cli/commands/configure.py`
 - `sccfm-ansible/plugins/module_utils/config.py`
 - `.env.example`
 - region text in multiple `sccfm-ansible/plugins/modules/*.py`
 - `README.md`
 
 Recommended fix path:
-- Introduce one shared region constant in `sccfm_core/constants.py`.
+- Introduce one shared region constant in `cisco_sccfm_core/constants.py`.
 - Normalize region values to lowercase before validation everywhere.
 - Regenerate or centralize region help/doc strings from the shared source.
 
@@ -156,18 +156,18 @@ Validated facts:
 - The CLI mixes bare `print(json.dumps(...))` and `self.console.print(json.dumps(...))` / `console.print(json.dumps(...))`.
 - `json.dumps(...)` kwargs also drift by command: some use `ensure_ascii=False`, some use `default=str`, some use neither.
 - Confirmed `console.print(json.dumps(...))` examples include:
-  `sccfm_cli/commands/base.py`,
-  `sccfm_cli/commands/inventory/devices/rendering.py`,
-  `sccfm_cli/commands/inventory/manager/list/command.py`,
-  `sccfm_cli/commands/policies/access_group/list/command.py`,
-  `sccfm_cli/commands/policies/access_rule/list/command.py`,
+  `cisco_sccfm_cli/commands/base.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/rendering.py`,
+  `cisco_sccfm_cli/commands/inventory/manager/list/command.py`,
+  `cisco_sccfm_cli/commands/policies/access_group/list/command.py`,
+  `cisco_sccfm_cli/commands/policies/access_rule/list/command.py`,
   many `objects/*` commands.
 - Confirmed bare `print(json.dumps(...))` examples include:
-  `sccfm_cli/commands/transaction.py`,
-  `sccfm_cli/commands/inventory/devices/asa/shun/show/command.py`,
-  `sccfm_cli/commands/inventory/devices/asa/disk/list_files/command.py`,
-  `sccfm_cli/commands/inventory/devices/asa/list_boot_registry/command.py`,
-  `sccfm_cli/commands/inventory/devices/ftd/upgrade/trigger/command.py`.
+  `cisco_sccfm_cli/commands/transaction.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/shun/show/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/disk/list_files/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/list_boot_registry/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/ftd/upgrade/trigger/command.py`.
 
 Integrated conclusion:
 - This is a real contract split, not just a formatting preference.
@@ -192,15 +192,15 @@ Sources integrated:
 Status: Confirmed mismatch plus structural inconsistency
 
 Validated facts:
-- `sccfm_core/services/transaction_service.py` defaults to `timeout_sec=300` and `polling_interval_sec=10`.
+- `cisco_sccfm_core/services/transaction_service.py` defaults to `timeout_sec=300` and `polling_interval_sec=10`.
 - CLI transaction-facing commands default to `timeout=3600`.
 - `sccfm-ansible/plugins/modules/trigger_ftd_upgrade.py` defaults to `timeout=3600`.
 - `sccfm-ansible/plugins/modules/trigger_asa_upgrade.py` defaults to `timeout=300`, while its examples show `timeout: 900`.
 - Polling interval overrides exist in:
-  `sccfm_core/services/inventory/asa_cli_service.py` with `3`,
-  `sccfm_core/services/inventory/asa_onboard_service.py` with `5`,
-  `sccfm_core/services/inventory/ftd_onboard_service.py` with `5`,
-  `sccfm_core/services/inventory/ftd_ztp_onboard_service.py` with `5`.
+  `cisco_sccfm_core/services/inventory/asa_cli_service.py` with `3`,
+  `cisco_sccfm_core/services/inventory/asa_onboard_service.py` with `5`,
+  `cisco_sccfm_core/services/inventory/ftd_onboard_service.py` with `5`,
+  `cisco_sccfm_core/services/inventory/ftd_ztp_onboard_service.py` with `5`.
 
 Integrated conclusion:
 - Timeout defaults are a confirmed external inconsistency.
@@ -233,7 +233,7 @@ Validated facts:
   and two separate CLI test naming schemes.
 - ASA execute-CLI source path is `inventory/devices/asa/cli/execute/...` while the test path is `inventory/devices/asas/cli/executions/...`.
 - `sccfm-ansible/examples/group_vars/all/vault.yml.example` references `.vault_pass_example` while the actual file is `.vault_pass.example`.
-- `with_spinner` import style is mostly `from sccfm_cli.utils import with_spinner`, but one ASA local-user command imports from `sccfm_cli.utils.spinner`.
+- `with_spinner` import style is mostly `from cisco_sccfm_cli.utils import with_spinner`, but one ASA local-user command imports from `cisco_sccfm_cli.utils.spinner`.
 
 Integrated conclusion:
 - These are not deep behavioral bugs, but they do materially degrade grep-based review, test mirroring, and documentation trustworthiness.
@@ -256,8 +256,8 @@ Sources integrated:
 Status: Confirmed mismatch
 
 Validated facts:
-- `sccfm_cli/commands/policies/access_rule/list/command.py` declares inline `click.Option(["--limit"], ...)` and `click.Option(["--offset"], ...)`.
-- `sccfm_cli/commands/policies/access_group/list/command.py` does the same.
+- `cisco_sccfm_cli/commands/policies/access_rule/list/command.py` declares inline `click.Option(["--limit"], ...)` and `click.Option(["--offset"], ...)`.
+- `cisco_sccfm_cli/commands/policies/access_group/list/command.py` does the same.
 - Other list surfaces generally use shared `limit_option()` / `offset_option()` factories, which provide the repo-wide `-l` / `-o` short flags and shared behavior.
 
 Integrated conclusion:
@@ -297,7 +297,7 @@ Validated facts:
   `show_asa_shun`,
   `update_object_default`.
 - 27 modules have no same-name example playbook.
-- 28 core service/helper files exist under `sccfm_core/services` excluding `__init__.py`.
+- 28 core service/helper files exist under `cisco_sccfm_core/services` excluding `__init__.py`.
 - 15 service/helper names have no direct same-name core test file:
   `asa_cli_service`,
   `asa_disk_file_service`,
@@ -341,12 +341,12 @@ Status: Structural inconsistency
 
 Validated facts:
 - Device-target helper logic exists in parallel but not identical forms in:
-  `sccfm_cli/commands/inventory/devices/asa/shared.py`,
-  `sccfm_cli/commands/inventory/devices/ftd/shared.py`,
-  `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/shared.py`.
+  `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/ftd/shared.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/shared.py`.
 - Raw-response helpers are duplicated in:
-  `sccfm_core/services/object_management/object_api_helper.py`,
-  `sccfm_core/services/policy/policy_api_helper.py`.
+  `cisco_sccfm_core/services/object_management/object_api_helper.py`,
+  `cisco_sccfm_core/services/policy/policy_api_helper.py`.
 - `resolve_device_uids_from_query(...)` is duplicated across 9 Ansible modules.
 - Serializer helpers such as `_serialize_results(...)`, `_version_to_dict(...)`,
   `_serialize_result(...)`, `_serialize_device(...)`, `_serialize_entries(...)`,
@@ -410,9 +410,9 @@ Validated facts:
 - Legacy typing syntax is mixed with newer style:
   `List[...]`, `Dict[...]`, and `Optional[...]` still appear in multiple core and CLI files.
 - Frozen dataclass usage is mixed:
-  many payload models are frozen, while several response/helper dataclasses and `sccfm_core/errors.py::SccApiError` are not.
+  many payload models are frozen, while several response/helper dataclasses and `cisco_sccfm_core/errors.py::SccApiError` are not.
 - `from __future__ import annotations` is present in much of the repo but missing from several scripts, package files, and command/service files.
-- Developer-facing scripts such as `scripts/build_ansible_collection.py` and `scripts/validate_regex.py` use bare `print()` and emoji/status text rather than the richer CLI output conventions used elsewhere.
+- Developer-facing scripts such as `cisco_sccfm_scripts/build_ansible_collection.py` and `cisco_sccfm_scripts/validate_regex.py` use bare `print()` and emoji/status text rather than the richer CLI output conventions used elsewhere.
 
 Qualified conclusion:
 - These are real convention mismatches.
@@ -444,7 +444,7 @@ Reason:
 - The typo appears in
   `dev/inconsistency-findings/claude-inconsistencies.md`, but not in the
   current repo.
-- The file now exists at `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py`,
+- The file now exists at `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py`,
   and it correctly calls `_render_table(console=console, result=result)`.
 
 ### B. `sys.exit()` in `BaseCommand` is an inconsistency
@@ -454,7 +454,7 @@ Result:
 
 Reason:
 - This is a design critique of the current CLI error funnel, not drift between two repo surfaces.
-- The repo currently implements this pattern deliberately in `sccfm_cli/commands/base.py`.
+- The repo currently implements this pattern deliberately in `cisco_sccfm_cli/commands/base.py`.
 
 Original source:
 - Gemini item 2

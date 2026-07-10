@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from plugins.modules import delete_access_rule  # noqa: E402
 
-from sccfm_core.errors import NotFoundError
+from cisco_sccfm_core.errors import NotFoundError
 
 
 @pytest.fixture

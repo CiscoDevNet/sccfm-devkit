@@ -14,10 +14,10 @@ from scc_firewall_manager_sdk import (
     FtdVersion,
 )
 
-from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
-from sccfm_core.services.inventory import FtdUpgradeVersionService
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
+from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

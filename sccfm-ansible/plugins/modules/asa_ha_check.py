@@ -9,7 +9,7 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
-from sccfm_core import (
+from cisco_sccfm_core import (
     ASA_DEVICE_TYPE_FILTER,
     AsaHaCheckReport,
     AsaHaCheckService,

@@ -40,11 +40,11 @@ the expected behavior, the offending site(s), and a one-line fix.
 
 - **Mechanism:** §3.1 — JSON branch must use bare `print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))`. `console.print` re-processes Rich escapes and corrupts machine-readable output.
 - **Offending sites:**
-  - [sccfm_cli/commands/base.py L72](sccfm_cli/commands/base.py#L72)
-  - [sccfm_cli/commands/base.py L208](sccfm_cli/commands/base.py#L208)
-  - [sccfm_cli/commands/policies/access_rule/create/command.py L208](sccfm_cli/commands/policies/access_rule/create/command.py#L208)
-  - [sccfm_cli/commands/policies/access_rule/list/command.py L70](sccfm_cli/commands/policies/access_rule/list/command.py#L70)
-  - [sccfm_cli/commands/inventory/devices/rendering.py L31](sccfm_cli/commands/inventory/devices/rendering.py#L31)
+  - [cisco_sccfm_cli/commands/base.py L72](cisco_sccfm_cli/commands/base.py#L72)
+  - [cisco_sccfm_cli/commands/base.py L208](cisco_sccfm_cli/commands/base.py#L208)
+  - [cisco_sccfm_cli/commands/policies/access_rule/create/command.py L208](cisco_sccfm_cli/commands/policies/access_rule/create/command.py#L208)
+  - [cisco_sccfm_cli/commands/policies/access_rule/list/command.py L70](cisco_sccfm_cli/commands/policies/access_rule/list/command.py#L70)
+  - [cisco_sccfm_cli/commands/inventory/devices/rendering.py L31](cisco_sccfm_cli/commands/inventory/devices/rendering.py#L31)
   - …~15 additional command files follow the same anti-pattern.
 - **Severity:** **High**
 - **Fix:** Replace every `self.console.print(json.dumps(...))` / `console.print(json.dumps(...))` in a JSON branch with bare `print(json.dumps(..., indent=2, ensure_ascii=False, default=str))`.
@@ -53,8 +53,8 @@ the expected behavior, the offending site(s), and a one-line fix.
 
 - **Mechanism:** §15.1 — use `list[X]`, `dict[K, V]`; never `typing.List` / `typing.Dict`.
 - **Offending sites:**
-  - [sccfm_core/utils/validation.py L3, L8](sccfm_core/utils/validation.py#L3)
-  - [sccfm_cli/commands/base.py L7](sccfm_cli/commands/base.py#L7) and [L104, L111-112](sccfm_cli/commands/base.py#L104)
+  - [cisco_sccfm_core/utils/validation.py L3, L8](cisco_sccfm_core/utils/validation.py#L3)
+  - [cisco_sccfm_cli/commands/base.py L7](cisco_sccfm_cli/commands/base.py#L7) and [L104, L111-112](cisco_sccfm_cli/commands/base.py#L104)
 - **Severity:** **Medium**
 - **Fix:** Migrate `List[X]` → `list[X]`, drop the `typing.List` import.
 
@@ -62,7 +62,7 @@ the expected behavior, the offending site(s), and a one-line fix.
 
 - **Mechanism:** §15.1 — PEP 604 unions only.
 - **Offending sites:**
-  - [sccfm_core/services/transaction_service.py L2, L24](sccfm_core/services/transaction_service.py#L2)
+  - [cisco_sccfm_core/services/transaction_service.py L2, L24](cisco_sccfm_core/services/transaction_service.py#L2)
 - **Severity:** **Medium**
 - **Fix:** Replace `Optional[Callable[[CdoTransaction], None]]` with `Callable[[CdoTransaction], None] | None`; remove `Optional` import.
 
@@ -70,9 +70,9 @@ the expected behavior, the offending site(s), and a one-line fix.
 
 - **Mechanism:** §5.1 — immutable payload/response dataclasses use `@dataclass(frozen=True)`.
 - **Offending sites:**
-  - [sccfm_core/errors.py L13](sccfm_core/errors.py#L13) — `SccApiError`
-  - [sccfm_core/services/object_management/network_object_service.py L18, L63](sccfm_core/services/object_management/network_object_service.py#L18) — `NetworkObjectResponse`, `NetworkObjectListResponse`
-  - [sccfm_core/services/object_management/object_override_service.py L22, L42, L67, L97, L126](sccfm_core/services/object_management/object_override_service.py#L22) — `ObjectTargetItem`, `ObjectTargetsResponse`, `ObjectOverridesResponse`, `ObjectRawOverride`, `ObjectOverride`
+  - [cisco_sccfm_core/errors.py L13](cisco_sccfm_core/errors.py#L13) — `SccApiError`
+  - [cisco_sccfm_core/services/object_management/network_object_service.py L18, L63](cisco_sccfm_core/services/object_management/network_object_service.py#L18) — `NetworkObjectResponse`, `NetworkObjectListResponse`
+  - [cisco_sccfm_core/services/object_management/object_override_service.py L22, L42, L67, L97, L126](cisco_sccfm_core/services/object_management/object_override_service.py#L22) — `ObjectTargetItem`, `ObjectTargetsResponse`, `ObjectOverridesResponse`, `ObjectRawOverride`, `ObjectOverride`
 - **Severity:** **Medium**
 - **Fix:** Add `frozen=True` to every payload/response dataclass.
 
@@ -80,10 +80,10 @@ the expected behavior, the offending site(s), and a one-line fix.
 
 - **Mechanism:** §15.1 — every `.py` file starts with `from __future__ import annotations`.
 - **Offending sites:**
-  - [scripts/build_ansible_collection.py](scripts/build_ansible_collection.py)
-  - [scripts/validate_regex.py](scripts/validate_regex.py)
-  - [scripts/_test_setup_tokens.py](scripts/_test_setup_tokens.py)
-  - [sccfm_core/__init__.py](sccfm_core/__init__.py)
+  - [cisco_sccfm_scripts/build_ansible_collection.py](cisco_sccfm_scripts/build_ansible_collection.py)
+  - [cisco_sccfm_scripts/validate_regex.py](cisco_sccfm_scripts/validate_regex.py)
+  - [cisco_sccfm_scripts/_test_setup_tokens.py](cisco_sccfm_scripts/_test_setup_tokens.py)
+  - [cisco_sccfm_core/__init__.py](cisco_sccfm_core/__init__.py)
 - **Severity:** **Low**
 - **Fix:** Add the import line directly after each shebang / at the top.
 
@@ -96,7 +96,7 @@ at, expanded)
 ### H2. **Live `NameError` typo** in FTD CLI result renderer
 
 - **Mechanism:** §3.1 — every render call must reference an in-scope `console` parameter.
-- **Offending site:** [sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L21](sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L21)
+- **Offending site:** [cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L21](cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L21)
   ```python
   _render_table(console=consoe, result=result)   # ← `consoe` is undefined
   ```
@@ -108,9 +108,9 @@ at, expanded)
 
 - **Mechanism:** §10 / §11.3 — getter methods use one contract; mutate/delete methods use another. Same-class methods inside one file should not mix.
 - **Offending sites:**
-  - [sccfm_core/services/policy/access_rule_service.py L273](sccfm_core/services/policy/access_rule_service.py#L273) raises
-  - [sccfm_core/services/object_management/network_object_service.py L157, L161, L186](sccfm_core/services/object_management/network_object_service.py#L157) returns `None`
-  - [sccfm_core/services/object_management/network_group_service.py L151](sccfm_core/services/object_management/network_group_service.py#L151) returns `None`, [L181](sccfm_core/services/object_management/network_group_service.py#L181) raises, [L593, L598](sccfm_core/services/object_management/network_group_service.py#L593) raises — all in one file
+  - [cisco_sccfm_core/services/policy/access_rule_service.py L273](cisco_sccfm_core/services/policy/access_rule_service.py#L273) raises
+  - [cisco_sccfm_core/services/object_management/network_object_service.py L157, L161, L186](cisco_sccfm_core/services/object_management/network_object_service.py#L157) returns `None`
+  - [cisco_sccfm_core/services/object_management/network_group_service.py L151](cisco_sccfm_core/services/object_management/network_group_service.py#L151) returns `None`, [L181](cisco_sccfm_core/services/object_management/network_group_service.py#L181) raises, [L593, L598](cisco_sccfm_core/services/object_management/network_group_service.py#L593) raises — all in one file
 - **Severity:** **High** (callers can't write a single try/except contract)
 - **Fix:** Establish: `get_*` returns `Optional[T]`; `delete_*`, `update_*`,
   identifier-resolution helpers raise `NotFoundError`. Refactor outliers and
@@ -120,20 +120,20 @@ at, expanded)
 
 - **Mechanism:** §7.1 — canonical `polling_interval_sec=10` in `TransactionService`; per-operation overrides should be justified.
 - **Offending sites:**
-  - Canonical: [sccfm_core/services/transaction_service.py L20](sccfm_core/services/transaction_service.py#L20) — `10`
-  - [sccfm_core/services/inventory/asa_cli_service.py L42](sccfm_core/services/inventory/asa_cli_service.py#L42) — hardcoded `3`
-  - [sccfm_core/services/inventory/asa_onboard_service.py L20](sccfm_core/services/inventory/asa_onboard_service.py#L20) — hardcoded `5`
-  - [sccfm_core/services/inventory/ftd_onboard_service.py L20](sccfm_core/services/inventory/ftd_onboard_service.py#L20) — hardcoded `5`
-  - [sccfm_core/services/inventory/ftd_ztp_onboard_service.py L20](sccfm_core/services/inventory/ftd_ztp_onboard_service.py#L20) — hardcoded `5`
+  - Canonical: [cisco_sccfm_core/services/transaction_service.py L20](cisco_sccfm_core/services/transaction_service.py#L20) — `10`
+  - [cisco_sccfm_core/services/inventory/asa_cli_service.py L42](cisco_sccfm_core/services/inventory/asa_cli_service.py#L42) — hardcoded `3`
+  - [cisco_sccfm_core/services/inventory/asa_onboard_service.py L20](cisco_sccfm_core/services/inventory/asa_onboard_service.py#L20) — hardcoded `5`
+  - [cisco_sccfm_core/services/inventory/ftd_onboard_service.py L20](cisco_sccfm_core/services/inventory/ftd_onboard_service.py#L20) — hardcoded `5`
+  - [cisco_sccfm_core/services/inventory/ftd_ztp_onboard_service.py L20](cisco_sccfm_core/services/inventory/ftd_ztp_onboard_service.py#L20) — hardcoded `5`
 - **Severity:** **Medium**
-- **Fix:** Add named constants in `sccfm_core/constants.py` (`SHORT_POLL_INTERVAL_SEC`, `STANDARD_POLL_INTERVAL_SEC`) and use them; document the rationale per call site.
+- **Fix:** Add named constants in `cisco_sccfm_core/constants.py` (`SHORT_POLL_INTERVAL_SEC`, `STANDARD_POLL_INTERVAL_SEC`) and use them; document the rationale per call site.
 
 ### M5. Renderer signatures diverge between ASA and FTD CLI families
 
 - **Mechanism:** §3.1 / §18 — same operation should expose the same callable shape across families.
 - **Offending sites:**
-  - ASA: `render_cli_results(*, console, results: Sequence[CdoCliResult], uid_to_device, script, output_format)` — [sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py](sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py)
-  - FTD: `render_ftd_cli_results(*, console, result: FtdBulkCliResult, output_format)` — [sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L13](sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L13)
+  - ASA: `render_cli_results(*, console, results: Sequence[CdoCliResult], uid_to_device, script, output_format)` — [cisco_sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py](cisco_sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py)
+  - FTD: `render_ftd_cli_results(*, console, result: FtdBulkCliResult, output_format)` — [cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L13](cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L13)
 - **Impact:** Different parameter names, different result types, no shared protocol — refactors and shared logic are blocked.
 - **Severity:** **Medium**
 - **Fix:** Define a `CliResultRenderer` Protocol and adapt both families to it (e.g. `render(*, console, payload, output_format)`); push family-specific shaping into adapters.
@@ -142,22 +142,22 @@ at, expanded)
 
 - **Mechanism:** §15.3 / §18 — pick one strategy per repo.
 - **Offending site:**
-  - [sccfm_cli/commands/base.py L16-L18](sccfm_cli/commands/base.py#L16) — `from sccfm_core import SccApiError` next to `from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus` and `from sccfm_core.services.transaction_service import TransactionService`.
+  - [cisco_sccfm_cli/commands/base.py L16-L18](cisco_sccfm_cli/commands/base.py#L16) — `from cisco_sccfm_core import SccApiError` next to `from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus` and `from cisco_sccfm_core.services.transaction_service import TransactionService`.
 - **Severity:** **Medium**
 - **Fix:** Decide policy. Recommendation: re-export commonly used symbols
   (`SccApiError`, `NotFoundError`, `CdoTransactionStatus`, key services) from
-  `sccfm_core/__init__.py`; require deep imports only for rare types. Codify in
+  `cisco_sccfm_core/__init__.py`; require deep imports only for rare types. Codify in
   `dev/consistency-checklists/claude-consistency.md` §15.3.
 
 ### M7. "Not found" message wording drift
 
 - **Mechanism:** §10.3 — uniform tone and structure for user-facing errors.
 - **Offending sites (sample):**
-  - [sccfm_cli/commands/base.py L55](sccfm_cli/commands/base.py#L55) — `"Profile '{profile}' not found."`
-  - [sccfm_core/services/policy/access_rule_service.py L273](sccfm_core/services/policy/access_rule_service.py#L273) — `"Network object '{name}' not found."`
-  - [sccfm_core/services/object_management/network_group_service.py L181](sccfm_core/services/object_management/network_group_service.py#L181) — `"Network group with UID '{uid}' not found."`
-  - [sccfm_core/services/object_management/network_group_service.py L593, L598](sccfm_core/services/object_management/network_group_service.py#L593) — `"Network object with UID '{ref}' not found."` / `"Network object with name '{ref}' not found."`
-  - [sccfm_cli/commands/objects/utils.py L233](sccfm_cli/commands/objects/utils.py#L233) — `"Referenced object '{ref}' not found"` (no period)
+  - [cisco_sccfm_cli/commands/base.py L55](cisco_sccfm_cli/commands/base.py#L55) — `"Profile '{profile}' not found."`
+  - [cisco_sccfm_core/services/policy/access_rule_service.py L273](cisco_sccfm_core/services/policy/access_rule_service.py#L273) — `"Network object '{name}' not found."`
+  - [cisco_sccfm_core/services/object_management/network_group_service.py L181](cisco_sccfm_core/services/object_management/network_group_service.py#L181) — `"Network group with UID '{uid}' not found."`
+  - [cisco_sccfm_core/services/object_management/network_group_service.py L593, L598](cisco_sccfm_core/services/object_management/network_group_service.py#L593) — `"Network object with UID '{ref}' not found."` / `"Network object with name '{ref}' not found."`
+  - [cisco_sccfm_cli/commands/objects/utils.py L233](cisco_sccfm_cli/commands/objects/utils.py#L233) — `"Referenced object '{ref}' not found"` (no period)
 - **Severity:** **Medium**
 - **Fix:** Adopt one template: `"<Entity> with <id-kind> '<value>' not found."` with a trailing period. Centralize in a small helper (`format_not_found(entity, id_kind, value)`).
 
@@ -172,20 +172,20 @@ at, expanded)
 - **Severity:** **Medium**
 - **Fix:** Pull family-level serializers into `module_utils/asa_serializers.py` and `module_utils/ftd_serializers.py`. (Folds into codex item #16.)
 
-### M9. Inline entity-type lists instead of `sccfm_core/constants.py`
+### M9. Inline entity-type lists instead of `cisco_sccfm_core/constants.py`
 
 - **Mechanism:** §20 — no magic strings/lists; family lists live in `constants.py`.
 - **Offending sites:**
-  - [sccfm_cli/commands/inventory/devices/rendering.py L74](sccfm_cli/commands/inventory/devices/rendering.py#L74) — inlines `[EntityType.ASA]`.
+  - [cisco_sccfm_cli/commands/inventory/devices/rendering.py L74](cisco_sccfm_cli/commands/inventory/devices/rendering.py#L74) — inlines `[EntityType.ASA]`.
   - ASA / FTD `shared.py` files build entity-type filters inline rather than importing canonical lists.
 - **Severity:** **Medium**
-- **Fix:** Add `ASA_ENTITY_TYPES = [EntityType.ASA]` to `sccfm_core/constants.py` (alongside `FTD_ENTITY_TYPES`) and import everywhere.
+- **Fix:** Add `ASA_ENTITY_TYPES = [EntityType.ASA]` to `cisco_sccfm_core/constants.py` (alongside `FTD_ENTITY_TYPES`) and import everywhere.
 
 ### L2. `--limit` / `--offset` re-declared without `-l` / `-o` short flags
 
 - **Mechanism:** §2.1 — always compose from `limit_option()` / `offset_option()` factories so short flags stay uniform.
 - **Offending sites:**
-  - [sccfm_cli/commands/policies/access_rule/list/command.py L18, L25](sccfm_cli/commands/policies/access_rule/list/command.py#L18) — declares `["--limit"]` / `["--offset"]` directly.
+  - [cisco_sccfm_cli/commands/policies/access_rule/list/command.py L18, L25](cisco_sccfm_cli/commands/policies/access_rule/list/command.py#L18) — declares `["--limit"]` / `["--offset"]` directly.
 - **Severity:** **Low**
 - **Fix:** Replace inline `click.Option(["--limit"], ...)` with `limit_option()` (and same for offset). Add a grep guard to pre-commit.
 
@@ -193,8 +193,8 @@ at, expanded)
 
 - **Mechanism:** §15.2 — file roles map to suffixes (`*_service.py`, `*_helper.py`, `shared.py`).
 - **Offending sites:**
-  - `sccfm_core/services/object_management/object_api_helper.py` and `sccfm_core/services/policy/policy_api_helper.py` use `_helper.py` while sibling files use `_service.py`.
-  - `sccfm_cli/commands/inventory/devices/asa/shared.py` (per-family helpers) vs `sccfm_cli/commands/objects/utils.py` (per-domain helpers) — same role, different name.
+  - `cisco_sccfm_core/services/object_management/object_api_helper.py` and `cisco_sccfm_core/services/policy/policy_api_helper.py` use `_helper.py` while sibling files use `_service.py`.
+  - `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py` (per-family helpers) vs `cisco_sccfm_cli/commands/objects/utils.py` (per-domain helpers) — same role, different name.
 - **Severity:** **Low**
 - **Fix:** Pick one bucket per role and document in
   `dev/consistency-checklists/claude-consistency.md` §15.2 (`_service.py` for
@@ -220,17 +220,17 @@ at, expanded)
 
 - **Mechanism:** §13.1 — same-class tests should assert the same way.
 - **Offending sites (sample):**
-  - parsed JSON: [sccfm_cli/commands/tests/inventory/devices/asa/smartlicense/test_smartlicense.py L478](sccfm_cli/commands/tests/inventory/devices/asa/smartlicense/test_smartlicense.py#L478)
-  - substring: [sccfm_cli/commands/tests/objects/test_update_default.py L146](sccfm_cli/commands/tests/objects/test_update_default.py#L146), [sccfm_cli/commands/tests/policies/access_rule/test_access_rule.py L243-L244](sccfm_cli/commands/tests/policies/access_rule/test_access_rule.py#L243)
+  - parsed JSON: [cisco_sccfm_cli/commands/tests/inventory/devices/asa/smartlicense/test_smartlicense.py L478](cisco_sccfm_cli/commands/tests/inventory/devices/asa/smartlicense/test_smartlicense.py#L478)
+  - substring: [cisco_sccfm_cli/commands/tests/objects/test_update_default.py L146](cisco_sccfm_cli/commands/tests/objects/test_update_default.py#L146), [cisco_sccfm_cli/commands/tests/policies/access_rule/test_access_rule.py L243-L244](cisco_sccfm_cli/commands/tests/policies/access_rule/test_access_rule.py#L243)
 - **Severity:** **Low**
 - **Fix:** Convention: success/payload assertions use parsed JSON via `--format json`; error-path assertions can use substring matches but should match against a known canonical phrase (ties into M7).
 
 ### L7. Conftest fixture organization
 
 - **Mechanism:** §13.1 — root conftest exposes shared fixtures; nested conftests should extend, not shadow.
-- **Offending sites (probable):** [sccfm_cli/commands/tests/conftest.py L50-L100](sccfm_cli/commands/tests/conftest.py#L50) defines `sample_devices`, `sample_managers`, `mock_inventory_service`, `default_config`, `config_path`. Need to confirm no nested conftest re-defines these with different return shapes.
+- **Offending sites (probable):** [cisco_sccfm_cli/commands/tests/conftest.py L50-L100](cisco_sccfm_cli/commands/tests/conftest.py#L50) defines `sample_devices`, `sample_managers`, `mock_inventory_service`, `default_config`, `config_path`. Need to confirm no nested conftest re-defines these with different return shapes.
 - **Severity:** **Low** (verify before fixing)
-- **Fix:** `find sccfm_cli sccfm_core -name conftest.py` and diff fixture surfaces; consolidate.
+- **Fix:** `find cisco_sccfm_cli cisco_sccfm_core -name conftest.py` and diff fixture surfaces; consolidate.
 
 ---
 
@@ -269,7 +269,7 @@ at, expanded)
 4. **M4** — name the polling intervals in `constants.py`; align onboard/CLI overrides.
 5. **M1 / M2 / M3 / L1** — mechanical sweeps; can be one PR each or bundled.
 6. **M5** — extract `CliResultRenderer` Protocol.
-7. **M6 / M9** — re-export from `sccfm_core/__init__.py`, add `ASA_ENTITY_TYPES`.
+7. **M6 / M9** — re-export from `cisco_sccfm_core/__init__.py`, add `ASA_ENTITY_TYPES`.
 8. **M7 / L2 / L3 / L4 / L5 / L6 / L7** — style / metadata sweeps with grep guards in pre-commit where possible.
 
 ---
@@ -286,7 +286,7 @@ I should have caught these in Pass 1/2; codex did. Verified independently:
 
 - **Region vocabulary split** — confirmed:
   `_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")` in
-  [sccfm_cli/commands/configure.py L14](sccfm_cli/commands/configure.py#L14)
+  [cisco_sccfm_cli/commands/configure.py L14](cisco_sccfm_cli/commands/configure.py#L14)
   vs `ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")`
   in [sccfm-ansible/plugins/module_utils/config.py L10](sccfm-ansible/plugins/module_utils/config.py#L10).
   Two real divergences: `au` (CLI) vs `aus` (Ansible), and `ci` is Ansible-only.
@@ -310,7 +310,7 @@ I should have caught these in Pass 1/2; codex did. Verified independently:
   applies syntax highlighting to JSON-looking strings on a TTY and emits ANSI;
   on non-TTY pipes the ANSI is suppressed but markup-like substrings (`[bold]`)
   are still parsed. **Downgrade to Medium** in cases where the payload cannot
-  contain `[…]`-like substrings; **keep High** for [base.py L72](sccfm_cli/commands/base.py#L72)
+  contain `[…]`-like substrings; **keep High** for [base.py L72](cisco_sccfm_cli/commands/base.py#L72)
   (error JSON — error bodies can contain anything).
 - **M5 — ASA vs FTD renderer signatures**: partially explained by the SDK
   (FTD bulk endpoint returns one aggregated object; ASA returns per-device
@@ -318,7 +318,7 @@ I should have caught these in Pass 1/2; codex did. Verified independently:
   domain reason. **Downgrade to Low** unless we extract a unifying Protocol;
   document the rationale in §3.1.
 - **M6 — mixed package-level vs deep imports in one file**: this is endemic
-  in modern Python; only worth fixing once `sccfm_core/__init__.py` formally
+  in modern Python; only worth fixing once `cisco_sccfm_core/__init__.py` formally
   re-exports. **Downgrade to Low** until that policy lands.
 - **L7 — conftest fixture organization**: still unverified.
   **Demoting to "open question"** until confirmed (see N5).
@@ -343,24 +343,24 @@ I should have caught these in Pass 1/2; codex did. Verified independently:
 - **Mechanism:** §2.1 (shared `timeout_option(default=3600)`) / §7.1
   (service default `timeout_sec=300`).
 - **Sites:**
-  - Service default: [sccfm_core/services/transaction_service.py](sccfm_core/services/transaction_service.py) — `timeout_sec=300`.
-  - CLI factory: [sccfm_cli/commands/shared_options.py](sccfm_cli/commands/shared_options.py) `timeout_option(default=3600)`.
+  - Service default: [cisco_sccfm_core/services/transaction_service.py](cisco_sccfm_core/services/transaction_service.py) — `timeout_sec=300`.
+  - CLI factory: [cisco_sccfm_cli/commands/shared_options.py](cisco_sccfm_cli/commands/shared_options.py) `timeout_option(default=3600)`.
   - Ansible ASA trigger: `timeout=300` in code, `timeout: 900` in EXAMPLES
     (see codex §4).
   - Ansible FTD trigger: `timeout=3600`.
 - **Severity:** **Medium**
 - **Fix:** Promote to a single named constant
-  (`DEFAULT_TRANSACTION_TIMEOUT_SEC`) in `sccfm_core/constants.py`; reference
+  (`DEFAULT_TRANSACTION_TIMEOUT_SEC`) in `cisco_sccfm_core/constants.py`; reference
   from CLI factory, services, and Ansible modules. Distinct from M4 (poll
   cadence).
 
-#### N2. `_REGIONS` is a CLI-local tuple, not imported from `sccfm_core/constants.py`
+#### N2. `_REGIONS` is a CLI-local tuple, not imported from `cisco_sccfm_core/constants.py`
 
 - **Mechanism:** §20 — no magic strings/lists outside `constants.py`.
-- **Site:** [sccfm_cli/commands/configure.py L14](sccfm_cli/commands/configure.py#L14)
+- **Site:** [cisco_sccfm_cli/commands/configure.py L14](cisco_sccfm_cli/commands/configure.py#L14)
   defines `_REGIONS` directly.
 - **Severity:** **Medium** (root cause of codex §1: there is no shared list).
-- **Fix:** Move the canonical region tuple into `sccfm_core/constants.py`
+- **Fix:** Move the canonical region tuple into `cisco_sccfm_core/constants.py`
   (`SCCFM_REGIONS`); import from CLI, Ansible `Config`, README generator.
   This single change collapses codex §1 + codex §2 + my N2.
 
@@ -381,7 +381,7 @@ I should have caught these in Pass 1/2; codex did. Verified independently:
 
 - **Mechanism:** §9.1 / §9.2 — config validation parity.
 - **Sites:**
-  - CLI: [sccfm_cli/commands/configure.py L52](sccfm_cli/commands/configure.py#L52)
+  - CLI: [cisco_sccfm_cli/commands/configure.py L52](cisco_sccfm_cli/commands/configure.py#L52)
     uses `click.Choice(_REGIONS, case_sensitive=False)`.
   - Ansible: [sccfm-ansible/plugins/module_utils/config.py L48](sccfm-ansible/plugins/module_utils/config.py#L48)
     uses `if self.region not in ALLOWED_REGIONS:` — exact-match only.
@@ -393,14 +393,14 @@ I should have caught these in Pass 1/2; codex did. Verified independently:
 #### N5. `conftest.py` audit (L7 follow-up)
 
 - Action item, not a finding yet: run
-  `find sccfm_cli sccfm_core sccfm-ansible -name conftest.py` and diff
+  `find cisco_sccfm_cli cisco_sccfm_core sccfm-ansible -name conftest.py` and diff
   `@pytest.fixture` names. Carry over from L7.
 
 #### N6. `print(json.dumps(...))` is used in service code, not just CLI
 
 - **Mechanism:** §4.1 — services do not perform IO; only CLI/Ansible render.
 - **Sites:** verified in
-  [sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L38](sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L38)
+  [cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L38](cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L38)
   the renderer prints directly via `print(json.dumps(...))` (correct per H1)
   but renderers live in the CLI tree, so this is fine. **Spot-check core
   services for any stray `print(...)` calls** as part of the H1 sweep.
@@ -449,7 +449,7 @@ Codex claims: *"I could not find that typo in the repo; it appears only inside
 `dev/inconsistency-findings/claude-inconsistencies.md`."*
 
 This is incorrect. Re-verified at
-[sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L21](sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L21):
+[cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py L21](cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py#L21):
 
 ```python
 def render_ftd_cli_results(
@@ -478,7 +478,7 @@ but I do not consider the cited set a clean confirmed inconsistency."*
 Fair point. My H3 conflated three different method classes. Reframing:
 
 - **Real drift inside one file**:
-  [sccfm_core/services/object_management/network_group_service.py](sccfm_core/services/object_management/network_group_service.py)
+  [cisco_sccfm_core/services/object_management/network_group_service.py](cisco_sccfm_core/services/object_management/network_group_service.py)
   uses `return None` at L151 (getter) and `raise NotFoundError` at L181
   (delete) — that's the documented pattern (getters return `None`, mutators
   raise) and is **fine**.
@@ -598,18 +598,18 @@ Adopting this expansion under H1.
 
 - **Action item added to H1**: standardize on
   `print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))` and
-  factor it into a tiny `print_json(payload)` helper in `sccfm_cli/utils/`.
+  factor it into a tiny `print_json(payload)` helper in `cisco_sccfm_cli/utils/`.
 
 #### H.7 Codex §23 strengthens my L2
 
 Codex confirmed the same drift in
-[sccfm_cli/commands/policies/access_group/list/command.py](sccfm_cli/commands/policies/access_group/list/command.py)
+[cisco_sccfm_cli/commands/policies/access_group/list/command.py](cisco_sccfm_cli/commands/policies/access_group/list/command.py)
 not just access_rule. Updating L2's site list.
 
 #### H.8 Codex §25 finds an additional "not found" wording site I missed
 
 Codex pointed at
-[sccfm_core/services/object_management/utils.py](sccfm_core/services/object_management/utils.py)
+[cisco_sccfm_core/services/object_management/utils.py](cisco_sccfm_core/services/object_management/utils.py)
 template `"{entity_name} with name '{name}' not found."`. Adding to M7.
 
 ### I. Updated counts
