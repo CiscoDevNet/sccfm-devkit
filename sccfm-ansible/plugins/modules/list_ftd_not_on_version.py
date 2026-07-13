@@ -10,9 +10,9 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage, EntityType, FtdVersion
 
-from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
-from sccfm_core.services.inventory import FtdUpgradeVersionService
+from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
+from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
 
 from ..module_utils.config import base_argument_spec, create_config
 

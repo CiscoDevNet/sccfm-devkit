@@ -27,8 +27,8 @@ available on Ansible Galaxy.
 
 ## Installing the CLI
 
-Follow these steps to install the `sccfm` Python package, which provides the `sccfm-cli`
-command and the `sccfm_core` Python library.
+Follow these steps to install the `cisco-sccfm-devkit` Python package, which provides the
+`sccfm-cli` command and the `cisco_sccfm_core` Python library.
 
 ### Prerequisites
 
@@ -51,7 +51,7 @@ pyenv global 3.12
 isolated while exposing `sccfm-cli` on your `PATH`.
 
 ```bash
-pipx install sccfm
+pipx install cisco-sccfm-devkit
 ```
 
 ### Install with pip
@@ -59,7 +59,7 @@ pipx install sccfm
 Use `pip` when you are installing into an existing virtual environment:
 
 ```bash
-python -m pip install sccfm
+python -m pip install cisco-sccfm-devkit
 ```
 
 ### Install from GitHub Releases
@@ -68,11 +68,12 @@ If you need an exact release artifact before PyPI is available, install the whee
 GitHub Releases:
 
 1. Navigate to the [GitHub Releases](https://github.com/CiscoDevNet/sccfm-devkit/releases) page for this project.
-2. Download the latest wheel asset named like `sccfm-<version>-py3-none-any.whl` to your local machine.
+2. Download the latest wheel asset named like
+   `cisco_sccfm_devkit-<version>-py3-none-any.whl` to your local machine.
 3. Install the downloaded wheel:
 
 ```bash
-pipx install /path/to/sccfm-<version>-py3-none-any.whl
+pipx install /path/to/cisco_sccfm_devkit-<version>-py3-none-any.whl
 ```
 
 ### Install CLI man pages
@@ -81,7 +82,7 @@ Unix-style man pages are generated from the Click command metadata. If you are w
 from the repository, install or refresh them locally with:
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 install-cli-man-docs
 ```
 
@@ -129,12 +130,12 @@ After sourcing, tab completion will work for all `sccfm` commands and options.
 
 ## Using the Python library
 
-The same PyPI package exposes the typed `sccfm_core` library for Python automation:
+The same PyPI package exposes the typed `cisco_sccfm_core` library for Python automation:
 
 ```python
 from dataclasses import dataclass
 
-from sccfm_core import InventoryService
+from cisco_sccfm_core import InventoryService
 
 
 @dataclass(frozen=True)
@@ -148,7 +149,7 @@ devices = inventory.get_devices(limit=10, offset=0, query=None)
 ```
 
 The generated `scc-firewall-manager-sdk` remains the low-level SDK dependency.
-`sccfm_core` is the higher-level library used by the CLI and Ansible collection.
+`cisco_sccfm_core` is the higher-level library used by the CLI and Ansible collection.
 
 ## Installing the Ansible collection
 
@@ -167,7 +168,7 @@ ansible-galaxy collection install /path/to/cisco-sccfm-{version}.tar.gz
 ### Verify installation
 
 ```bash
-python -c "import sccfm_core; print('Python package installed')"
+python -c "import cisco_sccfm_core; print('Python package installed')"
 ansible-galaxy collection list | grep cisco.sccfm
 ```
 

@@ -25,7 +25,7 @@ Status: Confirmed mismatch
 
 Evidence:
 - CLI configure accepts `_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")`
-  in `sccfm_cli/commands/configure.py`.
+  in `cisco_sccfm_cli/commands/configure.py`.
 - `README.md` command docs also advertise `au`.
 - Ansible shared config uses
   `ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")`
@@ -72,7 +72,7 @@ Status: Confirmed mismatch
 
 Evidence:
 - `README.md` documents `sccfm-cli inventory managers list`.
-- `sccfm_cli/commands/inventory/manager/command.py` defines the group name as `manager`.
+- `cisco_sccfm_cli/commands/inventory/manager/command.py` defines the group name as `manager`.
 
 Impact:
 - The README command string is wrong for the current CLI.
@@ -86,11 +86,11 @@ Recommendation:
 Status: Confirmed mismatch
 
 Evidence:
-- `sccfm_core/services/transaction_service.py` uses `timeout_sec: int = 300`.
+- `cisco_sccfm_core/services/transaction_service.py` uses `timeout_sec: int = 300`.
 - CLI transaction polling surfaces default to `3600`:
-  `sccfm_cli/commands/transaction.py`,
-  `sccfm_cli/commands/inventory/devices/asa/upgrade/trigger/command.py`,
-  `sccfm_cli/commands/inventory/devices/ftd/upgrade/trigger/command.py`.
+  `cisco_sccfm_cli/commands/transaction.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/upgrade/trigger/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/ftd/upgrade/trigger/command.py`.
 - Ansible FTD trigger also defaults to `3600`:
   `sccfm-ansible/plugins/modules/trigger_ftd_upgrade.py`.
 - Ansible ASA trigger defaults to `300` in code:
@@ -111,14 +111,14 @@ Recommendation:
 Status: Confirmed mismatch
 
 Evidence:
-- CLI command directory is `sccfm_cli/commands/inventory/devices/asa/list_asa_local_users/`.
+- CLI command directory is `cisco_sccfm_cli/commands/inventory/devices/asa/list_asa_local_users/`.
 - CLI command name is `list-local-users` in
-  `sccfm_cli/commands/inventory/devices/asa/list_asa_local_users/command.py`.
+  `cisco_sccfm_cli/commands/inventory/devices/asa/list_asa_local_users/command.py`.
 - Ansible module is `list_asa_local_users.py`.
 - CLI tests are split across two naming schemes:
-  `sccfm_cli/commands/tests/inventory/devices/asa/list_asa_local_users/test_list_asa_local_users.py`
+  `cisco_sccfm_cli/commands/tests/inventory/devices/asa/list_asa_local_users/test_list_asa_local_users.py`
   and
-  `sccfm_cli/commands/tests/inventory/devices/asa/list_local_users/test_list_local_users.py`.
+  `cisco_sccfm_cli/commands/tests/inventory/devices/asa/list_local_users/test_list_local_users.py`.
 
 Impact:
 - The same feature is described with three different names:
@@ -134,9 +134,9 @@ Status: Confirmed mismatch
 
 Evidence:
 - Source command path:
-  `sccfm_cli/commands/inventory/devices/asa/cli/execute/command.py`
+  `cisco_sccfm_cli/commands/inventory/devices/asa/cli/execute/command.py`
 - Test path:
-  `sccfm_cli/commands/tests/inventory/devices/asas/cli/executions/test_asa_execute_cli.py`
+  `cisco_sccfm_cli/commands/tests/inventory/devices/asas/cli/executions/test_asa_execute_cli.py`
 
 Impact:
 - Test layout is inconsistent with source layout.
@@ -151,9 +151,9 @@ Recommendation:
 Status: Confirmed mismatch
 
 Evidence:
-- Most commands import `with_spinner` via `from sccfm_cli.utils import with_spinner`.
-- `sccfm_cli/commands/inventory/devices/asa/list_asa_local_users/command.py`
-  imports `from sccfm_cli.utils.spinner import with_spinner`.
+- Most commands import `with_spinner` via `from cisco_sccfm_cli.utils import with_spinner`.
+- `cisco_sccfm_cli/commands/inventory/devices/asa/list_asa_local_users/command.py`
+  imports `from cisco_sccfm_cli.utils.spinner import with_spinner`.
 
 Impact:
 - Minor, but it breaks a repo-wide import convention used almost everywhere else.
@@ -501,9 +501,9 @@ These items are not always wrong today, but they are current sources of drift.
 Status: Structural inconsistency
 
 Locations:
-- `sccfm_cli/commands/inventory/devices/asa/shared.py`
-- `sccfm_cli/commands/inventory/devices/ftd/shared.py`
-- `sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/ftd/shared.py`
+- `cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/shared.py`
 
 Observed divergence:
 - Different support for `allow_no_filters`
@@ -522,8 +522,8 @@ Recommendation:
 Status: Structural inconsistency
 
 Locations:
-- `sccfm_core/services/object_management/object_api_helper.py`
-- `sccfm_core/services/policy/policy_api_helper.py`
+- `cisco_sccfm_core/services/object_management/object_api_helper.py`
+- `cisco_sccfm_core/services/policy/policy_api_helper.py`
 
 Observed duplication:
 - Very similar `read_raw_response(...)`
@@ -643,17 +643,17 @@ Why this survived review:
 
 Evidence:
 - Bare `print(...)` examples:
-  `sccfm_cli/commands/transaction.py`,
-  `sccfm_cli/commands/inventory/devices/asa/shun/show/command.py`,
-  `sccfm_cli/commands/inventory/devices/asa/disk/list_files/command.py`,
-  `sccfm_cli/commands/inventory/devices/asa/list_boot_registry/command.py`,
-  `sccfm_cli/commands/inventory/devices/ftd/upgrade/trigger/command.py`.
+  `cisco_sccfm_cli/commands/transaction.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/shun/show/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/disk/list_files/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/list_boot_registry/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/ftd/upgrade/trigger/command.py`.
 - `self.console.print(...)` / `console.print(...)` examples:
-  `sccfm_cli/commands/base.py`,
-  `sccfm_cli/commands/inventory/devices/rendering.py`,
-  `sccfm_cli/commands/inventory/manager/list/command.py`,
-  `sccfm_cli/commands/policies/access_group/list/command.py`,
-  `sccfm_cli/commands/policies/access_rule/list/command.py`,
+  `cisco_sccfm_cli/commands/base.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/rendering.py`,
+  `cisco_sccfm_cli/commands/inventory/manager/list/command.py`,
+  `cisco_sccfm_cli/commands/policies/access_group/list/command.py`,
+  `cisco_sccfm_cli/commands/policies/access_rule/list/command.py`,
   many `objects/*` commands.
 
 Impact:
@@ -674,10 +674,10 @@ Why this survived review:
   access-group list as well.
 
 Evidence:
-- `sccfm_cli/commands/policies/access_rule/list/command.py`
+- `cisco_sccfm_cli/commands/policies/access_rule/list/command.py`
   declares `click.Option(["--limit"], ...)` and `click.Option(["--offset"], ...)`
   directly.
-- `sccfm_cli/commands/policies/access_group/list/command.py`
+- `cisco_sccfm_cli/commands/policies/access_group/list/command.py`
   does the same.
 - Most other list commands use `limit_option()` and `offset_option()` from
   shared option helpers.
@@ -699,12 +699,12 @@ Why this survived review:
 
 Evidence:
 - Canonical transaction wait default:
-  `sccfm_core/services/transaction_service.py` uses `polling_interval_sec=10`.
+  `cisco_sccfm_core/services/transaction_service.py` uses `polling_interval_sec=10`.
 - Faster/alternate overrides exist in:
-  `sccfm_core/services/inventory/asa_cli_service.py` with `3`,
-  `sccfm_core/services/inventory/asa_onboard_service.py` with `5`,
-  `sccfm_core/services/inventory/ftd_onboard_service.py` with `5`,
-  `sccfm_core/services/inventory/ftd_ztp_onboard_service.py` with `5`.
+  `cisco_sccfm_core/services/inventory/asa_cli_service.py` with `3`,
+  `cisco_sccfm_core/services/inventory/asa_onboard_service.py` with `5`,
+  `cisco_sccfm_core/services/inventory/ftd_onboard_service.py` with `5`,
+  `cisco_sccfm_core/services/inventory/ftd_ztp_onboard_service.py` with `5`.
 
 Impact:
 - Similar long-running operations poll at different cadences with no obvious
@@ -724,15 +724,15 @@ Why this survived review:
   type is included.
 
 Evidence:
-- `sccfm_cli/commands/base.py`:
+- `cisco_sccfm_cli/commands/base.py`:
   `Profile '{profile}' not found.`
-- `sccfm_core/services/policy/access_rule_service.py`:
+- `cisco_sccfm_core/services/policy/access_rule_service.py`:
   `Network object '{name}' not found.`
-- `sccfm_core/services/object_management/network_group_service.py`:
+- `cisco_sccfm_core/services/object_management/network_group_service.py`:
   `Network group with UID '{uid}' not found.`
-- `sccfm_core/services/object_management/utils.py`:
+- `cisco_sccfm_core/services/object_management/utils.py`:
   `{entity_name} with name '{name}' not found.`
-- `sccfm_cli/commands/objects/utils.py`:
+- `cisco_sccfm_cli/commands/objects/utils.py`:
   `Referenced object '{ref}' not found`
   (no period).
 
@@ -754,21 +754,21 @@ Why this survived review:
   are maintained.
 
 Evidence:
-- `sccfm_core/constants.py` defines `FTD_ENTITY_TYPES`.
-- `sccfm_cli/commands/inventory/devices/ftd/shared.py` and
-  `sccfm_cli/commands/inventory/devices/ftd/command.py` consume that constant.
+- `cisco_sccfm_core/constants.py` defines `FTD_ENTITY_TYPES`.
+- `cisco_sccfm_cli/commands/inventory/devices/ftd/shared.py` and
+  `cisco_sccfm_cli/commands/inventory/devices/ftd/command.py` consume that constant.
 - ASA equivalents inline `EntityType.ASA.value` in:
-  `sccfm_cli/commands/inventory/devices/asa/shared.py`,
-  `sccfm_cli/commands/inventory/devices/asa/onboard/command.py`,
-  `sccfm_cli/commands/inventory/devices/rendering.py`,
-  `sccfm_cli/commands/inventory/devices/asa/command.py`.
+  `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/onboard/command.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/rendering.py`,
+  `cisco_sccfm_cli/commands/inventory/devices/asa/command.py`.
 
 Impact:
 - One device family has a canonical source of truth for entity types and the other does not.
 - Refactors and future family expansion are more likely to drift on the ASA side.
 
 Recommendation:
-- Add `ASA_ENTITY_TYPES` to `sccfm_core/constants.py` or explicitly document why
+- Add `ASA_ENTITY_TYPES` to `cisco_sccfm_core/constants.py` or explicitly document why
   ASA remains inline while FTD is centralized.
 
 ### 27. Region vocabulary has no shared source of truth constant
@@ -780,18 +780,18 @@ Why this survived review:
 - The current repo keeps region vocabulary in at least two separate code-level definitions.
 
 Evidence:
-- `sccfm_cli/commands/configure.py` defines a CLI-local
+- `cisco_sccfm_cli/commands/configure.py` defines a CLI-local
   `_REGIONS = ("in", "au", "uae", "us", "eu", "apj", "int")`.
 - `sccfm-ansible/plugins/module_utils/config.py` defines a separate
   `ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")`.
-- `sccfm_core/constants.py` does not define any shared region constant today.
+- `cisco_sccfm_core/constants.py` does not define any shared region constant today.
 
 Impact:
 - Region drift is structurally easy to reintroduce because there is no canonical import target.
 - CLI, Ansible, and docs can keep diverging independently.
 
 Recommendation:
-- Introduce one shared constant in `sccfm_core/constants.py` and import it everywhere
+- Introduce one shared constant in `cisco_sccfm_core/constants.py` and import it everywhere
   region vocabulary is validated or displayed.
 
 ### 28. CLI and Ansible handle region case normalization differently
@@ -805,7 +805,7 @@ Why this survived review:
 Evidence:
 - CLI configure accepts a case-insensitive choice:
   `click.Choice(_REGIONS, case_sensitive=False)` in
-  `sccfm_cli/commands/configure.py`.
+  `cisco_sccfm_cli/commands/configure.py`.
 - The CLI then normalizes the stored value via `region.lower()` in the same file.
 - Ansible `Config.__post_init__` validates with an exact membership check:
   `if self.region not in ALLOWED_REGIONS:` in
@@ -828,20 +828,20 @@ into the main priority stack because they are mostly mechanical style cleanup:
 
 - Legacy typing syntax is mixed with newer style.
   Examples:
-  `sccfm_core/services/inventory/asa_cli_service.py`,
-  `sccfm_core/utils/validation.py`,
-  `sccfm_cli/commands/base.py`
+  `cisco_sccfm_core/services/inventory/asa_cli_service.py`,
+  `cisco_sccfm_core/utils/validation.py`,
+  `cisco_sccfm_cli/commands/base.py`
   still use `List[...]`, `Dict[...]`, and/or `Optional[...]` while many newer files use
   `list[...]`, `dict[...]`, and `... | None`.
 - Frozen dataclass usage is mixed.
   Many models and CLI filter dataclasses are `@dataclass(frozen=True)`, while several
-  service response/helper dataclasses and `sccfm_core/errors.py::SccApiError` are not.
+  service response/helper dataclasses and `cisco_sccfm_core/errors.py::SccApiError` are not.
 - `from __future__ import annotations` usage is mixed.
   It is present in much of the repo, but missing from several scripts and service/package
-  files, including `scripts/build_ansible_collection.py`,
-  `scripts/validate_regex.py`,
-  `scripts/_test_setup_tokens.py`,
-  `sccfm_core/__init__.py`,
+  files, including `cisco_sccfm_scripts/build_ansible_collection.py`,
+  `cisco_sccfm_scripts/validate_regex.py`,
+  `cisco_sccfm_scripts/_test_setup_tokens.py`,
+  `cisco_sccfm_core/__init__.py`,
   and a number of command group / service files.
 - Region ordering/spelling presentation also drifts beyond the core value split.
   `_REGIONS` and `ALLOWED_REGIONS` do not just differ by `au` vs `aus` and `ci`;

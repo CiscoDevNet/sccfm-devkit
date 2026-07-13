@@ -1,7 +1,7 @@
 # Consistency Review Checklist — SCCFM Devkit
 
 **Survey date:** 2026-04-21
-**Scope:** `sccfm_cli/`, `sccfm_core/`, `sccfm-ansible/`, `scripts/`, `pyproject.toml`, build configs
+**Scope:** `cisco_sccfm_cli/`, `cisco_sccfm_core/`, `sccfm-ansible/`, `cisco_sccfm_scripts/`, `pyproject.toml`, build configs
 **Purpose:** Catalog every recurring mechanism in the repo so future PRs can be reviewed for consistency. When a PR modifies one instance of a mechanism listed below, the reviewer should audit all other instances and either move them together or explicitly justify the divergence.
 
 > Convention used in this doc:
@@ -15,8 +15,8 @@
 ## 1. CLI Command Pattern
 
 ### 1.1 `BaseCommand` lifecycle
-- **Canonical:** [sccfm_cli/commands/base.py](sccfm_cli/commands/base.py)
-- **Appears in:** every leaf command (e.g. [status.py](sccfm_cli/commands/status.py), [transaction.py](sccfm_cli/commands/transaction.py), [configure.py](sccfm_cli/commands/configure.py)) and every group command (e.g. `inventory/command.py`, `objects/command.py`, `policies/command.py`, `inventory/devices/asa/command.py`, `inventory/devices/ftd/command.py`, `inventory/devices/cdfmc_managed_ftd/command.py`).
+- **Canonical:** [cisco_sccfm_cli/commands/base.py](cisco_sccfm_cli/commands/base.py)
+- **Appears in:** every leaf command (e.g. [status.py](cisco_sccfm_cli/commands/status.py), [transaction.py](cisco_sccfm_cli/commands/transaction.py), [configure.py](cisco_sccfm_cli/commands/configure.py)) and every group command (e.g. `inventory/command.py`, `objects/command.py`, `policies/command.py`, `inventory/devices/asa/command.py`, `inventory/devices/ftd/command.py`, `inventory/devices/cdfmc_managed_ftd/command.py`).
 - **Invariants:**
   - Subclass `BaseCommand`; implement `name`, `help_text`, `handle(ctx, **kwargs)`, and `build_params()`.
   - `handle()` always receives a `click.Context` and `**kwargs`.
@@ -26,14 +26,14 @@
 - **Drift risks:** ad-hoc try/except in handlers, inconsistent exit codes, missing subcommand-fail-through.
 
 ### 1.2 Command registration
-- **Canonical:** [sccfm_cli/cli.py](sccfm_cli/cli.py) `_build_commands()`; group commands store children in `_subcommands` and wire them in `build()`.
+- **Canonical:** [cisco_sccfm_cli/cli.py](cisco_sccfm_cli/cli.py) `_build_commands()`; group commands store children in `_subcommands` and wire them in `build()`.
 - **Invariants:**
   - Top-level commands are explicit (no auto-discovery).
   - Each group command exposes the same `register(group)` / `build()` shape.
   - Sub-trees mirror the directory layout (one `command.py` per group).
 
 ### 1.3 `_dispatch()` error funnel
-- **Canonical:** `BaseCommand._dispatch` in [base.py](sccfm_cli/commands/base.py).
+- **Canonical:** `BaseCommand._dispatch` in [base.py](cisco_sccfm_cli/commands/base.py).
 - **Invariants:**
   - `ApiException` → `SccApiError.from_exception()` → JSON or table format honoring `--format`.
   - `click.ClickException`, `click.Abort`, `click.exceptions.Exit` re-raised untouched.
@@ -46,7 +46,7 @@
 ## 2. Click Options & Shared Option Factories
 
 ### 2.1 Global shared options
-- **Canonical:** [sccfm_cli/commands/shared_options.py](sccfm_cli/commands/shared_options.py)
+- **Canonical:** [cisco_sccfm_cli/commands/shared_options.py](cisco_sccfm_cli/commands/shared_options.py)
 - **Functions and contracts:**
   - `format_option()` → `--format`, `Choice(["table","json"])`, default `"table"`, case-insensitive.
   - `config_path_option()` → `--config-path`, envvar `SCCFM_CONFIG`, resolved `Path`.
@@ -60,20 +60,20 @@
   - Pagination ranges (`1–200` / `0+`) are uniform across every list command.
 
 ### 2.2 Inventory option group
-- **Canonical:** `sccfm_cli/commands/inventory/options.py` — `query_option(help_text=None)` and `inventory_list_params()`.
+- **Canonical:** `cisco_sccfm_cli/commands/inventory/options.py` — `query_option(help_text=None)` and `inventory_list_params()`.
 - **Invariants:**
   - All inventory `list` commands compose from `inventory_list_params()`; never hand-roll.
   - `--query` help text always references "Lucene Query Syntax".
 
 ### 2.3 Device filter options (ASA / FTD / cdFMC)
-- **Canonical:** `sccfm_cli/commands/inventory/devices/asa/shared.py` and `.../ftd/shared.py`.
+- **Canonical:** `cisco_sccfm_cli/commands/inventory/devices/asa/shared.py` and `.../ftd/shared.py`.
 - **Appears in:** every ASA and FTD subcommand that targets devices (upgrade, CLI execution, shun, password, deploy, etc.).
 - **Invariants:**
   - Mutually exclusive: exactly one of `--device-name`, `--query`, `--device-uids`.
   - `--device-uids` is `multiple=True`.
   - `--device-name` supports wildcards (`branch-*`).
   - Default help text strings come from the `_DEFAULT_DEVICE_*_HELP` constants in each `shared.py`; do not duplicate strings inline.
-  - ASA and FTD filters use the canonical device-type constants from `sccfm_core/constants.py`.
+  - ASA and FTD filters use the canonical device-type constants from `cisco_sccfm_core/constants.py`.
 - **Drift risks:** mutual-exclusion checks getting out of sync between ASA and FTD families.
 
 ### 2.4 Boolean / confirmation flags
@@ -88,18 +88,18 @@
 
 ### 3.1 Table vs JSON branching
 - **Canonical examples:**
-  - [sccfm_cli/commands/inventory/devices/rendering.py](sccfm_cli/commands/inventory/devices/rendering.py)
-  - `sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py`
-  - [sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py](sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py)
+  - [cisco_sccfm_cli/commands/inventory/devices/rendering.py](cisco_sccfm_cli/commands/inventory/devices/rendering.py)
+  - `cisco_sccfm_cli/commands/inventory/devices/asa/cli_result_renderer.py`
+  - [cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py](cisco_sccfm_cli/commands/inventory/devices/cdfmc_managed_ftd/cli_result_renderer.py)
   - All `objects/` and `policies/` list/get commands.
 - **Invariants:**
-  - JSON branch uses `print_json(payload)` from `sccfm_cli/utils/json_output.py` — **not** `console.print` (Rich would re-process escapes).
+  - JSON branch uses `print_json(payload)` from `cisco_sccfm_cli/utils/json_output.py` — **not** `console.print` (Rich would re-process escapes).
   - Table branch uses `rich.table.Table(title=..., show_lines=True)` with explicit column styles (`cyan` for identifiers, `magenta`/`green` for state, `dim` for muted).
   - List renderers always emit `Number of entries:` and `Page: X / Y` before the table.
 - **Drift risks:** `console.print(json.dumps(...))` corrupting JSON for downstream tooling.
 
 ### 3.2 Spinner usage
-- **Canonical:** [sccfm_cli/utils/spinner.py](sccfm_cli/utils/spinner.py) — `@with_spinner("...")`.
+- **Canonical:** [cisco_sccfm_cli/utils/spinner.py](cisco_sccfm_cli/utils/spinner.py) — `@with_spinner("...")`.
 - **Invariants:**
   - Decorator respects `ctx.obj.get("silent", False)`.
   - Spinner text must be operation-specific (`"Fetching ASA devices..."`, not `"Working..."`).
@@ -120,10 +120,10 @@
 
 ---
 
-## 4. Service Layer (`sccfm_core`)
+## 4. Service Layer (`cisco_sccfm_core`)
 
 ### 4.1 Service constructor signature
-- **Canonical:** `sccfm_core/services/**/*_service.py`.
+- **Canonical:** `cisco_sccfm_core/services/**/*_service.py`.
 - **Invariants:**
   - `def __init__(self, config: ConfigLike) -> None:`
   - Build the SDK API client once via `ApiClientFactory().build(config)`; store as `self.api`.
@@ -132,13 +132,13 @@
   - Exceptions propagate; do not swallow `ApiException`.
 
 ### 4.2 `ApiClientFactory`
-- **Canonical:** [sccfm_core/factories/api_client_factory.py](sccfm_core/factories/api_client_factory.py)
+- **Canonical:** [cisco_sccfm_core/factories/api_client_factory.py](cisco_sccfm_core/factories/api_client_factory.py)
 - **Invariants:**
   - Sole producer of SDK `ApiClient` instances; nothing instantiates `ApiClient` directly.
   - Region/token resolution lives only here (and in the parallel Ansible `Config`).
 
 ### 4.3 API helpers (raw response handling)
-- **Canonical:** `sccfm_core/services/object_management/object_api_helper.py`, `sccfm_core/services/policy/policy_api_helper.py`.
+- **Canonical:** `cisco_sccfm_core/services/object_management/object_api_helper.py`, `cisco_sccfm_core/services/policy/policy_api_helper.py`.
 - **Invariants:**
   - One helper per API surface.
   - `read_raw_response(response)` → decode → `raise_for_status(status, body)` → `json.loads`.
@@ -153,7 +153,7 @@
 ## 5. Models & Dataclasses
 
 ### 5.1 Frozen dataclass + `from_dict` / `to_dict`
-- **Canonical:** `sccfm_core/models/*.py`, `sccfm_cli/models/config.py`, `sccfm-ansible/plugins/module_utils/config.py`.
+- **Canonical:** `cisco_sccfm_core/models/*.py`, `cisco_sccfm_cli/models/config.py`, `sccfm-ansible/plugins/module_utils/config.py`.
 - **Invariants:**
   - `@dataclass(frozen=True)` for immutable payloads/configs.
   - Type hints on every field; mutable defaults via `field(default_factory=...)`.
@@ -169,7 +169,7 @@
 ## 6. Parsers (ASA CLI text → models)
 
 ### 6.1 Parser function signature
-- **Canonical:** `sccfm_core/parsers/asa_*_parser.py`.
+- **Canonical:** `cisco_sccfm_core/parsers/asa_*_parser.py`.
 - **Invariants:**
   - `parse_<entity>(raw_text: str, ...) -> <Model>` returns a typed dataclass, never a dict.
   - Regexes compiled at module level with `re.compile(..., re.IGNORECASE | re.MULTILINE)` as appropriate.
@@ -178,22 +178,22 @@
   - Helper `_extract(pattern, text, default)` (or equivalent) for safe group access.
 
 ### 6.2 Parser ↔ model ↔ test triple
-- **Invariants:** every parser has (1) a model in `sccfm_core/models/`, (2) a test in `sccfm_core/tests/test_<parser>.py` with realistic CLI fixtures.
+- **Invariants:** every parser has (1) a model in `cisco_sccfm_core/models/`, (2) a test in `cisco_sccfm_core/tests/test_<parser>.py` with realistic CLI fixtures.
 
 ---
 
 ## 7. Transactions & Long-Running Operations
 
 ### 7.1 `TransactionService.wait_for_transaction_to_finish`
-- **Canonical:** [sccfm_core/services/transaction_service.py](sccfm_core/services/transaction_service.py)
+- **Canonical:** [cisco_sccfm_core/services/transaction_service.py](cisco_sccfm_core/services/transaction_service.py)
 - **Invariants:**
-  - Default `polling_interval_sec=10`, `timeout_sec=3600` from `sccfm_core/constants.py`.
+  - Default `polling_interval_sec=10`, `timeout_sec=3600` from `cisco_sccfm_core/constants.py`.
   - Terminal states: `DONE`, `ERROR`, `CANCELLED`.
   - Optional `on_poll(transaction)` callback before/after each poll.
   - Raises `TimeoutError` on timeout.
 
 ### 7.2 CLI `wait_for_transaction` helper on `BaseCommand`
-- **Canonical:** `BaseCommand.wait_for_transaction` in [base.py](sccfm_cli/commands/base.py).
+- **Canonical:** `BaseCommand.wait_for_transaction` in [base.py](cisco_sccfm_cli/commands/base.py).
 - **Invariants:**
   - Honors `--wait`; returns immediately when `False`.
   - Spinner text via `Live(..., console=stderr_console, transient=True)`.
@@ -230,7 +230,7 @@
 ## 9. Configuration & Authentication
 
 ### 9.1 CLI profile loading
-- **Canonical:** `BaseCommand.get_profile`, [sccfm_cli/services/config_service.py](sccfm_cli/services/config_service.py), [sccfm_cli/models/config.py](sccfm_cli/models/config.py).
+- **Canonical:** `BaseCommand.get_profile`, [cisco_sccfm_cli/services/config_service.py](cisco_sccfm_cli/services/config_service.py), [cisco_sccfm_cli/models/config.py](cisco_sccfm_cli/models/config.py).
 - **Invariants:**
   - Global `--profile` (default `"default"`).
   - `--config-path` env var `SCCFM_CONFIG`; default `~/.sccfm-cli/config.json`.
@@ -254,7 +254,7 @@
 ## 10. Errors
 
 ### 10.1 `SccApiError`
-- **Canonical:** [sccfm_core/errors.py](sccfm_core/errors.py).
+- **Canonical:** [cisco_sccfm_core/errors.py](cisco_sccfm_core/errors.py).
 - **Invariants:**
   - `from_exception(ApiException)` parses `errorMsg`, `errorCode`, `details`, `status_code` out of JSON body; falls back to `str(exc)`.
   - `to_dict()` returns the exact keys Ansible expects: `msg`, `error_code`, `error_details`, `status_code`.
@@ -284,7 +284,7 @@
   - No-op updates skip the API call and report `changed=False`.
 
 ### 11.3 Identifier resolution (`uid` vs `name`)
-- **Canonical:** `sccfm_core/services/object_management/utils.py::resolve_uid` and the `identifier_argument_spec()` helper on the Ansible side.
+- **Canonical:** `cisco_sccfm_core/services/object_management/utils.py::resolve_uid` and the `identifier_argument_spec()` helper on the Ansible side.
 - **Invariants:**
   - Exactly one of `uid` or `name` (mutually exclusive, one required).
   - Name resolves via `get_by_name_fn`; UID optionally verified via `get_by_uid_fn`.
@@ -297,7 +297,7 @@
 
 ## 12. Pagination
 
-- **Canonical:** [sccfm_cli/commands/inventory/devices/rendering.py](sccfm_cli/commands/inventory/devices/rendering.py).
+- **Canonical:** [cisco_sccfm_cli/commands/inventory/devices/rendering.py](cisco_sccfm_cli/commands/inventory/devices/rendering.py).
 - **Invariants:**
   - List responses expose `count`, `items`, `limit`, `offset`.
   - Renderers compute `current_page = (offset // limit) + 1`, `total_pages = max(1, ceil(count/limit))`.
@@ -309,7 +309,7 @@
 ## 13. Tests
 
 ### 13.1 CLI test layout
-- **Canonical:** `sccfm_cli/commands/tests/`, `sccfm_cli/services/tests/`.
+- **Canonical:** `cisco_sccfm_cli/commands/tests/`, `cisco_sccfm_cli/services/tests/`.
 - **Invariants:**
   - `cli_runner` (`click.testing.CliRunner`) fixture.
   - `config_path` + `default_config` fixtures for profile setup; uses `tmp_path` and `monkeypatch` for `SCCFM_CONFIG`.
@@ -317,7 +317,7 @@
   - Assertions on `result.exit_code` and `result.output`.
 
 ### 13.2 Core test layout
-- **Canonical:** `sccfm_core/tests/`.
+- **Canonical:** `cisco_sccfm_core/tests/`.
 - **Invariants:** mock SDK API client, parametrize edge cases, parser tests use realistic CLI fixture strings.
 
 ### 13.3 Ansible E2E phase pattern
@@ -373,7 +373,7 @@
   - Every parameter and return type annotated.
   - Use `X | None` (PEP 604), not `Optional[X]`; use `|` unions, not `Union[...]`.
   - Protocols (`ConfigLike`) for duck typing.
-  - mypy strict for both `sccfm_cli` and `sccfm_core`; `py.typed` ships in both.
+  - mypy strict for both `cisco_sccfm_cli` and `cisco_sccfm_core`; `py.typed` ships in both.
 
 ### 15.2 File / symbol naming
 - **Invariants:**
@@ -416,14 +416,14 @@
   - `cz` drives version bumps and `CHANGELOG.md` updates; do not edit version strings by hand.
 
 ### 16.5 Helper scripts
-- **Canonical:** `scripts/` (`devkit_cli.py`, `setup_environment.sh`, `setup_ci_environment.sh`, `setup_tokens.py`, `token_store.py`, `build_ansible_collection.py`, `cz.sh`).
-- **Invariants:** any new repo-wide automation lives in `scripts/` and is exposed via `pyproject.toml` entry points where it's user-facing.
+- **Canonical:** `cisco_sccfm_scripts/` (`devkit_cli.py`, `setup_environment.sh`, `setup_ci_environment.sh`, `setup_tokens.py`, `token_store.py`, `build_ansible_collection.py`, `cz.sh`).
+- **Invariants:** any new repo-wide automation lives in `cisco_sccfm_scripts/` and is exposed via `pyproject.toml` entry points where it's user-facing.
 
 ---
 
 ## 17. Questionary Prompts
 
-- **Canonical:** [scripts/setup_tokens.py](scripts/setup_tokens.py), `sccfm_cli/commands/configure.py`.
+- **Canonical:** [cisco_sccfm_scripts/setup_tokens.py](cisco_sccfm_scripts/setup_tokens.py), `cisco_sccfm_cli/commands/configure.py`.
 - **Invariants:**
   - Use `.unsafe_ask()` (sync API) — never the async variant.
   - `confirm()` for yes/no with explicit `default`.
@@ -436,9 +436,9 @@
 
 ### 18.1 Layer mirroring
 - **Invariants:**
-  - `sccfm_core/services/inventory/*` ↔ `sccfm_cli/commands/inventory/**` ↔ `sccfm-ansible/plugins/modules/*` (inventory & device ops).
-  - `sccfm_core/services/object_management/*` ↔ `sccfm_cli/commands/objects/**` ↔ `sccfm-ansible/plugins/modules/*_network_*`.
-  - `sccfm_core/services/policy/*` ↔ `sccfm_cli/commands/policies/**` ↔ (planned) Ansible policy modules.
+  - `cisco_sccfm_core/services/inventory/*` ↔ `cisco_sccfm_cli/commands/inventory/**` ↔ `sccfm-ansible/plugins/modules/*` (inventory & device ops).
+  - `cisco_sccfm_core/services/object_management/*` ↔ `cisco_sccfm_cli/commands/objects/**` ↔ `sccfm-ansible/plugins/modules/*_network_*`.
+  - `cisco_sccfm_core/services/policy/*` ↔ `cisco_sccfm_cli/commands/policies/**` ↔ (planned) Ansible policy modules.
   - New service ⇒ matching CLI command + Ansible module + e2e playbook + tests in all three layers.
 
 ### 18.2 Per-feature folder layout
@@ -449,7 +449,7 @@
 ## 19. Special / Cross-Cutting Patterns
 
 ### 19.1 `warnings.catch_warnings` to silence Pydantic noise
-- **Canonical:** `sccfm_core/services/object_management/network_group_service.py`.
+- **Canonical:** `cisco_sccfm_core/services/object_management/network_group_service.py`.
 - **Invariants:** scoped via context manager, with a comment explaining the SDK warning being suppressed.
 
 ### 19.2 `cast(...)` for kwargs unpacked from Click
@@ -462,7 +462,7 @@
 
 ## 20. Constants & Enums
 
-- **Canonical:** [sccfm_core/constants.py](sccfm_core/constants.py).
+- **Canonical:** [cisco_sccfm_core/constants.py](cisco_sccfm_core/constants.py).
 - **Invariants:**
   - `ASA_ENTITY_TYPES`, `FTD_ENTITY_TYPES`, `FTD_LICENSES`, `FTDV_PERFORMANCE_TIERS`, etc. defined once.
   - No magic strings/lists in command/service code — import from `constants.py`.
@@ -522,5 +522,5 @@
 - [ ] **Tests:** CLI test uses `cli_runner` + monkeypatched services; core test mocks SDK; parser test has realistic fixture.
 - [ ] **Style:** `from __future__ import annotations`, PEP 604 unions, no untyped code, files under `command.py` / `shared.py` / `*_renderer.py` / `*_parser.py` / `*_service.py` naming.
 - [ ] **Cross-layer:** new capability lands in core service + CLI command + Ansible module + docs + examples + tests.
-- [ ] **Constants:** no magic strings; new shared values added to `sccfm_core/constants.py`.
+- [ ] **Constants:** no magic strings; new shared values added to `cisco_sccfm_core/constants.py`.
 - [ ] **Commits:** conventional-commit prefixes; CHANGELOG handled by `cz`, not by hand.

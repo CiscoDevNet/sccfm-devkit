@@ -9,13 +9,13 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
-from sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.ftd_cli_result import FtdBulkCliResult
-from sccfm_core.services.inventory.ftd_cli_service import (
+from cisco_sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult
+from cisco_sccfm_core.services.inventory.ftd_cli_service import (
     FtdCommandLineService,
     _validate_show_command,
 )
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

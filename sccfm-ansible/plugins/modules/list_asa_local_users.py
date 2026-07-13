@@ -10,9 +10,14 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaCommandLineService, InventoryService, SccApiError
-from sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import (
+    ASA_DEVICE_TYPE_FILTER,
+    AsaCommandLineService,
+    InventoryService,
+    SccApiError,
+)
+from cisco_sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

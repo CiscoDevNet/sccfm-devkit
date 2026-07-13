@@ -10,7 +10,7 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 
 from ..module_utils.config import base_argument_spec, create_config
 

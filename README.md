@@ -1,9 +1,9 @@
 # sccfm-devkit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
-Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python package with the
-`sccfm-cli` command, a reusable `sccfm_core` automation library, and an Ansible
-collection. Shared business logic lives in `sccfm_core` so the CLI, Python scripts,
-and collection can reuse the same SDK integrations.
+Toolkit for interacting with Security Cloud Control Firewall Manager (SCCFM): a Python
+package with the `sccfm-cli` command, a reusable `cisco_sccfm_core` automation library,
+and an Ansible collection. Shared business logic lives in `cisco_sccfm_core` so the CLI,
+Python scripts, and collection can reuse the same SDK integrations.
 
 **Documentation:** [Generated CLI and Ansible reference](https://ciscodevnet.github.io/sccfm-devkit/)
 
@@ -25,8 +25,8 @@ and collection can reuse the same SDK integrations.
 ## Getting started
 
 ```bash
-scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
-source scripts/activate.sh     # activates the project virtualenv
+cisco_sccfm_scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
+source cisco_sccfm_scripts/activate.sh     # activates the project virtualenv
 sccfm-cli --help               # the main SCCFM CLI
 devkit                         # interactive developer toolkit menu
 ```
@@ -42,7 +42,7 @@ devkit                         # interactive developer toolkit menu
 - `sccfm-cli inventory devices asa change-boot-image --image-path disk0:/asa9xxx.bin ...`: Changes the configured ASA boot image for the next reload. The image must already exist on the device; the command does not upload or reboot. `--check` performs non-mutating validation of the image path and containing filesystem before any change.
 
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
-Every command lives in `sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
+Every command lives in `cisco_sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
 
 Generated CLI reference docs can be previewed locally:
 
@@ -64,13 +64,13 @@ See [docs/README.md](docs/README.md) for generation details.
 
 ## Python library
 
-Installing the `sccfm` package also exposes `sccfm_core`, a typed high-level Python
-automation library built on top of the generated `scc-firewall-manager-sdk`.
+Installing the `cisco-sccfm-devkit` package also exposes `cisco_sccfm_core`, a typed high-level
+Python automation library built on top of the generated `scc-firewall-manager-sdk`.
 
 ```python
 from dataclasses import dataclass
 
-from sccfm_core import InventoryService
+from cisco_sccfm_core import InventoryService
 
 
 @dataclass(frozen=True)
@@ -84,7 +84,7 @@ devices = inventory.get_devices(limit=10, offset=0, query=None)
 ```
 
 The package root exports the supported public service classes and response models through
-`sccfm_core.__all__`. Internal modules may change between releases.
+`cisco_sccfm_core.__all__`. Internal modules may change between releases.
 
 ## Ansible collection
 
@@ -102,7 +102,7 @@ The package root exports the supported public service classes and response model
 All common development tasks are available through the interactive `devkit` menu:
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 devkit
 ```
 
@@ -126,13 +126,13 @@ After a task completes you're returned to the menu — select **Exit** when done
 The underlying tools are still available directly if needed:
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 pytest
-mypy sccfm_cli
+mypy cisco_sccfm_cli
 black .
 ```
 
-See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expectations. The setup script also installs a local `git cz` alias that runs `./scripts/cz.sh commit` so you can use `git cz` for conventional commits with visible pre-commit output.
+See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expectations. The setup script also installs a local `git cz` alias that runs `./cisco_sccfm_scripts/cz.sh commit` so you can use `git cz` for conventional commits with visible pre-commit output.
 
 ## CLI Installation
 
@@ -142,13 +142,13 @@ For end users, install the published PyPI package with `pipx` when possible. `pi
 keeps the CLI isolated while exposing `sccfm-cli` on `PATH`:
 
 ```bash
-pipx install sccfm
+pipx install cisco-sccfm-devkit
 ```
 
 Installing into a virtual environment with `pip` is also supported:
 
 ```bash
-python -m pip install sccfm
+python -m pip install cisco-sccfm-devkit
 ```
 
 See `INSTALL.md` for installation options and shell completion.
@@ -159,7 +159,7 @@ Key tooling:
 - `pytest`, `coverage`, `mypy`, `black`, `isort`, and `pre-commit` enforce correctness and consistency.
 - ASA disk discovery can help operators find likely image paths before using `change-boot-image`, and `change-boot-image --check` validates the chosen path on-device before mutating config.
 
-To add a new command, drop a file under `sccfm_cli/commands/`, subclass `BaseCommand`, and register it in `sccfm_cli/cli.py`. SDK integrations live in `sccfm_core/`, keeping external dependencies isolated and easy to reuse (CLI or Ansible).
+To add a new command, drop a file under `cisco_sccfm_cli/commands/`, subclass `BaseCommand`, and register it in `cisco_sccfm_cli/cli.py`. SDK integrations live in `cisco_sccfm_core/`, keeping external dependencies isolated and easy to reuse (CLI or Ansible).
 
 ## Troubleshooting
 
@@ -172,10 +172,14 @@ If tests fail with messages like `Usage: group inventory devices asa [OPTIONS] C
 ```bash
 poetry install  # Reinstall the package in editable mode
 find . -type d -name "__pycache__" -exec rm -rf {} +  # Clear all bytecode caches
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 pytest  # Rerun tests
 ```
 
 **Why this happens:** When you modify command structure or add new CLI commands, Python's `__pycache__` directories can retain old `.pyc` files that don't reflect your changes. Tests then run against the cached version instead of your updated source code.
 
 **Prevention:** After modifying command registrations or CLI structure, always reinstall the package and clear caches before running tests.
+
+## License
+
+Distributed under the Apache 2.0 License. See [LICENSE](LICENSE) for more information.

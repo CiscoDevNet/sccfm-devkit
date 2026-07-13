@@ -9,8 +9,8 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaShunService, InventoryService, SccApiError
-from sccfm_core.services.inventory.asa_shun_service import ShunEntrySpec
+from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaShunService, InventoryService, SccApiError
+from cisco_sccfm_core.services.inventory.asa_shun_service import ShunEntrySpec
 
 from ..module_utils.config import base_argument_spec, create_config
 

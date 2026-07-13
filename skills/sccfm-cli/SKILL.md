@@ -1,9 +1,9 @@
 ---
 name: sccfm-cli
-description: Use the customer-facing SCC Firewall Manager CLI by discovering the live schema, validating command metadata, and either executing or generating safe sccfm-cli commands without hardcoded command knowledge.
+description: Use the customer-facing SCC Firewall Manager CLI by discovering the live schema, validating command metadata, and either executing or generating safe sccfm-cli commands without hardcoded command knowledge. Use for SCCFM CLI workflows; use the sccfm-ansible skill instead for cisco.sccfm Ansible playbooks, inventories, and modules.
 when_to_use: When the user asks to use, install, configure, inspect, or generate commands for sccfm-cli or SCC Firewall Manager CLI workflows.
 argument-hint: "[describe the SCCFM CLI task]"
-allowed-tools: "Bash(command -v *) Bash(sccfm-cli *) Bash(source scripts/activate.sh) Bash(brew *) Bash(pipx *) Bash(jq *) Read Grep Glob"
+allowed-tools: "Bash(command -v *) Bash(sccfm-cli *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(brew *) Bash(pipx *) Bash(jq *) Read Grep Glob"
 ---
 
 # SCC Firewall Manager CLI
@@ -14,6 +14,13 @@ not hardcode command names, options, examples, or behavior.
 
 This skill operates against customer SCC Firewall Manager environments. Optimize
 for customer safety first and convenience second.
+
+## Scope: CLI vs. Ansible
+
+This skill covers only the `sccfm-cli` command-line tool. For `cisco.sccfm`
+Ansible playbooks, inventory files, modules, or the inventory plugin, use the
+`sccfm-ansible` skill. For requests spanning both surfaces, apply each skill only
+to its respective operations.
 
 ## Core Rules
 
@@ -107,7 +114,7 @@ Follow these checks in order:
 1. Run `command -v sccfm-cli`.
    - If found, the invocation prefix is `sccfm-cli`.
 2. If you are inside this repository, the binary is not on `PATH`, and
-   `scripts/activate.sh` exists, run `source scripts/activate.sh` once for the
+   `cisco_sccfm_scripts/activate.sh` exists, run `source cisco_sccfm_scripts/activate.sh` once for the
    shell session, then resolve again. Do not use `poetry run`.
 3. Only install or perform setup when the user explicitly asks for it.
 4. Otherwise, stop and tell the user the CLI is not installed or not on `PATH`.

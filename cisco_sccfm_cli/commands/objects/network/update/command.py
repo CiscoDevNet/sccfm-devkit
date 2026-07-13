@@ -1,0 +1,119 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
+from __future__ import annotations
+
+from typing import Any, Sequence, cast
+
+import click
+from rich.table import Table
+
+from cisco_sccfm_cli.commands.base import BaseCommand
+from cisco_sccfm_cli.commands.objects.options import object_update_params, parse_tags
+from cisco_sccfm_cli.commands.objects.utils import (
+    check_object_exists,
+    validate_has_updates,
+    validate_identifier,
+)
+from cisco_sccfm_cli.utils import print_json, with_spinner
+from cisco_sccfm_core.errors import NotFoundError
+from cisco_sccfm_core.services import NetworkObjectService
+from cisco_sccfm_core.services.object_management import NetworkObjectResponse
+
+
+class UpdateNetworkObjectCommand(BaseCommand):
+    """Update a network object in SCC Firewall Manager."""
+
+    @property
+    def name(self) -> str:
+        return "update"
+
+    @property
+    def help_text(self) -> str:
+        return "Update a network object."
+
+    def build_params(self) -> Sequence[click.Parameter]:
+        return object_update_params()
+
+    @with_spinner("Updating network object...")
+    def handle(self, ctx: click.Context, **kwargs: Any) -> None:
+        uid = cast(str | None, kwargs.get("uid"))
+        name = cast(str | None, kwargs.get("name"))
+        check = cast(bool, kwargs.get("check", False))
+        output_format = cast(str, kwargs.get("format"))
+
+        validate_identifier(ctx, uid=uid, name=name)
+
+        config = self.get_profile(ctx=ctx, **kwargs)
+        service = NetworkObjectService(config)
+
+        if check:
+            check_object_exists(
+                console=self.console,
+                uid=uid,
+                name=name,
+                get_by_uid_fn=service.get_network_object,
+                get_by_name_fn=service.get_network_object_by_name,
+                object_name="Network object",
+                output_format=output_format,
+                operation="update",
+            )
+            return
+
+        new_name = cast(str | None, kwargs.get("new_name"))
+        value = cast(str | None, kwargs.get("value"))
+        description = cast(str | None, kwargs.get("description"))
+        labels_tuple = kwargs.get("labels")
+        labels = list(labels_tuple) if labels_tuple else None
+        tags_tuple = cast(tuple[str, ...] | None, kwargs.get("tags"))
+        tags = parse_tags(tags_tuple)
+
+        validate_has_updates(
+            ctx,
+            fields={
+                "new_name": new_name,
+                "value": value,
+                "description": description,
+                "labels": labels,
+                "tags": tags,
+            },
+            field_names=["--new-name", "--value", "--description", "--labels", "--tags"],
+        )
+
+        try:
+            response: NetworkObjectResponse = service.update_network_object(
+                uid=uid,
+                name=name,
+                new_name=new_name,
+                value=value,
+                description=description,
+                labels=labels,
+                tags=tags,
+            )
+            self._render_response(response, output_format)
+        except NotFoundError as e:
+            ctx.fail(str(e))
+
+    def _render_response(
+        self,
+        response: NetworkObjectResponse,
+        output_format: str,
+    ) -> None:
+        if output_format == "json":
+            print_json(response.to_dict())
+            return
+
+        table = Table(title="Network Object", width=120)
+        table.add_column("UID")
+        table.add_column("Name")
+        table.add_column("Type")
+        table.add_column("Literal")
+        table.add_row(
+            response.uid or "-",
+            response.name or "-",
+            response.object_type or "-",
+            response.literal or "-",
+        )
+        self.console.print("[green]✓[/green] Network object updated")
+        self.console.print(table)
