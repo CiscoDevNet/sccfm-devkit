@@ -336,6 +336,7 @@ def _read_until_prompt(channel: paramiko.Channel, timeout: int) -> str:
                 buffer += chunk
                 if not confirmed and _CONFIRM_PROMPT.search(buffer):
                     channel.send("yes\n")
+                    buffer += "\n"
                     confirmed = True
                 # Only stop when the prompt occupies its own line, so a banner or
                 # EULA line that merely ends in '>' (e.g. "... read the EULA -->")

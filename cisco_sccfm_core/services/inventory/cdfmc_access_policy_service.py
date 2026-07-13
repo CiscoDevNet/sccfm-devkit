@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from scc_firewall_manager_sdk import ApiClient
@@ -52,7 +53,8 @@ class CdfmcAccessPolicyService:
             collection_formats=None,
         )
         response = self._api_client.call_api(*params)
-        response.read()  # type: ignore[no-untyped-call]
+        read_response: Callable[[], object] = response.read
+        read_response()
         data = json.loads(response.data)
         items = [
             FmcAccessPolicy(uid=item["id"], name=item["name"]) for item in data.get("items", [])

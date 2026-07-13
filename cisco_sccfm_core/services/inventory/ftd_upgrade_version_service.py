@@ -11,10 +11,6 @@ from scc_firewall_manager_sdk import ApiException, DeviceUpgradesApi, FtdVersion
 from cisco_sccfm_core.errors import SccApiError
 from cisco_sccfm_core.factories import ApiClientFactory
 from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
-from cisco_sccfm_core.services.inventory.asa_upgrade_version_service import (
-    _version_sort_key,
-    is_version_downgrade,
-)
 from cisco_sccfm_core.types import ConfigLike
 from cisco_sccfm_core.utils import validate_uids
 
@@ -63,7 +59,8 @@ def resolve_upgrade_package_uid(
     """
     for v in compatible_versions:
         if v.software_version == software_version:
-            return v.upgrade_package_uid
+            package_uid = v.upgrade_package_uid
+            return package_uid if isinstance(package_uid, str) else None
     return None
 
 
