@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 from plugins.modules import register_cdfmc_ftd  # noqa: E402
 from scc_firewall_manager_sdk import ConfigState, ConnectivityState, Device, EntityType
 
@@ -42,6 +44,13 @@ def mock_module_instance(base_module_params: dict[str, Any]) -> MagicMock:
     mock_module.exit_json.side_effect = SystemExit(0)
     mock_module.fail_json.side_effect = SystemExit(1)
     return mock_module
+
+
+def test_module_is_in_all_action_group() -> None:
+    runtime_path = Path(__file__).parents[3] / "meta" / "runtime.yml"
+    runtime = yaml.safe_load(runtime_path.read_text(encoding="utf-8"))
+
+    assert "register_cdfmc_ftd" in runtime["action_groups"]["cisco.sccfm.all"]
 
 
 @patch("plugins.modules.register_cdfmc_ftd.Config")

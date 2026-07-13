@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device
 
@@ -52,11 +54,17 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Register vFTD with cdFMC
-  cisco.sccfm.register_cdfmc_ftd:
-    ftd_uid: "{{ ftd_onboard_result.device.uid }}"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+- name: Register vFTD with cdFMC using shared authentication defaults
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+  tasks:
+    - name: Complete the FTD registration
+      cisco.sccfm.register_cdfmc_ftd:
+        ftd_uid: "{{ ftd_onboard_result.device.uid }}"
 """
 
 RETURN = r"""
@@ -68,7 +76,7 @@ device:
 """
 
 
-def build_argument_spec() -> dict:
+def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "ftd_uid": {"type": "str", "required": True},
         "skip_initial_deployment": {"type": "bool", "required": False, "default": False},
