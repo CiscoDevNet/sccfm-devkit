@@ -13,17 +13,17 @@ from scc_firewall_manager_sdk import (
     DevicePage,
 )
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
-from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
-from sccfm_core.services.inventory import (
+from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
+from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
+from cisco_sccfm_core.services.inventory import (
     AsaUpgradeService,
     AsaUpgradeVersionService,
     get_asdm_compatibility_info,
     is_version_downgrade,
 )
-from sccfm_core.services.transaction_service import TransactionService
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core.services.transaction_service import TransactionService
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

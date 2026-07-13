@@ -8,7 +8,7 @@ title: Local Preview
 Generate and validate the local docs from the repository root:
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 sync-docs-readme
 generate-cli-docs
 generate-cli-man-docs

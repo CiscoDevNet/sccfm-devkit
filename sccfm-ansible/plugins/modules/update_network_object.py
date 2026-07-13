@@ -9,8 +9,8 @@ from typing import Any
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core.errors import NotFoundError, SccApiError
-from sccfm_core.services.object_management import NetworkObjectResponse, NetworkObjectService
+from cisco_sccfm_core.errors import NotFoundError, SccApiError
+from cisco_sccfm_core.services.object_management import NetworkObjectResponse, NetworkObjectService
 
 from ..module_utils.config import (
     Config,

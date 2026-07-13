@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
 from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core.errors import NotFoundError, SccApiError
+from cisco_sccfm_core.errors import NotFoundError, SccApiError
 
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule

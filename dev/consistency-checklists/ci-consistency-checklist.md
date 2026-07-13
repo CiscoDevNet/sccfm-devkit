@@ -57,7 +57,7 @@ If the PR touches one of these areas, check all related siblings and fail the re
 ### A. Region, auth, and environment contract
 
 Check when touching:
-- `sccfm_cli/commands/configure.py`
+- `cisco_sccfm_cli/commands/configure.py`
 - `sccfm-ansible/plugins/module_utils/config.py`
 - `.env.example`
 - `README.md`
@@ -98,8 +98,8 @@ Fail if:
 
 Check when touching:
 - any CLI command renderer or `_render_*` method
-- `sccfm_cli/commands/base.py`
-- `sccfm_cli/commands/inventory/devices/rendering.py`
+- `cisco_sccfm_cli/commands/base.py`
+- `cisco_sccfm_cli/commands/inventory/devices/rendering.py`
 
 Verify:
 - JSON mode uses one consistent machine-readable contract.
@@ -113,7 +113,7 @@ Fail if:
 ### D. Async transaction contract
 
 Check when touching:
-- `sccfm_core/services/transaction_service.py`
+- `cisco_sccfm_core/services/transaction_service.py`
 - async inventory services
 - upgrade, onboard, deploy, shun, CLI execution flows
 - CLI/Ansible timeout settings
@@ -216,20 +216,20 @@ Warn only if:
 
 Use this map to decide which sibling surfaces to inspect beyond the diff.
 
-### If changed path starts with `sccfm_cli/commands/`
+### If changed path starts with `cisco_sccfm_cli/commands/`
 
 Also inspect as relevant:
-- `sccfm_cli/commands/base.py`
-- `sccfm_cli/commands/shared_options.py`
+- `cisco_sccfm_cli/commands/base.py`
+- `cisco_sccfm_cli/commands/shared_options.py`
 - sibling command families under the same feature tree
-- matching tests under `sccfm_cli/commands/tests/`
+- matching tests under `cisco_sccfm_cli/commands/tests/`
 - matching docs/examples if the command is public-facing
 
-### If changed path starts with `sccfm_core/services/`
+### If changed path starts with `cisco_sccfm_core/services/`
 
 Also inspect as relevant:
 - sibling services in the same family
-- `sccfm_core/constants.py`
+- `cisco_sccfm_core/constants.py`
 - matching CLI and Ansible entry points that consume the service
 - matching tests and parser/model clusters
 

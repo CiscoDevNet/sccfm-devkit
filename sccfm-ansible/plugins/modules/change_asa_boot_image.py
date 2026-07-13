@@ -16,10 +16,10 @@ from scc_firewall_manager_sdk import (
     DevicePage,
 )
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
-from sccfm_core.services.inventory import AsaBootImageService
-from sccfm_core.utils import validate_asa_image_path
+from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+from cisco_sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
+from cisco_sccfm_core.services.inventory import AsaBootImageService
+from cisco_sccfm_core.utils import validate_asa_image_path
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

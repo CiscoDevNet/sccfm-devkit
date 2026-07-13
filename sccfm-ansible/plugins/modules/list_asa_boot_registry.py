@@ -9,9 +9,14 @@ from typing import Any, cast
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaBootRegistryService, InventoryService, SccApiError
-from sccfm_core.models.asa_boot_registry import AsaBootRegistry
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import (
+    ASA_DEVICE_TYPE_FILTER,
+    AsaBootRegistryService,
+    InventoryService,
+    SccApiError,
+)
+from cisco_sccfm_core.models.asa_boot_registry import AsaBootRegistry
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

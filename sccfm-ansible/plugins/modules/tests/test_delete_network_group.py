@@ -11,7 +11,7 @@ import pytest
 from plugins.modules import delete_network_group  # noqa: E402
 from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core.errors import NotFoundError
+from cisco_sccfm_core.errors import NotFoundError
 
 
 @pytest.fixture

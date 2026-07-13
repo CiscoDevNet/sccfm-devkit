@@ -19,7 +19,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.models.asa_boot_registry import AsaBootRegistry
+from cisco_sccfm_core.models.asa_boot_registry import AsaBootRegistry
 
 
 @pytest.fixture

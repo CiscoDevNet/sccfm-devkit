@@ -15,9 +15,9 @@ from scc_firewall_manager_sdk import (
     ZtpOnboardingInput,
 )
 
-from sccfm_core import InventoryService, SccApiError
-from sccfm_core.services.inventory import FtdZtpOnboardService
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import InventoryService, SccApiError
+from cisco_sccfm_core.services.inventory import FtdZtpOnboardService
+from cisco_sccfm_core.types import ConfigLike
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 

@@ -39,7 +39,7 @@ reserve breaking changes until the next major version release.
 
 ## Development Setup
 
-1. Run `scripts/setup_environment.sh` to install dependencies and create the virtualenv.
+1. Run `cisco_sccfm_scripts/setup_environment.sh` to install dependencies and create the virtualenv.
 
 2. Install [direnv](https://direnv.net/) for automatic environment activation:
 
@@ -64,7 +64,7 @@ We enforce conventional commits via Commitizen. Please:
 
 - Ensure the virtualenv is active (happens automatically with direnv, or run `source .venv/bin/activate`).
 - Install the `pre-commit` hooks (`pre-commit install && pre-commit install --hook-type commit-msg`).
-- Use `./scripts/cz.sh commit` (runs `pre-commit` visibly, then Commitizen) or `poetry run cz commit` to create commits, or ensure your commit messages
+- Use `./cisco_sccfm_scripts/cz.sh commit` (runs `pre-commit` visibly, then Commitizen) or `poetry run cz commit` to create commits, or ensure your commit messages
   follow the Conventional Commits spec (e.g., `feat: add inventory manager list pagination`).
 - CI will fail if commit messages do not comply.
 

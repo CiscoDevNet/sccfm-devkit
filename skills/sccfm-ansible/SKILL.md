@@ -1,7 +1,7 @@
 ---
 name: sccfm-ansible
-description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules and inventory plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use when the user asks to use, install, configure, inspect, generate, run, or debug cisco.sccfm Ansible modules, inventory, vault, playbooks, or SCC Firewall Manager automation through Ansible. Do NOT use for sccfm-cli commands, Jira/Confluence work, architecture design, or non-Ansible tasks.
-allowed-tools: "Bash(command -v *) Bash(source scripts/activate.sh) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(devkit *) Bash(jq *) Read Grep Glob Write Edit"
+description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules and inventory plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use for cisco.sccfm Ansible modules, inventory, vault, and playbook workflows. Do NOT use for sccfm-cli commands; use the sccfm-cli skill instead. Do not use for Jira/Confluence work, architecture design, or non-Ansible tasks.
+allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(devkit *) Bash(jq *) Read Grep Glob Write Edit"
 ---
 
 # SCC Firewall Manager Ansible Collection
@@ -14,6 +14,13 @@ behavior.
 
 This skill operates against customer SCC Firewall Manager environments and
 managed devices. Optimize for customer safety first and convenience second.
+
+## Scope: Ansible vs. CLI
+
+This skill covers only the `cisco.sccfm` Ansible collection (modules and the
+inventory plugin). For `sccfm-cli` command-line invocations, use the `sccfm-cli`
+skill. For requests spanning both surfaces, apply each skill only to its
+respective operations.
 
 ## Core Rules
 
@@ -123,7 +130,7 @@ before execution.
 Follow these checks in order:
 1. Run `command -v ansible-doc`.
 2. If you are inside this repository, `ansible-doc` is missing, and
-   `scripts/activate.sh` exists, run `source scripts/activate.sh` once for the
+   `cisco_sccfm_scripts/activate.sh` exists, run `source cisco_sccfm_scripts/activate.sh` once for the
    shell session, then resolve again. Do not use `poetry run`.
 3. Run discovery:
 

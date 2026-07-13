@@ -9,9 +9,9 @@ on:
       - ready_for_review
     paths:
       - ".github/workflows/consistency-check.yml"
-      - "scripts/consistency_check.py"
-      - "sccfm_cli/**/*.py"
-      - "sccfm_core/**/*.py"
+      - "cisco_sccfm_scripts/consistency_check.py"
+      - "cisco_sccfm_cli/**/*.py"
+      - "cisco_sccfm_core/**/*.py"
       - "sccfm-ansible/plugins/**/*.py"
 
 jobs:
@@ -49,7 +49,7 @@ jobs:
         run: |
           set +e
           report_txt="consistency-report.txt"
-          poetry run python scripts/consistency_check.py \
+          poetry run python cisco_sccfm_scripts/consistency_check.py \
             --base "${{ github.base_ref }}" \
             --fail-on-warning | tee "$report_txt"
           exit_code=${PIPESTATUS[0]}
