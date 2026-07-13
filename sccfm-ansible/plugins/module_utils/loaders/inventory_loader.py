@@ -9,9 +9,9 @@ from typing import List, Optional
 from ansible.errors import AnsibleParserError
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage
 
-from sccfm_core import SccApiError
-from sccfm_core.services import InventoryService
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import SccApiError
+from cisco_sccfm_core.services import InventoryService
+from cisco_sccfm_core.types import ConfigLike
 
 
 class InventoryLoader:

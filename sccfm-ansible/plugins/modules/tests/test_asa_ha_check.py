@@ -19,14 +19,14 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.models.asa_failover_status import (
+from cisco_sccfm_core.models.asa_failover_status import (
     AsaFailoverInterface,
     AsaFailoverStatus,
     AsaFailoverUnit,
     HaCheckResult,
 )
-from sccfm_core.services import AsaHaCheckReport
-from sccfm_core.services.inventory.asa_ha_check_service import UnmonitoredInterface
+from cisco_sccfm_core.services import AsaHaCheckReport
+from cisco_sccfm_core.services.inventory.asa_ha_check_service import UnmonitoredInterface
 
 UID_1 = "11111111-1111-4111-8111-111111111111"
 

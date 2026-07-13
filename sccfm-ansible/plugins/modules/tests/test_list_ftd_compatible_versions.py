@@ -19,7 +19,7 @@ from scc_firewall_manager_sdk import (
     FtdVersion,
 )
 
-from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
+from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 
 
 @pytest.fixture

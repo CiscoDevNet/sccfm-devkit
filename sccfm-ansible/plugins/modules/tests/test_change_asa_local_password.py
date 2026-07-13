@@ -19,7 +19,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
+from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
 
 
 @pytest.fixture

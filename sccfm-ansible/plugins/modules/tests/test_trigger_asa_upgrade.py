@@ -19,7 +19,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
+from cisco_sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
 
 
 def _make_device(

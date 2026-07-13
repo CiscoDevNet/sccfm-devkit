@@ -8,7 +8,7 @@ from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule, env_fallback
 
-from sccfm_core.services.inventory import (
+from cisco_sccfm_core.services.inventory import (
     FtdConfigureManagerError,
     FtdConfigureManagerService,
     parse_jump_host,

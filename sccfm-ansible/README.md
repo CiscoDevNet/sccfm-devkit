@@ -70,7 +70,7 @@ build-ansible-collection
 
 This will:
 1. Initialize the poetry virtual environment (if needed)
-2. Install Python dependencies (`sccfm_core`, `sccfm_cli`, etc.)
+2. Install Python dependencies (`cisco_sccfm_core`, `cisco_sccfm_cli`, etc.)
 3. Install the Ansible collection
 
 ## Trying out examples

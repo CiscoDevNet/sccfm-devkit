@@ -8,7 +8,7 @@ from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
 
-from sccfm_core.services.object_management import NetworkGroupService
+from cisco_sccfm_core.services.object_management import NetworkGroupService
 
 from ..module_utils.config import (
     Config,

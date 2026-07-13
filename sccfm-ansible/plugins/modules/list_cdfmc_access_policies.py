@@ -9,8 +9,8 @@ from typing import Any
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException
 
-from sccfm_core import SccApiError
-from sccfm_core.services.inventory.cdfmc_access_policy_service import CdfmcAccessPolicyService
+from cisco_sccfm_core import SccApiError
+from cisco_sccfm_core.services.inventory.cdfmc_access_policy_service import CdfmcAccessPolicyService
 
 from ..module_utils.config import base_argument_spec, create_config
 
