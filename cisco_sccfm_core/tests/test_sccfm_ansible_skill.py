@@ -8,10 +8,39 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL_PATH = ROOT / "skills" / "sccfm-ansible" / "SKILL.md"
+CLI_SKILL_PATH = ROOT / "skills" / "sccfm-cli" / "SKILL.md"
 
 
 def _skill_text() -> str:
     return SKILL_PATH.read_text(encoding="utf-8")
+
+
+def _cli_skill_text() -> str:
+    return CLI_SKILL_PATH.read_text(encoding="utf-8")
+
+
+def _frontmatter(skill: str) -> str:
+    return skill.split("---", maxsplit=2)[1]
+
+
+def test_sccfm_skills_route_cli_and_ansible_requests_explicitly() -> None:
+    ansible_skill = _skill_text()
+    cli_skill = _cli_skill_text()
+    ansible_routing = ansible_skill.replace("\n", " ")
+    cli_routing = cli_skill.replace("\n", " ")
+    mixed_request_rule = (
+        "For requests spanning both surfaces, apply each skill only to its respective "
+        "operations."
+    )
+
+    assert "use the sccfm-ansible skill instead" in _frontmatter(cli_skill)
+    assert "use the sccfm-cli skill instead" in _frontmatter(ansible_skill)
+    assert "use the `sccfm-ansible` skill" in cli_routing
+    assert "use the `sccfm-cli` skill" in ansible_routing
+    assert mixed_request_rule in cli_routing
+    assert mixed_request_rule in ansible_routing
+    assert "unless the user explicitly wants the CLI" not in cli_skill
+    assert "unless the user explicitly wants Ansible" not in ansible_skill
 
 
 def test_sccfm_ansible_skill_is_ansible_doc_driven() -> None:
