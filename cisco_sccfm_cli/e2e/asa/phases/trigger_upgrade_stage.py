@@ -24,11 +24,13 @@ from cisco_sccfm_cli.e2e.asa.phases.test_data import (
 
 
 def run(ctx: ProfileContext) -> None:
-    if not ASA_UPGRADE_SOFTWARE_VERSION:
+    software_version = ASA_UPGRADE_SOFTWARE_VERSION
+    if not software_version:
         pytest.skip(
             "ASA upgrade software version not configured "
             "(set SCCFM_E2E_ASA_UPGRADE_SOFTWARE_VERSION)"
         )
+        return
 
     args: list[str] = [
         "inventory",
@@ -39,7 +41,7 @@ def run(ctx: ProfileContext) -> None:
         "--query",
         ASA_TEST_QUERY,
         "--software-version",
-        ASA_UPGRADE_SOFTWARE_VERSION,
+        software_version,
     ]
     if ASA_UPGRADE_ASDM_VERSION:
         args += ["--asdm-version", ASA_UPGRADE_ASDM_VERSION]

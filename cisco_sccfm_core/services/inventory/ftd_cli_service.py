@@ -95,7 +95,7 @@ class FtdCommandLineService:
         if not managers:
             raise ValueError("No cdFMC manager found in this tenant.")
         domain_uid = managers[0].fmc_domain_uid
-        if not domain_uid:
+        if not isinstance(domain_uid, str) or not domain_uid:
             raise ValueError("cdFMC manager has no domain UID.")
         return domain_uid
 

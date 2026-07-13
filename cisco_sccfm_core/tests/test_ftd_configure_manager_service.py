@@ -155,6 +155,34 @@ def test_success_output_removes_echoed_cli_key(monkeypatch: MonkeyPatch) -> None
     assert "natid456" not in result.output
 
 
+def test_license_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> None:
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",  # initial prompt
+            (
+                b"If you enabled any feature licenses, you must disable them in Secure "
+                b"Firewall Device Manager before deleting the local manager.\r\n"
+                b"Do you want to continue[yes/no]: "
+            ),
+            b"Manager successfully configured.\r\n> ",  # after yes
+        ]
+    )
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    result = _service().configure_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        cli_key=_CLI_KEY,
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert channel.sent == [_CLI_KEY + "\n", "yes\n"]
+
+
 def test_banner_line_ending_in_arrow_does_not_end_read_early(monkeypatch: MonkeyPatch) -> None:
     # A login banner line ending in "-->" must not be mistaken for the CLI
     # prompt; the read must continue until "> " on its own line.
