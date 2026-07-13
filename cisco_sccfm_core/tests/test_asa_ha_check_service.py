@@ -362,16 +362,19 @@ class TestParseCliResults:
 class TestFindUnmonitoredInterfaces:
     def test_should_capture_interface_lookup_errors(self) -> None:
         service = AsaHaCheckService.__new__(AsaHaCheckService)
-        cast(Any, service)._interfaces_api = _FakeInterfacesApi(
-            physical_error=RuntimeError("physical lookup failed"),
-            subinterface_items=[
-                _mock_interface(
-                    enabled=True,
-                    name="dmz",
-                    monitor_interface=False,
-                    hardware_name="GigabitEthernet0/3",
-                )
-            ],
+        service._interfaces_api = cast(
+            Any,
+            _FakeInterfacesApi(
+                physical_error=RuntimeError("physical lookup failed"),
+                subinterface_items=[
+                    _mock_interface(
+                        enabled=True,
+                        name="dmz",
+                        monitor_interface=False,
+                        hardware_name="GigabitEthernet0/3",
+                    )
+                ],
+            ),
         )
 
         result = service._find_unmonitored_interfaces("uid-1")
@@ -383,24 +386,27 @@ class TestFindUnmonitoredInterfaces:
 
     def test_should_fetch_all_interface_pages(self) -> None:
         service = AsaHaCheckService.__new__(AsaHaCheckService)
-        cast(Any, service)._interfaces_api = _FakeInterfacesApi(
-            physical_items=[
-                _mock_interface(
-                    enabled=True,
-                    name=f"inside-{index}",
-                    monitor_interface=True,
-                    hardware_name=f"GigabitEthernet0/{index}",
-                )
-                for index in range(200)
-            ]
-            + [
-                _mock_interface(
-                    enabled=True,
-                    name="dmz",
-                    monitor_interface=False,
-                    hardware_name="GigabitEthernet0/200",
-                )
-            ]
+        service._interfaces_api = cast(
+            Any,
+            _FakeInterfacesApi(
+                physical_items=[
+                    _mock_interface(
+                        enabled=True,
+                        name=f"inside-{index}",
+                        monitor_interface=True,
+                        hardware_name=f"GigabitEthernet0/{index}",
+                    )
+                    for index in range(200)
+                ]
+                + [
+                    _mock_interface(
+                        enabled=True,
+                        name="dmz",
+                        monitor_interface=False,
+                        hardware_name="GigabitEthernet0/200",
+                    )
+                ]
+            ),
         )
 
         result = service._find_unmonitored_interfaces("uid-1")

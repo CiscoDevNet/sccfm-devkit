@@ -13,7 +13,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import Mapping, Sequence, cast
+from typing import Mapping, Sequence
 
 import click
 from click.testing import CliRunner
@@ -66,7 +66,10 @@ def _help_output(path: Sequence[str]) -> str:
             f"{_command_text(path)} --help failed with exit code {result.exit_code}\n"
             f"{result.output}"
         )
-    return cast(str, result.output).strip()
+    output = result.output
+    if not isinstance(output, str):
+        raise TypeError(f"{_command_text(path)} --help returned non-text output")
+    return output.strip()
 
 
 def _render_page(path: Sequence[str], output: str) -> str:

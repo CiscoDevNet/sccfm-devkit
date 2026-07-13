@@ -60,7 +60,7 @@ def resolve_upgrade_package_uid(
     for v in compatible_versions:
         if v.software_version == software_version:
             package_uid = v.upgrade_package_uid
-            return None if package_uid is None else str(package_uid)
+            return package_uid if isinstance(package_uid, str) else None
     return None
 
 

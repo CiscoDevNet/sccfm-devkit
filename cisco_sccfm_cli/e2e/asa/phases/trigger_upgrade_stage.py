@@ -30,7 +30,7 @@ def run(ctx: ProfileContext) -> None:
             "ASA upgrade software version not configured "
             "(set SCCFM_E2E_ASA_UPGRADE_SOFTWARE_VERSION)"
         )
-    software_version_arg = str(software_version)
+        return
 
     args: list[str] = [
         "inventory",
@@ -41,7 +41,7 @@ def run(ctx: ProfileContext) -> None:
         "--query",
         ASA_TEST_QUERY,
         "--software-version",
-        software_version_arg,
+        software_version,
     ]
     if ASA_UPGRADE_ASDM_VERSION:
         args += ["--asdm-version", ASA_UPGRADE_ASDM_VERSION]

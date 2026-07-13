@@ -41,6 +41,7 @@ action_groups:
     - onboard_asa
     - onboard_cdfmc_ftd
     - onboard_cdfmc_ftd_ztp
+    - register_cdfmc_ftd
     - remove_asa_shun
     - remove_network_group_members
     - show_asa_shun

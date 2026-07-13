@@ -216,8 +216,8 @@ def _state_text(state: Any) -> str:
 def _is_device_ready_for_config(device: Device) -> bool:
     connectivity = _state_text(_device_attr(device, "connectivity_state", "connectivityState"))
     config_state = _state_text(_device_attr(device, "config_state", "configState"))
-    return connectivity == str(ConnectivityState.ONLINE.value) and config_state == str(
-        ConfigState.SYNCED.value
+    return bool(
+        connectivity == ConnectivityState.ONLINE.value and config_state == ConfigState.SYNCED.value
     )
 
 
