@@ -15,7 +15,10 @@ import paramiko
 from cisco_sccfm_core.types import ConfigLike
 
 _PROMPT = ">"
-_CONFIRM_PROMPT = re.compile(r"Do you want to continue\[yes/no\]\s*:\s*$", re.MULTILINE)
+_CONFIRM_PROMPT = re.compile(
+    r"(?:Do you want to continue|Are you sure)\??\s*\[(?:yes/no|y/n)\]\s*[:?]?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 # The FTD confirms with a line like "Manager <fmc-host> successfully configured."
 # Match per line (not across the whole buffer): the interactive shell echoes the
 # typed "configure manager add ..." command back, so a buffer-wide search would

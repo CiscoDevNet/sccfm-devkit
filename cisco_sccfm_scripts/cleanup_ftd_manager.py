@@ -88,8 +88,9 @@ def cleanup_manager_from_environment() -> bool:
             if attempt < retries:
                 time.sleep(delay)
 
+    detail = str(last_error) if last_error is not None else "unknown SSH error"
     raise FtdManagerCleanupError(
-        f"Could not remove the manager from FTD {host} after {retries} attempts."
+        f"Could not remove the manager from FTD {host} after {retries} attempts: {detail}"
     ) from last_error
 
 

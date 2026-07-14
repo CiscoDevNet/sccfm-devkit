@@ -181,6 +181,30 @@ def test_license_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -
     assert channel.sent == [_CLI_KEY + "\n", "yes\n"]
 
 
+def test_short_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> None:
+    command = "configure manager delete"
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            command.encode() + b"\r\nAre you sure? [y/n]: ",
+            b"Manager successfully deleted.\r\n> ",
+        ]
+    )
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    result = _service().delete_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert channel.sent == [command + "\n", "yes\n"]
+
+
 def test_delete_manager_answers_confirmation_and_sanitizes_echo(
     monkeypatch: MonkeyPatch,
 ) -> None:

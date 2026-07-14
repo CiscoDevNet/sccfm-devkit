@@ -9,8 +9,11 @@
 set -euo pipefail
 
 PYTHON_VERSION="3.12.4"
+POETRY_VERSION="2.4.1"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${PROJECT_ROOT}/.venv"
+POETRY_VENV_DIR="${VENV_DIR}/.poetry"
+POETRY_BIN="${POETRY_VENV_DIR}/bin/poetry"
 PYTHON_BIN=""
 
 can_run_as_root() {
@@ -171,11 +174,18 @@ create_venv() {
   source "${VENV_DIR}/bin/activate"
   python -m pip install --upgrade pip
 
-  if ! command -v poetry >/dev/null 2>&1; then
-    pip install poetry
+  # Keep Poetry outside the project environment it modifies. Otherwise a
+  # project-locked virtualenv version can replace Poetry's imported version
+  # during `poetry install` and leave the running process inconsistent.
+  if [[ ! -x "${POETRY_BIN}" ]]; then
+    echo "Installing Poetry ${POETRY_VERSION} in an isolated tooling environment..."
+    "${PYTHON_BIN}" -m venv "${POETRY_VENV_DIR}"
+    "${POETRY_VENV_DIR}/bin/python" -m pip install --upgrade pip
+    "${POETRY_VENV_DIR}/bin/pip" install "poetry==${POETRY_VERSION}"
   fi
+  ln -sfn "../.poetry/bin/poetry" "${VENV_DIR}/bin/poetry"
 
-  POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --with dev,build
+  POETRY_VIRTUALENVS_IN_PROJECT=1 "${POETRY_BIN}" install --with dev,build
 
   if [[ ! -x "${VENV_DIR}/bin/cz" ]]; then
     echo "Commitizen did not install correctly." >&2

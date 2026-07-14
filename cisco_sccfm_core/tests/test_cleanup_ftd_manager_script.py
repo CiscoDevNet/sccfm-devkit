@@ -73,6 +73,16 @@ def test_cleanup_retries_transient_ssh_failure(monkeypatch: MonkeyPatch) -> None
     assert len(service.calls) == 2
 
 
+def test_cleanup_reports_last_ssh_failure(monkeypatch: MonkeyPatch) -> None:
+    _configure_environment(monkeypatch)
+    service = _FakeService(failures=3)
+    monkeypatch.setattr(cleanup, "FtdConfigureManagerService", lambda: service)
+    monkeypatch.setattr(cleanup.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(cleanup.FtdManagerCleanupError, match="temporary SSH failure"):
+        cleanup.cleanup_manager_from_environment()
+
+
 def test_cleanup_requires_password(monkeypatch: MonkeyPatch) -> None:
     _configure_environment(monkeypatch)
     monkeypatch.delenv("SCCFM_FTD_PASSWORD")
