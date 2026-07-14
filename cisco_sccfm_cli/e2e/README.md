@@ -1,3 +1,17 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [sccfm-cli E2E Integration Tests](#sccfm-cli-e2e-integration-tests)
+  - [Structure](#structure)
+  - [Why This Shape](#why-this-shape)
+  - [Prerequisites](#prerequisites)
+  - [Running](#running)
+  - [FTD configure-manager registration suite](#ftd-configure-manager-registration-suite)
+  - [Opt-in upgrade phases](#opt-in-upgrade-phases)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # sccfm-cli E2E Integration Tests
 
 Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `sccfm-ansible/e2e/` 1:1 so the same scenarios are exercised through both surfaces.
@@ -73,6 +87,37 @@ poetry run pytest cisco_sccfm_cli/e2e/access_rules -v -k verify_create
 ```
 
 JUnit output is written to `results/ci-cli-tests.xml` for Jenkins to ingest.  The default `poetry run pytest` lane (no path) skips this directory via `norecursedirs` in `pyproject.toml`.
+
+## FTD configure-manager registration suite
+
+`ftd/test_ftd_registration.py` exercises the full onboarding path against one
+dedicated persistent FTD (CI: `10.10.3.101`):
+
+1. `onboard` — create the SCCFM record, capture the one-time CLI key (kept only
+   in process state and passed to the CLI via `SCCFM_FTD_CLI_KEY`, never argv)
+   and the pre-registration `NOT_SYNCED` config state.
+2. `configure_manager` — `cdfmc-managed-ftd configure-manager` SSHes in and pastes the key.
+3. `verify_registration` — polls until the device is `ONLINE` **and** its config
+   state has moved off `NOT_SYNCED`.
+
+The suite's `lifecycle_cleanup` fixture deletes the reserved `ci-e2e-cli-ftd-*`
+record and clears the manager off the appliance over SSH (`configure manager
+delete`) before and after the run — so with the Ansible suite it runs four times
+per pipeline.  Cleanup refuses to run unless `SCCFM_E2E_FTD_MANAGER_DELETE_HOST`
+matches `FTD_HOST` exactly, guarding against wiping an arbitrary appliance.
+
+It is skipped unless these are set (Jenkins injects them):
+
+```
+FTD_HOST=10.10.3.101            # management IP of the persistent FTD
+FMC_ACCESS_POLICY_UID=<uuid>    # cdFMC access policy to apply on onboard
+FTD_PERFORMANCE_TIER=FTDv5      # virtual FTD tier
+SCCFM_FTD_PASSWORD=<ssh pw>     # FTD SSH password (also used by cleanup)
+SCCFM_E2E_FTD_MANAGER_DELETE_HOST=10.10.3.101   # must equal FTD_HOST
+# optional: FTD_PORT, FTD_USER, FTD_JUMP_HOST, FTD_SSH_TIMEOUT,
+#           FTD_REGISTRATION_RETRIES, FTD_REGISTRATION_DELAY, FTD_CLEANUP_RETRIES
+# set SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1 to fail (not skip) on missing inputs
+```
 
 ## Opt-in upgrade phases
 

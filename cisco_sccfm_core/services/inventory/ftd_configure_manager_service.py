@@ -15,7 +15,14 @@ import paramiko
 from cisco_sccfm_core.types import ConfigLike
 
 _PROMPT = ">"
-_CONFIRM_PROMPT = re.compile(r"Do you want to continue\[yes/no\]\s*:\s*$", re.MULTILINE)
+# Accept both the "configure manager add" license warning ("Do you want to
+# continue[yes/no]:") and the "configure manager delete" confirmation
+# ("Are you sure you want to ... [y/n]?"), so neither operation blocks on an
+# unanswered prompt.
+_CONFIRM_PROMPT = re.compile(
+    r"(?:Do you want to continue|Are you sure)\??\s*\[(?:yes/no|y/n)\]\s*[:?]?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 # The FTD confirms with a line like "Manager <fmc-host> successfully configured."
 # Match per line (not across the whole buffer): the interactive shell echoes the
 # typed "configure manager add ..." command back, so a buffer-wide search would
@@ -24,6 +31,11 @@ _CONFIRM_PROMPT = re.compile(r"Do you want to continue\[yes/no\]\s*:\s*$", re.MU
 # starts with "manager" also lets the FMC host contain "not" (e.g. "not-prod").
 _SUCCESS_LINE = re.compile(r"^manager\b.*\bsuccessfully configured\b", re.IGNORECASE)
 _NEGATED = re.compile(r"\bnot successfully configured\b", re.IGNORECASE)
+# "show managers" on an unmanaged FTD prints either "No managers configured" or
+# "... not currently configured to be managed ...".  Either marker means the
+# device is clean and there is nothing to delete.
+_NO_MANAGER = re.compile(r"\bno managers?\b.*\bconfigured\b", re.IGNORECASE)
+_OTHER_UNMANAGED = re.compile(r"\bnot currently configured to be managed\b", re.IGNORECASE)
 _RECV_CHUNK = 4096
 
 
@@ -44,6 +56,24 @@ class ConfigureManagerResult:
 
     The output field contains device output with the echoed registration command removed.
     """
+
+    host: str
+    success: bool
+    output: str
+    message: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "host": self.host,
+            "success": self.success,
+            "output": self.output,
+            "message": self.message,
+        }
+
+
+@dataclass(frozen=True)
+class ManagerCleanupResult:
+    """Outcome of removing the configured manager from an FTD over SSH."""
 
     host: str
     success: bool
@@ -114,51 +144,16 @@ class FtdConfigureManagerService:
         jump: JumpHostSpec | None = None,
     ) -> ConfigureManagerResult:
         command = _validate_cli_key(cli_key)
-
-        jump_client, sock = self._open_jump_channel(jump, host, port, timeout)
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            try:
-                client.connect(
-                    hostname=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    timeout=timeout,
-                    look_for_keys=False,
-                    allow_agent=False,
-                    sock=sock,
-                )
-            except paramiko.AuthenticationException as exc:
-                raise FtdConfigureManagerError(
-                    f"SSH authentication failed for {username}@{host}:{port}."
-                ) from exc
-            except (paramiko.SSHException, socket.timeout, OSError) as exc:
-                raise FtdConfigureManagerError(
-                    f"Could not establish SSH connection to {host}:{port}: {exc}"
-                ) from exc
-
-            try:
-                channel = client.invoke_shell()
-                channel.settimeout(timeout)
-                # Drain the banner / wait for the initial '>' prompt.
-                _read_until_prompt(channel, timeout)
-                channel.send(command + "\n")
-                output = _read_until_prompt(channel, timeout)
-            except FtdConfigureManagerError as exc:
-                raise FtdConfigureManagerError(
-                    str(exc),
-                    output=_sanitize_manager_command_echo(exc.output, command),
-                ) from exc
-            except (paramiko.SSHException, socket.timeout, OSError) as exc:
-                raise FtdConfigureManagerError(
-                    f"SSH session error while configuring manager on {host}: {exc}"
-                ) from exc
-        finally:
-            client.close()
-            if jump_client is not None:
-                jump_client.close()
+        output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=command,
+            timeout=timeout,
+            operation="configuring manager",
+            jump=jump,
+        )
 
         sanitized_output = _sanitize_manager_command_echo(output, command)
         if not _is_success(output):
@@ -173,6 +168,71 @@ class FtdConfigureManagerService:
             output=sanitized_output,
             message="Manager successfully configured.",
         )
+
+    def delete_manager(
+        self,
+        *,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        timeout: int,
+        jump: JumpHostSpec | None = None,
+    ) -> ManagerCleanupResult:
+        """Remove any configured manager from an FTD, leaving it unmanaged.
+
+        Runs ``show managers`` first: if the device already reports no manager
+        there is nothing to delete, so return early (idempotent).  Otherwise run
+        ``configure manager delete`` and re-check with ``show managers`` to
+        confirm the device is now unmanaged.  Used by the E2E suites to reset
+        the persistent registration fixture before and after each run.
+        """
+        show_command = "show managers"
+        initial_output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=show_command,
+            timeout=timeout,
+            operation="checking configured managers",
+            jump=jump,
+        )
+        outputs = [_sanitize_manager_command_echo(initial_output, show_command)]
+        if _is_unmanaged(initial_output):
+            return _manager_cleanup_result(host, outputs)
+
+        delete_command = "configure manager delete"
+        delete_output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=delete_command,
+            timeout=timeout,
+            operation="deleting manager",
+            jump=jump,
+        )
+        outputs.append(_sanitize_manager_command_echo(delete_output, delete_command))
+
+        final_output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=show_command,
+            timeout=timeout,
+            operation="verifying manager cleanup",
+            jump=jump,
+        )
+        outputs.append(_sanitize_manager_command_echo(final_output, show_command))
+        if not _is_unmanaged(final_output):
+            raise FtdConfigureManagerError(
+                f"FTD still has a configured manager after cleanup on {host}.",
+                output=_join_outputs(outputs),
+            )
+
+        return _manager_cleanup_result(host, outputs)
 
     def check_reachable(
         self,
@@ -256,6 +316,88 @@ class FtdConfigureManagerService:
             ) from exc
 
         return jump_client, channel
+
+    def _execute_cli_command(
+        self,
+        *,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        command: str,
+        timeout: int,
+        operation: str,
+        jump: JumpHostSpec | None,
+    ) -> str:
+        """Open an SSH shell to the FTD, run one CLI command, return its output.
+
+        Shared by :meth:`configure_manager` and :meth:`delete_manager`; each
+        invocation opens (and tears down) its own connection so a jump channel
+        is never reused across commands.  ``operation`` is only used to phrase
+        the error message.
+        """
+        jump_client, sock = self._open_jump_channel(jump, host, port, timeout)
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            try:
+                client.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    timeout=timeout,
+                    look_for_keys=False,
+                    allow_agent=False,
+                    sock=sock,
+                )
+            except paramiko.AuthenticationException as exc:
+                raise FtdConfigureManagerError(
+                    f"SSH authentication failed for {username}@{host}:{port}."
+                ) from exc
+            except (paramiko.SSHException, socket.timeout, OSError) as exc:
+                raise FtdConfigureManagerError(
+                    f"Could not establish SSH connection to {host}:{port}: {exc}"
+                ) from exc
+
+            try:
+                channel = client.invoke_shell()
+                channel.settimeout(timeout)
+                # Drain the banner / wait for the initial '>' prompt.
+                _read_until_prompt(channel, timeout)
+                channel.send(command + "\n")
+                return _read_until_prompt(channel, timeout)
+            except FtdConfigureManagerError as exc:
+                raise FtdConfigureManagerError(
+                    str(exc),
+                    output=_sanitize_manager_command_echo(exc.output, command),
+                ) from exc
+            except (paramiko.SSHException, socket.timeout, OSError) as exc:
+                raise FtdConfigureManagerError(
+                    f"SSH session error while {operation} on {host}: {exc}"
+                ) from exc
+        finally:
+            client.close()
+            if jump_client is not None:
+                jump_client.close()
+
+
+def _manager_cleanup_result(host: str, outputs: list[str]) -> ManagerCleanupResult:
+    """Build a successful cleanup result from sanitized device responses."""
+    return ManagerCleanupResult(
+        host=host,
+        success=True,
+        output=_join_outputs(outputs),
+        message="All managers were removed.",
+    )
+
+
+def _join_outputs(outputs: list[str]) -> str:
+    return "\n".join(output for output in outputs if output)
+
+
+def _is_unmanaged(output: str) -> bool:
+    return bool(_NO_MANAGER.search(output) or _OTHER_UNMANAGED.search(output))
 
 
 def parse_jump_host(value: str, password: str | None, default_port: int = 22) -> JumpHostSpec:

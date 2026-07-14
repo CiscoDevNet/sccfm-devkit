@@ -15,12 +15,19 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# Options whose value is a secret: when the runner logs argv, the token that
+# follows one of these flags is masked.
+_SENSITIVE_FLAGS = frozenset(("--cli-key", "--ftd-password", "--jump-password"))
+_REDACTED = "<redacted>"
 
 
 @dataclass(frozen=True)
@@ -29,7 +36,72 @@ class CLIResult:
     returncode: int
     stdout: str
     stderr: str
-    json: Any | None
+    # Excluded from repr so a pytest failure dump never prints a secret that
+    # survived inside the parsed payload.
+    json: Any | None = field(repr=False)
+
+
+def _redact_args(args: list[str], sensitive_values: tuple[str, ...]) -> tuple[str, ...]:
+    """Return log-safe argv with secret options and explicit values removed."""
+    values = {value for value in sensitive_values if value}
+    redacted: list[str] = []
+    redact_next = False
+    for arg in args:
+        if redact_next or arg in values:
+            redacted.append(_REDACTED)
+            redact_next = False
+            continue
+        redacted.append(arg)
+        redact_next = arg in _SENSITIVE_FLAGS
+    return tuple(redacted)
+
+
+def _redact_text(value: str, sensitive_values: tuple[str, ...]) -> str:
+    """Remove explicit secrets from captured subprocess output."""
+    redacted = value
+    for sensitive_value in sensitive_values:
+        if sensitive_value:
+            redacted = redacted.replace(sensitive_value, _REDACTED)
+    return redacted
+
+
+def _json_field_secrets(payload: Any, field_names: frozenset[str]) -> tuple[str, ...]:
+    """Collect the string values of named fields anywhere in a parsed payload."""
+    if isinstance(payload, dict):
+        secrets: list[str] = []
+        for key, value in payload.items():
+            if key in field_names and isinstance(value, str):
+                secrets.append(value)
+            secrets.extend(_json_field_secrets(value, field_names))
+        return tuple(secrets)
+    if isinstance(payload, list):
+        return tuple(
+            secret for item in payload for secret in _json_field_secrets(item, field_names)
+        )
+    return ()
+
+
+def _redact_json_fields(value: str, field_names: tuple[str, ...]) -> str:
+    """Mask named JSON string fields even when the whole payload is malformed."""
+    redacted = value
+    for field_name in field_names:
+        pattern = re.compile(
+            rf'("{re.escape(field_name)}"\s*:\s*)"(?:\\.|[^"\\])*"',
+            re.IGNORECASE,
+        )
+        redacted = pattern.sub(rf'\1"{_REDACTED}"', redacted)
+    return redacted
+
+
+def _redact_payload(payload: Any, sensitive_values: tuple[str, ...]) -> Any:
+    """Return a copy of parsed output with explicit secret strings removed."""
+    if isinstance(payload, dict):
+        return {key: _redact_payload(value, sensitive_values) for key, value in payload.items()}
+    if isinstance(payload, list):
+        return [_redact_payload(value, sensitive_values) for value in payload]
+    if isinstance(payload, str):
+        return _redact_text(payload, sensitive_values)
+    return payload
 
 
 def _resolve_binary() -> list[str]:
@@ -74,6 +146,9 @@ def run_cli(
     expected_error: str | tuple[str, ...] | None = None,
     tolerate_any_rc: bool = False,
     parse_json: bool = True,
+    sensitive_values: tuple[str, ...] = (),
+    redact_json_fields: tuple[str, ...] = (),
+    extra_env: Mapping[str, str] | None = None,
 ) -> CLIResult:
     """Invoke ``sccfm-cli`` and return the parsed result.
 
@@ -92,6 +167,13 @@ def run_cli(
 
     Set ``tolerate_any_rc=True`` for cleanup paths where a fresh
     tenant has nothing to remove and rc != 0 is fine.
+
+    Pass one-time credentials through ``sensitive_values`` and set
+    ``extra_env`` to hand them to the CLI out of band (e.g. the FTD CLI key via
+    ``SCCFM_FTD_CLI_KEY``) so they never appear in argv.  When a command emits a
+    secret, name its JSON response fields in ``redact_json_fields``.  The parsed
+    payload stays available to the phase, but argv, captured output, the result
+    repr, and every assertion message contain only a redacted placeholder.
     """
     cmd: list[str] = [
         *_resolve_binary(),
@@ -100,9 +182,12 @@ def run_cli(
         "--silent",
         *args,
     ]
+    display_args = _redact_args(cmd, sensitive_values)
+    display_command = " ".join(display_args)
 
     env = os.environ.copy()
     env["SCCFM_CONFIG"] = str(config_path)
+    env.update(extra_env or {})
 
     try:
         completed = subprocess.run(
@@ -114,19 +199,37 @@ def run_cli(
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
+        safe_stdout = _redact_json_fields(
+            _redact_text(_decode(exc.stdout), sensitive_values), redact_json_fields
+        )
+        safe_stderr = _redact_json_fields(
+            _redact_text(_decode(exc.stderr), sensitive_values), redact_json_fields
+        )
+        # Raise ``from None``: the original exception carries the un-redacted
+        # stdout/stderr, and pytest prints the __cause__ chain.
         raise AssertionError(
-            f"sccfm-cli command timed out after {exc.timeout}s: {' '.join(cmd)}\n"
-            f"--- stdout ---\n{_decode(exc.stdout)}\n"
-            f"--- stderr ---\n{_decode(exc.stderr)}"
-        ) from exc
+            f"sccfm-cli command timed out after {exc.timeout}s: {display_command}\n"
+            f"--- stdout ---\n{safe_stdout}\n"
+            f"--- stderr ---\n{safe_stderr}"
+        ) from None
 
     payload = _parse_json_payload(completed.stdout) if parse_json else None
+    # Secrets the command minted (e.g. a freshly returned cli_key) must be
+    # masked too, so pull them out of the parsed payload before building output.
+    response_secrets = _json_field_secrets(payload, frozenset(redact_json_fields))
+    all_sensitive_values = (*sensitive_values, *response_secrets)
+    safe_stdout = _redact_json_fields(
+        _redact_text(completed.stdout, all_sensitive_values), redact_json_fields
+    )
+    safe_stderr = _redact_json_fields(
+        _redact_text(completed.stderr, all_sensitive_values), redact_json_fields
+    )
     result = CLIResult(
-        args=tuple(cmd),
+        args=display_args,
         returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
-        json=payload,
+        stdout=safe_stdout,
+        stderr=safe_stderr,
+        json=_redact_payload(payload, sensitive_values),
     )
 
     if tolerate_any_rc:
@@ -134,26 +237,26 @@ def run_cli(
     if expect_failure:
         if completed.returncode == 0:
             raise AssertionError(
-                f"sccfm-cli command unexpectedly succeeded: {' '.join(cmd)}\n"
-                f"--- stdout ---\n{completed.stdout}\n"
-                f"--- stderr ---\n{completed.stderr}"
+                f"sccfm-cli command unexpectedly succeeded: {display_command}\n"
+                f"--- stdout ---\n{safe_stdout}\n"
+                f"--- stderr ---\n{safe_stderr}"
             )
         if expected_error is not None:
             needles = (expected_error,) if isinstance(expected_error, str) else expected_error
-            haystack = (completed.stdout + "\n" + completed.stderr).lower()
+            haystack = (safe_stdout + "\n" + safe_stderr).lower()
             if not any(needle.lower() in haystack for needle in needles):
                 raise AssertionError(
                     f"sccfm-cli failed (rc={completed.returncode}) but the output "
                     f"did not contain any expected error marker {needles!r}: "
-                    f"{' '.join(cmd)}\n"
-                    f"--- stdout ---\n{completed.stdout}\n"
-                    f"--- stderr ---\n{completed.stderr}"
+                    f"{display_command}\n"
+                    f"--- stdout ---\n{safe_stdout}\n"
+                    f"--- stderr ---\n{safe_stderr}"
                 )
     elif completed.returncode != 0:
         raise AssertionError(
-            f"sccfm-cli command failed (rc={completed.returncode}): {' '.join(cmd)}\n"
-            f"--- stdout ---\n{completed.stdout}\n"
-            f"--- stderr ---\n{completed.stderr}"
+            f"sccfm-cli command failed (rc={completed.returncode}): {display_command}\n"
+            f"--- stdout ---\n{safe_stdout}\n"
+            f"--- stderr ---\n{safe_stderr}"
         )
 
     return result

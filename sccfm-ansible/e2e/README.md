@@ -1,3 +1,15 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Ansible E2E Integration Tests](#ansible-e2e-integration-tests)
+  - [Structure](#structure)
+  - [Why This Shape](#why-this-shape)
+  - [Running](#running)
+  - [FTD configure-manager registration suite](#ftd-configure-manager-registration-suite)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Ansible E2E Integration Tests
 
 This directory contains the tenant-backed integration tests for the Ansible collection.
@@ -25,3 +37,23 @@ Run the full integration suite with:
 ```
 
 JUnit output is written to `results/ci-ansible-tests.xml` for Jenkins to ingest.
+
+## FTD configure-manager registration suite
+
+`ftd/test_ftd_registration.py` drives the full onboarding path against one
+dedicated persistent FTD (CI: `10.10.3.101`) with focused playbooks:
+
+- `onboard_and_configure_ftd.yml` — onboards the reserved `ci-e2e-ansible-ftd-*`
+  device, records its pre-registration `NOT_SYNCED` state, then registers it over
+  SSH with `cisco.sccfm.configure_manager` (keeping the one-time key in one
+  playbook so it never lands on disk).
+- `verify_ftd_registration.yml` — polls until the device is `ONLINE` **and** its
+  config state has moved off the recorded `NOT_SYNCED` value.
+
+The suite's `lifecycle_cleanup` fixture deletes the record and clears the
+manager off the appliance over SSH (`configure manager delete`) before and after
+the run. Skipped unless `FTD_HOST`, `FMC_ACCESS_POLICY_UID`,
+`FTD_PERFORMANCE_TIER`, and `SCCFM_FTD_PASSWORD` are set; the SSH cleanup also
+requires `SCCFM_E2E_FTD_MANAGER_DELETE_HOST` to equal `FTD_HOST`. Set
+`SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1` to fail rather than skip on missing
+inputs.

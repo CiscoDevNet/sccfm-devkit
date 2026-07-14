@@ -2,18 +2,76 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""FTD cleanup placeholder.
+"""Reset the persistent FTD and remove its CLI registration-test record.
 
-FTD tests are read-only or use onboard/remove for lifecycle management,
-so there is nothing to clear here.  The phase exists so the suite's
-``lifecycle_cleanup`` fixture has something to call symmetrically with
-the other suites.
+Runs before and after the suite via the ``lifecycle_cleanup`` fixture.  When the
+registration E2E is not configured (``FTD_HOST`` unset) this is a no-op, so the
+other FTD tests keep working unchanged.  Otherwise it deletes the reserved
+``ci-e2e-cli-ftd-*`` device from the tenant, waits for the record to disappear,
+then clears the manager off the appliance over SSH so the next run starts clean.
 """
 
 from __future__ import annotations
 
+import time
+
+from scc_firewall_manager_sdk import InventoryApi
+from scc_firewall_manager_sdk.exceptions import ApiException
+
 from cisco_sccfm_cli.e2e._profile import ProfileContext
+from cisco_sccfm_cli.e2e.ftd.phases.test_data import (
+    FTD_CLEANUP_RETRIES,
+    FTD_REGISTRATION_DELAY_SEC,
+    FTD_REGISTRATION_HOST,
+    FTD_REGISTRATION_NAME,
+    validate_registration_name,
+)
+from cisco_sccfm_cli.services import ConfigService
+from cisco_sccfm_core.factories import ApiClientFactory
+from cisco_sccfm_scripts.cleanup_ftd_manager import cleanup_manager_from_environment
 
 
-def run(_ctx: ProfileContext) -> None:
-    return None
+def _registration_query() -> str:
+    escaped_name = FTD_REGISTRATION_NAME.replace("\\", "\\\\").replace('"', '\\"')
+    return f'deviceType:CDFMC_MANAGED_FTD AND name:"{escaped_name}"'
+
+
+def _matching_devices(api: InventoryApi) -> list[object]:
+    page = api.get_devices(limit="50", offset="0", q=_registration_query())
+    return [
+        device
+        for device in page.items or []
+        if getattr(device, "name", None) == FTD_REGISTRATION_NAME
+    ]
+
+
+def run(ctx: ProfileContext) -> None:
+    if not FTD_REGISTRATION_HOST:
+        return
+    validate_registration_name()
+    config = ConfigService(path=ctx.config_path).load(ctx.profile)
+    if config is None:
+        raise AssertionError(f"E2E profile {ctx.profile!r} was not found at {ctx.config_path}")
+
+    api = InventoryApi(ApiClientFactory.build(config))
+    for device in _matching_devices(api):
+        uid = getattr(device, "uid", None)
+        if not uid:
+            raise AssertionError(f"Registration-test FTD {FTD_REGISTRATION_NAME!r} has no UID")
+        try:
+            api.delete_cd_fmc_managed_ftd_device(device_uid=uid)
+        except ApiException as exc:
+            # A concurrent delete may have already removed it; anything else is real.
+            if exc.status != 404:
+                raise
+
+    for _ in range(FTD_CLEANUP_RETRIES):
+        if not _matching_devices(api):
+            # Record is gone from the tenant; now clear the manager off the box.
+            cleanup_manager_from_environment()
+            return
+        time.sleep(FTD_REGISTRATION_DELAY_SEC)
+
+    raise AssertionError(
+        f"FTD {FTD_REGISTRATION_NAME!r} still exists after {FTD_CLEANUP_RETRIES} cleanup checks"
+    )

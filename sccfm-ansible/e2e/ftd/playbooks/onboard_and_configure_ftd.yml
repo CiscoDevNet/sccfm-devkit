@@ -1,0 +1,93 @@
+---
+# Create the SCCFM record and immediately use its one-time registration command.
+# Keeping both operations in one playbook prevents the CLI key reaching disk.
+
+- name: "CI: Onboard and configure a cdFMC-managed FTD"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Validate registration-test inputs
+      ansible.builtin.assert:
+        that:
+          - ftd_registration_host | length > 0
+          - ftd_registration_access_policy_uid | length > 0
+          - ftd_registration_performance_tier | length > 0
+          - lookup('env', 'SCCFM_FTD_PASSWORD') | length > 0
+          - >-
+            ftd_registration_name is match(
+              '^ci-e2e-ansible-ftd-[A-Za-z0-9-]+$'
+            )
+        fail_msg: >-
+          FTD_HOST, FMC_ACCESS_POLICY_UID, FTD_PERFORMANCE_TIER, and
+          SCCFM_FTD_PASSWORD are required for the FTD registration E2E, and the
+          device name must use the reserved 'ci-e2e-ansible-ftd-' prefix.
+
+    - name: Onboard the registration-test FTD
+      cisco.sccfm.onboard_cdfmc_ftd:
+        name: "{{ ftd_registration_name }}"
+        fmc_access_policy_uid: "{{ ftd_registration_access_policy_uid }}"
+        licenses:
+          - BASE
+        virtual: true
+        performance_tier: "{{ ftd_registration_performance_tier }}"
+      register: onboard_result
+      no_log: true
+
+    - name: Validate the one-time registration command
+      ansible.builtin.assert:
+        that:
+          - onboard_result.changed
+          - onboard_result.device.uid | default('') | length > 0
+          - onboard_result.device.name == ftd_registration_name
+          - onboard_result.cli_key | default('') | lower is match('^configure manager add')
+        fail_msg: "FTD onboarding did not return the expected device and registration command."
+      no_log: true
+
+    # Capture the pre-registration config state so verify can assert the
+    # NOT_SYNCED -> synced transition. A freshly onboarded record must not be
+    # SYNCED yet.
+    - name: Record the pre-registration config state
+      ansible.builtin.copy:
+        content: "{{ onboard_result.device.config_state | default('NOT_SYNCED') }}"
+        dest: "{{ ftd_registration_pre_state_file }}"
+        mode: "0600"
+
+    - name: Assert the onboarded FTD is not yet synced
+      ansible.builtin.assert:
+        that:
+          - >-
+            (onboard_result.device.config_state | default('NOT_SYNCED'))
+            in ['NOT_SYNCED', 'NO_CONFIG']
+        fail_msg: >-
+          Newly onboarded FTD should be unsynced, got
+          config_state={{ onboard_result.device.config_state | default('(unset)') }}.
+
+    - name: Configure the cloud manager on the FTD over SSH
+      cisco.sccfm.configure_manager:
+        ftd_host: "{{ ftd_registration_host }}"
+        ftd_port: "{{ ftd_registration_port }}"
+        ftd_user: "{{ ftd_registration_user }}"
+        cli_key: "{{ onboard_result.cli_key }}"
+        jump_host: >-
+          {{ ftd_registration_jump_host if ftd_registration_jump_host | length > 0 else omit }}
+        ssh_timeout: "{{ ftd_registration_ssh_timeout }}"
+      register: configure_result
+
+    - name: Assert the FTD accepted the manager configuration
+      ansible.builtin.assert:
+        that:
+          - configure_result.changed
+          - configure_result.success
+          - configure_result.host == ftd_registration_host
+        fail_msg: "FTD did not confirm that the cloud manager was configured."

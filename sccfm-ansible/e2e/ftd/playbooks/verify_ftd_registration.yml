@@ -1,0 +1,59 @@
+---
+# Wait for the FTD to phone home and become ONLINE in SCCFM, then assert that
+# its config state moved off the pre-registration NOT_SYNCED value.
+
+- name: "CI: Verify cdFMC-managed FTD registration"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../examples/group_vars/all/vars.yml
+    - ../../../examples/group_vars/all/vault.yml
+    - vars/test_data.yml
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      region: "{{ sccfm_region }}"
+      api_token: "{{ sccfm_api_token }}"
+
+  tasks:
+    - name: Read the pre-registration config state
+      ansible.builtin.slurp:
+        src: "{{ ftd_registration_pre_state_file }}"
+      register: pre_state_raw
+
+    - name: Decode the pre-registration config state
+      ansible.builtin.set_fact:
+        ftd_pre_config_state: "{{ pre_state_raw.content | b64decode | trim }}"
+
+    - name: Wait for the registration-test FTD to become online
+      cisco.sccfm.list_ftd_not_on_version:
+        query: "{{ ftd_registration_query }}"
+        version: "{{ ftd_not_on_version }}"
+      register: registration_result
+      until: >-
+        not (registration_result is failed)
+        and (registration_result.devices | default([])) | length == 1
+        and registration_result.devices[0].connectivity_state == 'ONLINE'
+      retries: "{{ ftd_registration_poll_retries }}"
+      delay: "{{ ftd_registration_poll_delay }}"
+
+    - name: Assert the registered FTD identity, connectivity and config transition
+      ansible.builtin.assert:
+        that:
+          - not registration_result.changed
+          - registration_result.device_count == 1
+          - registration_result.devices | length == 1
+          - registration_result.devices[0].name == ftd_registration_name
+          - registration_result.devices[0].uid | length > 0
+          - registration_result.devices[0].connectivity_state == 'ONLINE'
+          - registration_result.devices[0].config_state != ftd_pre_config_state
+        fail_msg: >-
+          Expected exactly one ONLINE cdFMC-managed FTD named
+          '{{ ftd_registration_name }}' whose config_state changed from
+          '{{ ftd_pre_config_state }}'.
+
+    - name: Remove the pre-registration state file
+      ansible.builtin.file:
+        path: "{{ ftd_registration_pre_state_file }}"
+        state: absent

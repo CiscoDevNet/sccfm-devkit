@@ -6,3 +6,30 @@ ftd_test_query_all: "name:ftd-7.4.2-172-1516"
 
 # For list_ftd_not_on_version -- fake version no device should be on
 ftd_not_on_version: "99.99.99"
+
+# Registration workflow. CI maps one dedicated persistent FTD (10.10.3.101) to
+# these inputs; every value comes from the environment so credentials stay in
+# Jenkins. The device name uses a reserved 'ci-e2e-ansible-ftd-' prefix that
+# cleanup validates before deleting anything.
+ftd_registration_host: "{{ lookup('env', 'FTD_HOST') }}"
+ftd_registration_port: "{{ lookup('env', 'FTD_PORT') | default('22', true) | int }}"
+ftd_registration_user: "{{ lookup('env', 'FTD_USER') | default('admin', true) }}"
+ftd_registration_name: >-
+  {{ lookup('env', 'SCCFM_E2E_FTD_NAME')
+     | default('ci-e2e-ansible-ftd-' ~ (lookup('env', 'FTD_HOST') | regex_replace('[^A-Za-z0-9-]', '-')), true) }}
+ftd_registration_query: >-
+  name:"{{ ftd_registration_name }}" AND connectivityState:ONLINE
+ftd_registration_access_policy_uid: "{{ lookup('env', 'FMC_ACCESS_POLICY_UID') }}"
+ftd_registration_performance_tier: "{{ lookup('env', 'FTD_PERFORMANCE_TIER') }}"
+ftd_registration_jump_host: "{{ lookup('env', 'FTD_JUMP_HOST') }}"
+ftd_registration_ssh_timeout: >-
+  {{ lookup('env', 'FTD_SSH_TIMEOUT') | default('60', true) | int }}
+ftd_registration_poll_retries: >-
+  {{ lookup('env', 'FTD_REGISTRATION_RETRIES') | default('120', true) | int }}
+ftd_registration_poll_delay: >-
+  {{ lookup('env', 'FTD_REGISTRATION_DELAY') | default('10', true) | int }}
+ftd_cleanup_poll_retries: >-
+  {{ lookup('env', 'FTD_CLEANUP_RETRIES') | default('60', true) | int }}
+# File used to hand the pre-registration config state from the onboard playbook
+# to the verify playbook (separate ansible-playbook processes).
+ftd_registration_pre_state_file: "/tmp/ci_ftd_registration_pre_state"

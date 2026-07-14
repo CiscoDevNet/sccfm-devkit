@@ -67,7 +67,11 @@ class FtdConfigureManagerCommand(BaseCommand):
             click.Option(
                 ["--cli-key"],
                 required=True,
-                help="The full 'configure manager add ...' string returned by 'onboard'.",
+                envvar="SCCFM_FTD_CLI_KEY",
+                help=(
+                    "The full 'configure manager add ...' string returned by 'onboard' "
+                    "(or set SCCFM_FTD_CLI_KEY)."
+                ),
             ),
             click.Option(
                 ["--jump-host"],
