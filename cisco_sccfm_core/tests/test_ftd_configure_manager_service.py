@@ -254,6 +254,25 @@ def test_delete_manager_is_idempotent_when_no_manager_exists(
     assert "No managers configured." in result.output
 
 
+def test_delete_manager_accepts_other_unmanaged_response(monkeypatch: MonkeyPatch) -> None:
+    channel = _FakeChannel(
+        [b"\r\n> ", b"This device is not currently configured to be managed.\r\n> "]
+    )
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    result = _service().delete_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert "not currently configured" in result.output
+
+
 def test_delete_manager_rejects_unconfirmed_cleanup(monkeypatch: MonkeyPatch) -> None:
     channel = _FakeChannel([b"\r\n> ", b"Manager deletion failed.\r\n> "])
     client = _FakeClient(channel)

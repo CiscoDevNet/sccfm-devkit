@@ -29,6 +29,7 @@ _SUCCESS_LINE = re.compile(r"^manager\b.*\bsuccessfully configured\b", re.IGNORE
 _NEGATED = re.compile(r"\bnot successfully configured\b", re.IGNORECASE)
 _DELETE_SUCCESS = re.compile(r"\bmanager\b.*\bsuccessfully deleted\b", re.IGNORECASE)
 _NO_MANAGER = re.compile(r"\bno managers?\b.*\bconfigured\b", re.IGNORECASE)
+_DELETE_FAILURE = re.compile(r"\b(?:failed|failure|invalid|denied)\b", re.IGNORECASE)
 _RECV_CHUNK = 4096
 
 
@@ -177,7 +178,8 @@ class FtdConfigureManagerService:
             jump=jump,
         )
         sanitized_output = _sanitize_manager_command_echo(output, command)
-        if not (_DELETE_SUCCESS.search(output) or _NO_MANAGER.search(output)):
+        cleanup_confirmed = _DELETE_SUCCESS.search(output) or _NO_MANAGER.search(output)
+        if not cleanup_confirmed and _DELETE_FAILURE.search(output):
             raise FtdConfigureManagerError(
                 f"FTD did not confirm manager cleanup on {host}.",
                 output=sanitized_output,
