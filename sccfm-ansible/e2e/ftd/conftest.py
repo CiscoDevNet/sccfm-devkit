@@ -87,9 +87,9 @@ def run_playbook(name: str, timeout: int = 600) -> subprocess.CompletedProcess[s
 
 
 def cleanup_registration_fixture() -> None:
-    """Reset the persistent appliance, then remove its reserved SCCFM record."""
-    cleanup_manager_from_environment()
+    """Remove the SCCFM record, then reset the persistent appliance."""
     run_playbook("cleanup.yml", timeout=_cleanup_timeout())
+    cleanup_manager_from_environment()
 
 
 @pytest.fixture(scope="session", autouse=True)

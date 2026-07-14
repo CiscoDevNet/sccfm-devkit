@@ -54,7 +54,7 @@ def test_cleanup_should_ignore_nonexact_query_matches(monkeypatch: MonkeyPatch) 
     assert devices == [exact_match]
 
 
-def test_cleanup_should_reset_manager_before_loading_profile(
+def test_cleanup_should_not_reset_manager_before_loading_profile(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:
     calls: list[str] = []
@@ -68,6 +68,27 @@ def test_cleanup_should_reset_manager_before_loading_profile(
 
     with pytest.raises(AssertionError, match="profile.*was not found"):
         cleanup.run(_context(tmp_path))
+
+    assert calls == []
+
+
+def test_cleanup_should_reset_manager_after_device_record_is_gone(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(cleanup, "FTD_REGISTRATION_HOST", "10.10.3.105")
+    monkeypatch.setattr(cleanup, "validate_registration_name", lambda: None)
+    monkeypatch.setattr(cleanup.ConfigService, "load", lambda *_args: object())
+    monkeypatch.setattr(cleanup.ApiClientFactory, "build", lambda _config: object())
+    monkeypatch.setattr(cleanup, "InventoryApi", lambda _client: object())
+    monkeypatch.setattr(cleanup, "_matching_devices", lambda _api: [])
+    monkeypatch.setattr(
+        cleanup,
+        "cleanup_manager_from_environment",
+        lambda: calls.append("manager-reset"),
+    )
+
+    cleanup.run(_context(tmp_path))
 
     assert calls == ["manager-reset"]
 

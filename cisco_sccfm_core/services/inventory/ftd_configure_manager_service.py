@@ -27,9 +27,12 @@ _CONFIRM_PROMPT = re.compile(
 # starts with "manager" also lets the FMC host contain "not" (e.g. "not-prod").
 _SUCCESS_LINE = re.compile(r"^manager\b.*\bsuccessfully configured\b", re.IGNORECASE)
 _NEGATED = re.compile(r"\bnot successfully configured\b", re.IGNORECASE)
-_DELETE_SUCCESS = re.compile(r"\bmanager\b.*\bsuccessfully deleted\b", re.IGNORECASE)
 _NO_MANAGER = re.compile(r"\bno managers?\b.*\bconfigured\b", re.IGNORECASE)
-_DELETE_FAILURE = re.compile(r"\b(?:failed|failure|invalid|denied)\b", re.IGNORECASE)
+_OTHER_UNMANAGED = re.compile(r"\bnot currently configured to be managed\b", re.IGNORECASE)
+_MANAGER_IDENTIFIER = re.compile(
+    r"^\s*Identifier\s*:\s*([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 _RECV_CHUNK = 4096
 
 
@@ -166,30 +169,56 @@ class FtdConfigureManagerService:
         jump: JumpHostSpec | None = None,
     ) -> ManagerCleanupResult:
         """Remove any configured manager from an FTD registration fixture."""
-        command = "configure manager delete"
-        output = self._execute_cli_command(
+        show_command = "show managers"
+        initial_output = self._execute_cli_command(
             host=host,
             port=port,
             username=username,
             password=password,
-            command=command,
+            command=show_command,
             timeout=timeout,
-            operation="deleting manager",
+            operation="checking configured managers",
             jump=jump,
         )
-        sanitized_output = _sanitize_manager_command_echo(output, command)
-        cleanup_confirmed = _DELETE_SUCCESS.search(output) or _NO_MANAGER.search(output)
-        if not cleanup_confirmed and _DELETE_FAILURE.search(output):
-            raise FtdConfigureManagerError(
-                f"FTD did not confirm manager cleanup on {host}.",
-                output=sanitized_output,
+        outputs = [_sanitize_manager_command_echo(initial_output, show_command)]
+        if _is_unmanaged(initial_output):
+            return _manager_cleanup_result(host, outputs)
+
+        identifiers = _manager_identifiers(initial_output)
+        delete_commands = [
+            f"configure manager delete {identifier}" for identifier in identifiers
+        ] or ["configure manager delete"]
+        for command in delete_commands:
+            output = self._execute_cli_command(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                command=command,
+                timeout=timeout,
+                operation="deleting manager",
+                jump=jump,
             )
-        return ManagerCleanupResult(
+            outputs.append(_sanitize_manager_command_echo(output, command))
+
+        final_output = self._execute_cli_command(
             host=host,
-            success=True,
-            output=sanitized_output,
-            message="Manager cleanup command completed.",
+            port=port,
+            username=username,
+            password=password,
+            command=show_command,
+            timeout=timeout,
+            operation="verifying manager cleanup",
+            jump=jump,
         )
+        outputs.append(_sanitize_manager_command_echo(final_output, show_command))
+        if not _is_unmanaged(final_output):
+            raise FtdConfigureManagerError(
+                f"FTD still has a configured manager after cleanup on {host}.",
+                output=_join_outputs(outputs),
+            )
+
+        return _manager_cleanup_result(host, outputs)
 
     def check_reachable(
         self,
@@ -329,6 +358,29 @@ class FtdConfigureManagerService:
             client.close()
             if jump_client is not None:
                 jump_client.close()
+
+
+def _manager_cleanup_result(host: str, outputs: list[str]) -> ManagerCleanupResult:
+    """Build a successful cleanup result from sanitized device responses."""
+    return ManagerCleanupResult(
+        host=host,
+        success=True,
+        output=_join_outputs(outputs),
+        message="All managers were removed.",
+    )
+
+
+def _join_outputs(outputs: list[str]) -> str:
+    return "\n".join(output for output in outputs if output)
+
+
+def _is_unmanaged(output: str) -> bool:
+    return bool(_NO_MANAGER.search(output) or _OTHER_UNMANAGED.search(output))
+
+
+def _manager_identifiers(output: str) -> list[str]:
+    """Return unique manager UUIDs in their device-reported order."""
+    return list(dict.fromkeys(_MANAGER_IDENTIFIER.findall(output)))
 
 
 def parse_jump_host(value: str, password: str | None, default_port: int = 22) -> JumpHostSpec:

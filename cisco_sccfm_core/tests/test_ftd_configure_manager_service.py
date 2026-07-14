@@ -22,6 +22,13 @@ from cisco_sccfm_core.services.inventory import parse_jump_host
 
 _CLI_KEY = "configure manager add DONTRESOLVE regkey123 natid456"
 _SUCCESS_CHUNKS = [b"\r\n> ", b"Manager successfully configured.\r\n> "]
+_MANAGER_ID = "f7ffad78-bf16-11ec-a737-baa2f76ef602"
+_MANAGER = (
+    "Type : Manager\r\n"
+    "Host : fmc.example.com\r\n"
+    f"Identifier : {_MANAGER_ID}\r\n"
+    "Registration : Completed\r\n> "
+).encode()
 
 
 class _FakeChannel:
@@ -182,12 +189,16 @@ def test_license_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -
 
 
 def test_short_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> None:
-    command = "configure manager delete"
+    command = f"configure manager delete {_MANAGER_ID}"
     channel = _FakeChannel(
         [
             b"\r\n> ",
+            _MANAGER,
+            b"\r\n> ",
             command.encode() + b"\r\nAre you sure? [y/n]: ",
             b"Manager successfully deleted.\r\n> ",
+            b"\r\n> ",
+            b"No managers configured.\r\n> ",
         ]
     )
     client = _FakeClient(channel)
@@ -202,18 +213,22 @@ def test_short_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> 
     )
 
     assert result.success is True
-    assert channel.sent == [command + "\n", "yes\n"]
+    assert channel.sent == ["show managers\n", command + "\n", "yes\n", "show managers\n"]
 
 
 def test_delete_manager_answers_confirmation_and_sanitizes_echo(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    command = "configure manager delete"
+    command = f"configure manager delete {_MANAGER_ID}"
     channel = _FakeChannel(
         [
             b"\r\n> ",
+            _MANAGER,
+            b"\r\n> ",
             command.encode() + b"\r\nDo you want to continue[yes/no]: ",
             b"Manager successfully deleted.\r\n> ",
+            b"\r\n> ",
+            b"No managers configured.\r\n> ",
         ]
     )
     client = _FakeClient(channel)
@@ -231,7 +246,7 @@ def test_delete_manager_answers_confirmation_and_sanitizes_echo(
     assert result.host == "10.0.0.5"
     assert "successfully deleted" in result.output.casefold()
     assert command not in result.output.casefold()
-    assert channel.sent == [command + "\n", "yes\n"]
+    assert channel.sent == ["show managers\n", command + "\n", "yes\n", "show managers\n"]
     assert client.closed is True
 
 
@@ -252,6 +267,7 @@ def test_delete_manager_is_idempotent_when_no_manager_exists(
 
     assert result.success is True
     assert "No managers configured." in result.output
+    assert channel.sent == ["show managers\n"]
 
 
 def test_delete_manager_accepts_other_unmanaged_response(monkeypatch: MonkeyPatch) -> None:
@@ -273,12 +289,23 @@ def test_delete_manager_accepts_other_unmanaged_response(monkeypatch: MonkeyPatc
     assert "not currently configured" in result.output
 
 
-def test_delete_manager_rejects_unconfirmed_cleanup(monkeypatch: MonkeyPatch) -> None:
-    channel = _FakeChannel([b"\r\n> ", b"Manager deletion failed.\r\n> "])
+def test_delete_manager_rejects_manager_that_remains_configured(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            _MANAGER,
+            b"\r\n> ",
+            b"Manager deletion failed.\r\n> ",
+            b"\r\n> ",
+            _MANAGER,
+        ]
+    )
     client = _FakeClient(channel)
     _patch_client(monkeypatch, client)
 
-    with pytest.raises(FtdConfigureManagerError, match="did not confirm manager cleanup"):
+    with pytest.raises(FtdConfigureManagerError, match="still has a configured manager") as exc:
         _service().delete_manager(
             host="10.0.0.5",
             port=22,
@@ -286,6 +313,50 @@ def test_delete_manager_rejects_unconfirmed_cleanup(monkeypatch: MonkeyPatch) ->
             password="pw",
             timeout=5,
         )
+
+    assert "deletion failed" in exc.value.output
+
+
+def test_delete_manager_deletes_each_reported_identifier(monkeypatch: MonkeyPatch) -> None:
+    second_id = "a1234567-b123-c123-d123-e123456789ab"
+    managers = (
+        _MANAGER.removesuffix(b"> ")
+        + (
+            "\r\nType : Manager\r\n"
+            "Host : second.example.com\r\n"
+            f"Identifier : {second_id}\r\n> "
+        ).encode()
+    )
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            managers,
+            b"\r\n> ",
+            b"Manager successfully deleted.\r\n> ",
+            b"\r\n> ",
+            b"Manager successfully deleted.\r\n> ",
+            b"\r\n> ",
+            b"No managers configured.\r\n> ",
+        ]
+    )
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    result = _service().delete_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert channel.sent == [
+        "show managers\n",
+        f"configure manager delete {_MANAGER_ID}\n",
+        f"configure manager delete {second_id}\n",
+        "show managers\n",
+    ]
 
 
 def test_banner_line_ending_in_arrow_does_not_end_read_early(monkeypatch: MonkeyPatch) -> None:

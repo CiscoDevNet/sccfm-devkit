@@ -21,7 +21,9 @@ class _FakeService:
     def delete_manager(self, **kwargs: Any) -> None:
         self.calls.append(kwargs)
         if len(self.calls) <= self.failures:
-            raise FtdConfigureManagerError("temporary SSH failure")
+            raise FtdConfigureManagerError(
+                "temporary SSH failure", output="Manager is still configured."
+            )
 
 
 def _configure_environment(monkeypatch: MonkeyPatch) -> None:
@@ -79,8 +81,11 @@ def test_cleanup_reports_last_ssh_failure(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(cleanup, "FtdConfigureManagerService", lambda: service)
     monkeypatch.setattr(cleanup.time, "sleep", lambda _seconds: None)
 
-    with pytest.raises(cleanup.FtdManagerCleanupError, match="temporary SSH failure"):
+    with pytest.raises(cleanup.FtdManagerCleanupError, match="temporary SSH failure") as exc:
         cleanup.cleanup_manager_from_environment()
+
+    assert "Device output:" in str(exc.value)
+    assert "still configured" in str(exc.value)
 
 
 def test_cleanup_requires_password(monkeypatch: MonkeyPatch) -> None:

@@ -42,7 +42,6 @@ def run(ctx: ProfileContext) -> None:
     if not FTD_REGISTRATION_HOST:
         return
     validate_registration_name()
-    cleanup_manager_from_environment()
     config = ConfigService(path=ctx.config_path).load(ctx.profile)
     if config is None:
         raise AssertionError(f"E2E profile {ctx.profile!r} was not found at {ctx.config_path}")
@@ -60,6 +59,7 @@ def run(ctx: ProfileContext) -> None:
 
     for _ in range(FTD_CLEANUP_RETRIES):
         if not _matching_devices(api):
+            cleanup_manager_from_environment()
             return
         time.sleep(FTD_REGISTRATION_DELAY_SEC)
 
