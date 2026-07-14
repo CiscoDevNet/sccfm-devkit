@@ -52,8 +52,10 @@ dedicated persistent FTD (CI: `10.10.3.101`) with focused playbooks:
 
 The suite's `lifecycle_cleanup` fixture deletes the record and clears the
 manager off the appliance over SSH (`configure manager delete`) before and after
-the run. Skipped unless `FTD_HOST`, `FMC_ACCESS_POLICY_UID`,
-`FTD_PERFORMANCE_TIER`, and `SCCFM_FTD_PASSWORD` are set; the SSH cleanup also
-requires `SCCFM_E2E_FTD_MANAGER_DELETE_HOST` to equal `FTD_HOST`. Set
+the run. Skipped unless `FTD_HOST`, `FTD_PERFORMANCE_TIER`, and
+`SCCFM_FTD_PASSWORD` are set; the SSH cleanup also requires
+`SCCFM_E2E_FTD_MANAGER_DELETE_HOST` to equal `FTD_HOST`. The FMC access policy is
+resolved from the tenant's cdFMC automatically — override with
+`FMC_ACCESS_POLICY_UID`, or `FMC_ACCESS_POLICY_NAME` to pick one by name. Set
 `SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1` to fail rather than skip on missing
 inputs.

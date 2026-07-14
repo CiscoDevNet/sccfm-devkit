@@ -18,6 +18,8 @@ from cisco_sccfm_cli.e2e._payload import normalize_rows
 from cisco_sccfm_cli.e2e._profile import ProfileContext
 from cisco_sccfm_cli.e2e._runner import get_json, run_cli
 from cisco_sccfm_cli.e2e.ftd.phases.test_data import (
+    FTD_CDFMC_MANAGER_QUERY,
+    FTD_REGISTRATION_ACCESS_POLICY_NAME,
     FTD_REGISTRATION_ACCESS_POLICY_UID,
     FTD_REGISTRATION_NAME,
     FTD_REGISTRATION_PERFORMANCE_TIER,
@@ -37,6 +39,7 @@ _UNSYNCED_STATES = frozenset({"NOT_SYNCED", "NO_CONFIG"})
 
 def run(ctx: ProfileContext) -> None:
     validate_registration_name()
+    access_policy_uid = FTD_REGISTRATION_ACCESS_POLICY_UID or _resolve_access_policy_uid(ctx)
     result = run_cli(
         "inventory",
         "devices",
@@ -45,7 +48,7 @@ def run(ctx: ProfileContext) -> None:
         "--name",
         FTD_REGISTRATION_NAME,
         "--fmc-access-policy-uid",
-        FTD_REGISTRATION_ACCESS_POLICY_UID,
+        access_policy_uid,
         "--licenses",
         "BASE",
         "--virtual",
@@ -98,3 +101,80 @@ def _current_config_state(ctx: ProfileContext) -> str | None:
         return None
     state = match.get("config_state") or match.get("configState")
     return state if isinstance(state, str) else None
+
+
+def _resolve_access_policy_uid(ctx: ProfileContext) -> str:
+    """Discover the FMC access policy UID from the tenant's cdFMC.
+
+    Used when FMC_ACCESS_POLICY_UID is not provided: look up the cdFMC manager
+    to get its FMC domain UID, then list that domain's access policies.  When
+    FMC_ACCESS_POLICY_NAME is set, pick the policy with that name; otherwise
+    require exactly one so the choice is never ambiguous.
+    """
+    domain_uid = _resolve_cdfmc_domain_uid(ctx)
+    result = run_cli(
+        "inventory",
+        "manager",
+        "access-policies",
+        "list",
+        "--domain-uid",
+        domain_uid,
+        "--limit",
+        "50",
+        "--format",
+        "json",
+        profile=ctx.profile,
+        config_path=ctx.config_path,
+    )
+    policies = normalize_rows(get_json(result))
+    assert policies, (
+        "No FMC access policies found on the cdFMC (domain "
+        f"{domain_uid!r}); set FMC_ACCESS_POLICY_UID to override."
+    )
+
+    if FTD_REGISTRATION_ACCESS_POLICY_NAME:
+        wanted = FTD_REGISTRATION_ACCESS_POLICY_NAME.casefold()
+        matches = [p for p in policies if str(p.get("name", "")).casefold() == wanted]
+        assert len(matches) == 1, (
+            f"Expected exactly one FMC access policy named "
+            f"{FTD_REGISTRATION_ACCESS_POLICY_NAME!r}, found {len(matches)}."
+        )
+        uid = matches[0].get("uid")
+    else:
+        assert len(policies) == 1, (
+            f"cdFMC has {len(policies)} access policies; set FMC_ACCESS_POLICY_UID "
+            "or FMC_ACCESS_POLICY_NAME to disambiguate."
+        )
+        uid = policies[0].get("uid")
+
+    assert isinstance(uid, str) and uid, f"Resolved access policy has no UID: {policies!r}"
+    return uid
+
+
+def _resolve_cdfmc_domain_uid(ctx: ProfileContext) -> str:
+    """Return the FMC domain UID of the tenant's single cdFMC manager."""
+    result = run_cli(
+        "inventory",
+        "manager",
+        "list",
+        "--query",
+        FTD_CDFMC_MANAGER_QUERY,
+        "--limit",
+        "50",
+        "--format",
+        "json",
+        profile=ctx.profile,
+        config_path=ctx.config_path,
+    )
+    managers = normalize_rows(get_json(result))
+    domain_uids = [
+        d
+        for d in (m.get("fmc_domain_uid") or m.get("fmcDomainUid") for m in managers)
+        if isinstance(d, str) and d
+    ]
+    unique = sorted(set(domain_uids))
+    assert len(unique) == 1, (
+        f"Expected exactly one cdFMC domain UID from query {FTD_CDFMC_MANAGER_QUERY!r}, "
+        f"found {unique!r}. Set FMC_ACCESS_POLICY_UID to override."
+    )
+    return unique[0]

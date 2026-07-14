@@ -19,7 +19,14 @@ ftd_registration_name: >-
      | default('ci-e2e-ansible-ftd-' ~ (lookup('env', 'FTD_HOST') | regex_replace('[^A-Za-z0-9-]', '-')), true) }}
 ftd_registration_query: >-
   name:"{{ ftd_registration_name }}" AND connectivityState:ONLINE
+# Optional override. When empty, the onboard playbook resolves the access policy
+# at runtime from the tenant's cdFMC (list_managers -> list_cdfmc_access_policies).
 ftd_registration_access_policy_uid: "{{ lookup('env', 'FMC_ACCESS_POLICY_UID') }}"
+# Optional: pick the access policy by name when auto-resolving; empty means
+# "require exactly one".
+ftd_registration_access_policy_name: "{{ lookup('env', 'FMC_ACCESS_POLICY_NAME') }}"
+# cdFMC manager lookup used to discover the FMC domain UID when auto-resolving.
+ftd_cdfmc_manager_query: "{{ lookup('env', 'SCCFM_E2E_CDFMC_QUERY') | default('deviceType:CDFMC', true) }}"
 ftd_registration_performance_tier: "{{ lookup('env', 'FTD_PERFORMANCE_TIER') }}"
 ftd_registration_jump_host: "{{ lookup('env', 'FTD_JUMP_HOST') }}"
 ftd_registration_ssh_timeout: >-

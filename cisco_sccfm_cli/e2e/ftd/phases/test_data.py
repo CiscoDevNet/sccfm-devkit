@@ -39,16 +39,24 @@ FTD_REGISTRATION_NAME = os.environ.get(
 )
 _ESCAPED_REGISTRATION_NAME = FTD_REGISTRATION_NAME.replace("\\", "\\\\").replace('"', '\\"')
 FTD_REGISTRATION_QUERY = f'name:"{_ESCAPED_REGISTRATION_NAME}"'
+# Optional override. When empty, onboard_ftd resolves the access policy at
+# runtime from the tenant's cdFMC (manager list -> access-policies list).
 FTD_REGISTRATION_ACCESS_POLICY_UID = os.environ.get("FMC_ACCESS_POLICY_UID", "")
+# Optional override for which policy to pick when auto-resolving; matched
+# case-insensitively against the policy name. Empty means "take the only one".
+FTD_REGISTRATION_ACCESS_POLICY_NAME = os.environ.get("FMC_ACCESS_POLICY_NAME", "")
+# cdFMC manager lookup used to discover the FMC domain UID when auto-resolving.
+FTD_CDFMC_MANAGER_QUERY = os.environ.get("SCCFM_E2E_CDFMC_QUERY", "deviceType:CDFMC")
 FTD_REGISTRATION_PERFORMANCE_TIER = os.environ.get("FTD_PERFORMANCE_TIER", "")
 FTD_REGISTRATION_JUMP_HOST = os.environ.get("FTD_JUMP_HOST", "")
 FTD_REGISTRATION_SSH_TIMEOUT = _env_int("FTD_SSH_TIMEOUT", 60)
 FTD_REGISTRATION_RETRIES = _env_int("FTD_REGISTRATION_RETRIES", 120)
 FTD_REGISTRATION_DELAY_SEC = _env_int("FTD_REGISTRATION_DELAY", 10)
 FTD_CLEANUP_RETRIES = _env_int("FTD_CLEANUP_RETRIES", 60)
+# FMC_ACCESS_POLICY_UID is intentionally NOT required: the suite resolves it
+# from the tenant's cdFMC when unset.
 FTD_REGISTRATION_REQUIRED_ENV = (
     "FTD_HOST",
-    "FMC_ACCESS_POLICY_UID",
     "FTD_PERFORMANCE_TIER",
     "SCCFM_FTD_PASSWORD",
 )

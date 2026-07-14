@@ -110,11 +110,13 @@ It is skipped unless these are set (Jenkins injects them):
 
 ```
 FTD_HOST=10.10.3.101            # management IP of the persistent FTD
-FMC_ACCESS_POLICY_UID=<uuid>    # cdFMC access policy to apply on onboard
 FTD_PERFORMANCE_TIER=FTDv5      # virtual FTD tier
 SCCFM_FTD_PASSWORD=<ssh pw>     # FTD SSH password (also used by cleanup)
 SCCFM_E2E_FTD_MANAGER_DELETE_HOST=10.10.3.101   # must equal FTD_HOST
-# optional: FTD_PORT, FTD_USER, FTD_JUMP_HOST, FTD_SSH_TIMEOUT,
+# The access policy is resolved from the tenant's cdFMC automatically. Override
+# with FMC_ACCESS_POLICY_UID=<uuid>, or FMC_ACCESS_POLICY_NAME=<name> to pick one
+# by name when the cdFMC has several (default requires exactly one).
+# optional: FTD_PORT, FTD_USER, FTD_JUMP_HOST, FTD_SSH_TIMEOUT, SCCFM_E2E_CDFMC_QUERY,
 #           FTD_REGISTRATION_RETRIES, FTD_REGISTRATION_DELAY, FTD_CLEANUP_RETRIES
 # set SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1 to fail (not skip) on missing inputs
 ```

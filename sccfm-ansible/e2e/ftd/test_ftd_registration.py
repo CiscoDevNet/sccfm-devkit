@@ -21,9 +21,10 @@ from typing import Final
 import pytest
 from conftest import run_playbook
 
+# FMC_ACCESS_POLICY_UID is intentionally optional: the onboard playbook resolves
+# it from the tenant's cdFMC when unset.
 _REQUIRED_ENV: Final[tuple[str, ...]] = (
     "FTD_HOST",
-    "FMC_ACCESS_POLICY_UID",
     "FTD_PERFORMANCE_TIER",
     "SCCFM_FTD_PASSWORD",
 )

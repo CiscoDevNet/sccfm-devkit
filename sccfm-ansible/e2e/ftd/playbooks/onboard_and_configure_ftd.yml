@@ -21,7 +21,6 @@
       ansible.builtin.assert:
         that:
           - ftd_registration_host | length > 0
-          - ftd_registration_access_policy_uid | length > 0
           - ftd_registration_performance_tier | length > 0
           - lookup('env', 'SCCFM_FTD_PASSWORD') | length > 0
           - >-
@@ -29,14 +28,73 @@
               '^ci-e2e-ansible-ftd-[A-Za-z0-9-]+$'
             )
         fail_msg: >-
-          FTD_HOST, FMC_ACCESS_POLICY_UID, FTD_PERFORMANCE_TIER, and
-          SCCFM_FTD_PASSWORD are required for the FTD registration E2E, and the
-          device name must use the reserved 'ci-e2e-ansible-ftd-' prefix.
+          FTD_HOST, FTD_PERFORMANCE_TIER, and SCCFM_FTD_PASSWORD are required for
+          the FTD registration E2E, and the device name must use the reserved
+          'ci-e2e-ansible-ftd-' prefix. (FMC_ACCESS_POLICY_UID is optional; it is
+          resolved from the tenant's cdFMC when unset.)
+
+    # Resolve the access policy from the tenant's cdFMC unless an explicit UID
+    # was provided.  Look up the cdFMC manager for its FMC domain UID, then list
+    # that domain's access policies.
+    - name: Resolve the FMC access policy
+      when: ftd_registration_access_policy_uid | length == 0
+      block:
+        - name: Find the cdFMC manager
+          cisco.sccfm.list_managers:
+            query: "{{ ftd_cdfmc_manager_query }}"
+          register: cdfmc_managers
+
+        - name: Assert exactly one cdFMC domain UID
+          ansible.builtin.assert:
+            that:
+              - >-
+                (cdfmc_managers.managers | default([])
+                 | map(attribute='fmc_domain_uid') | select | unique | list | length) == 1
+            fail_msg: >-
+              Expected exactly one cdFMC domain UID from query
+              '{{ ftd_cdfmc_manager_query }}'; set FMC_ACCESS_POLICY_UID to override.
+
+        - name: List the cdFMC access policies
+          cisco.sccfm.list_cdfmc_access_policies:
+            domain_uid: >-
+              {{ (cdfmc_managers.managers | map(attribute='fmc_domain_uid')
+                  | select | unique | list)[0] }}
+          register: cdfmc_access_policies
+
+        - name: Select the access policy by name when provided
+          ansible.builtin.set_fact:
+            ftd_resolved_access_policy_uid: >-
+              {{ (cdfmc_access_policies.access_policies
+                  | selectattr('name', 'equalto', ftd_registration_access_policy_name)
+                  | map(attribute='uid') | list) }}
+          when: ftd_registration_access_policy_name | length > 0
+
+        - name: Otherwise require exactly one access policy
+          ansible.builtin.set_fact:
+            ftd_resolved_access_policy_uid: >-
+              {{ cdfmc_access_policies.access_policies | map(attribute='uid') | list }}
+          when: ftd_registration_access_policy_name | length == 0
+
+        - name: Assert a single access policy was resolved
+          ansible.builtin.assert:
+            that:
+              - (ftd_resolved_access_policy_uid | length) == 1
+            fail_msg: >-
+              Could not resolve a single FMC access policy
+              (name filter='{{ ftd_registration_access_policy_name }}'); set
+              FMC_ACCESS_POLICY_UID or FMC_ACCESS_POLICY_NAME to disambiguate.
+
+    - name: Pin the access policy UID to use for onboarding
+      ansible.builtin.set_fact:
+        ftd_onboard_access_policy_uid: >-
+          {{ ftd_registration_access_policy_uid
+             if ftd_registration_access_policy_uid | length > 0
+             else ftd_resolved_access_policy_uid[0] }}
 
     - name: Onboard the registration-test FTD
       cisco.sccfm.onboard_cdfmc_ftd:
         name: "{{ ftd_registration_name }}"
-        fmc_access_policy_uid: "{{ ftd_registration_access_policy_uid }}"
+        fmc_access_policy_uid: "{{ ftd_onboard_access_policy_uid }}"
         licenses:
           - BASE
         virtual: true
