@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Remove CLI registration-test FTD records before and after the suite."""
+"""Reset the persistent FTD and remove its CLI registration-test record."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from cisco_sccfm_cli.e2e.ftd.phases.test_data import (
 )
 from cisco_sccfm_cli.services import ConfigService
 from cisco_sccfm_core.factories import ApiClientFactory
+from cisco_sccfm_scripts.cleanup_ftd_manager import cleanup_manager_from_environment
 
 
 def _registration_query() -> str:
@@ -41,6 +42,7 @@ def run(ctx: ProfileContext) -> None:
     if not FTD_REGISTRATION_HOST:
         return
     validate_registration_name()
+    cleanup_manager_from_environment()
     config = ConfigService(path=ctx.config_path).load(ctx.profile)
     if config is None:
         raise AssertionError(f"E2E profile {ctx.profile!r} was not found at {ctx.config_path}")

@@ -42,7 +42,7 @@ JUnit output is written to `results/ci-ansible-tests.xml` for Jenkins to ingest.
 
 ## FTD registration inputs
 
-The registration phases are skipped unless CI provides a pristine, unregistered
+The registration phases are skipped unless CI provides a dedicated persistent
 FTD and all required values:
 
 - `FTD_HOST`, `FMC_ACCESS_POLICY_UID`, and `FTD_PERFORMANCE_TIER`
@@ -50,7 +50,9 @@ FTD and all required values:
 
 Optional overrides are `FTD_USER` (default `admin`), `FTD_PORT` (default `22`),
 `FTD_JUMP_HOST`, `SCCFM_JUMP_PASSWORD`, and `FTD_SSH_TIMEOUT`. Ansible and CLI
-must use separate FTD VMs because deleting the SCCFM record does not clear the
-manager configuration on the appliance. CI also sets
+run sequentially against the same appliance. Their lifecycle cleanup runs
+`configure manager delete` over SSH before and after each suite, then removes
+the reserved SCCFM record. Cleanup is refused unless
+`SCCFM_E2E_FTD_MANAGER_DELETE_HOST` exactly matches `FTD_HOST`. CI also sets
 `SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1` so missing inputs fail the job instead of
 silently skipping the registration phases.

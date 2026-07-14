@@ -18,9 +18,7 @@ from cisco_sccfm_core.services.inventory import (
     JumpHostSpec,
 )
 from cisco_sccfm_core.services.inventory import ftd_configure_manager_service as svc_mod
-from cisco_sccfm_core.services.inventory import (
-    parse_jump_host,
-)
+from cisco_sccfm_core.services.inventory import parse_jump_host
 
 _CLI_KEY = "configure manager add DONTRESOLVE regkey123 natid456"
 _SUCCESS_CHUNKS = [b"\r\n> ", b"Manager successfully configured.\r\n> "]
@@ -181,6 +179,70 @@ def test_license_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -
 
     assert result.success is True
     assert channel.sent == [_CLI_KEY + "\n", "yes\n"]
+
+
+def test_delete_manager_answers_confirmation_and_sanitizes_echo(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    command = "configure manager delete"
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            command.encode() + b"\r\nDo you want to continue[yes/no]: ",
+            b"Manager successfully deleted.\r\n> ",
+        ]
+    )
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    result = _service().delete_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert result.host == "10.0.0.5"
+    assert "successfully deleted" in result.output.casefold()
+    assert command not in result.output.casefold()
+    assert channel.sent == [command + "\n", "yes\n"]
+    assert client.closed is True
+
+
+def test_delete_manager_is_idempotent_when_no_manager_exists(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    channel = _FakeChannel([b"\r\n> ", b"No managers configured.\r\n> "])
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    result = _service().delete_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert "No managers configured." in result.output
+
+
+def test_delete_manager_rejects_unconfirmed_cleanup(monkeypatch: MonkeyPatch) -> None:
+    channel = _FakeChannel([b"\r\n> ", b"Manager deletion failed.\r\n> "])
+    client = _FakeClient(channel)
+    _patch_client(monkeypatch, client)
+
+    with pytest.raises(FtdConfigureManagerError, match="did not confirm manager cleanup"):
+        _service().delete_manager(
+            host="10.0.0.5",
+            port=22,
+            username="admin",
+            password="pw",
+            timeout=5,
+        )
 
 
 def test_banner_line_ending_in_arrow_does_not_end_read_early(monkeypatch: MonkeyPatch) -> None:

@@ -57,12 +57,14 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
 
 3. (CI only) Provision a CLI-dedicated vASA and export `ASA_HOST` + `VASA_PASSWORD`.  `run_e2e.sh` will onboard it as `ci-e2e-cli-asa-<host>` and remove it on exit.  When these vars are unset the script skips onboarding and tests run against any existing `ci-e2e-cli-asa-*` device.
 
-4. (CI only) To run FTD registration, provide a pristine FTD through `FTD_HOST`,
+4. (CI only) To run FTD registration, provide a dedicated persistent FTD through `FTD_HOST`,
    `FMC_ACCESS_POLICY_UID`, `FTD_PERFORMANCE_TIER`, and the secret environment
    binding `SCCFM_FTD_PASSWORD`. Optional overrides are `FTD_USER`, `FTD_PORT`,
    `FTD_JUMP_HOST`, `SCCFM_JUMP_PASSWORD`, and `FTD_SSH_TIMEOUT`. The CLI and
-   Ansible lanes require different FTD VMs because tenant cleanup does not clear
-   the manager configuration on the appliance. CI sets
+   Ansible lanes run sequentially against the same appliance. Their lifecycle
+   cleanup runs `configure manager delete` over SSH before and after each suite,
+   then removes the reserved SCCFM record. Cleanup is refused unless
+   `SCCFM_E2E_FTD_MANAGER_DELETE_HOST` exactly matches `FTD_HOST`. CI sets
    `SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1` so an incomplete configuration fails
    rather than skipping these phases. The one-time manager key is passed to the
    child CLI process through `SCCFM_FTD_CLI_KEY`; users may use that environment

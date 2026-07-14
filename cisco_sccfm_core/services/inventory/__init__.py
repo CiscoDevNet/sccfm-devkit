@@ -33,6 +33,7 @@ from cisco_sccfm_core.services.inventory.ftd_configure_manager_service import (
     FtdConfigureManagerError,
     FtdConfigureManagerService,
     JumpHostSpec,
+    ManagerCleanupResult,
     ReachabilityResult,
     parse_jump_host,
 )
@@ -68,6 +69,7 @@ __all__ = [
     "FtdConfigureManagerError",
     "FtdConfigureManagerService",
     "JumpHostSpec",
+    "ManagerCleanupResult",
     "ReachabilityResult",
     "parse_jump_host",
     "FtdDeployService",

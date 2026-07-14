@@ -54,6 +54,24 @@ def test_cleanup_should_ignore_nonexact_query_matches(monkeypatch: MonkeyPatch) 
     assert devices == [exact_match]
 
 
+def test_cleanup_should_reset_manager_before_loading_profile(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(cleanup, "FTD_REGISTRATION_HOST", "10.10.3.105")
+    monkeypatch.setattr(cleanup, "validate_registration_name", lambda: None)
+    monkeypatch.setattr(
+        cleanup,
+        "cleanup_manager_from_environment",
+        lambda: calls.append("manager-reset"),
+    )
+
+    with pytest.raises(AssertionError, match="profile.*was not found"):
+        cleanup.run(_context(tmp_path))
+
+    assert calls == ["manager-reset"]
+
+
 def test_configure_manager_should_discard_cli_key_after_failure(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:

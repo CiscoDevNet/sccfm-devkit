@@ -7,7 +7,7 @@ ftd_test_query_all: "name:ftd-7.4.2-172-1516"
 # For list_ftd_not_on_version -- fake version no device should be on
 ftd_not_on_version: "99.99.99"
 
-# Registration workflow. CI maps one pristine FTD VM to these generic inputs.
+# Registration workflow. CI maps one dedicated persistent FTD to these inputs.
 ftd_registration_host: "{{ lookup('env', 'FTD_HOST') }}"
 ftd_registration_port: "{{ lookup('env', 'FTD_PORT') | default('22', true) | int }}"
 ftd_registration_user: "{{ lookup('env', 'FTD_USER') | default('admin', true) }}"

@@ -24,6 +24,8 @@ _CONFIRM_PROMPT = re.compile(r"Do you want to continue\[yes/no\]\s*:\s*$", re.MU
 # starts with "manager" also lets the FMC host contain "not" (e.g. "not-prod").
 _SUCCESS_LINE = re.compile(r"^manager\b.*\bsuccessfully configured\b", re.IGNORECASE)
 _NEGATED = re.compile(r"\bnot successfully configured\b", re.IGNORECASE)
+_DELETE_SUCCESS = re.compile(r"\bmanager\b.*\bsuccessfully deleted\b", re.IGNORECASE)
+_NO_MANAGER = re.compile(r"\bno managers?\b.*\bconfigured\b", re.IGNORECASE)
 _RECV_CHUNK = 4096
 
 
@@ -57,6 +59,16 @@ class ConfigureManagerResult:
             "output": self.output,
             "message": self.message,
         }
+
+
+@dataclass(frozen=True)
+class ManagerCleanupResult:
+    """Outcome of removing the configured manager from an FTD over SSH."""
+
+    host: str
+    success: bool
+    output: str
+    message: str
 
 
 @dataclass(frozen=True)
@@ -114,51 +126,16 @@ class FtdConfigureManagerService:
         jump: JumpHostSpec | None = None,
     ) -> ConfigureManagerResult:
         command = _validate_cli_key(cli_key)
-
-        jump_client, sock = self._open_jump_channel(jump, host, port, timeout)
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            try:
-                client.connect(
-                    hostname=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    timeout=timeout,
-                    look_for_keys=False,
-                    allow_agent=False,
-                    sock=sock,
-                )
-            except paramiko.AuthenticationException as exc:
-                raise FtdConfigureManagerError(
-                    f"SSH authentication failed for {username}@{host}:{port}."
-                ) from exc
-            except (paramiko.SSHException, socket.timeout, OSError) as exc:
-                raise FtdConfigureManagerError(
-                    f"Could not establish SSH connection to {host}:{port}: {exc}"
-                ) from exc
-
-            try:
-                channel = client.invoke_shell()
-                channel.settimeout(timeout)
-                # Drain the banner / wait for the initial '>' prompt.
-                _read_until_prompt(channel, timeout)
-                channel.send(command + "\n")
-                output = _read_until_prompt(channel, timeout)
-            except FtdConfigureManagerError as exc:
-                raise FtdConfigureManagerError(
-                    str(exc),
-                    output=_sanitize_manager_command_echo(exc.output, command),
-                ) from exc
-            except (paramiko.SSHException, socket.timeout, OSError) as exc:
-                raise FtdConfigureManagerError(
-                    f"SSH session error while configuring manager on {host}: {exc}"
-                ) from exc
-        finally:
-            client.close()
-            if jump_client is not None:
-                jump_client.close()
+        output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=command,
+            timeout=timeout,
+            operation="configuring manager",
+            jump=jump,
+        )
 
         sanitized_output = _sanitize_manager_command_echo(output, command)
         if not _is_success(output):
@@ -172,6 +149,41 @@ class FtdConfigureManagerService:
             success=True,
             output=sanitized_output,
             message="Manager successfully configured.",
+        )
+
+    def delete_manager(
+        self,
+        *,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        timeout: int,
+        jump: JumpHostSpec | None = None,
+    ) -> ManagerCleanupResult:
+        """Remove any configured manager from an FTD registration fixture."""
+        command = "configure manager delete"
+        output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=command,
+            timeout=timeout,
+            operation="deleting manager",
+            jump=jump,
+        )
+        sanitized_output = _sanitize_manager_command_echo(output, command)
+        if not (_DELETE_SUCCESS.search(output) or _NO_MANAGER.search(output)):
+            raise FtdConfigureManagerError(
+                f"FTD did not confirm manager cleanup on {host}.",
+                output=sanitized_output,
+            )
+        return ManagerCleanupResult(
+            host=host,
+            success=True,
+            output=sanitized_output,
+            message="Manager cleanup command completed.",
         )
 
     def check_reachable(
@@ -256,6 +268,62 @@ class FtdConfigureManagerService:
             ) from exc
 
         return jump_client, channel
+
+    def _execute_cli_command(
+        self,
+        *,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        command: str,
+        timeout: int,
+        operation: str,
+        jump: JumpHostSpec | None,
+    ) -> str:
+        jump_client, sock = self._open_jump_channel(jump, host, port, timeout)
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            try:
+                client.connect(
+                    hostname=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    timeout=timeout,
+                    look_for_keys=False,
+                    allow_agent=False,
+                    sock=sock,
+                )
+            except paramiko.AuthenticationException as exc:
+                raise FtdConfigureManagerError(
+                    f"SSH authentication failed for {username}@{host}:{port}."
+                ) from exc
+            except (paramiko.SSHException, socket.timeout, OSError) as exc:
+                raise FtdConfigureManagerError(
+                    f"Could not establish SSH connection to {host}:{port}: {exc}"
+                ) from exc
+
+            try:
+                channel = client.invoke_shell()
+                channel.settimeout(timeout)
+                _read_until_prompt(channel, timeout)
+                channel.send(command + "\n")
+                return _read_until_prompt(channel, timeout)
+            except FtdConfigureManagerError as exc:
+                raise FtdConfigureManagerError(
+                    str(exc),
+                    output=_sanitize_manager_command_echo(exc.output, command),
+                ) from exc
+            except (paramiko.SSHException, socket.timeout, OSError) as exc:
+                raise FtdConfigureManagerError(
+                    f"SSH session error while {operation} on {host}: {exc}"
+                ) from exc
+        finally:
+            client.close()
+            if jump_client is not None:
+                jump_client.close()
 
 
 def parse_jump_host(value: str, password: str | None, default_port: int = 22) -> JumpHostSpec:

@@ -12,13 +12,14 @@ import pytest
 
 from cisco_sccfm_cli.e2e._profile import ProfileContext
 from cisco_sccfm_cli.e2e.ftd.phases import cleanup as cleanup_phase
+from cisco_sccfm_scripts.cleanup_ftd_manager import FtdManagerCleanupError
 
 
 @pytest.fixture(scope="session", autouse=True)
 def lifecycle_cleanup(e2e_profile: ProfileContext) -> Generator[None, None, None]:
     try:
         cleanup_phase.run(e2e_profile)
-    except AssertionError as exc:
+    except (AssertionError, FtdManagerCleanupError) as exc:
         pytest.exit(f"Pre-test cleanup failed, aborting suite: {exc}", returncode=1)
     yield
     cleanup_phase.run(e2e_profile)

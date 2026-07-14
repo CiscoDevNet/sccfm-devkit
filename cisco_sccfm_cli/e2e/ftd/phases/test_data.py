@@ -26,7 +26,7 @@ FTD_TEST_QUERY_ALL = f"name:{FTD_DEVICE_NAME}"
 # A made-up version no real device is on.
 FTD_NOT_ON_VERSION = "99.99.99"
 
-# Registration workflow. CI maps one pristine FTD VM to these generic inputs.
+# Registration workflow. CI maps one dedicated persistent FTD to these inputs.
 FTD_REGISTRATION_HOST = os.environ.get("FTD_HOST", "")
 FTD_REGISTRATION_PORT = os.environ.get("FTD_PORT", "22")
 FTD_REGISTRATION_USER = os.environ.get("FTD_USER", "admin")

@@ -14,6 +14,11 @@ from typing import Generator
 
 import pytest
 
+from cisco_sccfm_scripts.cleanup_ftd_manager import (
+    FtdManagerCleanupError,
+    cleanup_manager_from_environment,
+)
+
 FTD_DIR = Path(__file__).resolve().parent
 PLAYBOOKS_DIR = FTD_DIR / "playbooks"
 EXAMPLES_DIR = FTD_DIR.parent.parent / "examples"
@@ -81,12 +86,18 @@ def run_playbook(name: str, timeout: int = 600) -> subprocess.CompletedProcess[s
     return result
 
 
+def cleanup_registration_fixture() -> None:
+    """Reset the persistent appliance, then remove its reserved SCCFM record."""
+    cleanup_manager_from_environment()
+    run_playbook("cleanup.yml", timeout=_cleanup_timeout())
+
+
 @pytest.fixture(scope="session", autouse=True)
 def lifecycle_cleanup() -> Generator[None, None, None]:
     """Pre-clean before tests, and always clean up after -- even on failure."""
     try:
-        run_playbook("cleanup.yml", timeout=_cleanup_timeout())
-    except AssertionError as e:
-        pytest.exit(f"Pre-test cleanup failed, aborting suite: {e}", returncode=1)
+        cleanup_registration_fixture()
+    except (AssertionError, FtdManagerCleanupError) as exc:
+        pytest.exit(f"Pre-test cleanup failed, aborting suite: {exc}", returncode=1)
     yield
-    run_playbook("cleanup.yml", timeout=_cleanup_timeout())
+    cleanup_registration_fixture()

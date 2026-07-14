@@ -1,6 +1,6 @@
 ---
-# Remove only a reserved registration-test device. The existing fixed FTD
-# fixture is deliberately outside the allowed name prefixes.
+# Remove only a reserved registration-test device after the persistent fixture's
+# manager configuration has been cleared over SSH by the pytest lifecycle.
 
 - name: "CI: Remove registration-test FTD"
   hosts: localhost
