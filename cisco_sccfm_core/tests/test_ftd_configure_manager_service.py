@@ -189,7 +189,7 @@ def test_license_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -
 
 
 def test_short_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> None:
-    command = f"configure manager delete {_MANAGER_ID}"
+    command = "configure manager delete"
     channel = _FakeChannel(
         [
             b"\r\n> ",
@@ -219,7 +219,7 @@ def test_short_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> 
 def test_delete_manager_answers_confirmation_and_sanitizes_echo(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    command = f"configure manager delete {_MANAGER_ID}"
+    command = "configure manager delete"
     channel = _FakeChannel(
         [
             b"\r\n> ",
@@ -315,46 +315,9 @@ def test_delete_manager_rejects_manager_that_remains_configured(
         )
 
     assert "deletion failed" in exc.value.output
-
-
-def test_delete_manager_deletes_each_reported_identifier(monkeypatch: MonkeyPatch) -> None:
-    second_id = "a1234567-b123-c123-d123-e123456789ab"
-    managers = (
-        _MANAGER.removesuffix(b"> ")
-        + (
-            "\r\nType : Manager\r\n"
-            "Host : second.example.com\r\n"
-            f"Identifier : {second_id}\r\n> "
-        ).encode()
-    )
-    channel = _FakeChannel(
-        [
-            b"\r\n> ",
-            managers,
-            b"\r\n> ",
-            b"Manager successfully deleted.\r\n> ",
-            b"\r\n> ",
-            b"Manager successfully deleted.\r\n> ",
-            b"\r\n> ",
-            b"No managers configured.\r\n> ",
-        ]
-    )
-    client = _FakeClient(channel)
-    _patch_client(monkeypatch, client)
-
-    result = _service().delete_manager(
-        host="10.0.0.5",
-        port=22,
-        username="admin",
-        password="pw",
-        timeout=5,
-    )
-
-    assert result.success is True
     assert channel.sent == [
         "show managers\n",
-        f"configure manager delete {_MANAGER_ID}\n",
-        f"configure manager delete {second_id}\n",
+        "configure manager delete\n",
         "show managers\n",
     ]
 

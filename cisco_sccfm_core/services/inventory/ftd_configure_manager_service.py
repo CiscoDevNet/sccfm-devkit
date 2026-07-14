@@ -29,10 +29,6 @@ _SUCCESS_LINE = re.compile(r"^manager\b.*\bsuccessfully configured\b", re.IGNORE
 _NEGATED = re.compile(r"\bnot successfully configured\b", re.IGNORECASE)
 _NO_MANAGER = re.compile(r"\bno managers?\b.*\bconfigured\b", re.IGNORECASE)
 _OTHER_UNMANAGED = re.compile(r"\bnot currently configured to be managed\b", re.IGNORECASE)
-_MANAGER_IDENTIFIER = re.compile(
-    r"^\s*Identifier\s*:\s*([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\s*$",
-    re.IGNORECASE | re.MULTILINE,
-)
 _RECV_CHUNK = 4096
 
 
@@ -184,22 +180,18 @@ class FtdConfigureManagerService:
         if _is_unmanaged(initial_output):
             return _manager_cleanup_result(host, outputs)
 
-        identifiers = _manager_identifiers(initial_output)
-        delete_commands = [
-            f"configure manager delete {identifier}" for identifier in identifiers
-        ] or ["configure manager delete"]
-        for command in delete_commands:
-            output = self._execute_cli_command(
-                host=host,
-                port=port,
-                username=username,
-                password=password,
-                command=command,
-                timeout=timeout,
-                operation="deleting manager",
-                jump=jump,
-            )
-            outputs.append(_sanitize_manager_command_echo(output, command))
+        command = "configure manager delete"
+        output = self._execute_cli_command(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=command,
+            timeout=timeout,
+            operation="deleting manager",
+            jump=jump,
+        )
+        outputs.append(_sanitize_manager_command_echo(output, command))
 
         final_output = self._execute_cli_command(
             host=host,
@@ -376,11 +368,6 @@ def _join_outputs(outputs: list[str]) -> str:
 
 def _is_unmanaged(output: str) -> bool:
     return bool(_NO_MANAGER.search(output) or _OTHER_UNMANAGED.search(output))
-
-
-def _manager_identifiers(output: str) -> list[str]:
-    """Return unique manager UUIDs in their device-reported order."""
-    return list(dict.fromkeys(_MANAGER_IDENTIFIER.findall(output)))
 
 
 def parse_jump_host(value: str, password: str | None, default_port: int = 22) -> JumpHostSpec:
