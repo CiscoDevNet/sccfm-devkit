@@ -110,4 +110,4 @@ poetry run python -m pytest "${SCRIPT_DIR}" \
   -v \
   --tb=short \
   --junitxml="${RESULTS_DIR}/ci-cli-tests.xml" \
-  "${EXTRA_PYTEST_ARGS[@]}"
+  ${EXTRA_PYTEST_ARGS[@]+"${EXTRA_PYTEST_ARGS[@]}"}
