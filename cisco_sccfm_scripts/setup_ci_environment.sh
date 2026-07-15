@@ -92,9 +92,14 @@ create_venv() {
     exit 1
   fi
 
-  if [[ ! -d "${VENV_DIR}" ]]; then
+  # Recreate the venv unless its interpreter is actually usable. A venv restored
+  # from cache into a different workspace path (e.g. after the job moved folders)
+  # keeps absolute paths baked into pyvenv.cfg / bin, so its python falls back to
+  # the system one with no pip. Guarding on the directory alone would then run
+  # `pip install` against a broken interpreter, so probe python instead.
+  if [[ ! -x "${VENV_DIR}/bin/python" ]] || ! "${VENV_DIR}/bin/python" -c "" 2>/dev/null; then
     echo "Creating virtualenv at ${VENV_DIR}"
-    "${python_bin}" -m venv "${VENV_DIR}"
+    "${python_bin}" -m venv --clear "${VENV_DIR}"
   fi
 
   # shellcheck source=/dev/null
