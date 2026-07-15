@@ -43,7 +43,15 @@ poetry run ansible-galaxy collection install "${COLLECTION_DIR}" --force
 # ── Run integration tests ─────────────────────────────────────────
 echo "Running network object lifecycle e2e tests..."
 mkdir -p "${RESULTS_DIR}"
+
+# Optional extra pytest args for isolating a subset, e.g. running only the FTD
+# registration tests: SCCFM_E2E_PYTEST_ARGS="-k registration". Word-split
+# intentionally so multiple args can be passed; defaults to the full suite.
+# shellcheck disable=SC2206
+EXTRA_PYTEST_ARGS=(${SCCFM_E2E_PYTEST_ARGS:-})
+
 poetry run python -m pytest "${SCRIPT_DIR}" \
   -v \
   --tb=short \
-  --junitxml="${RESULTS_DIR}/ci-ansible-tests.xml"
+  --junitxml="${RESULTS_DIR}/ci-ansible-tests.xml" \
+  "${EXTRA_PYTEST_ARGS[@]}"

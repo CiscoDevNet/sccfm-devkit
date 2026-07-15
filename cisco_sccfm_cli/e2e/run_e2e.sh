@@ -100,7 +100,14 @@ export SCCFM_E2E_VAULT_FILE="${VAULT_FILE}"
 export SCCFM_E2E_VAULT_PASS="${VAULT_PASS}"
 export SCCFM_E2E_VARS_FILE="${VARS_FILE}"
 
+# Optional extra pytest args for isolating a subset, e.g. running only the FTD
+# registration tests: SCCFM_E2E_PYTEST_ARGS="-k registration". Word-split
+# intentionally so multiple args can be passed; defaults to the full suite.
+# shellcheck disable=SC2206
+EXTRA_PYTEST_ARGS=(${SCCFM_E2E_PYTEST_ARGS:-})
+
 poetry run python -m pytest "${SCRIPT_DIR}" \
   -v \
   --tb=short \
-  --junitxml="${RESULTS_DIR}/ci-cli-tests.xml"
+  --junitxml="${RESULTS_DIR}/ci-cli-tests.xml" \
+  "${EXTRA_PYTEST_ARGS[@]}"
