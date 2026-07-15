@@ -73,9 +73,19 @@ FTD_REGISTRATION_ENABLED = not FTD_REGISTRATION_MISSING_ENV
 FTD_REGISTRATION_REQUIRED = os.environ.get("SCCFM_E2E_REQUIRE_FTD_REGISTRATION") == "1"
 
 
+# Reserved device-name patterns. The guard refuses to onboard or clean up any
+# name that does not match one of these, so a misconfigured SCCFM_E2E_FTD_NAME
+# can never target a real appliance's record. Both suites share the persistent
+# FTD, so the CLI suite also accepts the sccfm-ansible-e2e-ftd-* fixture name.
+_RESERVED_NAME_PATTERNS = (
+    r"ci-e2e-cli-ftd-[A-Za-z0-9-]+",
+    r"sccfm-ansible-e2e-ftd-[A-Za-z0-9-]+",
+)
+
+
 def validate_registration_name() -> None:
     """Guard: refuse to onboard/clean up any non-reserved device name."""
-    if not re.fullmatch(r"ci-e2e-cli-ftd-[A-Za-z0-9-]+", FTD_REGISTRATION_NAME):
+    if not any(re.fullmatch(p, FTD_REGISTRATION_NAME) for p in _RESERVED_NAME_PATTERNS):
         raise AssertionError(
             "Refusing CLI FTD registration or cleanup for non-reserved device name "
             f"{FTD_REGISTRATION_NAME!r}"

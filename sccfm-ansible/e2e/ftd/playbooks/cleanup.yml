@@ -28,7 +28,7 @@
         - name: Validate the reserved device name before deletion
           ansible.builtin.assert:
             that:
-              - ftd_registration_name is match('^ci-e2e-ansible-ftd-[A-Za-z0-9-]+$')
+              - ftd_registration_name is match('^(ci-e2e-ansible-ftd|sccfm-ansible-e2e-ftd)-[A-Za-z0-9-]+$')
             fail_msg: >-
               Refusing FTD cleanup for unsafe device name
               '{{ ftd_registration_name }}'.
