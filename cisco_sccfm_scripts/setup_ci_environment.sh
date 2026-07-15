@@ -106,11 +106,22 @@ create_venv() {
   source "${VENV_DIR}/bin/activate"
   python -m pip install --upgrade pip
 
-  if ! command -v poetry >/dev/null 2>&1; then
-    pip install poetry
+  # Install Poetry in its own venv, NOT the project .venv it manages. If Poetry
+  # lives in the project env, `poetry install` can downgrade a package Poetry
+  # itself imports (e.g. virtualenv) mid-run, breaking the running process
+  # ("No discovery plugin found"). An isolated tooling env avoids that. Symlink
+  # its entrypoint into the project venv's bin so `poetry` stays on PATH after
+  # activation (activate.sh and the Jenkinsfile both call `poetry ...`).
+  local poetry_venv="${VENV_DIR}/.poetry"
+  if [[ ! -x "${poetry_venv}/bin/poetry" ]]; then
+    echo "Installing Poetry in an isolated tooling environment at ${poetry_venv}"
+    "${python_bin}" -m venv "${poetry_venv}"
+    "${poetry_venv}/bin/python" -m pip install --upgrade pip
+    "${poetry_venv}/bin/pip" install poetry
   fi
+  ln -sfn "../.poetry/bin/poetry" "${VENV_DIR}/bin/poetry"
 
-  POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --with dev,build
+  POETRY_VIRTUALENVS_IN_PROJECT=1 "${poetry_venv}/bin/poetry" install --with dev,build
 
   if [[ ! -x "${VENV_DIR}/bin/cz" ]]; then
     echo "Commitizen did not install correctly." >&2
