@@ -91,7 +91,7 @@ JUnit output is written to `results/ci-cli-tests.xml` for Jenkins to ingest.  Th
 ## FTD configure-manager registration suite
 
 `ftd/test_ftd_registration.py` exercises the full onboarding path against one
-dedicated persistent FTD (CI: `10.10.3.101`):
+dedicated persistent FTD (CI: `10.10.1.231`):
 
 1. `onboard` — create the SCCFM record, capture the one-time CLI key (kept only
    in process state and passed to the CLI via `SCCFM_FTD_CLI_KEY`, never argv)
@@ -109,10 +109,10 @@ matches `FTD_HOST` exactly, guarding against wiping an arbitrary appliance.
 It is skipped unless these are set (Jenkins injects them):
 
 ```
-FTD_HOST=10.10.3.101            # management IP of the persistent FTD
+FTD_HOST=10.10.1.231            # management IP of the persistent FTD
 FTD_PERFORMANCE_TIER=FTDv5      # virtual FTD tier
 SCCFM_FTD_PASSWORD=<ssh pw>     # FTD SSH password (also used by cleanup)
-SCCFM_E2E_FTD_MANAGER_DELETE_HOST=10.10.3.101   # must equal FTD_HOST
+SCCFM_E2E_FTD_MANAGER_DELETE_HOST=10.10.1.231   # must equal FTD_HOST
 # The access policy is resolved from the tenant's cdFMC automatically. Override
 # with FMC_ACCESS_POLICY_UID=<uuid>, or FMC_ACCESS_POLICY_NAME=<name> to pick one
 # by name when the cdFMC has several (default requires exactly one).

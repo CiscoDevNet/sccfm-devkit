@@ -27,7 +27,7 @@ FTD_TEST_QUERY_ALL = f"name:{FTD_DEVICE_NAME}"
 FTD_NOT_ON_VERSION = "99.99.99"
 
 # Registration workflow.  Exercises the full onboard -> configure-manager ->
-# verify path against one dedicated persistent FTD (CI: 10.10.3.101).  Every
+# verify path against one dedicated persistent FTD (CI: 10.10.1.231).  Every
 # input comes from the environment so credentials stay in Jenkins.
 FTD_REGISTRATION_HOST = os.environ.get("FTD_HOST", "")
 FTD_REGISTRATION_PORT = os.environ.get("FTD_PORT", "22")

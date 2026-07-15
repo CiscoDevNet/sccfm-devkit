@@ -41,7 +41,7 @@ JUnit output is written to `results/ci-ansible-tests.xml` for Jenkins to ingest.
 ## FTD configure-manager registration suite
 
 `ftd/test_ftd_registration.py` drives the full onboarding path against one
-dedicated persistent FTD (CI: `10.10.3.101`) with focused playbooks:
+dedicated persistent FTD (CI: `10.10.1.231`) with focused playbooks:
 
 - `onboard_and_configure_ftd.yml` — onboards the reserved `ci-e2e-ansible-ftd-*`
   device, records its pre-registration `NOT_SYNCED` state, then registers it over

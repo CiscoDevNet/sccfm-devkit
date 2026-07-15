@@ -12,7 +12,7 @@ after the CLI suite, and before and after the Ansible suite.
 
 Deleting a manager is destructive, so cleanup is refused unless
 ``SCCFM_E2E_FTD_MANAGER_DELETE_HOST`` matches ``FTD_HOST`` exactly.  CI sets both
-to the reserved fixture (10.10.3.101); a developer who only exports ``FTD_HOST``
+to the reserved fixture (10.10.1.231); a developer who only exports ``FTD_HOST``
 cannot accidentally wipe an arbitrary appliance.
 """
 

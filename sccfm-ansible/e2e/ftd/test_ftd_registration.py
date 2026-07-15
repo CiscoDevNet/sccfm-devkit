@@ -5,7 +5,7 @@
 """CI integration tests for complete cdFMC-managed FTD registration via Ansible.
 
 Drives the onboard -> configure_manager -> verify path with focused playbooks
-against one dedicated persistent FTD (CI: 10.10.3.101). Skipped unless the FTD
+against one dedicated persistent FTD (CI: 10.10.1.231). Skipped unless the FTD
 inputs are set in the environment; set SCCFM_E2E_REQUIRE_FTD_REGISTRATION=1 to
 make missing inputs a hard failure instead of a skip.
 
