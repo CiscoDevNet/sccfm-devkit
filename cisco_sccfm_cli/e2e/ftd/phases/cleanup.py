@@ -22,7 +22,7 @@ from cisco_sccfm_cli.e2e._profile import ProfileContext
 from cisco_sccfm_cli.e2e.ftd.phases.test_data import (
     FTD_CLEANUP_RETRIES,
     FTD_REGISTRATION_DELAY_SEC,
-    FTD_REGISTRATION_HOST,
+    FTD_REGISTRATION_ENABLED,
     FTD_REGISTRATION_NAME,
     validate_registration_name,
 )
@@ -46,7 +46,7 @@ def _matching_devices(api: InventoryApi) -> list[object]:
 
 
 def run(ctx: ProfileContext) -> None:
-    if not FTD_REGISTRATION_HOST:
+    if not FTD_REGISTRATION_ENABLED:
         return
     validate_registration_name()
     config = ConfigService(path=ctx.config_path).load(ctx.profile)

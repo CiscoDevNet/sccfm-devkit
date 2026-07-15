@@ -60,24 +60,29 @@ def _jump_host() -> JumpHostSpec | None:
 def cleanup_manager_from_environment() -> bool:
     """Delete the fixture's manager after validating an exact-host safety guard.
 
-    Returns ``True`` when a cleanup ran, ``False`` when ``FTD_HOST`` is unset
-    (the registration E2E is not configured, so there is nothing to reset).
-    Raises :class:`FtdManagerCleanupError` if inputs are unsafe or the SSH
-    delete never confirms.
+    Returns ``True`` when a cleanup ran, ``False`` when the registration E2E is
+    not configured (so there is nothing to reset). Raises
+    :class:`FtdManagerCleanupError` only when cleanup is actually requested but
+    the inputs are unsafe, or the SSH delete never confirms.
+
+    The opt-in signal is the delete-host guard plus the SSH password, NOT
+    ``FTD_HOST`` alone: Jenkins exposes every build parameter as an env var, so
+    ``FTD_HOST`` carries its default even on ASA-only runs. Treat a missing
+    guard/password as "not requested" and skip; only a guard that is set but
+    mismatched is an error.
     """
     host = os.getenv("FTD_HOST", "").strip()
-    if not host:
+    allowed_host = os.getenv(_ALLOWED_HOST_ENV, "").strip()
+    password = os.getenv("SCCFM_FTD_PASSWORD", "")
+
+    # Not requested: the caller did not opt into FTD registration this run.
+    if not host or not allowed_host or not password:
         return False
 
-    allowed_host = os.getenv(_ALLOWED_HOST_ENV, "").strip()
-    if not allowed_host or host != allowed_host:
+    if host != allowed_host:
         raise FtdManagerCleanupError(
             f"Refusing FTD manager cleanup for {host!r}; {_ALLOWED_HOST_ENV} must match exactly."
         )
-
-    password = os.getenv("SCCFM_FTD_PASSWORD", "")
-    if not password:
-        raise FtdManagerCleanupError("SCCFM_FTD_PASSWORD is required for FTD manager cleanup.")
 
     port = _env_int("FTD_PORT", 22)
     if port > 65535:

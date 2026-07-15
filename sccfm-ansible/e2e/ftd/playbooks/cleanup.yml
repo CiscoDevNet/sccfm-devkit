@@ -23,7 +23,7 @@
 
   tasks:
     - name: Clean the configured registration-test FTD
-      when: ftd_registration_host | length > 0
+      when: lookup('env', 'SCCFM_FTD_PASSWORD') | length > 0
       block:
         - name: Validate the reserved device name before deletion
           ansible.builtin.assert:
@@ -90,6 +90,6 @@
           no_log: true
 
     - name: FTD cleanup skipped (registration E2E not configured)
-      when: ftd_registration_host | length == 0
+      when: lookup('env', 'SCCFM_FTD_PASSWORD') | length == 0
       ansible.builtin.debug:
-        msg: "FTD_HOST unset; no registration-test device to remove."
+        msg: "SCCFM_FTD_PASSWORD unset; no registration-test device to remove."

@@ -48,28 +48,30 @@ def test_returns_false_when_ftd_host_unset(monkeypatch: MonkeyPatch) -> None:
     assert mod.cleanup_manager_from_environment() is False
 
 
-def test_refuses_when_guard_missing(monkeypatch: MonkeyPatch) -> None:
+def test_skips_when_guard_missing(monkeypatch: MonkeyPatch) -> None:
+    # FTD_HOST carries its Jenkins-param default on ASA-only runs, but without
+    # the delete-host guard the caller did not opt in -> skip, don't raise.
     _clear_env(monkeypatch)
     monkeypatch.setenv("FTD_HOST", "10.10.3.101")
     # SCCFM_E2E_FTD_MANAGER_DELETE_HOST intentionally unset.
-    with pytest.raises(mod.FtdManagerCleanupError, match="must match exactly"):
-        mod.cleanup_manager_from_environment()
+    assert mod.cleanup_manager_from_environment() is False
+
+
+def test_skips_when_password_missing(monkeypatch: MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("FTD_HOST", "10.10.3.101")
+    monkeypatch.setenv("SCCFM_E2E_FTD_MANAGER_DELETE_HOST", "10.10.3.101")
+    # No SCCFM_FTD_PASSWORD -> registration not requested -> skip.
+    assert mod.cleanup_manager_from_environment() is False
 
 
 def test_refuses_when_guard_mismatches(monkeypatch: MonkeyPatch) -> None:
+    # Guard IS set (opt-in) but points at a different host -> hard refusal.
     _clear_env(monkeypatch)
     monkeypatch.setenv("FTD_HOST", "10.10.3.101")
     monkeypatch.setenv("SCCFM_E2E_FTD_MANAGER_DELETE_HOST", "10.10.3.102")
     monkeypatch.setenv("SCCFM_FTD_PASSWORD", "pw")
     with pytest.raises(mod.FtdManagerCleanupError, match="must match exactly"):
-        mod.cleanup_manager_from_environment()
-
-
-def test_requires_password(monkeypatch: MonkeyPatch) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("FTD_HOST", "10.10.3.101")
-    monkeypatch.setenv("SCCFM_E2E_FTD_MANAGER_DELETE_HOST", "10.10.3.101")
-    with pytest.raises(mod.FtdManagerCleanupError, match="SCCFM_FTD_PASSWORD"):
         mod.cleanup_manager_from_environment()
 
 

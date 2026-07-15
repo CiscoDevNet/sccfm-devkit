@@ -63,6 +63,11 @@ FTD_REGISTRATION_REQUIRED_ENV = (
 FTD_REGISTRATION_MISSING_ENV = tuple(
     name for name in FTD_REGISTRATION_REQUIRED_ENV if not os.environ.get(name)
 )
+# The registration lifecycle (tests AND pre/post cleanup) is active only when
+# every required input is present. FTD_HOST alone is not a sufficient signal:
+# Jenkins exposes every build parameter as an env var, so FTD_HOST carries its
+# default on ASA-only runs too. Gate on the full set instead.
+FTD_REGISTRATION_ENABLED = not FTD_REGISTRATION_MISSING_ENV
 # When set to "1" the suite must run: missing inputs become a hard error rather
 # than a skip, so a misconfigured CI job fails loudly instead of silently.
 FTD_REGISTRATION_REQUIRED = os.environ.get("SCCFM_E2E_REQUIRE_FTD_REGISTRATION") == "1"
