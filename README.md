@@ -1,4 +1,4 @@
-# sccfm-devkit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
+# Cisco Security Cloud Control Firewall Manager (SCCFM) DevKit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
 Toolkit for interacting with Security Cloud Control Firewall Manager (SCCFM): a Python
 package with the `sccfm-cli` command, a reusable `cisco_sccfm_core` automation library,
@@ -19,6 +19,7 @@ Python scripts, and collection can reuse the same SDK integrations.
 - [CLI Installation](#cli-installation)
 - [Troubleshooting](#troubleshooting)
   - [Tests fail with "No such command" errors](#tests-fail-with-no-such-command-errors)
+- [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
