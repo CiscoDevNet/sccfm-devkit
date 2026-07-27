@@ -21,12 +21,14 @@ jobs:
         github.event.workflow_run.head_branch == 'main'
       )
     runs-on: ubuntu-latest
+    environment: release-bot
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
+          ssh-key: ${{ secrets.SCCFM_CI_DEPLOY_KEY }}
 
       - name: Refresh branch
         run: git pull --ff-only origin main
