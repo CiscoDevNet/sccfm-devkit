@@ -1,3 +1,23 @@
+## v0.38.0 (2026-07-27)
+
+### Feat
+
+- **inventory**: add FtdRegisterService and register_cdfmc_ftd Ansible module
+- **skills**: reference sccfm-ansible skill into sccfm-cli skill and vice versa
+- **lh-102436**: prepare devkit for PyPI publishing
+- **skills**: reference sccfm-ansible skill into sccfm-cli skill and vice versa
+- add schema-driven Ansible skill
+- prepare sccfm for pypi publishing
+- add schema-driven sccfm-cli skill
+- **cdfmc-ftd**: add configure-manager to complete FTD registration over SSH
+- add cli schema export
+
+### Fix
+
+- pass strict typing and FTD confirmation checks
+- **lh-102436**: make packaging metadata portable
+- **README**: Add license statement & clarify name acronym
+
 ## v0.37.0 (2026-06-04)
 
 ### Feat
