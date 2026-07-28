@@ -1,4 +1,4 @@
-# Cisco Security Cloud Control Firewall Manager (SCCFM) DevKit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
+# Cisco Security Cloud Control Firewall Manager (SCCFM) DevKit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg) [![Jenkins E2E](https://img.shields.io/badge/Jenkins-E2E-D24939?logo=jenkins&logoColor=white)](https://jenkins2.dev.lockhart.io/job/sccfm-ansible-e2e/job/sccfm-ansible-e2e/)
 
 Toolkit for interacting with Security Cloud Control Firewall Manager (SCCFM): a Python
 package with the `sccfm-cli` command, a reusable `cisco_sccfm_core` automation library,
