@@ -38,7 +38,7 @@ python = "^3.12"
 click = ">=8.0.0,<9"
 rich = "^14.2.0"
 click-option-group = "^0.5.9"
-scc-firewall-manager-sdk = "^1.17.27"
+scc-firewall-manager-sdk = "1.17.27"
 questionary = "^2.1.1"
 paramiko = "^3.5.0"
 

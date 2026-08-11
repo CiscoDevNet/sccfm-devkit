@@ -35,6 +35,16 @@ def test_published_packages_use_cisco_prefix() -> None:
     assert all(target.startswith("cisco_sccfm_") for target in script_targets)
 
 
+def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
+    poetry = _poetry_config()
+    collection_requirements = (PROJECT_ROOT / "sccfm-ansible" / "requirements.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert poetry["dependencies"]["scc-firewall-manager-sdk"] == "1.17.27"
+    assert "scc-firewall-manager-sdk==1.17.27" in collection_requirements.splitlines()
+
+
 def test_pyinstaller_spec_uses_repository_relative_entrypoint() -> None:
     spec = (PROJECT_ROOT / "sccfm-cli.spec").read_text(encoding="utf-8")
 

@@ -122,6 +122,45 @@ jobs:
             --max-archive-depth=1 \
             "${{ steps.bump.outputs.artifact_path }}"
 
+      - name: Build and verify wheel
+        if: steps.bump.outputs.bumped == 'true'
+        id: wheel
+        run: |
+          set -euo pipefail
+          poetry build -f wheel
+          PACKAGE_VERSION="$(poetry version -s)"
+          WHEEL_RELATIVE_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}-py3-none-any.whl"
+          WHEEL_PATH="${GITHUB_WORKSPACE}/${WHEEL_RELATIVE_PATH}"
+          test -f "${WHEEL_PATH}"
+          SMOKE_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-wheel-smoke.XXXXXX")"
+          python -m venv "${SMOKE_ROOT}/venv"
+          SMOKE_PYTHON="${SMOKE_ROOT}/venv/bin/python"
+          SMOKE_CLI="${SMOKE_ROOT}/venv/bin/sccfm-cli"
+          unset PYTHONHOME PYTHONPATH POETRY_ACTIVE
+          cd "${SMOKE_ROOT}"
+          "${SMOKE_PYTHON}" -I -m pip install --no-cache-dir "${WHEEL_PATH}"
+          "${SMOKE_PYTHON}" -I -m pip check
+          "${SMOKE_PYTHON}" -I - <<'PY'
+          import importlib
+          from importlib.metadata import version
+
+          expected_sdk = "1.17.27"
+          installed_sdk = version("scc-firewall-manager-sdk")
+          if installed_sdk != expected_sdk:
+              raise SystemExit(f"expected SDK {expected_sdk}, installed {installed_sdk}")
+          for package in (
+              "scc_firewall_manager_sdk",
+              "cisco_sccfm_cli",
+              "cisco_sccfm_core",
+              "cisco_sccfm_scripts",
+          ):
+              importlib.import_module(package)
+          PY
+          "${SMOKE_CLI}" --help >/dev/null
+          "${SMOKE_CLI}" schema export --format json | "${SMOKE_PYTHON}" -I -c \
+            'import json, sys; commands = json.load(sys.stdin).get("commands"); assert isinstance(commands, list) and len(commands) == 57, f"expected 57 commands, got {len(commands) if isinstance(commands, list) else 0}"'
+          echo "path=${WHEEL_RELATIVE_PATH}" >> "$GITHUB_OUTPUT"
+
       - name: Commit and tag verified release
         if: steps.bump.outputs.bumped == 'true'
         env:
@@ -139,13 +178,10 @@ jobs:
           git push origin HEAD:${BRANCH}
           git push origin --tags
 
-      - name: Build wheel
-        run: poetry build -f wheel
-
       - name: Create release
         if: steps.bump.outputs.bumped == 'true'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.bump.outputs.new_tag }}
-          artifacts: "dist/*.whl,${{ steps.bump.outputs.artifact_path }}"
+          artifacts: "${{ steps.wheel.outputs.path }},${{ steps.bump.outputs.artifact_path }}"
           token: ${{ secrets.GITHUB_TOKEN }}

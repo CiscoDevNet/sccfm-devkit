@@ -2,7 +2,7 @@
 # Install with: pip install -r requirements.txt
 
 # Core dependencies
-scc-firewall-manager-sdk>=1.17.27
+scc-firewall-manager-sdk==1.17.27
 paramiko>=3.5.0
 # Note: cisco-sccfm-devkit includes both cisco_sccfm_cli and cisco_sccfm_core
 # For local development, use: poetry install from parent directory
