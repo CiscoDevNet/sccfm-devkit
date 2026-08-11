@@ -215,7 +215,7 @@ jobs:
           PY
           "${SMOKE_CLI}" --help >/dev/null
           "${SMOKE_CLI}" schema export --format json | "${SMOKE_PYTHON}" -I -c \
-            'import json, sys; commands = json.load(sys.stdin).get("commands"); assert isinstance(commands, list) and len(commands) == 57, f"expected 57 commands, got {len(commands) if isinstance(commands, list) else 0}"'
+            'from importlib.metadata import version; import json, sys; payload = json.load(sys.stdin); commands = payload.get("commands"); schema_version = payload.get("version"); installed_version = version("cisco-sccfm-devkit"); assert schema_version == installed_version, f"expected schema version {installed_version}, got {schema_version}"; assert isinstance(commands, list) and len(commands) == 57, f"expected 57 commands, got {len(commands) if isinstance(commands, list) else 0}"'
           echo "path=${WHEEL_RELATIVE_PATH}" >> "$GITHUB_OUTPUT"
 
       - name: Commit and tag verified release

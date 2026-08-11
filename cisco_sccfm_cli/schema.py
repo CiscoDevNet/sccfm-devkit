@@ -17,6 +17,7 @@ import click
 from scc_firewall_manager_sdk import ConfigState, ConnectivityState, EntityType
 
 SCHEMA_VERSION = "1.0"
+_DISTRIBUTION_NAME = "cisco-sccfm-devkit"
 
 _SCCFM_FREE_COMMANDS = {
     ("configure",),
@@ -244,14 +245,10 @@ def _is_object_query_path(path: tuple[str, ...]) -> bool:
 
 
 def _package_version() -> str:
-    project_version = _pyproject_version()
-    if project_version is not None:
-        return project_version
-
     try:
-        return version("sccfm")
+        return version(_DISTRIBUTION_NAME)
     except PackageNotFoundError:
-        return "unknown"
+        return _pyproject_version() or "unknown"
 
 
 def _pyproject_version() -> str | None:
@@ -387,7 +384,7 @@ def _option_type(option: click.Option) -> str:
 
 
 def _type_metadata(
-    parameter_type: click.ParamType,
+    parameter_type: click.ParamType[Any],
 ) -> tuple[list[str] | None, dict[str, Any] | None]:
     if isinstance(parameter_type, click.Choice):
         return list(parameter_type.choices), {"case_sensitive": parameter_type.case_sensitive}

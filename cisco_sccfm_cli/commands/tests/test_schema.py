@@ -7,13 +7,64 @@ from __future__ import annotations
 import json
 import shlex
 import tomllib
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from typing import Any
 
 import click
+import pytest
 from click.testing import CliRunner
 
+from cisco_sccfm_cli import schema as schema_module
 from cisco_sccfm_cli.cli import cli
+
+
+def test_package_version_should_prefer_installed_distribution_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def installed_version(distribution_name: str) -> str:
+        assert distribution_name == "cisco-sccfm-devkit"
+        return "9.8.7"
+
+    def source_version() -> str | None:
+        return "1.2.3"
+
+    monkeypatch.setattr(schema_module, "version", installed_version)
+    monkeypatch.setattr(schema_module, "_pyproject_version", source_version)
+
+    assert schema_module._package_version() == "9.8.7"
+
+
+def test_package_version_should_fall_back_to_source_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(distribution_name: str) -> str:
+        assert distribution_name == "cisco-sccfm-devkit"
+        raise PackageNotFoundError(distribution_name)
+
+    def source_version() -> str | None:
+        return "1.2.3"
+
+    monkeypatch.setattr(schema_module, "version", missing_version)
+    monkeypatch.setattr(schema_module, "_pyproject_version", source_version)
+
+    assert schema_module._package_version() == "1.2.3"
+
+
+def test_package_version_should_report_unknown_without_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(distribution_name: str) -> str:
+        assert distribution_name == "cisco-sccfm-devkit"
+        raise PackageNotFoundError(distribution_name)
+
+    def source_version() -> str | None:
+        return None
+
+    monkeypatch.setattr(schema_module, "version", missing_version)
+    monkeypatch.setattr(schema_module, "_pyproject_version", source_version)
+
+    assert schema_module._package_version() == "unknown"
 
 
 def test_schema_export_should_emit_machine_readable_command_tree(
