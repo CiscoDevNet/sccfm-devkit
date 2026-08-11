@@ -101,7 +101,7 @@ No MCP servers are currently configured for this project. Skill files under `ski
 # Build and install locally
 build-ansible-collection
 
-# Set up tokens and vault
+# Set up tokens and vault (generated credential files are ignored and excluded from builds)
 devkit   # select "change-tokens"
 
 # Verify inventory plugin

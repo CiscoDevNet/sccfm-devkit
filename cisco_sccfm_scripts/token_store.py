@@ -24,7 +24,10 @@ Vault structure (plaintext)::
 
 from __future__ import annotations
 
+import os
+import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -90,6 +93,8 @@ class VaultTokenStore:
         """Decrypt vault.yml and return parsed YAML, or None."""
         if not self._vault_path.exists() or not self._vault_pass_path.exists():
             return None
+        if self._vault_path.is_symlink() or self._vault_pass_path.is_symlink():
+            raise RuntimeError("Refusing to read a symlinked vault credential file")
 
         result = subprocess.run(
             [
@@ -109,25 +114,64 @@ class VaultTokenStore:
         return data
 
     def _encrypt_vault(self, payload: dict[str, object]) -> Path:
-        """Write *payload* as YAML to vault.yml, encrypting in-place."""
-        self._vault_path.parent.mkdir(parents=True, exist_ok=True)
+        """Encrypt *payload* in a private temporary file, then replace atomically."""
+        group_vars_path = self._vault_path.parent.parent
+        if group_vars_path.is_symlink() or self._vault_path.parent.is_symlink():
+            raise RuntimeError("Refusing to write through a symlinked vault directory")
+        if self._vault_path.is_symlink() or self._vault_pass_path.is_symlink():
+            raise RuntimeError("Refusing to use a symlinked vault credential file")
+        group_vars_path.mkdir(parents=True, exist_ok=True, mode=stat.S_IRWXU)
+        group_vars_path.chmod(stat.S_IRWXU)
+        self._vault_path.parent.mkdir(parents=True, exist_ok=True, mode=stat.S_IRWXU)
+        self._vault_path.parent.chmod(stat.S_IRWXU)
 
         content = "---\n" + yaml.dump(payload, default_flow_style=False, sort_keys=False)
-
-        # Write plaintext, then encrypt in-place
-        self._vault_path.write_text(content)
-        result = subprocess.run(
-            [
-                "ansible-vault",
-                "encrypt",
-                str(self._vault_path),
-                "--vault-password-file",
-                str(self._vault_pass_path),
-            ],
-            capture_output=True,
-            text=True,
+        plaintext_descriptor, plaintext_name = tempfile.mkstemp(
+            prefix=".vault.plaintext.",
+            suffix=".tmp",
+            dir=self._vault_path.parent,
         )
-        if result.returncode != 0:
-            raise RuntimeError(f"ansible-vault encrypt failed:\n{result.stderr.strip()}")
+        plaintext_path = Path(plaintext_name)
+        ciphertext_path: Path | None = None
+        try:
+            os.fchmod(plaintext_descriptor, stat.S_IRUSR | stat.S_IWUSR)
+            with os.fdopen(plaintext_descriptor, "w", encoding="utf-8") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            ciphertext_descriptor, ciphertext_name = tempfile.mkstemp(
+                prefix=".vault.ciphertext.",
+                suffix=".tmp",
+                dir=self._vault_path.parent,
+            )
+            ciphertext_path = Path(ciphertext_name)
+            with os.fdopen(ciphertext_descriptor, "wb") as encrypted:
+                os.fchmod(encrypted.fileno(), stat.S_IRUSR | stat.S_IWUSR)
 
-        return self._vault_path
+            result = subprocess.run(
+                [
+                    "ansible-vault",
+                    "encrypt",
+                    str(plaintext_path),
+                    "--output",
+                    str(ciphertext_path),
+                    "--vault-password-file",
+                    str(self._vault_pass_path),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"ansible-vault encrypt failed:\n{result.stderr.strip()}")
+            with ciphertext_path.open("rb") as encrypted:
+                if not encrypted.readline(64).startswith(b"$ANSIBLE_VAULT;"):
+                    raise RuntimeError("ansible-vault did not produce valid encrypted output")
+
+            ciphertext_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+            os.replace(ciphertext_path, self._vault_path)
+            self._vault_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+            return self._vault_path
+        finally:
+            plaintext_path.unlink(missing_ok=True)
+            if ciphertext_path is not None:
+                ciphertext_path.unlink(missing_ok=True)

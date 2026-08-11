@@ -99,7 +99,10 @@ This will interactively:
 7. Write and encrypt `group_vars/all/vault.yml`
 8. Update `group_vars/all/vars.yml` with the selected region
 
-You can also point the standalone command at a custom examples directory:
+By default, Ansible credentials are written under `sccfm-ansible/examples`. They are Git-ignored
+and explicitly excluded from collection artifacts. You can also point the standalone command at a
+custom examples directory:
+
 ```bash
 change-tokens --path /path/to/examples
 ```
@@ -110,7 +113,7 @@ change-tokens --path /path/to/examples
 Create a vault password file (do NOT commit this!):
 
 ```bash
-cd examples
+cd sccfm-ansible/examples
 cp .vault_pass.example .vault_pass
 echo "YourSecureVaultPassword" > .vault_pass
 chmod 600 .vault_pass
@@ -285,7 +288,9 @@ documentation.
 
 ### What is Ansible Vault?
 
-Ansible Vault encrypts sensitive data (API tokens, passwords) so you can safely commit them to version control. The encrypted `vault.yml` file is committed, but the `.vault_pass` password file is **never** committed.
+Ansible Vault encrypts sensitive data such as API tokens and passwords. The local `vault.yml` and
+`.vault_pass` files are Git-ignored and excluded from collection artifacts; do not commit either
+file, even when the vault is encrypted.
 
 ### Vault Commands Reference
 
@@ -320,7 +325,7 @@ ansible-vault encrypt group_vars/all/vault.yml --vault-password-file .vault_pass
 ```bash
 ansible-vault rekey group_vars/all/vault.yml \
   --vault-password-file .vault_pass \
-  --new-vault-password-file .vault_pass_new
+  --new-vault-password-file ~/.sccfm-vault-pass-new
 ```
 
 **Verify file is encrypted:**
@@ -367,8 +372,8 @@ Three ways to provide credentials (in order of precedence):
 
 ## Security Best Practices
 
-1. **Never commit unencrypted secrets** to version control
-2. **Always encrypt vault files** before committing
+1. **Never commit credential files**, including encrypted customer vaults, to this repository
+2. **Keep vault files encrypted** whenever they are at rest
 3. **Store `.vault_pass` securely** and never commit it
 4. **Use different vault passwords** for different environments (dev/prod)
 5. **Rotate API tokens regularly** and update vault files accordingly
@@ -398,7 +403,8 @@ Three ways to provide credentials (in order of precedence):
 
 ## Examples
 
-See the `examples/` directory for complete working examples:
+See the `examples/` directory for complete working examples. Locally generated credential files
+are Git-ignored and excluded from collection artifacts:
 
 - **`inventory.sccfm.yml`** - Dynamic inventory configuration
 - **`show_devices.yml`** - Display all devices from inventory
@@ -408,7 +414,7 @@ See the `examples/` directory for complete working examples:
 - **`asa_ha_check.yml`** - Run HA health checks on ASA failover devices
 - **`change_asa_boot_image.yml`** - Change the configured ASA boot image
 - **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
-- **`group_vars/all/vault.yml`** - Encrypted secrets (API token, passwords)
+- **`group_vars/all/vault.yml`** - Locally generated encrypted secrets; never packaged
 - **`group_vars/all/vault.yml.example`** - Template for vault structure
 
 ## Additional Resources

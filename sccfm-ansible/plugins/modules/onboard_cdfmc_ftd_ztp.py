@@ -94,7 +94,7 @@ EXAMPLES = r"""
     serial_number: "FTD1234567890"
     licenses:
       - BASE
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "your-access-policy-uid"
     region: "{{ sccfm_region }}"
     api_token: "{{ sccfm_api_token }}"
 
@@ -106,9 +106,9 @@ EXAMPLES = r"""
     licenses:
       - BASE
       - CARRIER
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "your-access-policy-uid"
     admin_password: "{{ ftd_admin_password }}"
-    device_group_uid: "abcd1234-0000-0000-0000-000000000001"
+    device_group_uid: "your-device-group-uid"
 
 # Example 3: Using module_defaults (recommended)
 - name: Onboard cdFMC-managed FTD with ZTP
@@ -125,7 +125,7 @@ EXAMPLES = r"""
         serial_number: "FTD1234567890"
         licenses:
           - BASE
-        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+        fmc_access_policy_uid: "your-access-policy-uid"
 """
 
 RETURN = r"""

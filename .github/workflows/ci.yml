@@ -92,14 +92,44 @@ jobs:
 
           # Build Ansible collection with updated version
           poetry run build-ansible-collection
+          ARTIFACT_PATH="dist/cisco-sccfm-${NEW_VERSION}.tar.gz"
 
-          # Now commit everything together
-          git add .
-          git commit -m "bump: version ${NEW_VERSION}" -m "[skip ci]"
-          git tag "${NEW_TAG}"
+          # Verify the exact artifact that will be attached to the release.
+          poetry run python -m cisco_sccfm_scripts.verify_ansible_collection \
+            "${ARTIFACT_PATH}" --expected-version "${NEW_VERSION}"
+          ARTIFACT_SHA256=$(sha256sum "${ARTIFACT_PATH}" | cut -d ' ' -f 1)
 
           echo "bumped=true" >> "$GITHUB_OUTPUT"
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "artifact_path=${ARTIFACT_PATH}" >> "$GITHUB_OUTPUT"
+          echo "artifact_sha256=${ARTIFACT_SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Gitleaks
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          GITLEAKS_BIN_DIR="${RUNNER_TEMP}/gitleaks-bin"
+          mkdir -p "${GITLEAKS_BIN_DIR}"
+          GOBIN="${GITLEAKS_BIN_DIR}" go install github.com/gitleaks/gitleaks/v8@v8.30.1
+          echo "${GITLEAKS_BIN_DIR}" >> "$GITHUB_PATH"
+
+      - name: Scan exact collection artifact
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          gitleaks dir \
+            --no-banner \
+            --no-color \
+            --redact=100 \
+            --max-archive-depth=1 \
+            "${{ steps.bump.outputs.artifact_path }}"
+
+      - name: Commit and tag verified release
+        if: steps.bump.outputs.bumped == 'true'
+        env:
+          NEW_TAG: ${{ steps.bump.outputs.new_tag }}
+        run: |
+          git add .
+          git commit -m "bump: version ${NEW_TAG#v}" -m "[skip ci]"
+          git tag "${NEW_TAG}"
 
       - name: Push changes and tags
         if: steps.bump.outputs.bumped == 'true'
@@ -117,5 +147,5 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.bump.outputs.new_tag }}
-          artifacts: "dist/*.whl,dist/*.tar.gz"
+          artifacts: "dist/*.whl,${{ steps.bump.outputs.artifact_path }}"
           token: ${{ secrets.GITHUB_TOKEN }}

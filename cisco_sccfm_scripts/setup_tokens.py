@@ -35,9 +35,11 @@ Examples::
 
 from __future__ import annotations
 
+import os
 import re
 import stat
 import subprocess
+import tempfile
 from pathlib import Path
 
 import click
@@ -75,19 +77,20 @@ def _project_root() -> Path:
 # ── Path resolution ──────────────────────────────────────────────
 
 
-def _resolve_examples_path(path: str | None) -> Path:
-    """Return the absolute examples directory, raising if not found."""
-    if path:
-        resolved = Path(path).resolve()
+def _resolve_examples_path(path: str | Path | None) -> Path:
+    """Return the absolute examples directory, raising if it cannot be found."""
+    if path is not None:
+        resolved = Path(path).expanduser().resolve()
         if not resolved.is_dir():
             raise click.ClickException(f"Directory not found: {resolved}")
+        if not os.access(resolved, os.W_OK):
+            raise click.ClickException(f"Examples directory is not writable: {resolved}")
         return resolved
 
     default = Path.cwd() / _DEFAULT_EXAMPLES_PATH
     if default.is_dir():
         return default.resolve()
 
-    # Maybe the user already cd'd into the examples dir
     cwd = Path.cwd()
     if (cwd / "group_vars").is_dir() and (cwd / ".vault_pass.example").exists():
         return cwd.resolve()
@@ -96,6 +99,35 @@ def _resolve_examples_path(path: str | None) -> Path:
         "Could not locate the ansible examples directory.\n"
         "Run from the project root or pass --path explicitly."
     )
+
+
+def _secure_directory(path: Path) -> None:
+    """Create a user-private directory and enforce mode 0700."""
+    if path.is_symlink():
+        raise click.ClickException(f"Refusing to use a symlinked private directory: {path}")
+    path.mkdir(parents=True, exist_ok=True, mode=stat.S_IRWXU)
+    path.chmod(stat.S_IRWXU)
+
+
+def _write_private_text(path: Path, content: str) -> None:
+    """Atomically write UTF-8 text with mode 0600."""
+    if path.parent.is_symlink():
+        raise click.ClickException(
+            f"Refusing to write through a symlinked directory: {path.parent}"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 # ── Ansible-vault availability ───────────────────────────────────
@@ -244,6 +276,8 @@ def _write_env_file(root: Path, region: str, api_token: str) -> Path:
     """
     env_path = root / ".env"
     example_path = root / _ENV_EXAMPLE
+    if env_path.is_symlink():
+        raise click.ClickException(f"Refusing to update a symlinked credential file: {env_path}")
 
     if env_path.exists():
         content = env_path.read_text()
@@ -257,7 +291,7 @@ def _write_env_file(root: Path, region: str, api_token: str) -> Path:
 
     content = _upsert_env_var(content, "SCCFM_REGION", region)
     content = _upsert_env_var(content, "SCCFM_API_TOKEN", f'"{api_token}"')
-    env_path.write_text(content)
+    _write_private_text(env_path, content)
     console.print(f"[green]Updated .env file:[/green] {env_path}")
     return env_path
 
@@ -282,7 +316,12 @@ def _ensure_vault_pass(examples_path: Path) -> Path:
     """Return the vault password file, creating it interactively if needed."""
     vault_pass_path = examples_path / ".vault_pass"
 
+    if vault_pass_path.is_symlink():
+        raise click.ClickException(
+            f"Refusing to use a symlinked credential file: {vault_pass_path}"
+        )
     if vault_pass_path.exists():
+        vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
         console.print(f"\n[dim]Using existing vault password file: {vault_pass_path}[/dim]")
         return vault_pass_path
 
@@ -295,8 +334,7 @@ def _ensure_vault_pass(examples_path: Path) -> Path:
     if not password.strip():
         raise click.ClickException("Vault password cannot be empty.")
 
-    vault_pass_path.write_text(password.strip() + "\n")
-    vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
+    _write_private_text(vault_pass_path, password.strip() + "\n")
     console.print(f"[green]Created vault password file:[/green] {vault_pass_path}")
     return vault_pass_path
 
@@ -307,7 +345,12 @@ def _ensure_vault_pass_headless(examples_path: Path, vault_password: str | None)
     """
     vault_pass_path = examples_path / ".vault_pass"
 
+    if vault_pass_path.is_symlink():
+        raise click.ClickException(
+            f"Refusing to use a symlinked credential file: {vault_pass_path}"
+        )
     if vault_pass_path.exists():
+        vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
         console.print(f"[dim]Using existing vault password file: {vault_pass_path}[/dim]")
         return vault_pass_path
 
@@ -316,8 +359,7 @@ def _ensure_vault_pass_headless(examples_path: Path, vault_password: str | None)
             "No vault password file found and --vault-password was not supplied."
         )
 
-    vault_pass_path.write_text(vault_password.strip() + "\n")
-    vault_pass_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
+    _write_private_text(vault_pass_path, vault_password.strip() + "\n")
     console.print(f"[green]Created vault password file:[/green] {vault_pass_path}")
     return vault_pass_path
 
@@ -336,7 +378,10 @@ def _merge_token(store: VaultTokenStore, token: SavedToken) -> list[SavedToken]:
 def _update_vars_region(examples_path: Path, region: str) -> None:
     """Set sccfm_region in group_vars/all/vars.yml, preserving other content."""
     vars_path = examples_path / "group_vars" / "all" / "vars.yml"
-    vars_path.parent.mkdir(parents=True, exist_ok=True)
+    if vars_path.is_symlink():
+        raise click.ClickException(f"Refusing to update a symlinked workspace file: {vars_path}")
+    _secure_directory(examples_path / "group_vars")
+    _secure_directory(vars_path.parent)
 
     if vars_path.exists():
         content = vars_path.read_text()
@@ -349,15 +394,16 @@ def _update_vars_region(examples_path: Path, region: str) -> None:
             )
         else:
             updated = content.rstrip() + f"\nsccfm_region: {region}\n"
-        vars_path.write_text(updated)
+        _write_private_text(vars_path, updated)
     else:
-        vars_path.write_text(
+        _write_private_text(
+            vars_path,
             "---\n"
             "# Plain variables (not sensitive)\n"
             "# These can be committed to version control\n"
             "\n"
             "# SCCFM connection settings\n"
-            f"sccfm_region: {region}\n"
+            f"sccfm_region: {region}\n",
         )
 
     console.print(f"[green]Set region to '{region}' in:[/green] {vars_path}")
@@ -372,7 +418,7 @@ def _run_headless(
     name: str,
     profile: str,
     vault_password: str | None,
-    path: str | None,
+    path: Path | None,
 ) -> None:
     """Execute the full setup without any interactive prompts."""
     root = _project_root()
@@ -421,7 +467,7 @@ _VALID_REGIONS = tuple(_REGIONS)
 
 @click.command(
     help="Setup SCCFM API tokens, .env, and Ansible Vault.\n\n"
-    "Runs interactively by default.  Supply --region and --api-token "
+    "Runs interactively by default. Supply --region and --api-token "
     "to run in headless mode (no prompts).",
 )
 @click.option(
@@ -459,7 +505,14 @@ _VALID_REGIONS = tuple(_REGIONS)
 @click.option(
     "--path",
     default=None,
-    type=click.Path(resolve_path=True),
+    type=click.Path(
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        writable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
     help=f"Path to the ansible examples directory (default: {_DEFAULT_EXAMPLES_PATH}).",
 )
 def main(
@@ -468,7 +521,7 @@ def main(
     name: str,
     profile: str,
     vault_password: str | None,
-    path: str | None,
+    path: Path | None,
 ) -> None:
     """Setup tokens — auto-detects interactive vs headless mode."""
     headless = region is not None or api_token is not None
@@ -491,7 +544,7 @@ def main(
             console.print("\n[dim]Cancelled.[/dim]")
 
 
-def _run_setup(path: str | None) -> None:
+def _run_setup(path: Path | None) -> None:
     """Inner setup logic — separated so main() can catch exits cleanly."""
     console.print(
         Panel(
@@ -541,8 +594,9 @@ def _run_setup(path: str | None) -> None:
     console.print(summary)
     console.print(
         "\n[green]You can now run playbooks with:[/green]\n"
-        "  ansible-playbook -i examples/inventory.sccfm.yml \\\n"
-        "    examples/show_devices.yml --vault-password-file examples/.vault_pass"
+        f"  ansible-playbook -i {examples_path / 'inventory.sccfm.yml'} \\\n"
+        f"    {examples_path / 'show_devices.yml'} "
+        f"--vault-password-file {examples_path / '.vault_pass'}"
     )
 
 

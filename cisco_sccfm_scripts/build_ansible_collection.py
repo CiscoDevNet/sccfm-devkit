@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Build script for Ansible collection."""
+import os
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,21 @@ import tomllib
 from pathlib import Path
 
 import yaml
+
+from cisco_sccfm_scripts.verify_ansible_collection import (
+    ArtifactVerificationError,
+    verify_collection_artifact,
+)
+
+
+def _find_collection_symlink(collection_dir: Path) -> Path | None:
+    """Return the first symlink without following targets outside the collection."""
+    for root, directories, files in os.walk(collection_dir, followlinks=False):
+        for name in sorted([*directories, *files]):
+            candidate = Path(root) / name
+            if candidate.is_symlink():
+                return candidate.relative_to(collection_dir)
+    return None
 
 
 def main() -> int:
@@ -25,6 +41,11 @@ def main() -> int:
     license_dst = collection_dir / "LICENSE"
 
     print("🎭 Building Ansible collection...")
+
+    symlink = _find_collection_symlink(collection_dir)
+    if symlink is not None:
+        print(f"❌ Collection source contains a symlink: {symlink}", file=sys.stderr)
+        return 1
 
     # Copy the root LICENSE into the collection so galaxy.yml's `license_file`
     # resolves and the license ships in the tarball (Galaxy import requires it).
@@ -63,7 +84,16 @@ def main() -> int:
         print(f"❌ Failed to build Ansible collection:\n{result.stderr}", file=sys.stderr)
         return 1
 
-    print("✅ Ansible collection built successfully")
+    artifact_path = dist_dir / f"cisco-sccfm-{version}.tar.gz"
+    try:
+        verification = verify_collection_artifact(artifact_path, expected_version=version)
+    except ArtifactVerificationError as exc:
+        artifact_path.unlink(missing_ok=True)
+        print(f"❌ Collection artifact rejected: {exc}", file=sys.stderr)
+        return 1
+
+    print("✅ Ansible collection built and verified successfully")
+    print(f"🔐 SHA-256: {verification.sha256}")
     print(result.stdout)
     return 0
 

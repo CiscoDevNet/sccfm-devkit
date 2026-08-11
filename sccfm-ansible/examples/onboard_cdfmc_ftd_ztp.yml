@@ -26,7 +26,7 @@
 #     -e manager_name="MycdFMC" \
 #     -e '{"licenses":["BASE"]}' \
 #     -e admin_password="MyP@ssw0rd" \
-#     -e device_group_uid="abcd1234-0000-0000-0000-000000000001"
+#     -e device_group_uid="your-device-group-uid"
 #
 # Dry-run (check mode):
 #   ansible-playbook examples/onboard_cdfmc_ftd_ztp.yml \

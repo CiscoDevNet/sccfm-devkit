@@ -187,6 +187,9 @@ Or run the token setup directly:
 change-tokens
 ```
 
-This will prompt for your region, API token, and vault password, then create all the required files (.env, vars.yml, vault.yml).
+This prompts for your region, API token, and vault password, then creates `.env`, `.vault_pass`,
+`vars.yml`, and encrypted `vault.yml`. Local credential files are Git-ignored and explicitly
+excluded from collection release artifacts. Pass `--path /path/to/examples` to override the
+default `sccfm-ansible/examples` directory.
 
 See the [Trying out examples](sccfm-ansible/README.md#trying-out-examples) section in the Ansible collection README for the full walkthrough including how to run playbooks.

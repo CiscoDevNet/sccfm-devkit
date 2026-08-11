@@ -76,7 +76,7 @@ EXAMPLES:
 - name: Onboard FTD device
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My FTD"
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "your-access-policy-uid"
     licenses:
       - BASE
     region: "{{ sccfm_region }}"
@@ -86,7 +86,7 @@ EXAMPLES:
 - name: Onboard virtual FTD
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My vFTD"
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "your-access-policy-uid"
     licenses:
       - BASE
       - CARRIER
@@ -97,7 +97,7 @@ EXAMPLES:
 - name: Onboard FTD with labels
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "Branch FTD"
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "your-access-policy-uid"
     licenses:
       - BASE
     ungrouped_labels:
@@ -118,7 +118,7 @@ EXAMPLES:
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:
         name: "Branch FTD"
-        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+        fmc_access_policy_uid: "your-access-policy-uid"
         licenses:
           - BASE
 

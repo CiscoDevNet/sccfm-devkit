@@ -216,9 +216,10 @@ Rules:
 8. Use Write/Edit only for non-secret playbook, inventory, vars template, or
    documentation artifacts.
 
-Use `change-tokens` for local credential setup only when the user explicitly
-asks for it. It configures `.env`, CLI profile state, Ansible vars, and encrypted
-vault files.
+Use `change-tokens` for local credential setup only when the user explicitly asks for it. It
+configures `.env`, CLI profile state, Ansible vars, and encrypted vault files. Its default Ansible
+path is `sccfm-ansible/examples`; generated credential files there are Git-ignored and excluded
+from collection artifacts. Use `--path` only when the user supplies a different examples directory.
 
 ## Step 1: Match User Intent Conservatively
 

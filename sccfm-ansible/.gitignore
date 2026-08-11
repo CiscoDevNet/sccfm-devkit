@@ -1,5 +1,8 @@
 **/vault.yml
-**/.vault_pass~
+**/vault.yaml
+**/.vault_pass
+**/.vault_pass_*
+**/.vault_pass-*
 examples/group_vars/all/vault.yml
 
 # Token setup outputs (secrets — never commit)

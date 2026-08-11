@@ -126,7 +126,7 @@ show_missing = true
 skip_covered = true
 
 [tool.pytest.ini_options]
-testpaths = ["cisco_sccfm_cli", "cisco_sccfm_core", "sccfm-ansible"]
+testpaths = ["cisco_sccfm_cli", "cisco_sccfm_core", "sccfm-ansible", "tests"]
 norecursedirs = ["sccfm-ansible/e2e", "cisco_sccfm_cli/e2e"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

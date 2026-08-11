@@ -8,7 +8,7 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
 - `playbooks/onboard_vasa.yml` / `playbooks/remove_vasa.yml`: Ansible playbooks that mirror their `sccfm-ansible/e2e/asa/` counterparts but use the `ci-e2e-cli-asa-` name prefix so the CLI suite owns its own device.  The shared-device approach (a single `ci-e2e-asa-*` vASA) leaves the device NOT_SYNCED after the Ansible suite mutates it, which then blocks ASA CLI script pushes from this suite.
 - `conftest.py`: top-level suite ordering (`objects` → `asa` → `access_rules` → `ftd`) plus the session-scoped `e2e_profile` fixture that decodes the Ansible vault and writes a temp `sccfm-cli` profile.
 - `_runner.py`: `run_cli(...)` subprocess wrapper — the analog of Ansible's `run_playbook()`.  Asserts on rc, parses `--format json` stdout, and supports `expect_failure` / `tolerate_any_rc` for idempotency and cleanup paths.
-- `_profile.py`: bootstraps credentials by shelling out to `ansible-vault view` and writing a temp profile via `ConfigService.save()`.  Reuses `examples/group_vars/all/vault.yml` from the Ansible suite — one source of truth.
+- `_profile.py`: bootstraps credentials by shelling out to `ansible-vault view` and writing a temp profile via `ConfigService.save()`. Reuses `examples/group_vars/all/vault.yml` from the Ansible suite — one source of truth.
 - `_phases.py`: `PhaseCase` dataclass + `PhaseTracker` (skip-on-failed-deps, identical semantics to the Ansible suite).
 - `_state.py`: in-process cross-phase data store (replaces the `/tmp/ci_*_uid` files used by the Ansible suite).
 - Per-suite directories (`objects/`, `access_rules/`, `asa/`, `ftd/`):
@@ -32,7 +32,8 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
    poetry run change-tokens
    ```
 
-   This creates `sccfm-ansible/examples/.vault_pass` and an encrypted `vault.yml`.
+   This creates `sccfm-ansible/examples/.vault_pass` and an encrypted `vault.yml`. Both files are
+   Git-ignored and excluded from collection artifacts.
 
 2. Install dev dependencies so `ansible-vault` is available for the runner to decode the vault:
 

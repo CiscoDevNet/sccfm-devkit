@@ -91,7 +91,10 @@ The package root exports the supported public service classes and response model
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
 - Build and install the collection locally: `build-ansible-collection`.
-- Set up tokens interactively: `devkit` and select **change-tokens** (saves your API token, creates `.env`, `.vault_pass`, encrypts `group_vars/all/vault.yml`, and sets the region).
+- Set up tokens interactively with `devkit` and select **change-tokens**. By default this writes
+  `.vault_pass` and encrypted `group_vars/all/vault.yml` under `sccfm-ansible/examples`; both are
+  Git-ignored and explicitly excluded from collection artifacts. Use `--path` to override the
+  examples directory when needed.
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
 - Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
