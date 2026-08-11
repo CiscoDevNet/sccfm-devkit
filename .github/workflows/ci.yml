@@ -11,6 +11,17 @@ on:
 permissions:
   contents: read
 
+env:
+  PIP_AUDIT_VERSION: "2.10.1"
+  DEP002_EXCEPTION_EXPIRES: "2026-09-10"
+  DEP002_PIP_AUDIT_EXCEPTIONS: >-
+    --ignore-vuln PYSEC-2026-141
+    --ignore-vuln PYSEC-2026-1994
+    --ignore-vuln PYSEC-2026-1995
+    --ignore-vuln PYSEC-2026-1996
+    --ignore-vuln PYSEC-2026-1998
+    --ignore-vuln PYSEC-2026-1999
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
@@ -32,6 +43,31 @@ jobs:
 
       - name: Install dependencies
         run: poetry install --no-interaction --with dev
+
+      - name: Audit locked runtime dependencies
+        run: |
+          set -euo pipefail
+          TODAY_UTC="$(date -u +%F)"
+          if [[ "${TODAY_UTC}" > "${DEP002_EXCEPTION_EXPIRES}" ]]; then
+            echo "::error::DEP-002 exceptions expired on ${DEP002_EXCEPTION_EXPIRES}"
+            exit 1
+          fi
+          RUNTIME_REQUIREMENTS="${RUNNER_TEMP}/sccfm-runtime-requirements.txt"
+          poetry show --only main --no-ansi \
+            | awk 'NF >= 2 {print $1 "==" $2}' \
+            > "${RUNTIME_REQUIREMENTS}"
+          test -s "${RUNTIME_REQUIREMENTS}"
+          read -r -a AUDIT_EXCEPTION_ARGS <<< "${DEP002_PIP_AUDIT_EXCEPTIONS}"
+          pipx run --spec "pip-audit==${PIP_AUDIT_VERSION}" pip-audit \
+            --strict \
+            --no-deps \
+            --disable-pip \
+            --vulnerability-service osv \
+            --progress-spinner off \
+            --aliases on \
+            --desc off \
+            "${AUDIT_EXCEPTION_ARGS[@]}" \
+            --requirement "${RUNTIME_REQUIREMENTS}"
 
       - name: License headers
         run: git ls-files '*.py' | xargs poetry run reuse lint-file
@@ -140,6 +176,27 @@ jobs:
           cd "${SMOKE_ROOT}"
           "${SMOKE_PYTHON}" -I -m pip install --no-cache-dir "${WHEEL_PATH}"
           "${SMOKE_PYTHON}" -I -m pip check
+          TODAY_UTC="$(date -u +%F)"
+          if [[ "${TODAY_UTC}" > "${DEP002_EXCEPTION_EXPIRES}" ]]; then
+            echo "::error::DEP-002 exceptions expired on ${DEP002_EXCEPTION_EXPIRES}"
+            exit 1
+          fi
+          RUNTIME_REQUIREMENTS="${SMOKE_ROOT}/runtime-requirements.txt"
+          "${SMOKE_PYTHON}" -I -m pip freeze \
+            --exclude cisco-sccfm-devkit \
+            > "${RUNTIME_REQUIREMENTS}"
+          test -s "${RUNTIME_REQUIREMENTS}"
+          read -r -a AUDIT_EXCEPTION_ARGS <<< "${DEP002_PIP_AUDIT_EXCEPTIONS}"
+          pipx run --spec "pip-audit==${PIP_AUDIT_VERSION}" pip-audit \
+            --strict \
+            --no-deps \
+            --disable-pip \
+            --vulnerability-service osv \
+            --progress-spinner off \
+            --aliases on \
+            --desc off \
+            "${AUDIT_EXCEPTION_ARGS[@]}" \
+            --requirement "${RUNTIME_REQUIREMENTS}"
           "${SMOKE_PYTHON}" -I - <<'PY'
           import importlib
           from importlib.metadata import version

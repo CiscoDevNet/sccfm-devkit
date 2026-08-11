@@ -35,12 +35,14 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-click = ">=8.0.0,<9"
+click = ">=8.3.3,<9"
 rich = "^14.2.0"
 click-option-group = "^0.5.9"
 scc-firewall-manager-sdk = "1.17.27"
 questionary = "^2.1.1"
-paramiko = "^3.5.0"
+paramiko = ">=5.0.0,<6"
+cryptography = ">=50.0.0,<51"
+pygments = ">=2.20.0,<3"
 
 [tool.poetry.scripts]
 sccfm-cli = "cisco_sccfm_cli.cli:cli"
