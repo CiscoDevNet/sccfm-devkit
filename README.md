@@ -66,7 +66,7 @@ To install or refresh the CLI man pages for local `man sccfm-cli` lookup:
 install-cli-man-docs
 ```
 
-See [docs/README.md](docs/README.md) for generation details.
+See [docs/README.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/docs/README.md) for generation details.
 
 ## Python library
 
@@ -109,7 +109,7 @@ The package root exports the supported public service classes and response model
   or group variable. Do not use inventory output modes that render vars when your own
   `group_vars` or `host_vars` contain secrets.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
-- Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](docs/README.md) for details.
+- Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/docs/README.md) for details.
 
 ## Development
 
@@ -196,4 +196,4 @@ pytest  # Rerun tests
 
 ## License
 
-Distributed under the Apache 2.0 License. See [LICENSE](LICENSE) for more information.
+Distributed under the Apache 2.0 License. See [LICENSE](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/LICENSE) for more information.

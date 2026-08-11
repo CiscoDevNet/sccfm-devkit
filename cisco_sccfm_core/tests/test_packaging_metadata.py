@@ -11,14 +11,21 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _poetry_config() -> dict[str, Any]:
+def _pyproject() -> dict[str, Any]:
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
-        pyproject = tomllib.load(pyproject_file)
-    return dict(pyproject["tool"]["poetry"])
+        return tomllib.load(pyproject_file)
+
+
+def _project_config() -> dict[str, Any]:
+    return dict(_pyproject()["project"])
+
+
+def _poetry_config() -> dict[str, Any]:
+    return dict(_pyproject()["tool"]["poetry"])
 
 
 def test_distribution_uses_cisco_devkit_name() -> None:
-    assert _poetry_config()["name"] == "cisco-sccfm-devkit"
+    assert _project_config()["name"] == "cisco-sccfm-devkit"
 
 
 def test_published_package_contract_is_cli_and_core_only() -> None:
@@ -29,7 +36,7 @@ def test_published_package_contract_is_cli_and_core_only() -> None:
         "cisco_sccfm_cli",
         "cisco_sccfm_core",
     }
-    assert poetry["scripts"] == {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+    assert _project_config()["scripts"] == {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
 
 
 def test_published_packages_exclude_repository_only_code() -> None:
@@ -47,9 +54,7 @@ def test_published_packages_exclude_repository_only_code() -> None:
 
 
 def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
-    poetry = _poetry_config()
-
-    assert poetry["dependencies"]["scc-firewall-manager-sdk"] == "1.17.27"
+    assert "scc-firewall-manager-sdk==1.17.27" in _project_config()["dependencies"]
 
 
 def test_pyinstaller_spec_uses_repository_relative_entrypoint() -> None:

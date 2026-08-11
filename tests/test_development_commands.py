@@ -51,8 +51,10 @@ def test_devtools_declares_exact_maintainer_commands() -> None:
 def test_root_declares_devtools_only_as_a_development_dependency() -> None:
     pyproject = _load_pyproject(PROJECT_ROOT / "pyproject.toml")
     tool = pyproject["tool"]
+    project = pyproject["project"]
 
     assert isinstance(tool, dict)
+    assert isinstance(project, dict)
     poetry = tool["poetry"]
     assert isinstance(poetry, dict)
     dependencies = poetry["group"]["dev"]["dependencies"]
@@ -60,7 +62,9 @@ def test_root_declares_devtools_only_as_a_development_dependency() -> None:
         "path": "devtools",
         "develop": True,
     }
-    assert "cisco-sccfm-devtools" not in poetry["dependencies"]
+    assert all(
+        not dependency.startswith("cisco-sccfm-devtools") for dependency in project["dependencies"]
+    )
 
 
 def test_installed_devtools_entry_points_match_and_load() -> None:

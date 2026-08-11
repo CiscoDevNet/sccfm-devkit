@@ -35,7 +35,7 @@ jobs:
           with open("pyproject.toml", "rb") as pyproject_file:
               pyproject = tomllib.load(pyproject_file)
 
-          print(pyproject["tool"]["poetry"]["version"])
+          print(pyproject["project"]["version"])
           PY
           )"
 
@@ -50,7 +50,7 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
+          python -m pip install build twine==6.2.0
 
       - name: Build and verify package artifacts
         env:
@@ -75,6 +75,7 @@ jobs:
           python -m cisco_sccfm_scripts.verify_python_artifacts \
             "${WHEEL_PATH}" \
             "${SDIST_PATH}"
+          python -m twine check --strict "${WHEEL_PATH}" "${SDIST_PATH}"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

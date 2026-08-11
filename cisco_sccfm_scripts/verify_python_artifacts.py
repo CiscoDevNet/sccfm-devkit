@@ -8,15 +8,19 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import email.policy
 import io
+import re
 import stat
 import tarfile
 import tomllib
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
+from email.parser import BytesParser
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlsplit
 
 _DISTRIBUTION_STEM = "cisco_sccfm_devkit"
 _PACKAGE_ROOTS = frozenset({"cisco_sccfm_cli", "cisco_sccfm_core"})
@@ -24,12 +28,26 @@ _SDIST_METADATA_ROOTS = frozenset(
     {
         "LICENSE",
         "LICENSES",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "INSTALL.md",
         "PKG-INFO",
         "README.md",
+        "SECURITY.md",
         "pyproject.toml",
     }
 )
+_REQUIRED_SDIST_DOCUMENTS = frozenset(
+    {
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "INSTALL.md",
+        "README.md",
+        "SECURITY.md",
+    }
+)
 _EXPECTED_SCRIPTS = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+_MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(\s*(?:<(?P<angle>[^>]+)>|(?P<plain>[^\s)]+))")
 _FORBIDDEN_DIRECTORY_NAMES = frozenset(
     {
         ".cache",
@@ -211,14 +229,36 @@ def _verify_entry_points(raw: bytes) -> None:
         raise PythonArtifactVerificationError("wheel does not expose exactly the sccfm-cli command")
 
 
+def _verify_markdown_links(text: str, source: str) -> None:
+    """Reject links that would resolve relative to the PyPI project page."""
+    for match in _MARKDOWN_LINK.finditer(text):
+        target = match.group("angle") or match.group("plain")
+        if target.startswith("#") or target.startswith("//") or urlsplit(target).scheme:
+            continue
+        raise PythonArtifactVerificationError(f"{source} contains a relative Markdown link")
+
+
+def _verify_metadata_description(raw: bytes, source: str) -> None:
+    """Validate the Markdown long description embedded in package metadata."""
+    try:
+        metadata = BytesParser(policy=email.policy.default).parsebytes(raw)
+        description = metadata.get_payload()
+    except (TypeError, ValueError) as exc:
+        raise PythonArtifactVerificationError(f"{source} is invalid") from exc
+    if not isinstance(description, str):
+        raise PythonArtifactVerificationError(f"{source} has an invalid description")
+    _verify_markdown_links(description, source)
+
+
 def _verify_sdist_pyproject(raw: bytes) -> None:
     """Ensure a wheel rebuilt from the sdist retains the public package policy."""
     try:
         pyproject: dict[str, Any] = tomllib.loads(raw.decode("utf-8"))
+        project = pyproject["project"]
         poetry = pyproject["tool"]["poetry"]
     except (KeyError, TypeError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise PythonArtifactVerificationError("sdist has invalid Poetry metadata") from exc
-    if not isinstance(poetry, dict):
+    if not isinstance(project, dict) or not isinstance(poetry, dict):
         raise PythonArtifactVerificationError("sdist has invalid Poetry metadata")
 
     packages = poetry.get("packages")
@@ -235,7 +275,7 @@ def _verify_sdist_pyproject(raw: bytes) -> None:
     if package_roots != _PACKAGE_ROOTS:
         raise PythonArtifactVerificationError("sdist declares unexpected package roots")
 
-    scripts = poetry.get("scripts")
+    scripts = project.get("scripts")
     if scripts != _EXPECTED_SCRIPTS:
         raise PythonArtifactVerificationError("sdist does not expose exactly the sccfm-cli command")
 
@@ -273,6 +313,10 @@ def _verify_wheel(path: Path, version: str) -> int:
             if entry_points_name not in members:
                 raise PythonArtifactVerificationError("wheel has no entry-point metadata")
             _verify_entry_points(archive.read(members[entry_points_name]))
+            metadata_name = f"{expected_dist_info}/METADATA"
+            if metadata_name not in members:
+                raise PythonArtifactVerificationError("wheel has no package metadata")
+            _verify_metadata_description(archive.read(members[metadata_name]), "wheel metadata")
     except (OSError, zipfile.BadZipFile) as exc:
         raise PythonArtifactVerificationError("wheel is not a readable ZIP archive") from exc
     return len(members)
@@ -339,11 +383,33 @@ def _verify_sdist(path: Path, version: str) -> int:
                 raise PythonArtifactVerificationError(
                     "sdist does not contain the expected packages"
                 )
+            missing_documents = _REQUIRED_SDIST_DOCUMENTS.difference(relative_members)
+            if missing_documents:
+                raise PythonArtifactVerificationError("sdist is missing required project documents")
             pyproject_name = "pyproject.toml"
             pyproject_member = relative_members.get(pyproject_name)
             if pyproject_member is None or not pyproject_member.isfile():
                 raise PythonArtifactVerificationError("sdist has no pyproject.toml")
             _verify_sdist_pyproject(_read_tar_member(archive, pyproject_member))
+            for document_name in sorted(_REQUIRED_SDIST_DOCUMENTS):
+                document_member = relative_members[document_name]
+                if not document_member.isfile():
+                    raise PythonArtifactVerificationError(
+                        f"sdist project document is not a regular file: {document_name}"
+                    )
+                try:
+                    document = _read_tar_member(archive, document_member).decode("utf-8")
+                except UnicodeDecodeError as exc:
+                    raise PythonArtifactVerificationError(
+                        f"sdist project document is not UTF-8: {document_name}"
+                    ) from exc
+                _verify_markdown_links(document, f"sdist {document_name}")
+            package_info_member = relative_members.get("PKG-INFO")
+            if package_info_member is None or not package_info_member.isfile():
+                raise PythonArtifactVerificationError("sdist has no package metadata")
+            _verify_metadata_description(
+                _read_tar_member(archive, package_info_member), "sdist package metadata"
+            )
     except (OSError, tarfile.TarError) as exc:
         raise PythonArtifactVerificationError("sdist is not a readable tar.gz archive") from exc
     return sum(member.isfile() for member in members.values())

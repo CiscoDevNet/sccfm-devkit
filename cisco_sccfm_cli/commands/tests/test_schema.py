@@ -377,11 +377,9 @@ def _commands_by_name(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _project_version() -> str:
     pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    tool = data["tool"]
-    assert isinstance(tool, dict)
-    poetry = tool["poetry"]
-    assert isinstance(poetry, dict)
-    version = poetry["version"]
+    project = data["project"]
+    assert isinstance(project, dict)
+    version = project["version"]
     assert isinstance(version, str)
     return version
 

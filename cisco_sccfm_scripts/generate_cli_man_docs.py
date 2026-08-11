@@ -40,7 +40,7 @@ def _project_root() -> Path:
 def _project_version(project_root: Path) -> str:
     with (project_root / "pyproject.toml").open("rb") as pyproject:
         data = tomllib.load(pyproject)
-    version = data["tool"]["poetry"]["version"]
+    version = data["project"]["version"]
     if not isinstance(version, str):
         raise RuntimeError("Project version in pyproject.toml must be a string.")
     return version

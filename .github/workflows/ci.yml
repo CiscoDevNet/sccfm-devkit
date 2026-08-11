@@ -74,6 +74,7 @@ jobs:
 
       - name: Lint
         run: |
+          poetry check --strict --lock
           poetry run black --check .
           poetry run isort --check-only .
           poetry run mypy \
@@ -116,6 +117,8 @@ jobs:
           test -f "${WHEEL_PATH}"
           test -f "${SDIST_PATH}"
           poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
+          pipx run --spec "twine==6.2.0" twine check --strict \
             "${WHEEL_PATH}" "${SDIST_PATH}"
           poetry run build-ansible-collection
           test -f "${COLLECTION_PATH}"
@@ -213,6 +216,8 @@ jobs:
           test -f "${WHEEL_PATH}"
           test -f "${SDIST_PATH}"
           poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
+          pipx run --spec "twine==6.2.0" twine check --strict \
             "${WHEEL_PATH}" "${SDIST_PATH}"
           SMOKE_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-wheel-smoke.XXXXXX")"
           python -m venv "${SMOKE_ROOT}/venv"

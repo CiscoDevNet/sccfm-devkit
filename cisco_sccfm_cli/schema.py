@@ -258,15 +258,11 @@ def _pyproject_version() -> str | None:
     except (OSError, tomllib.TOMLDecodeError):
         return None
 
-    tool = pyproject.get("tool")
-    if not isinstance(tool, dict):
+    project = pyproject.get("project")
+    if not isinstance(project, dict):
         return None
 
-    poetry = tool.get("poetry")
-    if not isinstance(poetry, dict):
-        return None
-
-    project_version = poetry.get("version")
+    project_version = project.get("version")
     if not isinstance(project_version, str) or not project_version:
         return None
 

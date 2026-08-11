@@ -24,7 +24,7 @@ def _yaml_mapping(path: Path) -> dict[str, Any]:
 def test_collection_python_requirement_matches_release_versions() -> None:
     """Require the collection and its Python runtime package to ship in lockstep."""
     pyproject = tomllib.loads((_REPOSITORY_ROOT / "pyproject.toml").read_text())
-    project_version = pyproject["tool"]["poetry"]["version"]
+    project_version = pyproject["project"]["version"]
     galaxy_version = _yaml_mapping(_COLLECTION_ROOT / "galaxy.yml")["version"]
     requirement_lines = [
         line.strip()

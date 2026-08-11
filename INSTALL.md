@@ -199,4 +199,4 @@ The Python and collection versions printed above must be identical.
 
 Provide `SCCFM_REGION` and `SCCFM_API_TOKEN` through the controller or execution environment's
 secret manager. See the collection's [packaged installation, authentication, execution environment,
-and example instructions](sccfm-ansible/README.md#installation) for the complete consumer workflow.
+and example instructions](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/sccfm-ansible/README.md#installation) for the complete consumer workflow.
