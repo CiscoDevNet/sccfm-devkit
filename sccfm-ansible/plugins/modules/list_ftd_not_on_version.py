@@ -1,20 +1,10 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
+# isort: skip_file
 
 from __future__ import annotations
-
-import re
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device, DevicePage, EntityType, FtdVersion
-
-from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
-from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
-
-from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -81,17 +71,14 @@ options:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
   api_token:
     description: API token for SCCFM.
     required: false
     type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
 author:
-  - Cisco SCCFM Team
+  - huides00 (@huides00)
+  - Scoombe (@Scoombe)
+  - afercal (@afercal)
 """
 
 EXAMPLES = r"""
@@ -188,6 +175,24 @@ mode:
   returned: success
   type: str
 """
+
+
+import re
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.config import base_argument_spec, create_config
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device, DevicePage
+
+    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
+except ImportError as exc:
+    record_import_error(exc)
+
 
 _VERSION_RE = re.compile(r"^\d+\.\d+")
 

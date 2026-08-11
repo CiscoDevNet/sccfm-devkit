@@ -1,18 +1,10 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
+# isort: skip_file
 
 from __future__ import annotations
-
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device
-
-from cisco_sccfm_core import SccApiError
-from cisco_sccfm_core.services.inventory import FtdRegisterService
-
-from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -39,18 +31,15 @@ options:
       - The SCC Firewall Manager region.
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
   api_token:
     description:
       - The SCC Firewall Manager API token.
     required: false
     type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
 author:
-  - Cisco SCCFM Team
+  - huides00 (@huides00)
+  - Scoombe (@Scoombe)
+  - afercal (@afercal)
 """
 
 EXAMPLES = r"""
@@ -74,6 +63,22 @@ device:
   returned: always
   type: dict
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device
+
+    from cisco_sccfm_core import SccApiError
+    from cisco_sccfm_core.services.inventory import FtdRegisterService
+except ImportError as exc:
+    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

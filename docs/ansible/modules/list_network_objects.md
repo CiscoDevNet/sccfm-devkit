@@ -22,11 +22,7 @@ $ ansible-doc -t module cisco.sccfm.list_network_objects
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - limit   Maximum number of results to return.
@@ -44,13 +40,10 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: List all network objects

@@ -30,14 +30,7 @@ from types import ModuleType
 # Set environment variable that Ansible uses for module argument passing
 os.environ.setdefault("ANSIBLE_MODULE_ARGS", "{}")
 
-# Load config module directly
 module_utils_path = Path(__file__).parent.parent.parent / "module_utils"
-config_path = module_utils_path / "config.py"
-spec = importlib.util.spec_from_file_location("config", config_path)
-assert spec is not None and spec.loader is not None
-config_module = importlib.util.module_from_spec(spec)
-sys.modules["config"] = config_module  # Add to sys.modules before executing
-spec.loader.exec_module(config_module)
 
 # Create proper package hierarchy
 plugins_module = ModuleType("plugins")
@@ -55,27 +48,30 @@ module_utils_module.__path__ = [str(module_utils_path)]
 module_utils_module.__package__ = "plugins.module_utils"
 sys.modules["plugins.module_utils"] = module_utils_module
 
-# Add config as a submodule with all exports
-config_submodule = ModuleType("plugins.module_utils.config")
-config_submodule.Config = config_module.Config
-config_submodule.base_argument_spec = config_module.base_argument_spec
-config_submodule.identifier_argument_spec = config_module.identifier_argument_spec
-config_submodule.create_config = config_module.create_config
-config_submodule.__package__ = "plugins.module_utils"
-sys.modules["plugins.module_utils.config"] = config_submodule
+# Load shared module utilities with their real package names so relative imports work.
+dependencies_path = module_utils_path / "dependencies.py"
+dependencies_spec = importlib.util.spec_from_file_location(
+    "plugins.module_utils.dependencies", dependencies_path
+)
+assert dependencies_spec is not None and dependencies_spec.loader is not None
+dependencies_module = importlib.util.module_from_spec(dependencies_spec)
+sys.modules["plugins.module_utils.dependencies"] = dependencies_module
+dependencies_spec.loader.exec_module(dependencies_module)
 
-# Load operations module directly
+config_path = module_utils_path / "config.py"
+spec = importlib.util.spec_from_file_location("plugins.module_utils.config", config_path)
+assert spec is not None and spec.loader is not None
+config_module = importlib.util.module_from_spec(spec)
+sys.modules["plugins.module_utils.config"] = config_module
+sys.modules["config"] = config_module
+spec.loader.exec_module(config_module)
+
 operations_path = module_utils_path / "operations.py"
-ops_spec = importlib.util.spec_from_file_location("operations", operations_path)
+ops_spec = importlib.util.spec_from_file_location(
+    "plugins.module_utils.operations", operations_path
+)
 assert ops_spec is not None and ops_spec.loader is not None
 operations_module = importlib.util.module_from_spec(ops_spec)
+sys.modules["plugins.module_utils.operations"] = operations_module
 sys.modules["operations"] = operations_module
 ops_spec.loader.exec_module(operations_module)
-
-# Add operations as a submodule
-operations_submodule = ModuleType("plugins.module_utils.operations")
-operations_submodule.fetch_object_by_identifier = operations_module.fetch_object_by_identifier
-operations_submodule.run_delete_with_idempotency = operations_module.run_delete_with_idempotency
-operations_submodule.fields_need_update = operations_module.fields_need_update
-operations_submodule.__package__ = "plugins.module_utils"
-sys.modules["plugins.module_utils.operations"] = operations_submodule

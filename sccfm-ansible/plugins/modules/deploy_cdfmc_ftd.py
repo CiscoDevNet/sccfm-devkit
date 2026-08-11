@@ -1,27 +1,10 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
+# isort: skip_file
 
 from __future__ import annotations
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    CdoTransaction,
-    DevicePage,
-    EntityType,
-)
-
-from cisco_sccfm_core import InventoryService, SccApiError
-from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
-from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
-from cisco_sccfm_core.services.inventory import FtdDeployService
-from cisco_sccfm_core.services.transaction_service import TransactionService
-from cisco_sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -92,17 +75,14 @@ options:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
   api_token:
     description: API token for SCCFM.
     required: false
     type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
 author:
-  - Cisco SCCFM Team
+  - huides00 (@huides00)
+  - Scoombe (@Scoombe)
+  - afercal (@afercal)
 """
 
 EXAMPLES = r"""
@@ -158,6 +138,32 @@ device_count:
 """
 
 
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+from ..module_utils.dependencies import record_import_error
+
+_DEFAULT_TRANSACTION_TIMEOUT_SEC = 3600
+
+try:
+    from scc_firewall_manager_sdk import (
+        ApiException,
+        CdoTransaction,
+        DevicePage,
+        EntityType,
+    )
+
+    from cisco_sccfm_core import InventoryService, SccApiError
+    from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
+    from cisco_sccfm_core.services.inventory import FtdDeployService
+    from cisco_sccfm_core.services.transaction_service import TransactionService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+
+
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "query": {"type": "str", "required": False},
@@ -171,7 +177,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "timeout": {
             "type": "int",
             "required": False,
-            "default": DEFAULT_TRANSACTION_TIMEOUT_SEC,
+            "default": _DEFAULT_TRANSACTION_TIMEOUT_SEC,
         },
         **base_argument_spec(),
     }
@@ -261,7 +267,7 @@ def run_module() -> None:
         description: str | None = module.params.get("description")
         ignore_warnings: bool = module.params.get("ignore_warnings", False)
         wait_for_completion: bool = module.params.get("wait", False)
-        timeout: int = module.params.get("timeout", DEFAULT_TRANSACTION_TIMEOUT_SEC)
+        timeout: int = module.params.get("timeout", _DEFAULT_TRANSACTION_TIMEOUT_SEC)
 
         transaction = _trigger_deploy(
             config=config,

@@ -4,9 +4,8 @@ version: 0.38.0
 readme: README.md
 authors:
 - Cisco Security Cloud Control Firewall Manager Team
-description: Ansible inventory plugin for Cisco SCC Firewall Manager (SCCFM).
-license:
-- Apache-2.0
+description: Ansible modules and dynamic inventory for Cisco Security Cloud Control
+  Firewall Manager.
 license_file: LICENSE
 tags:
 - cisco
@@ -29,6 +28,7 @@ build_ignore:
 - ansible_collections
 - plugins/modules/tests
 - plugins/modules/tests/**
+- changelogs/.plugin-cache.yaml
 - .DS_Store
 - '**/.DS_Store'
 - .gitignore

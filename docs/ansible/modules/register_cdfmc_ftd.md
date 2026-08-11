@@ -21,11 +21,7 @@ $ ansible-doc -t module cisco.sccfm.register_cdfmc_ftd
 OPTIONS (= indicates it is required):
 
 - api_token  The SCC Firewall Manager API token.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 = ftd_uid  The UID of the FTD device in SCC Firewall Manager to
@@ -33,9 +29,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  The SCC Firewall Manager region.
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -45,7 +38,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 - name: Register vFTD with cdFMC using shared authentication defaults

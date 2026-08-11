@@ -25,11 +25,7 @@ $ ansible-doc -t module cisco.sccfm.remove_network_group_members
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - name    Name of the network group to update.
@@ -43,9 +39,6 @@ OPTIONS (= indicates it is required):
         type: list
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -53,7 +46,7 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Remove members by name

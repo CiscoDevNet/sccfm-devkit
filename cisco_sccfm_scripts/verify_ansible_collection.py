@@ -25,22 +25,28 @@ _MAX_TOTAL_BYTES = 50 * 1024 * 1024
 _ALLOWED_TOP_LEVEL = frozenset(
     {
         "FILES.json",
+        "CHANGELOG.rst",
         "LICENSE",
         "MANIFEST.json",
         "README.md",
         "__init__.py",
+        "changelogs",
         "examples",
         "meta",
         "plugins",
         "requirements.txt",
+        "tests",
     }
 )
 _REQUIRED_MEMBERS = frozenset(
     {
         "FILES.json",
+        "CHANGELOG.rst",
         "LICENSE",
         "MANIFEST.json",
         "README.md",
+        "changelogs/changelog.yaml",
+        "changelogs/config.yaml",
         "examples/.vault_pass.example",
         "examples/group_vars/all/vault.yml.example",
         "meta/execution-environment.yml",
@@ -49,6 +55,8 @@ _REQUIRED_MEMBERS = frozenset(
         "plugins/module_utils",
         "plugins/modules",
         "requirements.txt",
+        "tests/sanity/ignore-2.20.txt",
+        "tests/sanity/ignore-2.21.txt",
     }
 )
 _SAFE_CREDENTIAL_TEMPLATES = frozenset(
@@ -99,6 +107,14 @@ _ALLOWED_EXAMPLE_PATHS = frozenset(
         "examples/trigger_ftd_upgrade.yml",
         "examples/update_network_groups.yml",
         "examples/update_network_objects.yml",
+    }
+)
+_ALLOWED_TEST_PATHS = frozenset(
+    {
+        "tests",
+        "tests/sanity",
+        "tests/sanity/ignore-2.20.txt",
+        "tests/sanity/ignore-2.21.txt",
     }
 )
 _FORBIDDEN_DIRECTORY_NAMES = frozenset(
@@ -203,6 +219,8 @@ def _check_member_path(name: str) -> None:
         raise ArtifactVerificationError(f"forbidden runtime directory in artifact: {name}")
     if path.parts[0] == "examples" and name not in _ALLOWED_EXAMPLE_PATHS:
         raise ArtifactVerificationError(f"unreviewed examples path in artifact: {name}")
+    if path.parts[0] == "tests" and name not in _ALLOWED_TEST_PATHS:
+        raise ArtifactVerificationError(f"unreviewed test policy path in artifact: {name}")
     if name in _SAFE_CREDENTIAL_TEMPLATES:
         return
 

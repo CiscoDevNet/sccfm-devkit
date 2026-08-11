@@ -87,6 +87,24 @@ jobs:
       - name: Test
         run: poetry run pytest --color=yes
 
+      - name: Ansible sanity
+        run: |
+          set -euo pipefail
+          VENV_PATH="$(poetry env info --path)"
+          SANITY_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-sanity.XXXXXX")"
+          COLLECTION_ROOT="${SANITY_ROOT}/ansible_collections/cisco/sccfm"
+          mkdir -p "${COLLECTION_ROOT}" "${SANITY_ROOT}/home" "${SANITY_ROOT}/local"
+          git archive HEAD:sccfm-ansible | tar -x -C "${COLLECTION_ROOT}"
+          rm -rf \
+            "${COLLECTION_ROOT}/ci" \
+            "${COLLECTION_ROOT}/e2e" \
+            "${COLLECTION_ROOT}/plugins/modules/tests"
+          cd "${COLLECTION_ROOT}"
+          HOME="${SANITY_ROOT}/home" \
+            XDG_CACHE_HOME="${SANITY_ROOT}/home/.cache" \
+            ANSIBLE_LOCAL_TEMP="${SANITY_ROOT}/local" \
+            "${VENV_PATH}/bin/ansible-test" sanity --local --truncate 0
+
       - name: Build and verify release artifacts
         run: |
           set -euo pipefail

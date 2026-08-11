@@ -2,14 +2,28 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+"""Build Ansible inventory hosts from SCCFM device records."""
+
 from __future__ import annotations
 
+from typing import Protocol
+
 from ansible.inventory.data import InventoryData
-from scc_firewall_manager_sdk import Device
+
+
+class DeviceLike(Protocol):
+    """Device fields consumed while constructing inventory."""
+
+    uid: str
+    name: str
+    device_type: object
+    connectivity_state: object
+    config_state: object
+    software_version: str | None
 
 
 class InventoryHostBuilder:
-    """Handles the addition of SCCFM devices to an Ansible inventory."""
+    """Add SCCFM devices to an Ansible inventory."""
 
     def __init__(self, inventory: InventoryData, region: str) -> None:
         self._inventory = inventory
@@ -18,11 +32,11 @@ class InventoryHostBuilder:
     def add_device_host(
         self,
         *,
-        device: Device,
+        device: DeviceLike,
         parent_group: str | None,
         group_by_device_type: bool,
     ) -> None:
-        """Add a device to the inventory as a host with appropriate grouping and variables."""
+        """Add a device as a host with grouping and SCCFM metadata variables."""
         target_group = self._determine_target_group(
             device=device,
             parent_group=parent_group,
@@ -35,7 +49,7 @@ class InventoryHostBuilder:
     def _determine_target_group(
         self,
         *,
-        device: Device,
+        device: DeviceLike,
         parent_group: str | None,
         group_by_device_type: bool,
     ) -> str | None:
@@ -43,7 +57,6 @@ class InventoryHostBuilder:
         if not group_by_device_type or not device.device_type:
             return parent_group
 
-        # Sanitize group name: replace dots with underscores for valid Ansible group names
         device_type_group = str(device.device_type).replace("EntityType.", "")
         self._inventory.add_group(device_type_group)
 
@@ -52,7 +65,7 @@ class InventoryHostBuilder:
 
         return device_type_group
 
-    def _set_host_variables(self, *, device: Device) -> None:
+    def _set_host_variables(self, *, device: DeviceLike) -> None:
         """Set standard SCCFM variables for a host."""
         self._inventory.set_variable(device.name, "sccfm_uid", device.uid)
         self._inventory.set_variable(device.name, "sccfm_name", device.name)

@@ -18,11 +18,7 @@ $ ansible-doc -t module cisco.sccfm.onboard_asa
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - connector_name  Name of the Secure Device Connector (SDC) to use
@@ -50,13 +46,9 @@ OPTIONS (= indicates it is required):
         type: str
 
 = password  Password used to authenticate with the device.
-        no_log: true
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -68,7 +60,7 @@ OPTIONS (= indicates it is required):
 = username  Username used to authenticate with the device.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Using module_defaults (recommended)

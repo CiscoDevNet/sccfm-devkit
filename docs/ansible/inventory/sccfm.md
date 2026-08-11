@@ -26,7 +26,6 @@ OPTIONS (= indicates it is required):
         set_via:
           env:
           - name: SCCFM_API_TOKEN
-        no_log: true
         type: str
 
 - group   Group to place all discovered SCCFM devices into.
@@ -42,7 +41,8 @@ OPTIONS (= indicates it is required):
         default: 100
         type: int
 
-= plugin  Ensure this plugin gets loaded.
+= plugin  Token that ensures this is a source file for the
+           `cisco.sccfm.sccfm' plugin.
         choices: [cisco.sccfm.sccfm]
 
 - query   Optional text filter applied to device names.
@@ -56,9 +56,7 @@ OPTIONS (= indicates it is required):
           - name: SCCFM_REGION
         type: str
 
-NAME: cisco.sccfm.sccfm
-
-PLUGIN_TYPE: inventory
+NAME: sccfm
 
 EXAMPLES:
 plugin: cisco.sccfm.sccfm

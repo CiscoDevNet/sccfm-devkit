@@ -19,11 +19,7 @@ $ ansible-doc -t module cisco.sccfm.delete_network_object
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - name    Name of the network object to delete.
@@ -31,9 +27,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -46,7 +39,7 @@ NOTES:
       * When using `name', the module will search for the object
         and resolve it to a UID before deletion.
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Delete a network object by UID

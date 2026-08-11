@@ -8,9 +8,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
-from scc_firewall_manager_sdk import ApiException
+from .dependencies import record_import_error
 
-from cisco_sccfm_core.errors import NotFoundError, SccApiError
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import NotFoundError, SccApiError
+except ImportError as exc:
+    record_import_error(exc)
 
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule

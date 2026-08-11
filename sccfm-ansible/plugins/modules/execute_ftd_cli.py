@@ -1,23 +1,10 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
+# isort: skip_file
 
 from __future__ import annotations
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device, DevicePage
-
-from cisco_sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult
-from cisco_sccfm_core.services.inventory.ftd_cli_service import (
-    FtdCommandLineService,
-    _validate_show_command,
-)
-from cisco_sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -76,17 +63,14 @@ options:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
   api_token:
     description: API token for SCCFM.
     required: false
     type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
 author:
-  - Cisco SCCFM Team
+  - huides00 (@huides00)
+  - Scoombe (@Scoombe)
+  - afercal (@afercal)
 """
 
 EXAMPLES = r"""
@@ -159,6 +143,27 @@ results:
       description: Error message if execution failed (null if successful).
       type: str
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device, DevicePage
+
+    from cisco_sccfm_core import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult
+    from cisco_sccfm_core.services.inventory.ftd_cli_service import (
+        FtdCommandLineService,
+        _validate_show_command,
+    )
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

@@ -1,22 +1,10 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
+# isort: skip_file
 
 from __future__ import annotations
-
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-
-from cisco_sccfm_core.services.object_management import NetworkObjectService
-
-from ..module_utils.config import (
-    Config,
-    base_argument_spec,
-    create_config,
-    identifier_argument_spec,
-)
-from ..module_utils.operations import run_delete_with_idempotency
 
 DOCUMENTATION = r"""
 ---
@@ -38,20 +26,17 @@ options:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
   api_token:
     description: API token for SCCFM.
     required: false
     type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
 notes:
   - Either C(uid) or C(name) must be provided, but not both.
   - When using C(name), the module will search for the object and resolve it to a UID before deletion.
 author:
-  - Cisco SCCFM Team
+  - huides00 (@huides00)
+  - Scoombe (@Scoombe)
+  - afercal (@afercal)
 """
 
 EXAMPLES = r"""
@@ -99,6 +84,27 @@ deleted_uid:
   type: str
   sample: "abc-123-def-456"
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.config import (
+    Config as _Config,
+    base_argument_spec,
+    create_config,
+    identifier_argument_spec,
+)
+from ..module_utils.dependencies import record_import_error
+from ..module_utils.operations import run_delete_with_idempotency
+
+Config = _Config
+
+try:
+    from cisco_sccfm_core.services.object_management import NetworkObjectService
+except ImportError as exc:
+    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

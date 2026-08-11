@@ -1,24 +1,12 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
 
 from __future__ import annotations
 
-import os
-from typing import Any, Dict, List, Optional, cast
-
-from ansible.errors import AnsibleParserError
-from ansible.plugins.inventory import BaseInventoryPlugin
-from ansible.utils.display import Display
-from scc_firewall_manager_sdk import Device
-
-from ..module_utils.builders import InventoryHostBuilder
-from ..module_utils.config import Config
-from ..module_utils.loaders import InventoryLoader
-
 DOCUMENTATION = r"""
-name: cisco.sccfm.sccfm
-plugin_type: inventory
+name: sccfm
 short_description: Load devices in SCC Firewall Manager as inventory hosts.
 description:
   - Uses Cisco Security Cloud Control Firewall Manager (SCCFM) to enumerate
@@ -28,7 +16,7 @@ description:
     to groups or hosts.
 options:
   plugin:
-    description: Ensure this plugin gets loaded.
+    description: Token that ensures this is a source file for the C(cisco.sccfm.sccfm) plugin.
     required: true
     choices: ["cisco.sccfm.sccfm"]
   region:
@@ -43,7 +31,6 @@ options:
       - name: SCCFM_API_TOKEN
     required: true
     type: str
-    no_log: true
   limit:
     description: Page size to use when fetching devices.
     required: false
@@ -74,6 +61,20 @@ query: "asa"
 group: sccfm
 group_by_device_type: true
 """
+
+import os
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
+
+from ansible.errors import AnsibleParserError
+from ansible.plugins.inventory import BaseInventoryPlugin
+from ansible.utils.display import Display
+
+from ..module_utils.config import Config
+from ..plugin_utils.inventory_host_builder import InventoryHostBuilder
+from ..plugin_utils.inventory_loader import InventoryLoader
+
+if TYPE_CHECKING:
+    from scc_firewall_manager_sdk import Device
 
 
 class InventoryModule(BaseInventoryPlugin):

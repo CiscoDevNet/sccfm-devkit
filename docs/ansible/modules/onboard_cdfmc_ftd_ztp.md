@@ -34,15 +34,10 @@ OPTIONS (= indicates it is required):
                    Required if a password has not already been set on
                    the device.
         default: null
-        no_log: true
         type: str
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - device_group_uid  UUID of the device group the device will join
@@ -64,16 +59,13 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
 = serial_number  Serial number of the physical FTD device.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Onboard a physical FTD via ZTP

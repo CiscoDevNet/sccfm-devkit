@@ -8,13 +8,23 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from cisco_sccfm_core.constants import SCCFM_REGIONS, normalize_sccfm_region
-
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
 
-ALLOWED_REGIONS = SCCFM_REGIONS
+from .dependencies import ensure_required_dependencies
+
+ALLOWED_REGIONS = ("int", "us", "eu", "apj", "au", "uae", "in", "ci")
+REGION_ALIASES = {"aus": "au"}
 ALLOWED_REGIONS_TEXT = ", ".join(ALLOWED_REGIONS)
+
+
+def _normalize_region(region: str | None) -> str | None:
+    """Normalize a region without importing the separately installed core package."""
+    if region is None:
+        return None
+
+    normalized = region.strip().lower()
+    return REGION_ALIASES.get(normalized, normalized)
 
 
 @dataclass(frozen=True)
@@ -30,7 +40,7 @@ class Config:
 
     def __post_init__(self) -> None:
         # Resolve from environment if not provided
-        resolved_region = normalize_sccfm_region(self.region or os.getenv("SCCFM_REGION"))
+        resolved_region = _normalize_region(self.region or os.getenv("SCCFM_REGION"))
         resolved_token = self.api_token or os.getenv("SCCFM_API_TOKEN")
 
         # Use object.__setattr__ since dataclass is frozen
@@ -91,6 +101,8 @@ def create_config(module: "AnsibleModule") -> Config:
     Note:
         On validation error, calls module.fail_json() and does not return.
     """
+    ensure_required_dependencies(module)
+
     try:
         return Config(
             region=module.params.get("region") or "",

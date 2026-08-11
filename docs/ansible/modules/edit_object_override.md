@@ -22,11 +22,7 @@ $ ansible-doc -t module cisco.sccfm.edit_object_override
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 = override_value  The new value for the override. For network objects
@@ -36,9 +32,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -48,7 +41,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the object to edit.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Edit an existing override for a specific device

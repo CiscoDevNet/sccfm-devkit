@@ -52,3 +52,35 @@ def test_supported_ansible_range_matches_development_and_collection_metadata() -
         ">=2.20,<2.22"
     )
     assert runtime["requires_ansible"] == ">=2.20.0,<2.22.0"
+
+
+def test_runtime_metadata_excludes_unsupported_module_defaults() -> None:
+    """Keep module defaults in playbooks, not unsupported runtime metadata."""
+    runtime = _yaml_mapping(_COLLECTION_ROOT / "meta" / "runtime.yml")
+
+    assert "module_defaults" not in runtime
+    assert "cisco.sccfm.all" in runtime["action_groups"]
+
+
+def test_galaxy_metadata_describes_the_published_collection() -> None:
+    """Describe both public plugin types and use one unambiguous license source."""
+    galaxy = _yaml_mapping(_COLLECTION_ROOT / "galaxy.yml")
+    description = galaxy["description"].lower()
+
+    assert "modules" in description
+    assert "inventory" in description
+    assert galaxy["license_file"] == "LICENSE"
+    assert "license" not in galaxy
+
+
+def test_collection_changelog_matches_published_version() -> None:
+    """Keep Galaxy metadata and both generated changelog forms version-aligned."""
+    galaxy = _yaml_mapping(_COLLECTION_ROOT / "galaxy.yml")
+    changelog = _yaml_mapping(_COLLECTION_ROOT / "changelogs" / "changelog.yaml")
+    changelog_config = _yaml_mapping(_COLLECTION_ROOT / "changelogs" / "config.yaml")
+    version = str(galaxy["version"])
+
+    assert changelog_config["changes_file"] == "changelog.yaml"
+    assert changelog_config["notesdir"] == "fragments"
+    assert version in changelog["releases"]
+    assert f"v{version}" in (_COLLECTION_ROOT / "CHANGELOG.rst").read_text()

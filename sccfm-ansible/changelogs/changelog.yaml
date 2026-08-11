@@ -1,0 +1,11 @@
+---
+ancestor: null
+releases:
+  0.38.0:
+    changes:
+      release_summary: Initial development release of the cisco.sccfm collection,
+        with dynamic inventory and modules for automating Cisco Security Cloud Control
+        Firewall Manager.
+    fragments:
+      - 0.38.0.yml
+    release_date: '2026-07-27'

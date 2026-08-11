@@ -21,11 +21,7 @@ $ ansible-doc -t module cisco.sccfm.delete_network_group
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - name    Name of the network group to delete.
@@ -33,9 +29,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -51,7 +44,7 @@ NOTES:
         accidentally matching network objects with the same
         name.
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Delete a network group by UID

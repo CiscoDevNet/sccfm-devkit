@@ -23,11 +23,7 @@ $ ansible-doc -t module cisco.sccfm.list_ftd_compatible_versions
 OPTIONS (= indicates it is required):
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - limit   Maximum number of devices to return when using `query'.
@@ -58,9 +54,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -70,7 +63,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Get compatible versions for a single FTD (flat list output)

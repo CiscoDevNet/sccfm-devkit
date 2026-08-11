@@ -30,6 +30,7 @@ _COLLECTION_METADATA = yaml.safe_load((_COLLECTION_SOURCE / "galaxy.yml").read_t
 _COLLECTION_VERSION = str(_COLLECTION_METADATA["version"])
 
 _MINIMUM_DIRECTORIES = {
+    "changelogs",
     "examples",
     "examples/group_vars",
     "examples/group_vars/all",
@@ -38,17 +39,28 @@ _MINIMUM_DIRECTORIES = {
     "plugins/inventory",
     "plugins/module_utils",
     "plugins/modules",
+    "tests",
+    "tests/sanity",
 }
 _MINIMUM_FILES = {
+    "CHANGELOG.rst": b"Cisco SCCFM Collection Release Notes\n",
     "LICENSE": b"Apache License\nVersion 2.0, January 2004\n",
     "README.md": b"# Test collection\n",
     "__init__.py": b"",
+    "changelogs/changelog.yaml": b"---\nancestor: null\nreleases: {}\n",
+    "changelogs/config.yaml": b"---\ntitle: Cisco SCCFM Collection\n",
     "examples/.vault_pass.example": b"replace-me\n",
     "examples/group_vars/all/vault.yml.example": b"---\nsccfm_api_token: placeholder\n",
     "examples/show_devices.yml": b"---\n- name: Synthetic example\n  hosts: localhost\n",
     "meta/execution-environment.yml": b"---\ndependencies:\n  python: requirements.txt\n",
     "meta/runtime.yml": b"requires_ansible: '>=2.20.0,<2.22.0'\n",
     "requirements.txt": f"cisco-sccfm-devkit=={_VERSION}\n".encode(),
+    "tests/sanity/ignore-2.20.txt": (
+        b"plugins/modules/example.py validate-modules:missing-gplv3-license\n"
+    ),
+    "tests/sanity/ignore-2.21.txt": (
+        b"plugins/modules/example.py validate-modules:missing-gplv3-license\n"
+    ),
 }
 
 
@@ -157,6 +169,16 @@ def test_verifier_rejects_sensitive_paths(tmp_path: Path, path: str) -> None:
     artifact = _build_synthetic_artifact(tmp_path, extra_files={path: b"synthetic\n"})
 
     with pytest.raises(ArtifactVerificationError):
+        verify_collection_artifact(artifact, expected_version=_VERSION)
+
+
+def test_verifier_rejects_unreviewed_test_content(tmp_path: Path) -> None:
+    artifact = _build_synthetic_artifact(
+        tmp_path,
+        extra_files={"tests/unit/test_live_tenant.py": b"synthetic\n"},
+    )
+
+    with pytest.raises(ArtifactVerificationError, match="unreviewed test policy"):
         verify_collection_artifact(artifact, expected_version=_VERSION)
 
 

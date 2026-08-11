@@ -25,11 +25,7 @@ OPTIONS (= indicates it is required):
         type: bool
 
 - api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
         default: null
-        no_log: true
         type: str
 
 - destination_network  Destination network object name.
@@ -57,9 +53,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 - region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -83,7 +76,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the access rule to update.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
 
 EXAMPLES:
 # Example 1: Update a rule's action

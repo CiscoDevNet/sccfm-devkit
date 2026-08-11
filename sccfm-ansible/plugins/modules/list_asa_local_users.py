@@ -1,25 +1,10 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
+# flake8: noqa: E402
+# isort: skip_file
 
 from __future__ import annotations
-
-import json
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
-
-from cisco_sccfm_core import (
-    ASA_DEVICE_TYPE_FILTER,
-    AsaCommandLineService,
-    InventoryService,
-    SccApiError,
-)
-from cisco_sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
-from cisco_sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -58,17 +43,14 @@ options:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
   api_token:
     description: API token for SCCFM
     required: false
     type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
 author:
-  - Cisco SCCFM Team
+  - huides00 (@huides00)
+  - Scoombe (@Scoombe)
+  - afercal (@afercal)
 """
 
 EXAMPLES = r"""
@@ -128,6 +110,29 @@ asa_local_users_json:
   returned: success
   type: str
 """
+
+
+import json
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaCommandLineService,
+        InventoryService,
+        SccApiError,
+    )
+    from cisco_sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
