@@ -26,7 +26,7 @@
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
   vars:
     target_version: ""

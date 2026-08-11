@@ -4,7 +4,7 @@
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Get list of ASA local users for UIDs
       cisco.sccfm.list_asa_local_users:

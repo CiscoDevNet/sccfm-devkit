@@ -17,6 +17,8 @@ $ ansible-doc -t inventory cisco.sccfm.sccfm
   enumerate devices using the REST APIs.
   Each device becomes an inventory host with SCCFM metadata attached
   as host variables.
+  Authentication values are consumed only while refreshing inventory
+  and are never attached to groups or hosts.
 
 OPTIONS (= indicates it is required):
 

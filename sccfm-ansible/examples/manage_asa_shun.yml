@@ -2,10 +2,10 @@
 # Shun management example for an ASA device
 #
 # RUN:
+#   export SCCFM_REGION=<your-region>
+#   export SCCFM_API_TOKEN=<your-api-token>
 #   ansible-playbook examples/manage_asa_shun.yml \
-#     -e device_uid=<your-device-uid> \
-#     -e sccfm_region=<your-region> \
-#     -e sccfm_api_token=<your-api-token>
+#     -e device_uid=<your-device-uid>
 
 - name: "Manage shun entries on ASA firewall"
   hosts: localhost
@@ -14,7 +14,7 @@
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
   vars:
     device_uid: ""

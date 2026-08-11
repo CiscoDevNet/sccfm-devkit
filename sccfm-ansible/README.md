@@ -158,11 +158,12 @@ Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to m
 
 **Graph inventory:**
 ```bash
-export SCCFM_REGION=int
-export SCCFM_API_TOKEN=$(ansible-vault view ./examples/group_vars/all/vault.yml --vault-password-file ./examples/.vault_pass | grep sccfm_api_token | cut -d '"' -f2)
+# Load SCCFM_REGION and SCCFM_API_TOKEN without putting the token on argv.
+# `change-tokens` writes the repository .env for use with direnv.
 ansible-inventory -i examples/inventory.sccfm.yml \
   --graph \
-  --playbook-dir examples
+  --playbook-dir examples \
+  --vault-password-file examples/.vault_pass
 ```
 
 **Show all devices:**
@@ -181,9 +182,12 @@ ansible-playbook onboard_asas.yml --vault-password-file .vault_pass
 ### Test Inventory
 
 ```bash
-ansible-inventory -i inventory.sccfm.yml --list --vault-password-file .vault_pass
 ansible-inventory -i inventory.sccfm.yml --graph --vault-password-file .vault_pass
 ```
+
+Do not use `--list`, `--yaml`, or `--graph --vars` while decrypted `group_vars` contain
+secrets: those output formats can print any variables supplied by Ansible Vault or other vars
+plugins. Plain `--graph` validates discovery without rendering variables.
 
 ### Host Variables
 
@@ -195,6 +199,11 @@ Each device gets the following variables:
 - `sccfm_connectivity_state` - Device connectivity state
 - `sccfm_config_state` - Device configuration state
 - `sccfm_software_version` - Device software version
+
+The inventory plugin never adds its API token to a group or host. It consumes the configured
+token only while refreshing inventory. This guarantee does not apply to secrets that users place
+in `group_vars`, which are ordinary Ansible inventory data and may be rendered by inventory
+commands.
 
 ## Modules
 
@@ -230,7 +239,7 @@ Onboard an ASA device to your SCCFM tenant.
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   
   tasks:
     - name: Onboard branch ASA
@@ -344,7 +353,7 @@ Instead of repeating `region` and `api_token` for every task, use `module_defaul
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   
   tasks:
     - name: Onboard device 1
@@ -379,6 +388,8 @@ Three ways to provide credentials (in order of precedence):
 5. **Rotate API tokens regularly** and update vault files accordingly
 6. **Use `.gitignore`** to prevent accidental commits of sensitive files
 7. **Use `no_log: true`** for password parameters in custom tasks
+8. **Do not serialize secret-bearing inventory** with `ansible-inventory --list`, `--yaml`, or
+   `--graph --vars`
 
 ## Troubleshooting
 
@@ -392,9 +403,9 @@ Three ways to provide credentials (in order of precedence):
 - Or provide `region` parameter in module defaults
 
 ### "api_token is required" error
-- Verify `sccfm_api_token` is in encrypted `group_vars/all/vault.yml`
-- Or set `SCCFM_API_TOKEN` environment variable
-- Or provide `api_token` parameter in module defaults
+- Verify `SCCFM_API_TOKEN` is set in the controller environment
+- Or provide a Vault-backed `api_token` parameter in module defaults; keep the Vault
+  playbook-local instead of placing it in inventory or `group_vars`
 
 ### Inventory returns no hosts
 - Check your API token has proper permissions

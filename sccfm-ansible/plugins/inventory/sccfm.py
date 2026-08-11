@@ -24,6 +24,8 @@ description:
   - Uses Cisco Security Cloud Control Firewall Manager (SCCFM) to enumerate
     devices using the REST APIs.
   - Each device becomes an inventory host with SCCFM metadata attached as host variables.
+  - Authentication values are consumed only while refreshing inventory and are never attached
+    to groups or hosts.
 options:
   plugin:
     description: Ensure this plugin gets loaded.
@@ -96,9 +98,9 @@ class InventoryModule(BaseInventoryPlugin):
         api_token = self._template_string(cast(Optional[str], config_data.get("api_token")))
 
         if region is None:
-            region = cast(Optional[str], os.getenv("SCCFM_REGION"))
+            region = os.getenv("SCCFM_REGION")
         if api_token is None:
-            api_token = cast(Optional[str], os.getenv("SCCFM_API_TOKEN"))
+            api_token = os.getenv("SCCFM_API_TOKEN")
 
         if not region:
             raise AnsibleParserError(
@@ -130,7 +132,6 @@ class InventoryModule(BaseInventoryPlugin):
         if group:
             self.inventory.add_group(group)
             self.inventory.set_variable(group, "sccfm_region", region)
-            self.inventory.set_variable(group, "sccfm_api_token", api_token)
 
         host_builder = InventoryHostBuilder(inventory=self.inventory, region=region)
 

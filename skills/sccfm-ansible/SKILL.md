@@ -286,8 +286,8 @@ For SCCFM modules, prefer this shape when `region` and `api_token` are supported
 ```yaml
 module_defaults:
   group/cisco.sccfm.all:
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 ```
 
 Do not repeat `region` or `api_token` inside each task unless the user asks for a
@@ -350,8 +350,11 @@ When credentials are available and the user requested inventory behavior:
 
 ```bash
 ansible-inventory -i <inventory.yml> --graph --playbook-dir <playbook_dir>
-ansible-inventory -i <inventory.yml> --list --playbook-dir <playbook_dir>
 ```
+
+Use `--list`, `--yaml`, or `--graph --vars` only after confirming that the inventory and all
+adjacent `group_vars`/`host_vars` are secret-free. These formats can print variables loaded by
+Ansible even though the SCCFM inventory plugin itself never exports its authentication token.
 
 If credentials are missing, validate only the file shape and mark it as not
 validated against live SCCFM.

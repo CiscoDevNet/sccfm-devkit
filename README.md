@@ -96,8 +96,13 @@ The package root exports the supported public service classes and response model
   Git-ignored and explicitly excluded from collection artifacts. Use `--path` to override the
   examples directory when needed.
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
-- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
+- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus
+  `SCCFM_API_TOKEN` in the controller environment. Never commit a plaintext token to an inventory
+  source.
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
+- The inventory plugin consumes its API token only during refresh and never exports it as a host
+  or group variable. Do not use inventory output modes that render vars when your own
+  `group_vars` or `host_vars` contain secrets.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
 - Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](docs/README.md) for details.
 

@@ -1,7 +1,8 @@
-# Credentials can be provided in two ways:
-# 1. Set environment variables SCCFM_REGION and SCCFM_API_TOKEN (recommended)
-#    - Create a .env file from .env.example and use direnv to auto-load
-# 2. Use the lookup syntax below (falls back to env vars if not set)
+# Set SCCFM_REGION and SCCFM_API_TOKEN in the controller environment.
+# Create a .env file from .env.example and use direnv to load it. The
+# lookups below keep plaintext credentials out of this inventory source.
+# Authentication values are used only to refresh inventory. The plugin never
+# exports them as host or group variables.
 plugin: cisco.sccfm.sccfm
 region: "{{ lookup('env', 'SCCFM_REGION') }}"
 api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
