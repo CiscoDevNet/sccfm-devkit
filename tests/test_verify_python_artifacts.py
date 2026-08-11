@@ -15,6 +15,7 @@ import pytest
 from cisco_sccfm_scripts.verify_python_artifacts import (
     PythonArtifactVerificationError,
     verify_python_artifacts,
+    verify_python_wheel,
 )
 
 _VERSION = "1.2.3"
@@ -86,6 +87,15 @@ def test_verifier_accepts_public_artifact_pair(tmp_path: Path) -> None:
 
     assert result.wheel_files == 6
     assert result.sdist_files == 7
+
+
+def test_wheel_verifier_accepts_public_wheel_without_sdist(tmp_path: Path) -> None:
+    wheel, _ = _build_artifacts(tmp_path)
+
+    result = verify_python_wheel(wheel)
+
+    assert result.version == _VERSION
+    assert result.files == 6
 
 
 @pytest.mark.parametrize(

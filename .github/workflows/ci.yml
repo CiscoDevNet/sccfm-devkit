@@ -79,22 +79,30 @@ jobs:
           poetry run mypy \
             cisco_sccfm_cli \
             cisco_sccfm_core \
+            cisco_sccfm_scripts/build_ansible_collection.py \
+            cisco_sccfm_scripts/verify_ansible_collection.py \
+            cisco_sccfm_scripts/verify_clean_controller.py \
             cisco_sccfm_scripts/verify_python_artifacts.py
 
       - name: Test
         run: poetry run pytest --color=yes
 
-      - name: Build and verify Python artifacts
+      - name: Build and verify release artifacts
         run: |
           set -euo pipefail
           poetry build
           PACKAGE_VERSION="$(poetry version -s)"
           WHEEL_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}-py3-none-any.whl"
           SDIST_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}.tar.gz"
+          COLLECTION_PATH="dist/cisco-sccfm-${PACKAGE_VERSION}.tar.gz"
           test -f "${WHEEL_PATH}"
           test -f "${SDIST_PATH}"
           poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
             "${WHEEL_PATH}" "${SDIST_PATH}"
+          poetry run build-ansible-collection
+          test -f "${COLLECTION_PATH}"
+          poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
+            "${WHEEL_PATH}" "${COLLECTION_PATH}" --expected-version "${PACKAGE_VERSION}"
 
   release:
     needs: lint-and-test
@@ -249,6 +257,14 @@ jobs:
           "${SMOKE_CLI}" schema export --format json | "${SMOKE_PYTHON}" -I -c \
             'from importlib.metadata import version; import json, sys; payload = json.load(sys.stdin); commands = payload.get("commands"); schema_version = payload.get("version"); installed_version = version("cisco-sccfm-devkit"); assert schema_version == installed_version, f"expected schema version {installed_version}, got {schema_version}"; assert isinstance(commands, list) and len(commands) == 57, f"expected 57 commands, got {len(commands) if isinstance(commands, list) else 0}"'
           echo "path=${WHEEL_RELATIVE_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify clean controller artifact pair
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
+            "${{ steps.wheel.outputs.path }}" \
+            "${{ steps.bump.outputs.artifact_path }}" \
+            --expected-version "$(poetry version -s)"
 
       - name: Commit and tag verified release
         if: steps.bump.outputs.bumped == 'true'

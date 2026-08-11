@@ -1,6 +1,6 @@
-# Set SCCFM_REGION and SCCFM_API_TOKEN in the controller environment.
-# Create a .env file from .env.example and use direnv to load it. The
-# lookups below keep plaintext credentials out of this inventory source.
+# Set SCCFM_REGION and SCCFM_API_TOKEN in the controller environment through
+# your shell, CI secret store, or Automation Controller credential. The lookups
+# below keep plaintext credentials out of this inventory source.
 # Authentication values are used only to refresh inventory. The plugin never
 # exports them as host or group variables.
 plugin: cisco.sccfm.sccfm

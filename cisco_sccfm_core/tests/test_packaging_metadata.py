@@ -48,12 +48,8 @@ def test_published_packages_exclude_repository_only_code() -> None:
 
 def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
     poetry = _poetry_config()
-    collection_requirements = (PROJECT_ROOT / "sccfm-ansible" / "requirements.txt").read_text(
-        encoding="utf-8"
-    )
 
     assert poetry["dependencies"]["scc-firewall-manager-sdk"] == "1.17.27"
-    assert "scc-firewall-manager-sdk==1.17.27" in collection_requirements.splitlines()
 
 
 def test_pyinstaller_spec_uses_repository_relative_entrypoint() -> None:

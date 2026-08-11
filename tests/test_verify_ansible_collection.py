@@ -46,8 +46,9 @@ _MINIMUM_FILES = {
     "examples/.vault_pass.example": b"replace-me\n",
     "examples/group_vars/all/vault.yml.example": b"---\nsccfm_api_token: placeholder\n",
     "examples/show_devices.yml": b"---\n- name: Synthetic example\n  hosts: localhost\n",
-    "meta/runtime.yml": b"requires_ansible: '>=2.15.0'\n",
-    "requirements.txt": b"example-package\n",
+    "meta/execution-environment.yml": b"---\ndependencies:\n  python: requirements.txt\n",
+    "meta/runtime.yml": b"requires_ansible: '>=2.20.0,<2.22.0'\n",
+    "requirements.txt": f"cisco-sccfm-devkit=={_VERSION}\n".encode(),
 }
 
 
@@ -198,6 +199,28 @@ def test_verifier_rejects_wrong_license_content(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ArtifactVerificationError, match="Apache-2.0"):
+        verify_collection_artifact(artifact, expected_version=_VERSION)
+
+
+def test_verifier_rejects_mismatched_python_package_version(tmp_path: Path) -> None:
+    artifact = _build_synthetic_artifact(
+        tmp_path,
+        extra_files={"requirements.txt": b"cisco-sccfm-devkit==9.9.9\n"},
+    )
+
+    with pytest.raises(ArtifactVerificationError, match="version-matched Python package"):
+        verify_collection_artifact(artifact, expected_version=_VERSION)
+
+
+def test_verifier_rejects_wrong_execution_environment_requirement_path(tmp_path: Path) -> None:
+    artifact = _build_synthetic_artifact(
+        tmp_path,
+        extra_files={
+            "meta/execution-environment.yml": b"---\ndependencies:\n  python: other.txt\n"
+        },
+    )
+
+    with pytest.raises(ArtifactVerificationError, match="does not reference requirements.txt"):
         verify_collection_artifact(artifact, expected_version=_VERSION)
 
 

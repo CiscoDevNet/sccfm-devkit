@@ -1,9 +1,7 @@
-# Python dependencies for cisco.sccfm Ansible collection
-# Install with: pip install -r requirements.txt
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
 
-# Core dependencies
-scc-firewall-manager-sdk==1.17.27
-paramiko>=5.0.0,<6
-cryptography>=50.0.0,<51
-# Note: cisco-sccfm-devkit includes both cisco_sccfm_cli and cisco_sccfm_core
-# For local development, use: poetry install from parent directory
+# Controller-side Python dependency for this cisco.sccfm release.
+# The collection build keeps this exact version aligned with galaxy.yml.
+cisco-sccfm-devkit==0.38.0

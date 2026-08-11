@@ -8,13 +8,14 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 
 - [Features](#features)
 - [Installation](#installation)
-  - [Local Development](#local-development)
+  - [Requirements](#requirements)
+  - [Install a matched release](#install-a-matched-release)
+  - [Upgrade or downgrade](#upgrade-or-downgrade)
+  - [Automation Controller and execution environments](#automation-controller-and-execution-environments)
+  - [Verify the installation offline](#verify-the-installation-offline)
 - [Trying out examples](#trying-out-examples)
-  - [1. Set Up Ansible Vault](#1-set-up-ansible-vault)
-  - [2. Edit playbook](#2-edit-playbook)
-  - [2. Create Encrypted Secrets](#2-create-encrypted-secrets)
-  - [3. Configure Plain Variables](#3-configure-plain-variables)
-  - [4. Run Examples](#4-run-examples)
+  - [Configure authentication](#configure-authentication)
+  - [Run an example](#run-an-example)
   - [Test Inventory](#test-inventory)
   - [Host Variables](#host-variables)
 - [Modules](#modules)
@@ -53,133 +54,173 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 
 ## Installation
 
-See instructions in the [INSTALL.md](INSTALL.md) file.
+The collection and its Python package form one release. Modules in `cisco.sccfm` import
+`cisco_sccfm_core` from the `cisco-sccfm-devkit` Python distribution, but Galaxy does not install
+Python packages. Install both published artifacts at the **same exact version**. Mixing versions is
+unsupported.
 
-### Local Development
+### Requirements
 
-From the repository root, build the collection with the source-only helper:
+- Python `>=3.12,<4.0` on the Ansible control node or inside the execution environment
+- `ansible-core>=2.20,<2.22` in that same environment
+- Network access from that environment to SCC Firewall Manager
+- An SCCFM API token and one of these regions: `int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or
+  `ci`
+
+The bundled examples run SCCFM API modules on `localhost`, so the Python package normally belongs
+on the control node or in the execution environment. If you run or delegate a module to another
+Ansible host, install the package in that host's module Python environment too. ASA and FTD devices
+managed through the SCCFM API do not need the package installed on them.
+
+### Install a matched release
+
+Create and activate a Python 3.12 virtual environment. Replace `X.Y.Z` with a version that exists
+on both PyPI and Ansible Galaxy, then install the Python artifact first and the Galaxy artifact
+second:
 
 ```bash
-source cisco_sccfm_scripts/activate.sh
-build-ansible-collection
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install "ansible-core>=2.20,<2.22" "cisco-sccfm-devkit==X.Y.Z"
+ansible-galaxy collection install "cisco.sccfm:==X.Y.Z"
 ```
 
-The helper reads the repository version, creates the tarball under `dist/`, and verifies the exact
-artifact. Install the built collection explicitly:
+Do not continue with a partially published release. If either `X.Y.Z` artifact is unavailable,
+install another version for which both artifacts exist.
+
+### Upgrade or downgrade
+
+Change both artifacts together, keeping the Python package first in the operation:
 
 ```bash
-ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
+python -m pip install --upgrade "cisco-sccfm-devkit==X.Y.Z"
+ansible-galaxy collection install "cisco.sccfm:==X.Y.Z" --upgrade
+```
+
+For a rollback, install the older Python version and force Ansible Galaxy to replace the installed
+collection:
+
+```bash
+python -m pip install "cisco-sccfm-devkit==X.Y.Z"
+ansible-galaxy collection install "cisco.sccfm:==X.Y.Z" --force
+```
+
+Never upgrade or roll back only one artifact.
+
+### Automation Controller and execution environments
+
+Automation Controller jobs must use an execution environment whose base image provides Python
+`>=3.12,<4.0` and `ansible-core>=2.20,<2.22`. Pin the collection in the execution environment's
+Galaxy requirements:
+
+```yaml
+---
+collections:
+  - name: cisco.sccfm
+    version: "==X.Y.Z"
+```
+
+The packaged [`meta/execution-environment.yml`](meta/execution-environment.yml) directs Ansible
+Builder to the packaged [`requirements.txt`](requirements.txt), which installs the exact matching
+`cisco-sccfm-devkit` Python release. Do not override that dependency with a different version.
+Provide `SCCFM_REGION` and `SCCFM_API_TOKEN` to the job through an Automation Controller
+credential or another secret manager; do not bake tokens into an image.
+
+### Verify the installation offline
+
+These checks resolve the installed Python package, modules, and inventory plugin without contacting
+SCCFM:
+
+```bash
+python -c 'from importlib.metadata import version; print(version("cisco-sccfm-devkit"))'
+python -m pip check
+ansible-galaxy collection list cisco.sccfm
+ansible-doc -l -t module cisco.sccfm
+ansible-doc -t inventory cisco.sccfm.sccfm
+```
+
+The two reported release versions must be identical. For an offline syntax smoke test, save this as
+`sccfm-smoke.yml`:
+
+```yaml
+---
+- name: Validate cisco.sccfm collection resolution
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Resolve a read-only SCCFM module
+      cisco.sccfm.list_network_objects:
+        limit: 1
+```
+
+Then run:
+
+```bash
+ansible-playbook -i localhost, --syntax-check sccfm-smoke.yml
 ```
 
 ## Trying out examples
 
-### 1. Set Up Tokens (Recommended — interactive)
+### Configure authentication
 
-The PyPI package exposes only the `sccfm-cli` console command; it does not install repository
-maintenance helpers. In an activated source checkout, run the token helper from the repository
-root:
-
-```bash
-change-tokens
-```
-
-This will interactively:
-1. Let you pick a previously saved token or create a new one
-2. Ask which SCCFM region you're connecting to (for new tokens)
-3. Prompt you to paste your API token
-4. Save the token for future reuse
-5. Create the `.env` file with `SCCFM_REGION` and `SCCFM_API_TOKEN`
-6. Create the `.vault_pass` password file (if it doesn't exist)
-7. Write and encrypt `group_vars/all/vault.yml`
-8. Update `group_vars/all/vars.yml` with the selected region
-
-By default, Ansible credentials are written under `sccfm-ansible/examples`. They are Git-ignored
-and explicitly excluded from collection artifacts. You can also point the standalone command at a
-custom examples directory:
+For local use, provide credentials to the process environment. Enter the token through your shell,
+CI secret store, or credential manager without putting it in a playbook, a tracked file, or a
+command-line argument:
 
 ```bash
-change-tokens --path /path/to/examples
+export SCCFM_REGION=us
+printf "SCCFM API token: "
+read -r -s SCCFM_API_TOKEN
+printf "\n"
+export SCCFM_API_TOKEN
 ```
 
-Users of installed artifacts should configure `SCCFM_REGION` and `SCCFM_API_TOKEN` through their
-controller environment or secret manager, or use the manual Ansible Vault setup below.
+For long-lived automation, use a secret manager or an Ansible Vault variable in a playbook-local
+file. For example, create `vault.yml` with `ansible-vault create vault.yml` and store:
 
-<details>
-<summary><strong>Manual setup (alternative)</strong></summary>
-
-Create a vault password file (do NOT commit this!):
-
-```bash
-cd sccfm-ansible/examples
-cp .vault_pass.example .vault_pass
-echo "YourSecureVaultPassword" > .vault_pass
-chmod 600 .vault_pass
-```
-
-Copy and edit the example vault file:
-
-```bash
-cp group_vars/all/vault.yml.example group_vars/all/vault.yml.temp
-vim group_vars/all/vault.yml.temp
-```
-
-Add your secrets:
 ```yaml
 ---
-sccfm_api_token: "your-actual-api-token-here"
-vault_asa_branch_office_01_password: "ActualPassword1"
+vault_sccfm_api_token: "replace-with-your-token"
 ```
 
-Encrypt the vault file:
-```bash
-ansible-vault encrypt group_vars/all/vault.yml.temp \
-  --vault-password-file .vault_pass \
-  --output group_vars/all/vault.yml
-
-rm group_vars/all/vault.yml.temp
-```
-
-Edit `group_vars/all/vars.yml`:
+Reference it without exposing the token:
 
 ```yaml
-sccfm_region: us  # Change to your region (int, us, eu, apj, au, uae, in, or ci)
+vars_files:
+  - vault.yml
+module_defaults:
+  group/cisco.sccfm.all:
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ vault_sccfm_api_token }}"
 ```
 
-</details>
+Run vault-backed playbooks with `--ask-vault-pass` or with your organization's approved vault
+secret integration. Never commit a real token, decrypted vault, or vault password.
 
-### 2. Edit playbook
+### Run an example
 
-Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to match your devices.
-
-### 4. Run Examples
+The `examples/` directory is included in the Galaxy artifact. Copy the example you want into your
+Ansible project before editing it. Use fully qualified collection names in your own playbooks.
 
 **Graph inventory:**
 ```bash
-# Load SCCFM_REGION and SCCFM_API_TOKEN without putting the token on argv.
-# `change-tokens` writes the repository .env for use with direnv.
 ansible-inventory -i examples/inventory.sccfm.yml \
   --graph \
-  --playbook-dir examples \
-  --vault-password-file examples/.vault_pass
+  --playbook-dir examples
 ```
 
 **Show all devices:**
 ```bash
 ansible-playbook \
 -i examples/inventory.sccfm.yml \
-examples/show_devices.yml \
---vault-password-file examples/.vault_pass
-```
-
-**Onboard ASA devices:**
-```bash
-ansible-playbook onboard_asas.yml --vault-password-file .vault_pass
+examples/show_devices.yml
 ```
 
 ### Test Inventory
 
 ```bash
-ansible-inventory -i inventory.sccfm.yml --graph --vault-password-file .vault_pass
+ansible-inventory -i inventory.sccfm.yml --graph
 ```
 
 Do not use `--list`, `--yaml`, or `--graph --vars` while decrypted `group_vars` contain
@@ -204,13 +245,13 @@ commands.
 
 ## Modules
 
-Generated module and inventory reference docs can be previewed locally. Generate them with:
+Discover the module and inventory documentation from the installed collection:
 
 ```bash
-generate-ansible-docs
+ansible-doc -l -t module cisco.sccfm
+ansible-doc cisco.sccfm.onboard_asa
+ansible-doc -t inventory cisco.sccfm.sccfm
 ```
-
-The generated Markdown is written under `docs/ansible/`.
 
 ### cisco.sccfm.onboard_asa
 
@@ -373,12 +414,12 @@ Three ways to provide credentials (in order of precedence):
 3. **Environment variables**:
    ```bash
    export SCCFM_REGION=us
-   export SCCFM_API_TOKEN=your-token-here
+   # Inject SCCFM_API_TOKEN through your shell or secret manager as shown above.
    ```
 
 ## Security Best Practices
 
-1. **Never commit credential files**, including encrypted customer vaults, to this repository
+1. **Never commit credential files**, including encrypted customer vaults, to your project
 2. **Keep vault files encrypted** whenever they are at rest
 3. **Store `.vault_pass` securely** and never commit it
 4. **Use different vault passwords** for different environments (dev/prod)
@@ -407,7 +448,7 @@ Three ways to provide credentials (in order of precedence):
 ### Inventory returns no hosts
 - Check your API token has proper permissions
 - Verify the region is correct
-- Test API access: `curl -H "Authorization: Bearer $SCCFM_API_TOKEN" https://<region>.cdo.cisco.com/api/rest/v1/inventory/devices`
+- Run plain `ansible-inventory --graph` to test discovery without printing inventory variables
 
 ## Examples
 
@@ -427,6 +468,8 @@ are Git-ignored and excluded from collection artifacts:
 
 ## Additional Resources
 
+- [Installing Ansible collections](https://docs.ansible.com/projects/ansible/latest/collections_guide/collections_installing.html)
+- [Ansible Core support matrix](https://docs.ansible.com/projects/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix)
 - [Ansible Vault Documentation](https://docs.ansible.com/ansible/latest/user_guide/vault.html)
 - [Ansible Inventory Plugins](https://docs.ansible.com/ansible/latest/plugins/inventory.html)
 - [SCC Firewall Manager API Documentation](https://developer.cisco.com/docs/security-cloud-control/)

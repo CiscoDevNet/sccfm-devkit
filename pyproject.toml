@@ -58,7 +58,7 @@ sccfm-cli = "cisco_sccfm_cli.cli:cli"
 
 [tool.poetry.group.dev.dependencies]
 cisco-sccfm-devtools = { path = "devtools", develop = true }
-ansible-core = "^2.17.0"
+ansible-core = ">=2.20,<2.22"
 black = "^25.11.0"
 click-man = "^0.5.1"
 isort = "^7.0.0"

@@ -113,6 +113,14 @@ class PythonArtifactVerification:
     sdist_files: int
 
 
+@dataclass(frozen=True)
+class PythonWheelVerification:
+    """Version and member count from a successfully verified public wheel."""
+
+    version: str
+    files: int
+
+
 def _wheel_version(path: Path) -> str:
     """Return the version encoded in the expected pure-Python wheel filename."""
     parts = path.name.removesuffix(".whl").split("-")
@@ -341,20 +349,26 @@ def _verify_sdist(path: Path, version: str) -> int:
     return sum(member.isfile() for member in members.values())
 
 
-def verify_python_artifacts(wheel: Path, sdist: Path) -> PythonArtifactVerification:
-    """Verify one matching wheel and sdist against the public artifact policy."""
+def verify_python_wheel(wheel: Path) -> PythonWheelVerification:
+    """Verify one public wheel without requiring its source-distribution counterpart."""
     if wheel.is_symlink() or not wheel.is_file():
         raise PythonArtifactVerificationError("wheel must be a regular file")
+    version = _wheel_version(wheel)
+    return PythonWheelVerification(version=version, files=_verify_wheel(wheel, version))
+
+
+def verify_python_artifacts(wheel: Path, sdist: Path) -> PythonArtifactVerification:
+    """Verify one matching wheel and sdist against the public artifact policy."""
     if sdist.is_symlink() or not sdist.is_file():
         raise PythonArtifactVerificationError("sdist must be a regular file")
 
-    wheel_version = _wheel_version(wheel)
+    wheel_verification = verify_python_wheel(wheel)
     sdist_version = _sdist_version(sdist)
-    if wheel_version != sdist_version:
+    if wheel_verification.version != sdist_version:
         raise PythonArtifactVerificationError("wheel and sdist versions do not match")
 
     return PythonArtifactVerification(
-        wheel_files=_verify_wheel(wheel, wheel_version),
+        wheel_files=wheel_verification.files,
         sdist_files=_verify_sdist(sdist, sdist_version),
     )
 

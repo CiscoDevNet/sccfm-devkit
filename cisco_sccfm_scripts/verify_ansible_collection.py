@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Sequence, cast
 
+import yaml
+
 _MAX_MEMBERS = 2_000
 _MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
 _MAX_MEMBER_BYTES = 10 * 1024 * 1024
@@ -41,6 +43,7 @@ _REQUIRED_MEMBERS = frozenset(
         "README.md",
         "examples/.vault_pass.example",
         "examples/group_vars/all/vault.yml.example",
+        "meta/execution-environment.yml",
         "meta/runtime.yml",
         "plugins/inventory",
         "plugins/module_utils",
@@ -241,6 +244,20 @@ def _load_json_member(
     return cast(dict[str, Any], parsed), raw
 
 
+def _load_yaml_member(archive: tarfile.TarFile, member: tarfile.TarInfo) -> dict[str, Any]:
+    """Load one required YAML mapping without exposing its contents in errors."""
+    raw = _read_member(archive, member)
+    try:
+        parsed: object = yaml.safe_load(raw.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise ArtifactVerificationError(f"invalid YAML in artifact member: {member.name}") from exc
+    if not isinstance(parsed, dict):
+        raise ArtifactVerificationError(
+            f"expected a YAML mapping in artifact member: {member.name}"
+        )
+    return cast(dict[str, Any], parsed)
+
+
 def _manifest_entries(files_manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Return a validated, duplicate-free FILES.json entry map."""
     raw_entries = files_manifest.get("files")
@@ -328,6 +345,36 @@ def _verify_license_content(archive: tarfile.TarFile, member: tarfile.TarInfo) -
         raise ArtifactVerificationError("artifact LICENSE does not contain Apache-2.0 text")
 
 
+def _verify_python_dependency_contract(
+    archive: tarfile.TarFile,
+    members: dict[str, tarfile.TarInfo],
+    expected_version: str,
+) -> None:
+    """Require Ansible Builder metadata and the lockstep Python package pin."""
+    try:
+        requirements = _read_member(archive, members["requirements.txt"]).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ArtifactVerificationError(
+            "invalid UTF-8 in artifact member: requirements.txt"
+        ) from exc
+    requirement_lines = [
+        line.strip()
+        for line in requirements.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    expected_requirement = f"cisco-sccfm-devkit=={expected_version}"
+    if requirement_lines != [expected_requirement]:
+        raise ArtifactVerificationError(
+            "requirements.txt does not contain only the version-matched Python package"
+        )
+
+    execution_environment = _load_yaml_member(archive, members["meta/execution-environment.yml"])
+    if execution_environment != {"dependencies": {"python": "requirements.txt"}}:
+        raise ArtifactVerificationError(
+            "meta/execution-environment.yml does not reference requirements.txt"
+        )
+
+
 def verify_collection_artifact(artifact: Path, expected_version: str) -> ArtifactVerification:
     """Verify structure, manifests, paths, content, and digest for one tarball."""
     expected_name = f"cisco-sccfm-{expected_version}.tar.gz"
@@ -370,6 +417,7 @@ def verify_collection_artifact(artifact: Path, expected_version: str) -> Artifac
 
             _verify_manifests(archive, members, expected_version)
             _verify_license_content(archive, members["LICENSE"])
+            _verify_python_dependency_contract(archive, members, expected_version)
             for name, member in members.items():
                 if member.isfile():
                     _scan_member_content(name, _read_member(archive, member))
