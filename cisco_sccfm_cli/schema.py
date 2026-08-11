@@ -356,6 +356,7 @@ def _option_schema(option: click.Option, *, scope: str) -> dict[str, Any]:
         "nargs": option.nargs,
         "is_flag": bool(option.is_flag),
         "is_bool_flag": bool(getattr(option, "is_bool_flag", False)),
+        "sensitive": bool(option.hide_input),
         "envvar": _envvar(option.envvar),
         "metavar": option.metavar,
     }
@@ -624,7 +625,21 @@ def _path_specific_constraints(
             ]
         )
     if path == ("inventory", "devices", "asa", "smartlicense"):
-        constraints.append(_required_unless("token", "feature_tier", unless="check"))
+        constraints.extend(
+            [
+                _required_unless("feature_tier", unless="check"),
+                {
+                    "type": "mutually_exclusive",
+                    "options": ["token", "token_file"],
+                    "min_required": 0,
+                    "max_allowed": 1,
+                    "description": (
+                        "Use at most one explicit Smart Licensing token source; omit both "
+                        "for the hidden interactive prompt."
+                    ),
+                },
+            ]
+        )
     if path == ("objects", "network", "create") and "value" in option_names:
         constraints.append(_required_unless("value", unless="check"))
     if path == ("objects", "network-group", "create"):
@@ -828,7 +843,7 @@ def _example_option_parts(
     parts: list[str] = []
     for option_name in option_names:
         option = option_by_name.get(option_name)
-        if option is None:
+        if option is None or option.hide_input:
             continue
         flag = _preferred_flag(option)
         if option.is_flag:

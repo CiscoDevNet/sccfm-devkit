@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.table import Table
 from scc_firewall_manager_sdk import CdoCliResult, Device
 
-from cisco_sccfm_cli.utils import print_json
+from cisco_sccfm_cli.utils import print_json, redact_data, redact_text
 
 
 def render_cli_results(
@@ -20,21 +20,25 @@ def render_cli_results(
     uid_to_device: Mapping[str, Device],
     script: str,
     output_format: str,
+    sensitive_values: Sequence[str] = (),
 ) -> None:
     if output_format == "json":
-        render_cli_results_json(results=results)
+        render_cli_results_json(results=results, sensitive_values=sensitive_values)
         return
     render_cli_results_table(
         console=console,
         results=results,
         uid_to_device=uid_to_device,
         script=script,
+        sensitive_values=sensitive_values,
     )
 
 
-def render_cli_results_json(*, results: Sequence[CdoCliResult]) -> None:
+def render_cli_results_json(
+    *, results: Sequence[CdoCliResult], sensitive_values: Sequence[str] = ()
+) -> None:
     results_data = [item.model_dump(mode="json") for item in results]
-    print_json(results_data)
+    print_json(redact_data(results_data, sensitive_values))
 
 
 def render_cli_results_table(
@@ -43,8 +47,9 @@ def render_cli_results_table(
     results: Sequence[CdoCliResult],
     uid_to_device: Mapping[str, Device],
     script: str,
+    sensitive_values: Sequence[str] = (),
 ) -> None:
-    console.print(f"Executed script: {script}")
+    console.print(f"Executed script: {redact_text(script, sensitive_values)}")
     table = Table(show_lines=True)
     table.add_column("Name")
     table.add_column("UID")
@@ -52,10 +57,10 @@ def render_cli_results_table(
     table.add_column("Error Message")
     for item in results:
         table.add_row(
-            uid_to_device[item.device_uid].name,
-            item.device_uid,
-            item.result,
-            item.error_msg or "-",
+            redact_text(uid_to_device[item.device_uid].name, sensitive_values),
+            redact_text(item.device_uid, sensitive_values),
+            redact_text(item.result or "-", sensitive_values),
+            redact_text(item.error_msg or "-", sensitive_values),
         )
 
     console.print(table)

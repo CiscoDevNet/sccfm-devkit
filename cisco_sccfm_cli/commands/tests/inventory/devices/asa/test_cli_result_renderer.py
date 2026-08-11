@@ -71,3 +71,71 @@ def test_render_cli_results_table() -> None:
     assert "uid-1" in output
     assert "uid-2" in output
     assert "timeout" in output
+
+
+@pytest.mark.parametrize("output_format", ["table", "json"])
+def test_render_cli_results_redacts_sensitive_values(
+    output_format: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sentinel = "SEC004-SYNTHETIC-SENTINEL"
+    result = CdoCliResult(
+        uid="result-sensitive",
+        device_uid="uid-1",
+        script=f"license smart register idtoken {sentinel}",
+        result=f"device echoed {sentinel}",
+        error_msg=f"failed to apply {sentinel}",
+    )
+    stream = StringIO()
+
+    render_cli_results(
+        console=Console(file=stream, force_terminal=False, width=120),
+        results=[result],
+        uid_to_device=_sample_uid_to_device(),
+        script=f"license smart register idtoken {sentinel}",
+        output_format=output_format,
+        sensitive_values=(sentinel,),
+    )
+
+    output = capsys.readouterr().out if output_format == "json" else stream.getvalue()
+    _assert_not_exposed(output, sentinel)
+    assert "<redacted>" in output
+
+    if output_format == "json":
+        payload = json.loads(output)
+        assert payload[0]["script"] == "license smart register idtoken <redacted>"
+        assert payload[0]["result"] == "device echoed <redacted>"
+        assert payload[0]["error_msg"] == "failed to apply <redacted>"
+
+
+@pytest.mark.parametrize("output_format", ["table", "json"])
+def test_render_cli_results_defensively_redacts_smart_license_token(
+    output_format: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sentinel = "UNREGISTERED-SMART-LICENSE-TOKEN"
+    result = CdoCliResult(
+        uid="result-sensitive",
+        device_uid="uid-1",
+        script=f"LICENSE SMART REGISTER IDTOKEN {sentinel}",
+        result=f"license smart register idtoken {sentinel}",
+        error_msg=None,
+    )
+    stream = StringIO()
+
+    render_cli_results(
+        console=Console(file=stream, force_terminal=False, width=120),
+        results=[result],
+        uid_to_device=_sample_uid_to_device(),
+        script=f"license  smart register idtoken\t{sentinel}",
+        output_format=output_format,
+    )
+
+    output = capsys.readouterr().out if output_format == "json" else stream.getvalue()
+    _assert_not_exposed(output, sentinel)
+    assert "<redacted>" in output
+
+
+def _assert_not_exposed(output: str, sensitive_value: str) -> None:
+    if sensitive_value in output:
+        pytest.fail("Sensitive value was exposed in rendered output.", pytrace=False)

@@ -30,7 +30,10 @@ Output format  [default: table]
 Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
 .TP
 \fB\-t,\fP \-\-token TEXT
-The smart license token for your virtual account, generated on https://software.cisco.com/clc
+Smart Licensing token for your virtual account. Passing it directly is supported for compatibility but may expose it in process listings and shell history; prefer SCCFM_SMART_LICENSE_TOKEN, --token-file, or the hidden prompt.  [env var: SCCFM_SMART_LICENSE_TOKEN]
+.TP
+\fB\-\-token\-file\fP FILE
+Read the Smart Licensing token from a file; use '-' to read from stdin.
 .TP
 \fB\-\-throughput\-level\fP [100M|1G]
 The throughput level of your ASA (required only for virtual ASAs)

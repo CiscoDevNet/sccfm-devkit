@@ -222,7 +222,8 @@ Parse the JSON output. The schema contains:
 - `option_groups`: inter-option constraints
 - `constraints`: validation and preflight constraints
 - `global_options`: flags that must appear before the command path
-- `options`: accepted flags, types, defaults, choices, and descriptions
+- `options`: accepted flags, types, defaults, choices, sensitivity, environment sources, and
+  descriptions
 - `examples`: declared usage examples, if any
 
 Cache the schema in memory for the session. Do not re-export unless:
@@ -331,11 +332,16 @@ Do not add optional flags because they seem convenient.
 ### Sensitive and Risky Flags
 
 1. Never include API tokens in chat output.
-2. Do not pass diagnostic or verbose flags unless the user explicitly asked for
+2. Treat every option with `sensitive: true` as a secret even when its name is neutral. Never put
+   its value on argv or in a generated command. Prefer the schema-declared `envvar`, a hidden local
+   prompt, or another documented non-argv source.
+3. When a sensitive value is required, tell the user which environment variable or local prompt
+   the command uses without asking for or displaying the value.
+4. Do not pass diagnostic or verbose flags unless the user explicitly asked for
    diagnostic output on a failed readonly command.
-3. Do not pass local output/export/config path options unless the user explicitly
+5. Do not pass local output/export/config path options unless the user explicitly
    asked for local writes and provided the destination path.
-4. Never rely on schema default output paths for customer data exports.
+6. Never rely on schema default output paths for customer data exports.
 
 ### Target Identity Rules
 

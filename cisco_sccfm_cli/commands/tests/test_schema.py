@@ -128,10 +128,22 @@ def test_schema_export_should_include_mutation_and_handler_constraints(
         "At least one update field must be provided."
     )
     assert _constraint(smartlicense["constraints"], "required_unless")["options"] == [
-        "token",
         "feature_tier",
     ]
-    assert "--token <token>" in smartlicense["examples"][1]
+    smartlicense_token = _option(smartlicense["options"], "token")
+    smartlicense_token_file = _option(smartlicense["options"], "token_file")
+    token_source_constraint = _constraint_for_options(
+        smartlicense["constraints"],
+        "mutually_exclusive",
+        ["token", "token_file"],
+    )
+    assert smartlicense_token["sensitive"] is True
+    assert smartlicense_token["envvar"] == "SCCFM_SMART_LICENSE_TOKEN"
+    assert smartlicense_token_file["type"] == "path"
+    assert token_source_constraint["min_required"] == 0
+    assert token_source_constraint["max_allowed"] == 1
+    assert "--token" not in smartlicense["examples"][1]
+    assert "--token-file" not in smartlicense["examples"][1]
     assert "--feature-tier standard" in smartlicense["examples"][1]
     ftd_virtual_dependency = _constraint(ftd_onboard["constraints"], "depends_on")
     assert ftd_virtual_dependency["option"] == "virtual"
@@ -286,6 +298,21 @@ def test_schema_examples_should_reference_declared_options(cli_runner: CliRunner
             assert set(example_flags) <= declared_aliases
 
 
+def test_schema_examples_should_omit_sensitive_argv_options(cli_runner: CliRunner) -> None:
+    result = cli_runner.invoke(cli, ["schema", "export"], prog_name="sccfm-cli")
+    assert result.exit_code == 0, result.output
+
+    for command in json.loads(result.output)["commands"]:
+        sensitive_aliases = {
+            alias
+            for option in command["options"]
+            if option["sensitive"]
+            for alias in option["aliases"]
+        }
+        for example in command["examples"]:
+            assert sensitive_aliases.isdisjoint(shlex.split(example))
+
+
 def _commands_by_name(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {command["command"]: command for command in payload["commands"]}
 
@@ -312,6 +339,18 @@ def _field(fields: list[dict[str, Any]], name: str) -> dict[str, Any]:
 
 def _constraint(constraints: list[dict[str, Any]], constraint_type: str) -> dict[str, Any]:
     return next(constraint for constraint in constraints if constraint["type"] == constraint_type)
+
+
+def _constraint_for_options(
+    constraints: list[dict[str, Any]],
+    constraint_type: str,
+    options: list[str],
+) -> dict[str, Any]:
+    return next(
+        constraint
+        for constraint in constraints
+        if constraint["type"] == constraint_type and constraint.get("options") == options
+    )
 
 
 def _option_group(option_groups: list[dict[str, Any]], name: str) -> dict[str, Any]:
