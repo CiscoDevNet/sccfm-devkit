@@ -57,34 +57,28 @@ See instructions in the [INSTALL.md](INSTALL.md) file.
 
 ### Local Development
 
-**Build and install (recommended):**
-```bash
-devkit
-# then select "build-collection" from the menu
-```
+From the repository root, build the collection with the source-only helper:
 
-Or directly:
 ```bash
+source cisco_sccfm_scripts/activate.sh
 build-ansible-collection
 ```
 
-This will:
-1. Initialize the poetry virtual environment (if needed)
-2. Install Python dependencies (`cisco_sccfm_core`, `cisco_sccfm_cli`, etc.)
-3. Install the Ansible collection
+The helper reads the repository version, creates the tarball under `dist/`, and verifies the exact
+artifact. Install the built collection explicitly:
+
+```bash
+ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
+```
 
 ## Trying out examples
 
 ### 1. Set Up Tokens (Recommended — interactive)
 
-The fastest way to configure your tokens, `.env`, vault, and region is with the devkit CLI:
+The PyPI package exposes only the `sccfm-cli` console command; it does not install repository
+maintenance helpers. In an activated source checkout, run the token helper from the repository
+root:
 
-```bash
-devkit
-# then select "change-tokens" from the menu
-```
-
-Or run the token setup directly:
 ```bash
 change-tokens
 ```
@@ -106,6 +100,9 @@ custom examples directory:
 ```bash
 change-tokens --path /path/to/examples
 ```
+
+Users of installed artifacts should configure `SCCFM_REGION` and `SCCFM_API_TOKEN` through their
+controller environment or secret manager, or use the manual Ansible Vault setup below.
 
 <details>
 <summary><strong>Manual setup (alternative)</strong></summary>

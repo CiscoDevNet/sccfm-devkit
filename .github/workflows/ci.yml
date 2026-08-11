@@ -76,10 +76,25 @@ jobs:
         run: |
           poetry run black --check .
           poetry run isort --check-only .
-          poetry run mypy cisco_sccfm_cli cisco_sccfm_core
+          poetry run mypy \
+            cisco_sccfm_cli \
+            cisco_sccfm_core \
+            cisco_sccfm_scripts/verify_python_artifacts.py
 
       - name: Test
         run: poetry run pytest --color=yes
+
+      - name: Build and verify Python artifacts
+        run: |
+          set -euo pipefail
+          poetry build
+          PACKAGE_VERSION="$(poetry version -s)"
+          WHEEL_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}-py3-none-any.whl"
+          SDIST_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}.tar.gz"
+          test -f "${WHEEL_PATH}"
+          test -f "${SDIST_PATH}"
+          poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
 
   release:
     needs: lint-and-test
@@ -158,16 +173,21 @@ jobs:
             --max-archive-depth=1 \
             "${{ steps.bump.outputs.artifact_path }}"
 
-      - name: Build and verify wheel
+      - name: Build and verify Python artifacts
         if: steps.bump.outputs.bumped == 'true'
         id: wheel
         run: |
           set -euo pipefail
-          poetry build -f wheel
+          poetry build
           PACKAGE_VERSION="$(poetry version -s)"
           WHEEL_RELATIVE_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}-py3-none-any.whl"
+          SDIST_RELATIVE_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}.tar.gz"
           WHEEL_PATH="${GITHUB_WORKSPACE}/${WHEEL_RELATIVE_PATH}"
+          SDIST_PATH="${GITHUB_WORKSPACE}/${SDIST_RELATIVE_PATH}"
           test -f "${WHEEL_PATH}"
+          test -f "${SDIST_PATH}"
+          poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
           SMOKE_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-wheel-smoke.XXXXXX")"
           python -m venv "${SMOKE_ROOT}/venv"
           SMOKE_PYTHON="${SMOKE_ROOT}/venv/bin/python"
@@ -199,7 +219,8 @@ jobs:
             --requirement "${RUNTIME_REQUIREMENTS}"
           "${SMOKE_PYTHON}" -I - <<'PY'
           import importlib
-          from importlib.metadata import version
+          from importlib.metadata import distribution, version
+          from importlib.util import find_spec
 
           expected_sdk = "1.17.27"
           installed_sdk = version("scc-firewall-manager-sdk")
@@ -209,9 +230,20 @@ jobs:
               "scc_firewall_manager_sdk",
               "cisco_sccfm_cli",
               "cisco_sccfm_core",
-              "cisco_sccfm_scripts",
           ):
               importlib.import_module(package)
+          if find_spec("cisco_sccfm_scripts") is not None:
+              raise SystemExit("cisco_sccfm_scripts must not be installed from the public wheel")
+          console_scripts = {
+              entry_point.name: entry_point.value
+              for entry_point in distribution("cisco-sccfm-devkit").entry_points
+              if entry_point.group == "console_scripts"
+          }
+          expected_console_scripts = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+          if console_scripts != expected_console_scripts:
+              raise SystemExit(
+                  f"expected console scripts {expected_console_scripts}, got {console_scripts}"
+              )
           PY
           "${SMOKE_CLI}" --help >/dev/null
           "${SMOKE_CLI}" schema export --format json | "${SMOKE_PYTHON}" -I -c \

@@ -174,22 +174,17 @@ ansible-galaxy collection list | grep cisco.sccfm
 
 ### Try out examples
 
-The fastest way to get going is to use the interactive devkit menu:
+The PyPI package exposes only the `sccfm-cli` console command; it does not install the repository's
+developer, collection-build, token-bootstrap, or documentation helpers. Configure the supported
+CLI with its hidden token prompt:
 
 ```bash
-devkit
-# select "change-tokens" from the menu
+sccfm-cli configure --region us
 ```
 
-Or run the token setup directly:
+For Ansible, provide `SCCFM_REGION` and `SCCFM_API_TOKEN` through your controller's environment or
+secret manager. If you prefer Ansible Vault, follow the manual setup in
+[Trying out examples](sccfm-ansible/README.md#trying-out-examples) to create `.vault_pass`,
+`vars.yml`, and an encrypted `vault.yml`; do not place plaintext credentials in tracked files.
 
-```bash
-change-tokens
-```
-
-This prompts for your region, API token, and vault password, then creates `.env`, `.vault_pass`,
-`vars.yml`, and encrypted `vault.yml`. Local credential files are Git-ignored and explicitly
-excluded from collection release artifacts. Pass `--path /path/to/examples` to override the
-default `sccfm-ansible/examples` directory.
-
-See the [Trying out examples](sccfm-ansible/README.md#trying-out-examples) section in the Ansible collection README for the full walkthrough including how to run playbooks.
+See that walkthrough for the inventory and playbook commands.

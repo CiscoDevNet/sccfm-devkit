@@ -21,18 +21,29 @@ def test_distribution_uses_cisco_devkit_name() -> None:
     assert _poetry_config()["name"] == "cisco-sccfm-devkit"
 
 
-def test_published_packages_use_cisco_prefix() -> None:
+def test_published_package_contract_is_cli_and_core_only() -> None:
     poetry = _poetry_config()
     included_packages = {package["include"] for package in poetry["packages"]}
-    script_targets = set(poetry["scripts"].values())
 
     assert included_packages == {
         "cisco_sccfm_cli",
         "cisco_sccfm_core",
-        "cisco_sccfm_scripts",
     }
-    assert script_targets
-    assert all(target.startswith("cisco_sccfm_") for target in script_targets)
+    assert poetry["scripts"] == {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+
+
+def test_published_packages_exclude_repository_only_code() -> None:
+    assert set(_poetry_config()["exclude"]) == {
+        "cisco_sccfm_scripts",
+        "**/tests",
+        "**/e2e",
+        "**/__pycache__",
+        "**/.pytest_cache",
+        "**/.mypy_cache",
+        "**/*.pyc",
+        "**/*.pyo",
+        "**/.DS_Store",
+    }
 
 
 def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:

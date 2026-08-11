@@ -95,7 +95,7 @@ The package root exports the supported public service classes and response model
 ## Ansible collection
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
-- Build and install the collection locally: `build-ansible-collection`.
+- Build the collection locally: `build-ansible-collection`.
 - Set up tokens interactively with `devkit` and select **change-tokens**. By default this writes
   `.vault_pass` and encrypted `group_vars/all/vault.yml` under `sccfm-ansible/examples`; both are
   Git-ignored and explicitly excluded from collection artifacts. Use `--path` to override the
