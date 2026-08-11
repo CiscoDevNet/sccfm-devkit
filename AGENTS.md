@@ -49,7 +49,7 @@ This repository ships skill files that document how to interact with the CLI and
 source cisco_sccfm_scripts/activate.sh
 
 # Configure credentials once
-sccfm-cli configure --region us --api-token <YOUR_TOKEN>
+sccfm-cli configure --region us  # API token is entered at a hidden prompt
 
 # Check connectivity
 sccfm-cli status
@@ -63,14 +63,17 @@ devkit
 
 ## Required environment variables
 
-Copy `.env.example` to `.env` and fill in your values (loaded automatically by direnv):
+For non-interactive use, pre-set these values in the environment (loaded automatically by direnv):
 
 ```bash
 export SCCFM_REGION=us          # int | us | eu | apj | au | uae | in | ci
 export SCCFM_API_TOKEN="..."    # from SCCFM UI > Settings > API Tokens
 ```
 
-Credentials are also stored under `~/.sccfm-cli/` after running `sccfm-cli configure`. Override the path with `--config-path` or `SCCFM_CONFIG`.
+Credentials are also stored under `~/.sccfm-cli/` after running `sccfm-cli configure`. On POSIX,
+the CLI enforces mode `0700` on that directory and `0600` on its configuration file. On Windows,
+keep it in the user profile and rely on filesystem ACLs. Override the path with `--config-path` or
+`SCCFM_CONFIG`, and keep custom paths private.
 
 ## Testing instructions
 

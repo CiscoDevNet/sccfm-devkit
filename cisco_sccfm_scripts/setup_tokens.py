@@ -7,8 +7,9 @@
 """Setup for SCCFM API tokens, .env, and Ansible Vault.
 
 Runs **interactively** by default (prompts for region, token, etc.).
-Supply ``--region`` and ``--api-token`` to run **headless** — suitable
-for CI pipelines and scripted workflows.
+Supply ``--region`` with ``SCCFM_API_TOKEN`` to run **headless** — suitable
+for CI pipelines and scripted workflows. The legacy ``--api-token`` option
+remains available but can expose the token in shell history and process listings.
 
 Manages a local token store so tokens can be reused across setups.
 Creates / updates:
@@ -23,14 +24,12 @@ Examples::
     # Interactive (default)
     python cisco_sccfm_scripts/setup_tokens.py
 
-    # Headless — minimal
-    python cisco_sccfm_scripts/setup_tokens.py --region us --api-token eyJ…
+    # Headless — SCCFM_API_TOKEN is injected by the CI secret environment
+    python cisco_sccfm_scripts/setup_tokens.py --region us
 
-    # Headless — all options
+    # Headless — optional non-secret settings
     python cisco_sccfm_scripts/setup_tokens.py \\
-        --region int --api-token eyJ… \\
-        --name staging --profile staging \\
-        --vault-password s3cret
+        --region int --name staging --profile staging
 """
 
 from __future__ import annotations
@@ -44,6 +43,7 @@ from pathlib import Path
 
 import click
 import questionary
+from click.core import ParameterSource
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -167,7 +167,7 @@ def _choose_from_saved_or_new(
     """Present saved tokens and an 'Add new' option."""
     choices: list[questionary.Choice] = [
         questionary.Choice(
-            title=f"{t.name:<20} region={t.region}  token=…{t.token[-6:]}",
+            title=f"{t.name:<20} region={t.region}",
             value=t.name,
         )
         for t in saved
@@ -238,7 +238,7 @@ def _prompt_region() -> str:
 
 def _prompt_token() -> str:
     """Ask the user to paste their API token (hidden input)."""
-    token: str = click.prompt("\nPaste your SCCFM API token")
+    token: str = click.prompt("\nPaste your SCCFM API token", hide_input=True)
     token = token.strip()
     if not token:
         raise click.ClickException("API token cannot be empty.")
@@ -467,7 +467,7 @@ _VALID_REGIONS = tuple(_REGIONS)
 
 @click.command(
     help="Setup SCCFM API tokens, .env, and Ansible Vault.\n\n"
-    "Runs interactively by default. Supply --region and --api-token "
+    "Runs interactively by default. Supply --region with SCCFM_API_TOKEN "
     "to run in headless mode (no prompts).",
 )
 @click.option(
@@ -475,13 +475,19 @@ _VALID_REGIONS = tuple(_REGIONS)
     "-r",
     default=None,
     type=click.Choice(_VALID_REGIONS, case_sensitive=False),
-    help="SCCFM region.  Enables headless mode when combined with --api-token.",
+    help="SCCFM region. Enables headless mode when combined with SCCFM_API_TOKEN.",
 )
 @click.option(
     "--api-token",
     "-t",
     default=None,
-    help="SCCFM API token.  Enables headless mode when combined with --region.",
+    envvar="SCCFM_API_TOKEN",
+    show_envvar=True,
+    hide_input=True,
+    help=(
+        "SCCFM API token. Passing it directly is supported for compatibility but may expose it "
+        "in process listings and shell history; prefer SCCFM_API_TOKEN."
+    ),
 )
 @click.option(
     "--name",
@@ -524,11 +530,25 @@ def main(
     path: Path | None,
 ) -> None:
     """Setup tokens — auto-detects interactive vs headless mode."""
+    ctx = click.get_current_context()
+    if (
+        api_token is not None
+        and ctx.get_parameter_source("api_token") is ParameterSource.COMMANDLINE
+    ):
+        click.echo(
+            "Warning: passing --api-token directly may expose it in process listings and "
+            "shell history; prefer SCCFM_API_TOKEN.",
+            err=True,
+        )
+
     headless = region is not None or api_token is not None
 
     if headless:
         if not region or not api_token:
-            raise click.UsageError("Headless mode requires both --region and --api-token.")
+            raise click.UsageError(
+                "Headless mode requires --region and an API token from SCCFM_API_TOKEN "
+                "or the legacy --api-token option."
+            )
         _run_headless(
             region=region,
             api_token=api_token,

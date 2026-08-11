@@ -36,7 +36,7 @@ devkit                         # interactive developer toolkit menu
 
 ## Commands
 
-- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) and stores it under `~/.sccfm-cli/` (override with `--config-path` or `SCCFM_CONFIG`).
+- `sccfm-cli configure --region REGION [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)). The token comes from a pre-set `SCCFM_API_TOKEN` or, in an interactive terminal, a hidden prompt. Direct `--api-token` input remains available for compatibility but can expose the token in shell history and process listings.
 - `sccfm-cli status [--config-path PATH]`: Shows the current profile plus SCCFM connectivity health using Rich tables.
 - `sccfm-cli inventory devices list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists device inventory with pagination and optional name filtering.
 - `sccfm-cli inventory manager list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
@@ -44,6 +44,11 @@ devkit                         # interactive developer toolkit menu
 
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
 Every command lives in `cisco_sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
+
+By default, configuration is stored in `~/.sccfm-cli/config.json`. On POSIX systems the CLI
+enforces mode `0700` on `~/.sccfm-cli` and `0600` on the configuration file, including existing
+storage. On Windows, keep the configuration in your user profile and rely on the filesystem's
+per-user access controls. Keep custom configuration paths private on every platform.
 
 Generated CLI reference docs can be previewed locally:
 

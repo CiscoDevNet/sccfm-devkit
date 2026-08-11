@@ -51,10 +51,14 @@ reserve breaking changes until the next major version release.
    ```
 
 3. Set up your SCCFM credentials:
+
    ```bash
-   cp .env.example .env
-   # Edit .env with your API token
+   devkit
+   # Select change-tokens; the API token is entered at a hidden prompt.
    ```
+
+   This creates the local credential files with private POSIX permissions. On Windows, keep them
+   under your user profile and rely on the filesystem's per-user access controls.
 
 Now whenever you `cd` into the project, the virtualenv activates and env vars load automatically.
 

@@ -311,7 +311,7 @@ def _update_token() -> None:
 
     token_choices: list[questionary.Choice | str] = [
         questionary.Choice(
-            title=f"{t.name}  ({t.region})  …{t.token[-6:]}",
+            title=f"{t.name}  ({t.region})",
             value=t.name,
         )
         for t in tokens
@@ -327,7 +327,7 @@ def _update_token() -> None:
         console.print("[red]Token not found.[/red]")
         return
 
-    new_token_value = questionary.text(
+    new_token_value = questionary.password(
         f"Paste new API token for '{token_to_update.name}':",
     ).unsafe_ask()
     new_token_value = new_token_value.strip()
@@ -368,10 +368,10 @@ def _remove_token() -> None:
         console.print("[yellow]Only one token saved — cannot remove the last token.[/yellow]")
         return
 
-    # Use Choice so the display shows region/token context but the value is just the name.
+    # Use Choice so the display shows region context but the value is just the name.
     token_choices: list[questionary.Choice | str] = [
         questionary.Choice(
-            title=f"{t.name}  ({t.region})  …{t.token[-6:]}",
+            title=f"{t.name}  ({t.region})",
             value=t.name,
         )
         for t in tokens

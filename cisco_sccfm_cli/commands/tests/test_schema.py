@@ -54,6 +54,7 @@ def test_schema_export_should_describe_options_and_auth_requirements(
     commands = _commands_by_name(json.loads(result.output))
     configure = commands["sccfm-cli configure"]
     region = _option(configure["options"], "region")
+    api_token = _option(configure["options"], "api_token")
 
     assert configure["readonly"] is True
     assert configure["side_effects"] == [
@@ -64,6 +65,11 @@ def test_schema_export_should_describe_options_and_auth_requirements(
     assert region["type"] == "choice"
     assert "us" in region["values"]
     assert region["required"] is True
+    assert api_token["required"] is False
+    assert api_token["sensitive"] is True
+    assert api_token["envvar"] == "SCCFM_API_TOKEN"
+    assert "--api-token" not in configure["examples"][1]
+    assert "--region int" in configure["examples"][1]
 
     status = commands["sccfm-cli status"]
     assert status["auth"]["mode"] == "sccfm_profile"

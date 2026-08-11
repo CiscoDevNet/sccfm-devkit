@@ -155,8 +155,8 @@ Use the selected command's `auth` object:
 3. Never log tokens or include them in final answers.
 4. Never use internal SystemDB credentials.
 5. If a profile is missing, guide the user to run the documented configuration
-   flow locally, or generate a validated configuration command with a placeholder
-   token.
+   flow locally. The token must come from its hidden prompt or schema-declared
+   environment source, never from a generated argv option.
 6. Only configure a profile yourself when the user explicitly provides a secure,
    local mechanism for the token.
 

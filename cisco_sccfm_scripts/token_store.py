@@ -28,7 +28,7 @@ import os
 import stat
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -41,7 +41,7 @@ class SavedToken:
 
     name: str
     region: str
-    token: str
+    token: str = field(repr=False)
 
 
 class VaultTokenStore:

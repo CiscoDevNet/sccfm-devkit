@@ -103,6 +103,65 @@ def test_headless_cli_keeps_path_optional(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert result.exit_code == 0, result.output
     assert captured["path"] is None
+    assert "process listings and shell history" in result.stderr
+    if "synthetic-token" in result.output:
+        pytest.fail("Sensitive value was exposed by change-tokens.", pytrace=False)
+
+
+def test_headless_cli_reads_api_token_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = "sec005-environment-sentinel-9f31"
+    captured: dict[str, object] = {}
+
+    def fake_run_headless(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(setup_tokens, "_run_headless", fake_run_headless)
+    result = CliRunner().invoke(
+        main,
+        ["--region", "us"],
+        env={"SCCFM_API_TOKEN": token},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["api_token"] == token
+    assert "process listings and shell history" not in result.output
+    observed = f"{result.stdout}\n{result.stderr}\n{result.exception!r}"
+    if token in observed:
+        pytest.fail("Sensitive value was exposed by change-tokens.", pytrace=False)
+
+
+def test_interactive_api_token_prompt_hides_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_prompt(prompt: str, **kwargs: object) -> str:
+        captured.update(prompt=prompt, **kwargs)
+        return "synthetic-token"
+
+    monkeypatch.setattr(setup_tokens.click, "prompt", fake_prompt)
+
+    assert setup_tokens._prompt_token() == "synthetic-token"
+    assert captured["hide_input"] is True
+
+
+def test_change_tokens_help_recommends_environment_input() -> None:
+    result = CliRunner().invoke(main, ["--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "SCCFM_API_TOKEN" in result.output
+    assert "process listings and shell history" in result.output
+
+
+def test_saved_token_representation_omits_token_value() -> None:
+    token = "sec005-repr-sentinel-284c"
+
+    rendered = repr(SavedToken(name="default", region="us", token=token))
+
+    if token in rendered:
+        pytest.fail("Sensitive value was exposed by SavedToken repr.", pytrace=False)
+    assert "name='default'" in rendered
+    assert "region='us'" in rendered
 
 
 def test_headless_cli_forwards_typed_workspace(
