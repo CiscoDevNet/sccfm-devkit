@@ -14,7 +14,7 @@
   hosts: localhost
   gather_facts: false
 
-  # sccfm_region / sccfm_api_token are supplied by run_e2e.sh via
+  # sccfm_region / vault_sccfm_api_token are supplied by run_e2e.sh via
   # -e "@${VARS_FILE}" -e "@${VAULT_FILE}".  Do NOT add vars_files here:
   # those are loaded/decrypted at parse time before the -e overrides
   # apply, which would force the default example files to exist and share
@@ -23,7 +23,7 @@
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ vault_sccfm_api_token }}"
 
   tasks:
     # Onboarding here must agree with removal in remove_vasa.yml, whose
