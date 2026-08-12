@@ -138,26 +138,12 @@ def _documented_probe(controller: _Controller, modules: dict[str, str]) -> str:
     return probe
 
 
-def _install_artifacts(
+def _install_controller_and_collection(
     controller: _Controller,
-    wheel: Path,
     collection: Path,
-    expected_version: str,
 ) -> None:
     python = controller.binaries / "python"
-    _run(
-        controller,
-        [python, "-I", "-m", "pip", "install", "--no-cache-dir", _ANSIBLE_CORE, wheel],
-    )
-    _run(controller, [python, "-I", "-m", "pip", "check"])
-    import_check = """\
-import importlib, importlib.metadata, importlib.util, sys
-assert importlib.metadata.version("cisco-sccfm-devkit") == sys.argv[1]
-for name in ("cisco_sccfm_cli", "cisco_sccfm_core", "scc_firewall_manager_sdk"):
-    importlib.import_module(name)
-assert importlib.util.find_spec("cisco_sccfm_scripts") is None
-"""
-    _run(controller, [python, "-I", "-c", import_check, expected_version])
+    _run(controller, [python, "-I", "-m", "pip", "install", "--no-cache-dir", _ANSIBLE_CORE])
     _run(
         controller,
         [
@@ -170,6 +156,70 @@ assert importlib.util.find_spec("cisco_sccfm_scripts") is None
             "-f",
         ],
     )
+
+
+def _verify_missing_devkit_dependency(
+    controller: _Controller,
+    expected_version: str,
+) -> None:
+    """Require modules to emit one actionable failure without the paired wheel."""
+    probes = {
+        "list_asa_not_on_version": 'version: "9.20(3)13"',
+        "list_ftd_not_on_version": 'version: "7.4.1"',
+    }
+    requirement = f"cisco-sccfm-devkit=={expected_version}"
+    forbidden = (
+        "ApiException' is not defined",
+        "Module result deserialization failed",
+        "Extra data: line",
+    )
+    for module_name, argument in probes.items():
+        playbook = controller.work / f"missing-{module_name}.yml"
+        playbook.write_text(
+            "---\n"
+            "- hosts: localhost\n"
+            "  connection: local\n"
+            "  gather_facts: false\n"
+            "  vars:\n"
+            f"    ansible_python_interpreter: {controller.binaries / 'python'}\n"
+            "  tasks:\n"
+            "    - name: Verify missing paired runtime dependency\n"
+            f"      cisco.sccfm.{module_name}:\n"
+            f"        {argument}\n",
+            encoding="utf-8",
+        )
+        result = _run(
+            controller,
+            [controller.binaries / "ansible-playbook", playbook],
+            check=False,
+        )
+        rendered = f"{result.stdout}\n{result.stderr}"
+        if (
+            result.returncode == 0
+            or requirement not in rendered
+            or any(message in rendered for message in forbidden)
+        ):
+            raise CleanControllerVerificationError(
+                f"{module_name} did not report the missing paired runtime cleanly"
+            )
+
+
+def _install_wheel(
+    controller: _Controller,
+    wheel: Path,
+    expected_version: str,
+) -> None:
+    python = controller.binaries / "python"
+    _run(controller, [python, "-I", "-m", "pip", "install", "--no-cache-dir", wheel])
+    _run(controller, [python, "-I", "-m", "pip", "check"])
+    import_check = """\
+import importlib, importlib.metadata, importlib.util, sys
+assert importlib.metadata.version("cisco-sccfm-devkit") == sys.argv[1]
+for name in ("cisco_sccfm_cli", "cisco_sccfm_core", "scc_firewall_manager_sdk"):
+    importlib.import_module(name)
+assert importlib.util.find_spec("cisco_sccfm_scripts") is None
+"""
+    _run(controller, [python, "-I", "-c", import_check, expected_version])
 
 
 def _discover(controller: _Controller) -> tuple[int, int, str]:
@@ -229,7 +279,9 @@ def verify_clean_controller(
     collection = collection.resolve()
     with tempfile.TemporaryDirectory(prefix="sccfm-clean-controller-") as temporary:
         controller = _create_controller(Path(temporary))
-        _install_artifacts(controller, wheel, collection, expected_version)
+        _install_controller_and_collection(controller, collection)
+        _verify_missing_devkit_dependency(controller, expected_version)
+        _install_wheel(controller, wheel, expected_version)
         module_count, inventory_count, probe = _discover(controller)
         _offline_checks(controller, probe)
     return module_count, inventory_count, probe

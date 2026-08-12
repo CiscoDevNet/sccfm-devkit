@@ -138,11 +138,30 @@ def test_generated_files_use_private_modes(tmp_path: Path) -> None:
 
     assert _mode(root) == root_mode
     assert _mode(workspace) == workspace_mode
-    assert _mode(workspace / "group_vars") == 0o700
-    assert _mode(workspace / "group_vars" / "all") == 0o700
+    assert _mode(workspace / "group_vars") == 0o755
+    assert _mode(workspace / "group_vars" / "all") == 0o755
     assert _mode(env_path) == 0o600
     assert _mode(vault_pass) == 0o600
-    assert _mode(vars_path) == 0o600
+    assert _mode(vars_path) == 0o644
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "..env.synthetic-crash-leftover",
+        "sccfm-ansible/examples/group_vars/all/.vault.plaintext.synthetic.tmp",
+    ],
+)
+def test_plaintext_crash_leftovers_are_gitignored(path: str) -> None:
+    repository = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        ["git", "check-ignore", "--no-index", "--quiet", path],
+        cwd=repository,
+        check=False,
+    )
+
+    assert result.returncode == 0
 
 
 def test_env_file_shell_quotes_token_without_executing_content(tmp_path: Path) -> None:
@@ -488,7 +507,7 @@ def test_credential_transaction_successful_write_stays_with_pinned_parent_after_
     with setup_tokens._credential_transaction([credential_path]):
         trusted_parent.rename(moved_parent)
         trusted_parent.symlink_to(attacker_parent, target_is_directory=True)
-        setup_tokens._write_private_bytes(credential_path, b"trusted-update", mode=0o600)
+        setup_tokens._write_bytes(credential_path, b"trusted-update", mode=0o600)
 
     assert (moved_parent / "token").read_bytes() == b"trusted-update"
     assert attacker_path.read_bytes() == attacker
@@ -499,7 +518,7 @@ def test_credential_transaction_normalizes_platform_temp_aliases() -> None:
     alias_path = Path(tempfile.mkdtemp()) / "missing" / "credential"
 
     with setup_tokens._credential_transaction([alias_path]):
-        setup_tokens._write_private_bytes(alias_path, b"created", mode=0o600)
+        setup_tokens._write_bytes(alias_path, b"created", mode=0o600)
 
     assert alias_path.read_bytes() == b"created"
 

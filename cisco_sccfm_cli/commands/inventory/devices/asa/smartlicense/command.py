@@ -156,6 +156,7 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
             )
 
     def _read_token_file(self, ctx: click.Context, token_file: Path) -> str:
+        contents: str
         try:
             if token_file == Path("-"):
                 contents = click.get_text_stream("stdin").read()

@@ -172,21 +172,13 @@ def _resolve_examples_path(path: str | Path | None) -> Path:
     )
 
 
-def _secure_directory(path: Path) -> None:
-    """Create a user-private directory and enforce mode 0700."""
-    if path.is_symlink():
-        raise click.ClickException(f"Refusing to use a symlinked private directory: {path}")
-    path.mkdir(parents=True, exist_ok=True, mode=stat.S_IRWXU)
-    path.chmod(stat.S_IRWXU)
-
-
 def _write_private_text(path: Path, content: str) -> None:
     """Atomically write UTF-8 text with mode 0600."""
-    _write_private_bytes(path, content.encode("utf-8"), mode=0o600)
+    _write_bytes(path, content.encode("utf-8"), mode=0o600)
 
 
-def _write_private_bytes(path: Path, content: bytes, *, mode: int) -> None:
-    """Atomically write private bytes without following a final symlink."""
+def _write_bytes(path: Path, content: bytes, *, mode: int) -> None:
+    """Atomically write bytes at an explicit mode without following a final symlink."""
     if _active_credential_transaction is not None and _active_credential_transaction.write_bytes(
         path, content, mode=mode
     ):
@@ -234,7 +226,7 @@ def _restore_file(snapshot: _FileSnapshot) -> None:
             raise RuntimeError("credential rollback encountered a symlink")
         snapshot.path.unlink(missing_ok=True)
         return
-    _write_private_bytes(
+    _write_bytes(
         snapshot.path,
         snapshot.content,
         mode=snapshot.mode or 0o600,
@@ -866,8 +858,7 @@ def _update_vars_region(examples_path: Path, region: str) -> None:
             )
         if vars_path.exists() and not vars_path.is_file():
             raise click.ClickException(f"Workspace path is not a regular file: {vars_path}")
-        _secure_directory(examples_path / "group_vars")
-        _secure_directory(vars_path.parent)
+        vars_path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
         content = vars_path.read_text() if vars_path.exists() else None
 
     if content is not None:
@@ -880,16 +871,19 @@ def _update_vars_region(examples_path: Path, region: str) -> None:
             )
         else:
             updated = content.rstrip() + f"\nsccfm_region: {region}\n"
-        _write_private_text(vars_path, updated)
+        _write_bytes(vars_path, updated.encode("utf-8"), mode=0o644)
     else:
-        _write_private_text(
+        _write_bytes(
             vars_path,
-            "---\n"
-            "# Plain variables (not sensitive)\n"
-            "# These can be committed to version control\n"
-            "\n"
-            "# SCCFM connection settings\n"
-            f"sccfm_region: {region}\n",
+            (
+                "---\n"
+                "# Plain variables (not sensitive)\n"
+                "# These can be committed to version control\n"
+                "\n"
+                "# SCCFM connection settings\n"
+                f"sccfm_region: {region}\n"
+            ).encode("utf-8"),
+            mode=0o644,
         )
 
     console.print(f"[green]Set region to '{region}' in:[/green] {vars_path}")

@@ -707,14 +707,17 @@ def _parse_example_tasks(source: str) -> list[tuple[int, dict[str, Any]]]:
     return tasks
 
 
-def _extract_example_return_lines(source: str) -> dict[str, int]:
+def _extract_example_return_lines(source: str, module_name: str) -> dict[str, int]:
     block = _extract_triple_quoted_assignment(source, "EXAMPLES")
     if block is None:
         return {}
     lines: dict[str, int] = {}
-    register_names = set(
-        re.findall(r"^\s*register:\s*([A-Za-z_]\w*)\s*$", block.body, re.MULTILINE)
-    )
+    register_names = {
+        register
+        for _, task in _parse_example_tasks(source)
+        if _task_module_options(task, module_name) is not None
+        and isinstance((register := task.get("register")), str)
+    }
     if not register_names:
         return lines
 
@@ -748,7 +751,7 @@ def _build_ansible_metadata(file: Path) -> AnsibleModuleMetadata:
         option_lines=option_lines,
         return_lines=return_lines,
         example_option_lines=example_option_lines,
-        example_return_lines=_extract_example_return_lines(source),
+        example_return_lines=_extract_example_return_lines(source, file.stem),
         exit_json_keys=exit_json_keys,
         operation_key=_ansible_operation_key(file),
         device_family=_ansible_device_family(file),
@@ -791,7 +794,7 @@ def check_ansible_examples(file: Path, metadata: AnsibleModuleMetadata) -> list[
 
 def check_ansible_return_contract(file: Path, metadata: AnsibleModuleMetadata) -> list[Issue]:
     issues: list[Issue] = []
-    documented = set(metadata.return_lines)
+    documented = set(metadata.return_lines) - _ANSIBLE_META_RETURN_KEYS
     actual = set(metadata.exit_json_keys) - _ANSIBLE_META_RETURN_KEYS
 
     undocumented = sorted(actual - documented)
@@ -2017,6 +2020,12 @@ def _examples_use_shared_module_defaults(source: str) -> bool:
     return "module_defaults" in block.body and "group/cisco.sccfm.all" in block.body
 
 
+def _module_uses_shared_sccfm_auth(file: Path) -> bool:
+    """Return whether a module declares the shared SCCFM API authentication options."""
+    metadata = _build_ansible_metadata(file)
+    return {"region", "api_token"} <= set(metadata.option_lines)
+
+
 def check_ansible_module_contract(file: Path) -> list[Issue]:
     """Check G — new/edited Ansible modules must follow the shared module contract."""
     if not _is_ansible_module(file):
@@ -2039,7 +2048,9 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
     if not has_ansible_module_instantiation:
         return []
 
-    if not _module_uses_helper(tree, "base_argument_spec"):
+    uses_shared_auth = _module_uses_shared_sccfm_auth(file)
+
+    if uses_shared_auth and not _module_uses_helper(tree, "base_argument_spec"):
         issues.append(
             Issue(
                 file=file,
@@ -2052,7 +2063,7 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
             )
         )
 
-    if not _module_uses_config(tree):
+    if uses_shared_auth and not _module_uses_config(tree):
         issues.append(
             Issue(
                 file=file,
@@ -2078,7 +2089,7 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
             )
         )
 
-    if not _examples_use_shared_module_defaults(source):
+    if uses_shared_auth and not _examples_use_shared_module_defaults(source):
         issues.append(
             Issue(
                 file=file,
@@ -2105,6 +2116,8 @@ def check_ansible_runtime_membership(files: Sequence[Path]) -> list[Issue]:
 
     for file in files:
         if not _is_ansible_module(file) or not file.exists():
+            continue
+        if not _module_uses_shared_sccfm_auth(file):
             continue
         module_name = file.stem
         if module_name not in action_group:

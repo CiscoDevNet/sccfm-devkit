@@ -182,7 +182,7 @@ from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
 
-from ..module_utils.config import base_argument_spec, create_config
+from ..module_utils.config import Config, base_argument_spec, create_config
 from ..module_utils.dependencies import record_import_error
 
 try:
@@ -225,8 +225,7 @@ def _validate_mode(module: AnsibleModule) -> None:
         )
 
 
-def _fetch_devices(module: AnsibleModule) -> list[Device]:
-    config = create_config(module)
+def _fetch_devices(module: AnsibleModule, config: Config) -> list[Device]:
     inventory_service = InventoryService(config=config)
 
     uids: list[str] | None = module.params.get("uids")
@@ -270,9 +269,9 @@ def _serialize_device(device: Device, *, recommended_version: str | None = None)
 
 def _check_recommended(
     module: AnsibleModule,
+    config: Config,
     devices: list[Device],
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-    config = create_config(module)
     device_uids = [d.uid for d in devices]
     if not device_uids:
         return [], {}
@@ -314,13 +313,14 @@ def run_module() -> None:
     version: str | None = module.params.get("version")
     recommended: bool = module.params.get("recommended", False)
     mode = "recommended" if recommended else "specified"
+    config = create_config(module)
 
     try:
-        all_devices = _fetch_devices(module)
+        all_devices = _fetch_devices(module, config)
         matched_device_count = len(all_devices)
 
         if recommended:
-            serialized, skipped = _check_recommended(module, all_devices)
+            serialized, skipped = _check_recommended(module, config, all_devices)
             evaluated_count = matched_device_count - len(skipped)
         else:
             devices_not_on_version = [d for d in all_devices if d.software_version != version]

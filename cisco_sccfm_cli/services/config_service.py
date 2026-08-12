@@ -9,7 +9,7 @@ import os
 import stat
 from errno import ELOOP, ENOTDIR
 from pathlib import Path
-from typing import Any, Dict, Mapping, TextIO, cast
+from typing import Any, Mapping, TextIO, cast
 
 from cisco_sccfm_cli.models import Config
 
@@ -55,7 +55,7 @@ class ConfigService:
             for name, data in sorted(profiles.items())
         ]
 
-    def _load_profiles(self) -> Dict[str, Dict[str, Any]]:
+    def _load_profiles(self) -> dict[str, dict[str, Any]]:
         self._validate_storage_path()
         self._validate_read_permissions()
         self._prepare_default_directory_permissions(repair=False)
@@ -67,7 +67,7 @@ class ConfigService:
             data = json.load(handle)
         return dict(data.get("profiles", {}))
 
-    def _read_profiles_for_update(self, handle: TextIO) -> Dict[str, Dict[str, Any]]:
+    def _read_profiles_for_update(self, handle: TextIO) -> dict[str, dict[str, Any]]:
         data = json.load(handle)
         return dict(data.get("profiles", {}))
 

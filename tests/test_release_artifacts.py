@@ -185,10 +185,17 @@ def test_workflows_promote_release_assets_without_rebuilding() -> None:
     assert "  release:\n" not in ci
     assert "  publish-to-pypi:\n" not in ci
     assert "  publish-to-galaxy:\n" not in ci
+    assert '"${COLLECTION_ROOT}/build.sh"' in ci
     assert "workflow_dispatch:" in release
     assert "release:\n    types:" not in release
     assert release.count("${{ inputs.version }}") == 1
     assert "RELEASE_VERSION: ${{ inputs.version }}" in release
+    assert "DEP002_EXCEPTION_EXPIRES" not in ci
+    assert "DEP002_EXCEPTION_EXPIRES" not in release
+    assert "exceptions expired" not in ci
+    assert "exceptions expired" not in release
+    assert ci.count("--ignore-vuln PYSEC-2026-") == 6
+    assert release.count("--ignore-vuln PYSEC-2026-") == 6
 
     build = release.split("  build-release:\n", maxsplit=1)[1].split(
         "  create-draft-release:\n", maxsplit=1

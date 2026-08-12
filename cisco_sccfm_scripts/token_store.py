@@ -500,10 +500,8 @@ class VaultTokenStore:
             self._validate_vault_password_file()
             if self._vault_path.exists() and not self._vault_path.is_file():
                 raise RuntimeError("Vault path must be a regular file")
-            group_vars_path.mkdir(parents=True, exist_ok=True, mode=stat.S_IRWXU)
-            group_vars_path.chmod(stat.S_IRWXU)
-            self._vault_path.parent.mkdir(parents=True, exist_ok=True, mode=stat.S_IRWXU)
-            self._vault_path.parent.chmod(stat.S_IRWXU)
+            group_vars_path.mkdir(parents=True, exist_ok=True, mode=0o755)
+            self._vault_path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
 
         content = "---\n" + yaml.dump(payload, default_flow_style=False, sort_keys=False)
         staging_directory, staged_password_path = self._transaction_staging_directory()

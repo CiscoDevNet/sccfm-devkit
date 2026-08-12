@@ -157,6 +157,8 @@ _FORBIDDEN_SUFFIXES = (
     ".keystore",
     ".log",
     ".orig",
+    ".pyc",
+    ".pyo",
     ".p12",
     ".pem",
     ".pfx",
@@ -165,6 +167,7 @@ _FORBIDDEN_SUFFIXES = (
     ".sqlite3",
     ".swo",
     ".swp",
+    ".tmp",
 )
 _CONTENT_RULES: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (

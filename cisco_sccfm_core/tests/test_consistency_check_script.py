@@ -24,6 +24,11 @@ def _patch_roots(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "ANSIBLE_MODULES",
         tmp_path / "sccfm-ansible" / "plugins" / "modules",
     )
+    monkeypatch.setattr(
+        consistency_check,
+        "_RUNTIME_YML",
+        tmp_path / "sccfm-ansible" / "meta" / "runtime.yml",
+    )
 
 
 def _write_file(tmp_path: Path, relative_path: str, content: str) -> Path:
@@ -90,6 +95,70 @@ def test_ansible_contract_checks_flag_missing_return_docs_and_example_refs(
 
     assert any("missing_key" in message for message in messages)
     assert any("device_count" in message for message in messages)
+
+
+def test_direct_device_module_is_exempt_from_shared_api_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    module_path = _write_file(
+        tmp_path,
+        "sccfm-ansible/plugins/modules/configure_manager.py",
+        '''
+        from ansible.module_utils.basic import AnsibleModule
+
+        DOCUMENTATION = r"""
+        ---
+        module: configure_manager
+        options:
+          ftd_host:
+            type: str
+          cli_key:
+            type: str
+        """
+
+        EXAMPLES = r"""
+        - name: Onboard through the API
+          cisco.sccfm.onboard_cdfmc_ftd: {}
+          register: onboard_result
+
+        - name: Configure the device directly
+          cisco.sccfm.configure_manager:
+            ftd_host: "203.0.113.10"
+            cli_key: "{{ onboard_result.cli_key }}"
+        """
+
+        RETURN = r"""
+        msg:
+          description: Result message
+          returned: always
+          type: str
+        """
+
+        def run_module() -> None:
+            module = AnsibleModule(argument_spec={}, supports_check_mode=True)
+            module.exit_json(changed=False, msg="ok")
+        ''',
+    )
+    _write_file(
+        tmp_path,
+        "sccfm-ansible/meta/runtime.yml",
+        """
+        action_groups:
+          cisco.sccfm.all: []
+        """,
+    )
+
+    metadata = consistency_check._build_ansible_metadata(module_path)
+    issues = (
+        consistency_check.check_ansible_examples(module_path, metadata)
+        + consistency_check.check_ansible_return_contract(module_path, metadata)
+        + consistency_check.check_ansible_module_contract(module_path)
+        + consistency_check.check_ansible_runtime_membership([module_path])
+    )
+
+    assert issues == []
 
 
 def test_cli_command_name_must_match_directory(

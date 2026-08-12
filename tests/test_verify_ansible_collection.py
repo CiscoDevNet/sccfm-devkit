@@ -172,6 +172,20 @@ def test_verifier_rejects_sensitive_paths(tmp_path: Path, path: str) -> None:
         verify_collection_artifact(artifact, expected_version=_VERSION)
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "plugins/modules/.vault.plaintext.synthetic.tmp",
+        "plugins/modules/synthetic.pyc",
+    ],
+)
+def test_verifier_rejects_runtime_temporary_files(tmp_path: Path, path: str) -> None:
+    artifact = _build_synthetic_artifact(tmp_path, extra_files={path: b"synthetic\n"})
+
+    with pytest.raises(ArtifactVerificationError, match="forbidden"):
+        verify_collection_artifact(artifact, expected_version=_VERSION)
+
+
 def test_verifier_rejects_unreviewed_test_content(tmp_path: Path) -> None:
     artifact = _build_synthetic_artifact(
         tmp_path,

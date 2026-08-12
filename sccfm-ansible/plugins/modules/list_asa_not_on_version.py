@@ -160,7 +160,7 @@ from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
 
-from ..module_utils.config import base_argument_spec, create_config
+from ..module_utils.config import Config, base_argument_spec, create_config
 from ..module_utils.dependencies import record_import_error
 
 try:
@@ -195,8 +195,7 @@ def _validate_version(module: AnsibleModule, version: str) -> None:
         )
 
 
-def _fetch_devices(module: AnsibleModule) -> list[Device]:
-    config = create_config(module)
+def _fetch_devices(module: AnsibleModule, config: Config) -> list[Device]:
     inventory_service = InventoryService(config=config)
 
     uids: list[str] | None = module.params.get("uids")
@@ -245,9 +244,10 @@ def run_module() -> None:
 
     version: str = module.params["version"]
     _validate_version(module, version)
+    config = create_config(module)
 
     try:
-        all_devices = _fetch_devices(module)
+        all_devices = _fetch_devices(module, config)
         matched_device_count = len(all_devices)
 
         if matched_device_count == 0:

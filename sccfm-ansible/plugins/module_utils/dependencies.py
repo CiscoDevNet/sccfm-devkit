@@ -29,7 +29,7 @@ def ensure_required_dependencies(module: "AnsibleModule") -> None:
     if not _IMPORT_ERRORS:
         return
 
-    _, import_traceback = _IMPORT_ERRORS[0]
+    import_traceback = _IMPORT_ERRORS[0][1]
     module.fail_json(
         msg=missing_required_lib(
             _PAIRED_DEVKIT_REQUIREMENT,

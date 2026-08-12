@@ -1,3 +1,16 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [sccfm-cli E2E Integration Tests](#sccfm-cli-e2e-integration-tests)
+  - [Structure](#structure)
+  - [Why This Shape](#why-this-shape)
+  - [Prerequisites](#prerequisites)
+  - [Running](#running)
+  - [Opt-in upgrade phases](#opt-in-upgrade-phases)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # sccfm-cli E2E Integration Tests
 
 Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `sccfm-ansible/e2e/` 1:1 so the same scenarios are exercised through both surfaces.
