@@ -72,6 +72,9 @@ We enforce conventional commits via Commitizen. Please:
   follow the Conventional Commits spec (e.g., `feat: add inventory manager list pagination`).
 - CI will fail if commit messages do not comply.
 
+Project maintainers perform releases manually by following the
+[release guide](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/RELEASING.md).
+
 ## Other Ways to Contribute
 
 We welcome anyone that wants to contribute to this CLI tool to triage and reply to open issues to help troubleshoot

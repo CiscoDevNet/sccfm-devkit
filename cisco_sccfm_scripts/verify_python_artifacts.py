@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import configparser
 import email.policy
+import hashlib
 import io
 import re
 import stat
@@ -17,6 +18,7 @@ import tomllib
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
+from email.message import Message
 from email.parser import BytesParser
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -47,6 +49,8 @@ _REQUIRED_SDIST_DOCUMENTS = frozenset(
     }
 )
 _EXPECTED_SCRIPTS = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+_EXPECTED_LICENSE_FILES = ("LICENSE", "LICENSES/Apache-2.0.txt")
+_APACHE_2_LICENSE_SHA256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 _MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(\s*(?:<(?P<angle>[^>]+)>|(?P<plain>[^\s)]+))")
 _FORBIDDEN_DIRECTORY_NAMES = frozenset(
     {
@@ -238,16 +242,38 @@ def _verify_markdown_links(text: str, source: str) -> None:
         raise PythonArtifactVerificationError(f"{source} contains a relative Markdown link")
 
 
-def _verify_metadata_description(raw: bytes, source: str) -> None:
-    """Validate the Markdown long description embedded in package metadata."""
+def _parse_package_metadata(raw: bytes, source: str) -> Message:
+    """Parse one bounded package metadata document."""
     try:
         metadata = BytesParser(policy=email.policy.default).parsebytes(raw)
-        description = metadata.get_payload()
     except (TypeError, ValueError) as exc:
         raise PythonArtifactVerificationError(f"{source} is invalid") from exc
+    return metadata
+
+
+def _verify_package_metadata(raw: bytes, source: str, version: str) -> None:
+    """Validate identity, license policy, and the embedded Markdown description."""
+    metadata = _parse_package_metadata(raw, source)
+    if metadata.get("Name") != "cisco-sccfm-devkit" or metadata.get("Version") != version:
+        raise PythonArtifactVerificationError(f"{source} has unexpected package identity")
+    if metadata.get("License-Expression") != "Apache-2.0":
+        raise PythonArtifactVerificationError(f"{source} has unexpected license expression")
+    if metadata.get_all("License-File", []) != list(_EXPECTED_LICENSE_FILES):
+        raise PythonArtifactVerificationError(f"{source} has unexpected license files")
+    if metadata.get("Description-Content-Type") != "text/markdown":
+        raise PythonArtifactVerificationError(f"{source} has unexpected description type")
+    description = metadata.get_payload()
     if not isinstance(description, str):
         raise PythonArtifactVerificationError(f"{source} has an invalid description")
     _verify_markdown_links(description, source)
+
+
+def _verify_apache_license(raw: bytes, source: str) -> None:
+    """Require the canonical Apache-2.0 license in an artifact license file."""
+    if hashlib.sha256(raw).hexdigest() != _APACHE_2_LICENSE_SHA256:
+        raise PythonArtifactVerificationError(
+            f"{source} does not contain the canonical Apache-2.0 text"
+        )
 
 
 def _verify_sdist_pyproject(raw: bytes) -> None:
@@ -316,7 +342,16 @@ def _verify_wheel(path: Path, version: str) -> int:
             metadata_name = f"{expected_dist_info}/METADATA"
             if metadata_name not in members:
                 raise PythonArtifactVerificationError("wheel has no package metadata")
-            _verify_metadata_description(archive.read(members[metadata_name]), "wheel metadata")
+            _verify_package_metadata(
+                archive.read(members[metadata_name]), "wheel metadata", version
+            )
+            for license_name in sorted(_EXPECTED_LICENSE_FILES):
+                member_name = f"{expected_dist_info}/licenses/{license_name}"
+                if member_name not in members:
+                    raise PythonArtifactVerificationError(
+                        "wheel is missing a required license file"
+                    )
+                _verify_apache_license(archive.read(members[member_name]), f"wheel {license_name}")
     except (OSError, zipfile.BadZipFile) as exc:
         raise PythonArtifactVerificationError("wheel is not a readable ZIP archive") from exc
     return len(members)
@@ -383,6 +418,15 @@ def _verify_sdist(path: Path, version: str) -> int:
                 raise PythonArtifactVerificationError(
                     "sdist does not contain the expected packages"
                 )
+            for license_name in sorted(_EXPECTED_LICENSE_FILES):
+                license_member = relative_members.get(license_name)
+                if license_member is None or not license_member.isfile():
+                    raise PythonArtifactVerificationError(
+                        "sdist is missing a required license file"
+                    )
+                _verify_apache_license(
+                    _read_tar_member(archive, license_member), f"sdist {license_name}"
+                )
             missing_documents = _REQUIRED_SDIST_DOCUMENTS.difference(relative_members)
             if missing_documents:
                 raise PythonArtifactVerificationError("sdist is missing required project documents")
@@ -407,8 +451,10 @@ def _verify_sdist(path: Path, version: str) -> int:
             package_info_member = relative_members.get("PKG-INFO")
             if package_info_member is None or not package_info_member.isfile():
                 raise PythonArtifactVerificationError("sdist has no package metadata")
-            _verify_metadata_description(
-                _read_tar_member(archive, package_info_member), "sdist package metadata"
+            _verify_package_metadata(
+                _read_tar_member(archive, package_info_member),
+                "sdist package metadata",
+                version,
             )
     except (OSError, tarfile.TarError) as exc:
         raise PythonArtifactVerificationError("sdist is not a readable tar.gz archive") from exc

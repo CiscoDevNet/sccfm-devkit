@@ -22,6 +22,15 @@ _VERSION = "1.2.3"
 _DIST_INFO = f"cisco_sccfm_devkit-{_VERSION}.dist-info"
 _ENTRY_POINTS = b"[console_scripts]\nsccfm-cli=cisco_sccfm_cli.cli:cli\n"
 _DESCRIPTION = b"# Synthetic package\n\nSee [documentation](https://example.com/docs).\n"
+_LICENSE = (Path(__file__).resolve().parents[1] / "LICENSE").read_bytes()
+_METADATA_HEADERS = (
+    b"Name: cisco-sccfm-devkit\n"
+    b"Version: 1.2.3\n"
+    b"License-Expression: Apache-2.0\n"
+    b"License-File: LICENSE\n"
+    b"License-File: LICENSES/Apache-2.0.txt\n"
+    b"Description-Content-Type: text/markdown\n\n"
+)
 _REQUIRED_PROJECT_DOCUMENTS = {
     "CHANGELOG.md",
     "CONTRIBUTING.md",
@@ -64,13 +73,11 @@ def _build_artifacts(
     wheel_files = {
         "cisco_sccfm_cli/__init__.py": b"",
         "cisco_sccfm_core/__init__.py": b"",
-        f"{_DIST_INFO}/METADATA": (
-            b"Name: cisco-sccfm-devkit\n"
-            b"Version: 1.2.3\n"
-            b"Description-Content-Type: text/markdown\n\n" + wheel_description
-        ),
+        f"{_DIST_INFO}/METADATA": _METADATA_HEADERS + wheel_description,
         f"{_DIST_INFO}/WHEEL": b"Wheel-Version: 1.0\n",
         f"{_DIST_INFO}/entry_points.txt": entry_points,
+        f"{_DIST_INFO}/licenses/LICENSE": _LICENSE,
+        f"{_DIST_INFO}/licenses/LICENSES/Apache-2.0.txt": _LICENSE,
         f"{_DIST_INFO}/RECORD": b"",
         **(wheel_extra or {}),
     }
@@ -81,16 +88,12 @@ def _build_artifacts(
     sdist = tmp_path / f"cisco_sccfm_devkit-{_VERSION}.tar.gz"
     prefix = f"cisco_sccfm_devkit-{_VERSION}"
     sdist_files = {
-        "LICENSE": b"Apache-2.0\n",
-        "LICENSES/Apache-2.0.txt": b"Apache-2.0\n",
+        "LICENSE": _LICENSE,
+        "LICENSES/Apache-2.0.txt": _LICENSE,
         "CHANGELOG.md": b"# Changelog\n",
         "CONTRIBUTING.md": b"# Contributing\n",
         "INSTALL.md": b"# Installation\n",
-        "PKG-INFO": (
-            b"Name: cisco-sccfm-devkit\n"
-            b"Version: 1.2.3\n"
-            b"Description-Content-Type: text/markdown\n\n" + sdist_description
-        ),
+        "PKG-INFO": _METADATA_HEADERS + sdist_description,
         "README.md": sdist_description,
         "SECURITY.md": b"# Security\n",
         "cisco_sccfm_cli/__init__.py": b"",
@@ -111,7 +114,7 @@ def test_verifier_accepts_public_artifact_pair(tmp_path: Path) -> None:
 
     result = verify_python_artifacts(wheel, sdist)
 
-    assert result.wheel_files == 6
+    assert result.wheel_files == 8
     assert result.sdist_files == 11
 
 
@@ -121,7 +124,7 @@ def test_wheel_verifier_accepts_public_wheel_without_sdist(tmp_path: Path) -> No
     result = verify_python_wheel(wheel)
 
     assert result.version == _VERSION
-    assert result.files == 6
+    assert result.files == 8
 
 
 @pytest.mark.parametrize(
@@ -221,4 +224,50 @@ def test_verifier_rejects_relative_link_in_sdist_description(tmp_path: Path) -> 
     )
 
     with pytest.raises(PythonArtifactVerificationError, match="relative Markdown link"):
+        verify_python_artifacts(wheel, sdist)
+
+
+@pytest.mark.parametrize("artifact", ["wheel", "sdist"])
+def test_verifier_rejects_incomplete_license_text(tmp_path: Path, artifact: str) -> None:
+    wheel_license = f"{_DIST_INFO}/licenses/LICENSE"
+    wheel_extra = {wheel_license: b"not the license\n"} if artifact == "wheel" else None
+    sdist_extra = {"LICENSE": b"not the license\n"} if artifact == "sdist" else None
+    wheel, sdist = _build_artifacts(
+        tmp_path,
+        wheel_extra=wheel_extra,
+        sdist_extra=sdist_extra,
+    )
+
+    with pytest.raises(PythonArtifactVerificationError, match="Apache-2.0 text"):
+        verify_python_artifacts(wheel, sdist)
+
+
+def test_verifier_rejects_incorrect_license_expression(tmp_path: Path) -> None:
+    metadata = (_METADATA_HEADERS + _DESCRIPTION).replace(
+        b"License-Expression: Apache-2.0", b"License-Expression: MIT"
+    )
+    wheel, sdist = _build_artifacts(
+        tmp_path,
+        wheel_extra={f"{_DIST_INFO}/METADATA": metadata},
+    )
+
+    with pytest.raises(PythonArtifactVerificationError, match="license expression"):
+        verify_python_artifacts(wheel, sdist)
+
+
+@pytest.mark.parametrize("artifact", ["wheel", "sdist"])
+def test_verifier_rejects_duplicate_license_file_header(tmp_path: Path, artifact: str) -> None:
+    metadata = (_METADATA_HEADERS + _DESCRIPTION).replace(
+        b"License-File: LICENSE\n",
+        b"License-File: LICENSE\nLicense-File: LICENSE\n",
+    )
+    wheel_extra = {f"{_DIST_INFO}/METADATA": metadata} if artifact == "wheel" else None
+    sdist_extra = {"PKG-INFO": metadata} if artifact == "sdist" else None
+    wheel, sdist = _build_artifacts(
+        tmp_path,
+        wheel_extra=wheel_extra,
+        sdist_extra=sdist_extra,
+    )
+
+    with pytest.raises(PythonArtifactVerificationError, match="license files"):
         verify_python_artifacts(wheel, sdist)

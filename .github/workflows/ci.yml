@@ -81,8 +81,11 @@ jobs:
             cisco_sccfm_cli \
             cisco_sccfm_core \
             cisco_sccfm_scripts/build_ansible_collection.py \
+            cisco_sccfm_scripts/prepare_ansible_release.py \
+            cisco_sccfm_scripts/release_artifacts.py \
             cisco_sccfm_scripts/verify_ansible_collection.py \
             cisco_sccfm_scripts/verify_clean_controller.py \
+            cisco_sccfm_scripts/verify_pypi_release.py \
             cisco_sccfm_scripts/verify_python_artifacts.py
 
       - name: Test
@@ -106,7 +109,7 @@ jobs:
             ANSIBLE_LOCAL_TEMP="${SANITY_ROOT}/local" \
             "${VENV_PATH}/bin/ansible-test" sanity --local --truncate 0
 
-      - name: Build and verify release artifacts
+      - name: Build and verify release candidates
         run: |
           set -euo pipefail
           poetry build
@@ -124,192 +127,3 @@ jobs:
           test -f "${COLLECTION_PATH}"
           poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
             "${WHEEL_PATH}" "${COLLECTION_PATH}" --expected-version "${PACKAGE_VERSION}"
-
-  release:
-    needs: lint-and-test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: release-bot
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          ssh-key: ${{ secrets.SCCFM_CI_DEPLOY_KEY }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Install pipx and Poetry
-        run: |
-          python -m pip install --upgrade pip pipx
-          python -m pipx ensurepath
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          pipx install poetry
-          pipx install commitizen
-
-      - name: Install dependencies
-        run: poetry install --no-interaction --with dev,build
-
-      - name: Bump version and build collection
-        id: bump
-        run: |
-          set -e
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.cisco.com"
-
-          # Check if version bump is needed
-          cz bump --dry-run --yes --changelog || exit 0
-
-          # Bump version in files only (no commit/tag yet)
-          cz bump --yes --changelog --files-only
-          NEW_VERSION=$(poetry version -s)
-          NEW_TAG="v${NEW_VERSION}"
-
-          # Build Ansible collection with updated version
-          poetry run build-ansible-collection
-          ARTIFACT_PATH="dist/cisco-sccfm-${NEW_VERSION}.tar.gz"
-
-          # Verify the exact artifact that will be attached to the release.
-          poetry run python -m cisco_sccfm_scripts.verify_ansible_collection \
-            "${ARTIFACT_PATH}" --expected-version "${NEW_VERSION}"
-          ARTIFACT_SHA256=$(sha256sum "${ARTIFACT_PATH}" | cut -d ' ' -f 1)
-
-          echo "bumped=true" >> "$GITHUB_OUTPUT"
-          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
-          echo "artifact_path=${ARTIFACT_PATH}" >> "$GITHUB_OUTPUT"
-          echo "artifact_sha256=${ARTIFACT_SHA256}" >> "$GITHUB_OUTPUT"
-
-      - name: Install pinned Gitleaks
-        if: steps.bump.outputs.bumped == 'true'
-        run: |
-          GITLEAKS_BIN_DIR="${RUNNER_TEMP}/gitleaks-bin"
-          mkdir -p "${GITLEAKS_BIN_DIR}"
-          GOBIN="${GITLEAKS_BIN_DIR}" go install github.com/gitleaks/gitleaks/v8@v8.30.1
-          echo "${GITLEAKS_BIN_DIR}" >> "$GITHUB_PATH"
-
-      - name: Scan exact collection artifact
-        if: steps.bump.outputs.bumped == 'true'
-        run: |
-          gitleaks dir \
-            --no-banner \
-            --no-color \
-            --redact=100 \
-            --max-archive-depth=1 \
-            "${{ steps.bump.outputs.artifact_path }}"
-
-      - name: Build and verify Python artifacts
-        if: steps.bump.outputs.bumped == 'true'
-        id: wheel
-        run: |
-          set -euo pipefail
-          poetry build
-          PACKAGE_VERSION="$(poetry version -s)"
-          WHEEL_RELATIVE_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}-py3-none-any.whl"
-          SDIST_RELATIVE_PATH="dist/cisco_sccfm_devkit-${PACKAGE_VERSION}.tar.gz"
-          WHEEL_PATH="${GITHUB_WORKSPACE}/${WHEEL_RELATIVE_PATH}"
-          SDIST_PATH="${GITHUB_WORKSPACE}/${SDIST_RELATIVE_PATH}"
-          test -f "${WHEEL_PATH}"
-          test -f "${SDIST_PATH}"
-          poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
-            "${WHEEL_PATH}" "${SDIST_PATH}"
-          pipx run --spec "twine==6.2.0" twine check --strict \
-            "${WHEEL_PATH}" "${SDIST_PATH}"
-          SMOKE_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-wheel-smoke.XXXXXX")"
-          python -m venv "${SMOKE_ROOT}/venv"
-          SMOKE_PYTHON="${SMOKE_ROOT}/venv/bin/python"
-          SMOKE_CLI="${SMOKE_ROOT}/venv/bin/sccfm-cli"
-          unset PYTHONHOME PYTHONPATH POETRY_ACTIVE
-          cd "${SMOKE_ROOT}"
-          "${SMOKE_PYTHON}" -I -m pip install --no-cache-dir "${WHEEL_PATH}"
-          "${SMOKE_PYTHON}" -I -m pip check
-          TODAY_UTC="$(date -u +%F)"
-          if [[ "${TODAY_UTC}" > "${DEP002_EXCEPTION_EXPIRES}" ]]; then
-            echo "::error::DEP-002 exceptions expired on ${DEP002_EXCEPTION_EXPIRES}"
-            exit 1
-          fi
-          RUNTIME_REQUIREMENTS="${SMOKE_ROOT}/runtime-requirements.txt"
-          "${SMOKE_PYTHON}" -I -m pip freeze \
-            --exclude cisco-sccfm-devkit \
-            > "${RUNTIME_REQUIREMENTS}"
-          test -s "${RUNTIME_REQUIREMENTS}"
-          read -r -a AUDIT_EXCEPTION_ARGS <<< "${DEP002_PIP_AUDIT_EXCEPTIONS}"
-          pipx run --spec "pip-audit==${PIP_AUDIT_VERSION}" pip-audit \
-            --strict \
-            --no-deps \
-            --disable-pip \
-            --vulnerability-service osv \
-            --progress-spinner off \
-            --aliases on \
-            --desc off \
-            "${AUDIT_EXCEPTION_ARGS[@]}" \
-            --requirement "${RUNTIME_REQUIREMENTS}"
-          "${SMOKE_PYTHON}" -I - <<'PY'
-          import importlib
-          from importlib.metadata import distribution, version
-          from importlib.util import find_spec
-
-          expected_sdk = "1.17.27"
-          installed_sdk = version("scc-firewall-manager-sdk")
-          if installed_sdk != expected_sdk:
-              raise SystemExit(f"expected SDK {expected_sdk}, installed {installed_sdk}")
-          for package in (
-              "scc_firewall_manager_sdk",
-              "cisco_sccfm_cli",
-              "cisco_sccfm_core",
-          ):
-              importlib.import_module(package)
-          if find_spec("cisco_sccfm_scripts") is not None:
-              raise SystemExit("cisco_sccfm_scripts must not be installed from the public wheel")
-          console_scripts = {
-              entry_point.name: entry_point.value
-              for entry_point in distribution("cisco-sccfm-devkit").entry_points
-              if entry_point.group == "console_scripts"
-          }
-          expected_console_scripts = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
-          if console_scripts != expected_console_scripts:
-              raise SystemExit(
-                  f"expected console scripts {expected_console_scripts}, got {console_scripts}"
-              )
-          PY
-          "${SMOKE_CLI}" --help >/dev/null
-          "${SMOKE_CLI}" schema export --format json | "${SMOKE_PYTHON}" -I -c \
-            'from importlib.metadata import version; import json, sys; payload = json.load(sys.stdin); commands = payload.get("commands"); schema_version = payload.get("version"); installed_version = version("cisco-sccfm-devkit"); assert schema_version == installed_version, f"expected schema version {installed_version}, got {schema_version}"; assert isinstance(commands, list) and len(commands) == 57, f"expected 57 commands, got {len(commands) if isinstance(commands, list) else 0}"'
-          echo "path=${WHEEL_RELATIVE_PATH}" >> "$GITHUB_OUTPUT"
-
-      - name: Verify clean controller artifact pair
-        if: steps.bump.outputs.bumped == 'true'
-        run: |
-          poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
-            "${{ steps.wheel.outputs.path }}" \
-            "${{ steps.bump.outputs.artifact_path }}" \
-            --expected-version "$(poetry version -s)"
-
-      - name: Commit and tag verified release
-        if: steps.bump.outputs.bumped == 'true'
-        env:
-          NEW_TAG: ${{ steps.bump.outputs.new_tag }}
-        run: |
-          git add .
-          git commit -m "bump: version ${NEW_TAG#v}" -m "[skip ci]"
-          git tag "${NEW_TAG}"
-
-      - name: Push changes and tags
-        if: steps.bump.outputs.bumped == 'true'
-        env:
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          git push origin HEAD:${BRANCH}
-          git push origin --tags
-
-      - name: Create release
-        if: steps.bump.outputs.bumped == 'true'
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ steps.bump.outputs.new_tag }}
-          artifacts: "${{ steps.wheel.outputs.path }},${{ steps.bump.outputs.artifact_path }}"
-          token: ${{ secrets.GITHUB_TOKEN }}
