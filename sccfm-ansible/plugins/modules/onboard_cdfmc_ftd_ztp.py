@@ -76,8 +76,8 @@ EXAMPLES = r"""
     licenses:
       - BASE
     fmc_access_policy_uid: "your-access-policy-uid"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Onboard with initial password and device group
 - name: Onboard FTD via ZTP with password
@@ -97,8 +97,8 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Onboard branch FTD through ZTP
       cisco.sccfm.onboard_cdfmc_ftd_ztp:

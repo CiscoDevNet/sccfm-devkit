@@ -27,7 +27,9 @@ Options:
   --ftd-password TEXT          SSH password for the FTD VM (or set
                                SCCFM_FTD_PASSWORD; prompted if needed).
   --cli-key TEXT               The full 'configure manager add ...' string
-                               returned by 'onboard'.  [required]
+                               returned by 'onboard' (or set SCCFM_CLI_KEY).
+                               Required unless --check is set.  [env var:
+                               SCCFM_CLI_KEY]
   --jump-host TEXT             Optional bastion to tunnel through, as
                                [user@]host[:port]. The FTD then sees the
                                connection from the jump host's IP, so that IP

@@ -102,6 +102,46 @@ def test_should_onboard_asa(
     assert payload["name"] == "test-asa"
 
 
+def test_should_redact_prompted_password_from_post_prompt_failures(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """A prompted ASA password should be registered before subsequent work can fail."""
+    password = "prompted-asa-password-sentinel"
+
+    def fail_with_password(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        raise RuntimeError(f"backend echoed {password}")
+
+    monkeypatch.setattr(InventoryService, "get_devices", fail_with_password)
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "onboard",
+            "--name",
+            "test-asa",
+            "--device-address",
+            "192.168.1.1:443",
+            "--username",
+            "admin",
+            "--connector-type",
+            "CDG",
+        ],
+        input=f"{password}\n",
+    )
+
+    assert result.exit_code != 0
+    assert "<redacted>" in result.output
+    assert password not in result.output
+    assert password not in repr(result.exception)
+
+
 def test_should_fail_if_connector_name_not_specified_and_connector_type_sdc(
     cli_runner: CliRunner,
     default_config: Config,

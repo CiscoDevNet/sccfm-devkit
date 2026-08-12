@@ -69,8 +69,8 @@ EXAMPLES:
 - name: Show shun entries on production ASAs
   cisco.sccfm.show_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: shun_entries
 
 # Example 2: Show shun entries on specific devices by UID
@@ -93,8 +93,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Show shun entries
       cisco.sccfm.show_asa_shun:

@@ -54,8 +54,8 @@ EXAMPLES = r"""
     uid: "abc-123-def"
     target_id: "70bde3c9-328c-4a4b-bdc9-a4d4042bf09a"
     override_value: "10.20.30.40"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Using module_defaults
 - name: Edit object overrides
@@ -63,7 +63,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Edit override

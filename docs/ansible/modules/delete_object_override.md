@@ -43,8 +43,8 @@ EXAMPLES:
   cisco.sccfm.delete_object_override:
     uid: "abc-123-def"
     target_id: "70bde3c9-328c-4a4b-bdc9-a4d4042bf09a"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Using module_defaults
 - name: Delete object overrides
@@ -52,7 +52,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Delete override

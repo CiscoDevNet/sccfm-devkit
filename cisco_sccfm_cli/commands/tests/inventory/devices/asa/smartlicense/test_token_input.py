@@ -118,6 +118,49 @@ def test_should_prompt_for_smart_license_token_without_echoing_it(
     _assert_not_exposed(result, caplog.text, token)
 
 
+def test_should_redact_prompted_token_from_post_prompt_failure(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A hidden-prompt token must be registered before downstream execution."""
+    token = _sentinel("prompt-failure")
+    monkeypatch.setattr(SmartlicenseCommand, "_can_prompt", lambda self: True)
+
+    def fake_get_devices(
+        self: InventoryService,
+        *,
+        limit: int,
+        offset: int,
+        query: str | None = None,
+    ) -> DevicePage:
+        return DevicePage(count=len(sample_devices), items=sample_devices)
+
+    def stub_cli_init(self: AsaCommandLineService, config: Any) -> None:
+        return None
+
+    def fail_execute(
+        self: AsaCommandLineService,
+        *,
+        device_uids: list[str],
+        asa_commands: list[str],
+    ) -> list[CdoCliResult]:
+        raise RuntimeError(f"execution echoed {token}")
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaCommandLineService, "__init__", stub_cli_init)
+    monkeypatch.setattr(AsaCommandLineService, "execute_cli", fail_execute)
+
+    result = cli_runner.invoke(cli, _command_args(), input=f"{token}\n")
+
+    assert result.exit_code != 0
+    assert "<redacted>" in result.output
+    _assert_not_exposed(result, caplog.text, token)
+
+
 def test_should_fail_noninteractively_without_smart_license_token(
     cli_runner: CliRunner,
     default_config: Config,
@@ -163,6 +206,31 @@ def test_should_reject_multiple_smart_license_token_sources_without_exposing_the
     assert "only one Smart Licensing token source" in result.output
     assert "asa_commands" not in captured
     _assert_not_exposed(result, caplog.text, environment_token, file_token)
+
+
+def test_check_should_reject_multiple_smart_license_token_sources(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+    sample_cli_results: list[CdoCliResult],
+    tmp_path: Path,
+) -> None:
+    """Preflight should enforce the same token-source constraints as execution."""
+    token_file = tmp_path / "smart-license-token"
+    token_file.write_text(_sentinel("file-check-conflict"), encoding="utf-8")
+    captured = _stub_execution(monkeypatch, sample_devices, sample_cli_results)
+
+    result = cli_runner.invoke(
+        cli,
+        _command_args("--token-file", str(token_file), "--check"),
+        env={_TOKEN_ENVVAR: _sentinel("environment-check-conflict")},
+    )
+
+    assert result.exit_code != 0
+    assert "only one Smart Licensing token source" in result.output
+    assert "asa_commands" not in captured
 
 
 @pytest.mark.parametrize(

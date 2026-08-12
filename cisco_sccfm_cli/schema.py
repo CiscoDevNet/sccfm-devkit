@@ -16,6 +16,8 @@ from typing import Any, cast
 import click
 from scc_firewall_manager_sdk import ConfigState, ConnectivityState, EntityType
 
+from cisco_sccfm_cli.option_metadata import is_sensitive_option
+
 SCHEMA_VERSION = "1.0"
 _DISTRIBUTION_NAME = "cisco-sccfm-devkit"
 
@@ -25,8 +27,16 @@ _SCCFM_FREE_COMMANDS = {
     ("schema", "export"),
 }
 
+_NO_PROFILE_COMMANDS = {
+    *_SCCFM_FREE_COMMANDS,
+    ("inventory", "devices", "cdfmc-managed-ftd", "configure-manager"),
+}
+
 _LOCAL_SIDE_EFFECT_COMMANDS: dict[tuple[str, ...], str] = {
-    ("configure",): "Writes the selected profile to the local sccfm-cli configuration file.",
+    ("configure",): (
+        "Writes the selected profile and repairs local POSIX configuration permissions."
+    ),
+    ("schema", "export"): "May write or overwrite the local file specified by --output.",
 }
 
 _SCCFM_READONLY_LEAF_NAMES = {
@@ -315,7 +325,7 @@ def _auth(*, path: tuple[str, ...], is_group: bool) -> dict[str, Any]:
 
 
 def _auth_requirements(*, path: tuple[str, ...], is_group: bool) -> dict[str, Any]:
-    if is_group or path in _SCCFM_FREE_COMMANDS:
+    if is_group or path in _NO_PROFILE_COMMANDS:
         return {
             "requires_profile": False,
             "requires_api_token": False,
@@ -349,7 +359,7 @@ def _option_schema(option: click.Option, *, scope: str) -> dict[str, Any]:
         "nargs": option.nargs,
         "is_flag": bool(option.is_flag),
         "is_bool_flag": bool(getattr(option, "is_bool_flag", False)),
-        "sensitive": bool(option.hide_input),
+        "sensitive": is_sensitive_option(option),
         "envvar": _envvar(option.envvar),
         "metavar": option.metavar,
     }
@@ -562,6 +572,8 @@ def _path_specific_constraints(
                 "description": "--command must be 'show' or start with 'show '.",
             }
         )
+    if path == ("inventory", "devices", "cdfmc-managed-ftd", "configure-manager"):
+        constraints.append(_required_unless("cli_key", unless="check"))
     if path == ("inventory", "devices", "asa", "onboard"):
         constraints.append(
             _required_unless("device_address", "username", "connector_type", unless="check")
@@ -836,7 +848,7 @@ def _example_option_parts(
     parts: list[str] = []
     for option_name in option_names:
         option = option_by_name.get(option_name)
-        if option is None or option.hide_input:
+        if option is None or is_sensitive_option(option):
             continue
         flag = _preferred_flag(option)
         if option.is_flag:

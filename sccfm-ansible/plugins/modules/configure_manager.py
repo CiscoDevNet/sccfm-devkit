@@ -107,8 +107,8 @@ EXAMPLES = r"""
     fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
     licenses:
       - BASE
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: onboard_result
 
 - name: Complete registration over SSH

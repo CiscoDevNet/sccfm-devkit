@@ -15,6 +15,7 @@ from rich.console import Console
 
 from cisco_sccfm_cli.commands.base import BaseCommand
 from cisco_sccfm_cli.models import Config
+from cisco_sccfm_cli.option_metadata import sensitive_option
 from cisco_sccfm_cli.services import ConfigService
 from cisco_sccfm_core.constants import SCCFM_REGION_CHOICES, SCCFM_REGIONS, normalize_sccfm_region
 
@@ -47,7 +48,7 @@ class ConfigureCommand(BaseCommand):
         return [
             GroupedOption(
                 ["--config-path"],
-                type=click.Path(path_type=Path, resolve_path=True),
+                type=click.Path(path_type=Path, resolve_path=False),
                 default=None,
                 envvar="SCCFM_CONFIG",
                 show_default=False,
@@ -61,20 +62,22 @@ class ConfigureCommand(BaseCommand):
                 group=credential_group,
                 required=True,
             ),
-            GroupedOption(
-                ["--api-token"],
-                type=str,
-                default=None,
-                envvar=self._API_TOKEN_ENVVAR,
-                show_envvar=True,
-                hide_input=True,
-                help=(
-                    "API token for the chosen region. Passing it directly is supported for "
-                    "compatibility but may expose it in process listings and shell history; "
-                    f"prefer {self._API_TOKEN_ENVVAR} or the hidden prompt."
+            sensitive_option(
+                GroupedOption(
+                    ["--api-token"],
+                    type=str,
+                    default=None,
+                    envvar=self._API_TOKEN_ENVVAR,
+                    show_envvar=True,
+                    hide_input=True,
+                    help=(
+                        "API token for the chosen region. Passing it directly is supported for "
+                        "compatibility but may expose it in process listings and shell history; "
+                        f"prefer {self._API_TOKEN_ENVVAR} or the hidden prompt."
+                    ),
+                    group=credential_group,
+                    required=False,
                 ),
-                group=credential_group,
-                required=False,
             ),
         ]
 
@@ -101,8 +104,7 @@ class ConfigureCommand(BaseCommand):
                     "An API token is required. Set "
                     f"{self._API_TOKEN_ENVVAR} or run interactively for a hidden prompt."
                 )
-            api_token = click.prompt("API token", hide_input=True)
-            self._register_sensitive_value(ctx, api_token)
+            api_token = self._prompt_sensitive("API token")
         elif source is ParameterSource.COMMANDLINE:
             click.echo(
                 "Warning: passing --api-token directly may expose it in process listings and "

@@ -13,6 +13,7 @@ from rich.console import Console
 
 from cisco_sccfm_cli.commands.base import BaseCommand
 from cisco_sccfm_cli.commands.inventory.options import format_option
+from cisco_sccfm_cli.option_metadata import sensitive_option
 from cisco_sccfm_cli.utils import print_json, with_spinner
 from cisco_sccfm_core.services.inventory import (
     FtdConfigureManagerError,
@@ -58,16 +59,28 @@ class FtdConfigureManagerCommand(BaseCommand):
                 required=True,
                 help="SSH username for the FTD VM.",
             ),
-            click.Option(
-                ["--ftd-password"],
-                default=None,
-                envvar="SCCFM_FTD_PASSWORD",
-                help="SSH password for the FTD VM (or set SCCFM_FTD_PASSWORD; prompted if needed).",
+            sensitive_option(
+                click.Option(
+                    ["--ftd-password"],
+                    default=None,
+                    envvar="SCCFM_FTD_PASSWORD",
+                    help=(
+                        "SSH password for the FTD VM (or set SCCFM_FTD_PASSWORD; prompted if "
+                        "needed)."
+                    ),
+                ),
             ),
-            click.Option(
-                ["--cli-key"],
-                required=True,
-                help="The full 'configure manager add ...' string returned by 'onboard'.",
+            sensitive_option(
+                click.Option(
+                    ["--cli-key"],
+                    default=None,
+                    envvar="SCCFM_CLI_KEY",
+                    show_envvar=True,
+                    help=(
+                        "The full 'configure manager add ...' string returned by 'onboard' "
+                        "(or set SCCFM_CLI_KEY). Required unless --check is set."
+                    ),
+                ),
             ),
             click.Option(
                 ["--jump-host"],
@@ -78,13 +91,15 @@ class FtdConfigureManagerCommand(BaseCommand):
                     "IP must be on the FTD ssh-access-list."
                 ),
             ),
-            click.Option(
-                ["--jump-password"],
-                default=None,
-                envvar="SCCFM_JUMP_PASSWORD",
-                help=(
-                    "Password for the jump host (or set SCCFM_JUMP_PASSWORD). "
-                    "Prompted if omitted; leave blank to use SSH key/agent auth."
+            sensitive_option(
+                click.Option(
+                    ["--jump-password"],
+                    default=None,
+                    envvar="SCCFM_JUMP_PASSWORD",
+                    help=(
+                        "Password for the jump host (or set SCCFM_JUMP_PASSWORD). "
+                        "Prompted if omitted; leave blank to use SSH key/agent auth."
+                    ),
                 ),
             ),
             click.Option(
@@ -113,7 +128,6 @@ class FtdConfigureManagerCommand(BaseCommand):
         # Resolve credentials before the spinner starts; prompting under a live
         # spinner garbles the terminal.
         jump = self._build_jump_spec(**kwargs)
-        password = "" if check else self._resolve_ftd_password(**kwargs)
 
         # This command talks to the device purely over SSH and never calls the
         # SCCFM API, so it deliberately does not require a configured profile.
@@ -123,7 +137,19 @@ class FtdConfigureManagerCommand(BaseCommand):
             self._handle_check(service, host, port, timeout, output_format, jump)
             return
 
-        self._execute(service, host, port, timeout, output_format, jump, password, **kwargs)
+        cli_key = self._require_cli_key(**kwargs)
+        password = self._resolve_ftd_password(**kwargs)
+        self._execute(
+            service,
+            host,
+            port,
+            timeout,
+            output_format,
+            jump,
+            password,
+            cli_key,
+            **kwargs,
+        )
 
     @with_spinner("Configuring manager on FTD via SSH...")
     def _execute(
@@ -135,17 +161,17 @@ class FtdConfigureManagerCommand(BaseCommand):
         output_format: str,
         jump: JumpHostSpec | None,
         password: str,
+        manager_command: str,
         **kwargs: Any,
     ) -> None:
         username = cast(str, kwargs.get("ftd_user"))
-        cli_key = cast(str, kwargs.get("cli_key"))
         try:
             result = service.configure_manager(
                 host=host,
                 port=port,
                 username=username,
                 password=password,
-                cli_key=cli_key,
+                cli_key=manager_command,
                 timeout=timeout,
                 jump=jump,
             )
@@ -168,7 +194,7 @@ class FtdConfigureManagerCommand(BaseCommand):
         if password:
             return password
         try:
-            return cast(str, click.prompt("FTD password", hide_input=True))
+            return self._prompt_sensitive("FTD password")
         except click.Abort:
             # click.prompt raises Abort for both Ctrl-C and EOF. On a real
             # terminal it's an intentional Ctrl-C, so let it propagate to the
@@ -180,6 +206,15 @@ class FtdConfigureManagerCommand(BaseCommand):
                 "FTD password is required. Provide --ftd-password or set "
                 "SCCFM_FTD_PASSWORD when running non-interactively."
             )
+
+    def _require_cli_key(self, **kwargs: Any) -> str:
+        cli_key = cast("str | None", kwargs.get("cli_key"))
+        if cli_key and cli_key.strip():
+            return cli_key
+        raise click.ClickException(
+            "--cli-key is required unless --check is set. Set SCCFM_CLI_KEY when running "
+            "non-interactively."
+        )
 
     def _build_jump_spec(self, **kwargs: Any) -> JumpHostSpec | None:
         jump_host = cast("str | None", kwargs.get("jump_host"))
@@ -194,9 +229,8 @@ class FtdConfigureManagerCommand(BaseCommand):
 
         jump_password = cast("str | None", kwargs.get("jump_password"))
         if jump_password is None:
-            jump_password = click.prompt(
+            jump_password = self._prompt_sensitive(
                 "Jump host password (leave blank for key/agent auth)",
-                hide_input=True,
                 default="",
                 show_default=False,
             )

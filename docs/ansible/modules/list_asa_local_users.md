@@ -60,15 +60,15 @@ EXAMPLES:
   cisco.sccfm.list_asa_local_users:
     query: "name:branch-* AND connectivityState:ONLINE"
     region: "us"
-    api_token: "{{ sccfm_api_token }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 - name: List local users with shared auth
   hosts: localhost
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: List local users on branch ASAs
       cisco.sccfm.list_asa_local_users:

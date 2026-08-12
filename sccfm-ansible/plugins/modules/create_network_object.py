@@ -67,8 +67,8 @@ EXAMPLES = r"""
     labels:
       - production
       - web
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Create a subnet network object using module_defaults
 - name: Create network objects
@@ -76,7 +76,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Create branch office subnet

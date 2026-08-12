@@ -184,6 +184,7 @@ def test_matching_nonempty_subset_is_safely_resumable(
         version=_VERSION,
         file_count=1,
         status=PyPIReleaseStatus.PARTIAL,
+        missing_filenames=(_SDIST if filename == _WHEEL else _WHEEL,),
     )
 
 
@@ -274,7 +275,12 @@ def test_network_error_is_normalized(
             "PyPI release verified",
         ),
         (
-            PyPIReleaseVerification(_VERSION, 1, PyPIReleaseStatus.PARTIAL),
+            PyPIReleaseVerification(
+                _VERSION,
+                1,
+                PyPIReleaseStatus.PARTIAL,
+                (_SDIST,),
+            ),
             3,
             "partially published",
         ),

@@ -82,8 +82,8 @@ EXAMPLES:
   cisco.sccfm.deploy_cdfmc_ftd:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Deploy with notes
 - name: Deploy FTD changes with deployment notes
@@ -107,8 +107,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Deploy branch FTD changes
       cisco.sccfm.deploy_cdfmc_ftd:

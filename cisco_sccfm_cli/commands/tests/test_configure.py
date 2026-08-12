@@ -5,8 +5,11 @@
 from __future__ import annotations
 
 import hmac
+import os
+import stat
 from pathlib import Path
 
+import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 
@@ -16,6 +19,10 @@ from cisco_sccfm_cli.models import Config
 from cisco_sccfm_cli.services import ConfigService
 
 _API_TOKEN_ENVVAR = "SCCFM_API_TOKEN"
+POSIX_ONLY = pytest.mark.skipif(
+    os.name != "posix",
+    reason="POSIX permission bits are not portable to this platform",
+)
 
 
 def test_should_create_new_profile(cli_runner: CliRunner, config_path: Path) -> None:
@@ -62,6 +69,33 @@ def test_should_read_api_token_from_environment(cli_runner: CliRunner, config_pa
     stored = ConfigService(path=config_path).load("lab")
     assert stored is not None
     _assert_same_secret(stored.api_token, api_token)
+
+
+@POSIX_ONLY
+def test_configure_repairs_unsafe_file_and_preserves_other_profiles(
+    cli_runner: CliRunner,
+    config_path: Path,
+) -> None:
+    """The explicit local-write command may repair storage before updating it."""
+    existing = Config(profile="existing", region="us", api_token="existing-example-token")
+    service = ConfigService(path=config_path)
+    service.save(existing)
+    config_path.chmod(0o644)
+    parent_mode = stat.S_IMODE(config_path.parent.stat().st_mode)
+
+    result = cli_runner.invoke(
+        cli,
+        ["--profile", "added", "configure", "--region", "eu"],
+        env={_API_TOKEN_ENVVAR: "added-example-token"},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(config_path.parent.stat().st_mode) == parent_mode
+    assert service.load(existing.profile) == existing
+    assert service.load("added") == Config(
+        profile="added", region="eu", api_token="added-example-token"
+    )
 
 
 def test_should_prompt_for_api_token_without_echoing_it(

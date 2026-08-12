@@ -72,8 +72,8 @@ EXAMPLES:
     fmc_access_policy_uid: "your-access-policy-uid"
     licenses:
       - BASE
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Onboard a virtual FTD with multiple licenses
 - name: Onboard virtual FTD
@@ -105,8 +105,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:

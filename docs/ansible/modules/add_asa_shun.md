@@ -135,8 +135,8 @@ EXAMPLES:
   cisco.sccfm.add_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Shun with connection tuple to drop an existing connection
 - name: Block attacker and drop active connection
@@ -161,8 +161,8 @@ EXAMPLES:
         dest_port: 443
         protocol: tcp
       - source_ip: "203.0.113.60"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 4: Using module_defaults (recommended)
 - name: Add shun entries
@@ -170,8 +170,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Shun attacker IP
       cisco.sccfm.add_asa_shun:

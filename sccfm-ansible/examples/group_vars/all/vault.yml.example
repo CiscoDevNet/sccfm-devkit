@@ -12,7 +12,7 @@
 
 # SCC Firewall Manager API token
 # Obtain this from your CDO/SCCFM tenant
-sccfm_api_token: "your-api-token-here-abc123xyz789"
+vault_sccfm_api_token: "your-api-token-here-abc123xyz789"
 
 # ASA device passwords - each device can have its own password
 # Use descriptive names that match your device naming in the playbook

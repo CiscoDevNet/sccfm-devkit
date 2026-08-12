@@ -79,8 +79,8 @@ EXAMPLES = r"""
   cisco.sccfm.execute_ftd_cli:
     query: "name:prod-* AND connectivityState:ONLINE"
     command: "show failover"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: cli_results
 
 # Example 2: Execute a command on specific devices by UID
@@ -98,8 +98,8 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Show route on branch FTDs
       cisco.sccfm.execute_ftd_cli:

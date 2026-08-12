@@ -49,8 +49,8 @@ EXAMPLES:
 # Example 1: List all network objects
 - name: List all network objects
   cisco.sccfm.list_network_objects:
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: result
 
 - name: Display network objects
@@ -63,7 +63,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Find web-related network objects

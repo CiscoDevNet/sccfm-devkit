@@ -16,6 +16,7 @@ from rich.live import Live
 from rich.spinner import Spinner
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, ConnectivityState, Device
 
+from cisco_sccfm_cli.option_metadata import is_sensitive_option
 from cisco_sccfm_cli.services import ConfigService
 from cisco_sccfm_cli.utils import print_json, redact_data, redact_text
 from cisco_sccfm_core import SccApiError
@@ -63,6 +64,7 @@ class BaseCommand(ABC):
                 f"Profile '{profile}' not found. "
                 f"Run 'sccfm-cli --profile {profile} configure' to set it up."
             )
+        self._register_sensitive_value(ctx, config.api_token)
         return cast(ConfigLike, cast(object, config))
 
     def build_params(self) -> Sequence[click.Parameter]:
@@ -131,9 +133,9 @@ class BaseCommand(ABC):
             ctx.meta[self._SENSITIVE_VALUES_META_KEY] = (*values, value)
 
     def _register_sensitive_parameters(self, ctx: click.Context, kwargs: dict[str, Any]) -> None:
-        """Register values from Click options marked for hidden input."""
+        """Register values from Click options explicitly marked as sensitive."""
         for parameter in ctx.command.params:
-            if not isinstance(parameter, click.Option) or not parameter.hide_input:
+            if not isinstance(parameter, click.Option) or not is_sensitive_option(parameter):
                 continue
             value = kwargs.get(parameter.name or "")
             if isinstance(value, str):
@@ -145,6 +147,35 @@ class BaseCommand(ABC):
         if not isinstance(raw_values, tuple):
             return ()
         return tuple(value for value in raw_values if isinstance(value, str) and value)
+
+    def _prompt_sensitive(
+        self,
+        text: str,
+        *,
+        default: str | None = None,
+        show_default: bool = True,
+    ) -> str:
+        """Prompt without echoing and immediately register the acquired secret."""
+        value = cast(
+            str,
+            click.prompt(
+                text,
+                default=default,
+                hide_input=True,
+                show_default=show_default,
+            ),
+        )
+        self._register_sensitive_value(click.get_current_context(), value)
+        return value
+
+    def _active_sensitive_values(
+        self, sensitive_values: Sequence[str] | None = None
+    ) -> Sequence[str]:
+        """Resolve explicit secrets or inherit the active command registry."""
+        if sensitive_values is not None:
+            return sensitive_values
+        ctx = click.get_current_context(silent=True)
+        return self._sensitive_values(ctx) if ctx is not None else ()
 
     @abstractmethod
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
@@ -259,8 +290,9 @@ class BaseCommand(ABC):
         cdo_transaction: CdoTransaction,
         format: str = "table",
         *,
-        sensitive_values: Sequence[str] = (),
+        sensitive_values: Sequence[str] | None = None,
     ) -> None:
+        sensitive_values = self._active_sensitive_values(sensitive_values)
         if format == "json":
             print_json(redact_data(cdo_transaction.to_dict(), sensitive_values))
         else:

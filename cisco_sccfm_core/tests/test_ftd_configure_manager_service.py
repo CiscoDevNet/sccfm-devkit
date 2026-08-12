@@ -155,6 +155,48 @@ def test_success_output_removes_echoed_cli_key(monkeypatch: MonkeyPatch) -> None
     assert "natid456" not in result.output
 
 
+@pytest.mark.parametrize(
+    "wrapped_echo",
+    [
+        # PTY wrap in the middle of a secret token.
+        (b"configure manager add DONTRESOLVE registration-secret-\r\n" b"abcdef natid456\r\n"),
+        # PTY wrap exactly between arguments, without retaining the separating space.
+        (b"configure manager add DONTRESOLVE\r\n" b"registration-secret-abcdef natid456\r\n"),
+        # PTY wrap exactly between arguments, retaining the space on the first line.
+        (b"configure manager add DONTRESOLVE \r\n" b"registration-secret-abcdef natid456\r\n"),
+        # Some terminal implementations retain it on the continuation line instead.
+        (b"configure manager add DONTRESOLVE\r\n" b" registration-secret-abcdef natid456\r\n"),
+    ],
+)
+def test_success_output_removes_wrapped_cli_key(
+    monkeypatch: MonkeyPatch,
+    wrapped_echo: bytes,
+) -> None:
+    cli_key = "configure manager add DONTRESOLVE registration-secret-abcdef natid456"
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            wrapped_echo + b"Manager fmc.example.com successfully configured.\r\n> ",
+        ]
+    )
+    _patch_client(monkeypatch, _FakeClient(channel))
+
+    result = _service().configure_manager(
+        host="10.0.0.5",
+        port=22,
+        username="admin",
+        password="pw",
+        cli_key=cli_key,
+        timeout=5,
+    )
+
+    assert result.success is True
+    assert "Manager fmc.example.com successfully configured." in result.output
+    assert "registration-secret-" not in result.output
+    assert "abcdef" not in result.output
+    assert "natid456" not in result.output
+
+
 def test_license_confirmation_prompt_is_answered_yes(monkeypatch: MonkeyPatch) -> None:
     channel = _FakeChannel(
         [
@@ -288,6 +330,111 @@ def test_error_output_removes_echoed_cli_key(monkeypatch: MonkeyPatch) -> None:
     assert _CLI_KEY not in excinfo.value.output
     assert "regkey123" not in excinfo.value.output
     assert "natid456" not in excinfo.value.output
+
+
+def test_error_output_removes_wrapped_cli_key(monkeypatch: MonkeyPatch) -> None:
+    cli_key = "configure manager add DONTRESOLVE registration-secret-abcdef natid456"
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            (
+                b"configure manager add DONTRESOLVE registration-secret-\r\n"
+                b"abcdef natid456\r\nManager already configured.\r\n> "
+            ),
+        ]
+    )
+    _patch_client(monkeypatch, _FakeClient(channel))
+
+    with pytest.raises(FtdConfigureManagerError) as excinfo:
+        _service().configure_manager(
+            host="10.0.0.5",
+            port=22,
+            username="admin",
+            password="pw",
+            cli_key=cli_key,
+            timeout=5,
+        )
+
+    assert "Manager already configured." in excinfo.value.output
+    assert "registration-secret-" not in excinfo.value.output
+    assert "abcdef" not in excinfo.value.output
+    assert "natid456" not in excinfo.value.output
+
+
+def test_error_output_removes_partial_cli_key_echo(monkeypatch: MonkeyPatch) -> None:
+    cli_key = "configure manager add DONTRESOLVE registration-secret-abcdef natid456"
+    channel = _FakeChannel(
+        [
+            b"\r\n> ",
+            (
+                b"configure manager add DONTRESOLVE registration-secret-\r\n"
+                b"abcdef\r\nManager already configured.\r\n> "
+            ),
+        ]
+    )
+    _patch_client(monkeypatch, _FakeClient(channel))
+
+    with pytest.raises(FtdConfigureManagerError) as excinfo:
+        _service().configure_manager(
+            host="10.0.0.5",
+            port=22,
+            username="admin",
+            password="pw",
+            cli_key=cli_key,
+            timeout=5,
+        )
+
+    assert "Manager already configured." in excinfo.value.output
+    assert "registration-secret-" not in excinfo.value.output
+    assert "abcdef" not in excinfo.value.output
+
+
+@pytest.mark.parametrize(
+    "partial_echo",
+    [
+        "configure manager add DONTRESOLVE registration-secret-",
+        "configure manager add DONTRESOLVE\nregistration-secret-\nabcdef",
+    ],
+)
+def test_timeout_output_removes_partial_cli_key_echo(
+    monkeypatch: MonkeyPatch,
+    partial_echo: str,
+) -> None:
+    cli_key = "configure manager add DONTRESOLVE registration-secret-abcdef natid456"
+    reads = 0
+
+    def fake_read_until_prompt(channel: paramiko.Channel, timeout: int) -> str:
+        nonlocal reads
+        reads += 1
+        if reads == 1:
+            return ">"
+        raise FtdConfigureManagerError(
+            "Timed out waiting for the FTD CLI prompt.",
+            output=f"{partial_echo}\nManager response remains visible.",
+        )
+
+    monkeypatch.setattr(svc_mod, "_read_until_prompt", fake_read_until_prompt)
+    _patch_client(monkeypatch, _FakeClient(_FakeChannel([])))
+
+    with pytest.raises(FtdConfigureManagerError, match="Timed out") as excinfo:
+        _service().configure_manager(
+            host="10.0.0.5",
+            port=22,
+            username="admin",
+            password="pw",
+            cli_key=cli_key,
+            timeout=5,
+        )
+
+    assert "Manager response remains visible." in excinfo.value.output
+    assert "registration-secret-" not in excinfo.value.output
+    assert "abcdef" not in excinfo.value.output
+
+
+def test_sanitizer_preserves_ordinary_response_that_mentions_command() -> None:
+    output = "Error: configure manager add DONTRESOLVE was rejected by policy."
+
+    assert svc_mod._sanitize_manager_command_echo(output, _CLI_KEY) == output
 
 
 def test_authentication_failure_maps_to_error(monkeypatch: MonkeyPatch) -> None:

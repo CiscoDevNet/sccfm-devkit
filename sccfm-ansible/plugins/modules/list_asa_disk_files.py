@@ -67,8 +67,8 @@ EXAMPLES = r"""
 - name: List disk files on production ASAs
   cisco.sccfm.list_asa_disk_files:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: disk_files
 
 # Example 2: List files on specific devices by UID
@@ -85,8 +85,8 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: List files on branch ASAs
       cisco.sccfm.list_asa_disk_files:

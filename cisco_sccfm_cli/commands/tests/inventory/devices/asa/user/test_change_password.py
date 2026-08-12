@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage, EntityType
@@ -411,3 +412,62 @@ def test_should_render_failed_transaction_as_json_when_requested(
     assert result.exit_code != 0
     assert '"transactionUid": "tx-123"' in result.output
     assert '"cdoTransactionStatus": "ERROR"' in result.output
+
+
+@pytest.mark.parametrize("output_format", ["table", "json"])
+def test_should_redact_prompted_password_from_returned_results(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+    output_format: str,
+) -> None:
+    """Returned messages must inherit secrets registered by the prompt helper."""
+    password = "prompted-password-result-sentinel"
+
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        return DevicePage(count=len(sample_devices), items=sample_devices)
+
+    def fake_change_password(
+        self: AsaUserPasswordService,
+        *,
+        device_uids: list[str],
+        username: str,
+        new_password: str,
+    ) -> dict[str, AsaPasswordChangeResult]:
+        return {
+            device_uids[0]: AsaPasswordChangeResult(
+                device_uid=device_uids[0],
+                status="failed",
+                message=f"device echoed {password}",
+            )
+        }
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaUserPasswordService, "change_password", fake_change_password)
+    _stub_password_service(monkeypatch)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "user",
+            "change-password",
+            "-u",
+            "uid-1",
+            "--username",
+            "admin",
+            "--format",
+            output_format,
+        ],
+        input=f"{password}\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "<redacted>" in result.output
+    assert password not in result.output

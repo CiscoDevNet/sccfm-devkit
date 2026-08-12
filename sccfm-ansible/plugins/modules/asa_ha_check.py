@@ -67,8 +67,8 @@ EXAMPLES = r"""
 - name: Run HA checks on production ASAs
   cisco.sccfm.asa_ha_check:
     query: "name:prod-ha-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: ha_results
 
 # Example 2: Check HA status on a specific device by UID
@@ -95,8 +95,8 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Run HA checks
       cisco.sccfm.asa_ha_check:

@@ -81,8 +81,8 @@ EXAMPLES:
     labels:
       - production
       - web
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Create a group with referenced objects using module_defaults
 - name: Create network groups
@@ -90,7 +90,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Create group from existing objects

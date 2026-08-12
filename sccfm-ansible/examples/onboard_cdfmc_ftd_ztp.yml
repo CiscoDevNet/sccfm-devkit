@@ -42,10 +42,11 @@
 
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ sccfm_api_token_effective }}"
 
   vars:
+    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
     device_name: ""
     serial_number: ""
     manager_name: ""

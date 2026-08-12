@@ -63,8 +63,8 @@ EXAMPLES:
 - name: List boot registry on production ASAs
   cisco.sccfm.list_asa_boot_registry:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: boot_registry
 
 # Example 2: Get boot registry info for specific devices by UID
@@ -81,8 +81,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: List boot registry on branch ASAs
       cisco.sccfm.list_asa_boot_registry:

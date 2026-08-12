@@ -143,6 +143,33 @@ class TestSuccessfulConfigure:
 
 
 class TestFailure:
+    def test_should_require_cli_key_outside_check(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("SCCFM_CLI_KEY", raising=False)
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "cdfmc-managed-ftd",
+                "configure-manager",
+                "--ftd-host",
+                "10.0.0.5",
+                "--ftd-user",
+                "admin",
+                "--ftd-password",
+                "s3cr3t",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "--cli-key is required unless --check is set" in result.output
+
     def test_should_fail_when_ftd_rejects(
         self,
         cli_runner: CliRunner,
@@ -190,9 +217,55 @@ class TestFailure:
         assert result.exit_code != 0
         assert "configure manager add" in result.output
 
+    def test_should_redact_all_credential_sources_from_service_failure(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """FTD, jump, and manager credentials must be redacted after acquisition."""
+        ftd_password = "prompted-ftd-password-sentinel"
+        jump_password = "prompted-jump-password-sentinel"
+        cli_key = "configure manager add secret-manager-key-sentinel"
+        monkeypatch.setattr(FtdConfigureManagerService, "__init__", _stub_service_init)
+
+        def fake_configure(
+            self: FtdConfigureManagerService, **kwargs: Any
+        ) -> ConfigureManagerResult:
+            jump = kwargs["jump"]
+            raise FtdConfigureManagerError(
+                f"credentials: {kwargs['password']} {kwargs['cli_key']} {jump.password}",
+                output=f"device echoed {kwargs['password']} and {jump.password}",
+            )
+
+        monkeypatch.setattr(FtdConfigureManagerService, "configure_manager", fake_configure)
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "cdfmc-managed-ftd",
+                "configure-manager",
+                "--ftd-host",
+                "10.0.0.5",
+                "--ftd-user",
+                "admin",
+                "--jump-host",
+                "jump.example.test",
+            ],
+            input=f"{jump_password}\n{ftd_password}\n",
+            env={"SCCFM_CLI_KEY": cli_key},
+        )
+
+        assert result.exit_code != 0
+        assert "<redacted>" in result.output
+        for secret in (ftd_password, jump_password, cli_key):
+            assert secret not in result.output
+            assert secret not in repr(result.exception)
+
 
 class TestCheckMode:
-    def test_check_reachable(
+    def test_check_reachable_without_cli_key(
         self,
         cli_runner: CliRunner,
         default_config: Config,
@@ -206,8 +279,22 @@ class TestCheckMode:
                 return None
 
         monkeypatch.setattr(socket, "create_connection", lambda *a, **k: _FakeConn())
+        monkeypatch.delenv("SCCFM_CLI_KEY", raising=False)
 
-        result = cli_runner.invoke(cli, _BASE_ARGS + ["--check"])
+        result = cli_runner.invoke(
+            cli,
+            [
+                "inventory",
+                "devices",
+                "cdfmc-managed-ftd",
+                "configure-manager",
+                "--ftd-host",
+                "10.0.0.5",
+                "--ftd-user",
+                "admin",
+                "--check",
+            ],
+        )
 
         assert result.exit_code == 0, f"Command failed: {result.output}"
         assert "reachable" in result.output

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 from typing import Any, cast
@@ -31,9 +32,19 @@ def test_collection_python_requirement_matches_release_versions() -> None:
         for line in (_COLLECTION_ROOT / "requirements.txt").read_text().splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
+    dependency_source = (
+        _COLLECTION_ROOT / "plugins" / "module_utils" / "dependencies.py"
+    ).read_text()
+    runtime_requirement = re.search(
+        r'^_PAIRED_DEVKIT_REQUIREMENT = "(?P<requirement>[^"]+)"$',
+        dependency_source,
+        re.MULTILINE,
+    )
 
     assert galaxy_version == project_version
     assert requirement_lines == [f"cisco-sccfm-devkit=={project_version}"]
+    assert runtime_requirement is not None
+    assert runtime_requirement.group("requirement") == requirement_lines[0]
 
 
 def test_execution_environment_uses_collection_requirements() -> None:

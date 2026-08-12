@@ -67,8 +67,8 @@ EXAMPLES:
   cisco.sccfm.change_asa_boot_image:
     query: "name:branch-*"
     image_path: "disk0:/asa9-18-4-smp-k8.bin"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Change boot image on specific devices
 - name: Change boot image on specific ASA devices
@@ -93,8 +93,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Set boot image on branch ASAs
       cisco.sccfm.change_asa_boot_image:

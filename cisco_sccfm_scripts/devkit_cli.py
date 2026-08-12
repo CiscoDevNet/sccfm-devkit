@@ -12,17 +12,21 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import questionary
 from rich.console import Console
 from rich.panel import Panel
 
 console = Console()
+
+if TYPE_CHECKING:
+    from cisco_sccfm_scripts.token_store import SavedToken, VaultTokenStore
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -171,6 +175,47 @@ def _run_e2e() -> None:
 # ── Run CLI commands ──────────────────────────────────────────────
 
 
+def _prompt_cli_value(message: str, *, sensitive: bool) -> str | None:
+    """Prompt for one CLI option value without echoing sensitive input."""
+    prompt = questionary.password(message) if sensitive else questionary.text(message)
+    answer: object = prompt.unsafe_ask()
+    return answer if isinstance(answer, str) else None
+
+
+def _primary_envvar(envvar: str | tuple[str, ...] | None) -> str | None:
+    """Return the first environment variable Click will inspect for an option."""
+    if isinstance(envvar, str):
+        return envvar or None
+    if envvar:
+        return envvar[0] or None
+    return None
+
+
+def _repeatable_envvar_value(values: list[str], splitter: str | None) -> str:
+    """Encode repeatable values exactly as Click's parameter type will split them."""
+    if splitter == "":
+        raise ValueError("the option declares an empty environment-variable splitter")
+    if splitter is None:
+        if any(any(character.isspace() for character in value) for value in values):
+            raise ValueError("a repeatable value contains whitespace")
+        return " ".join(values)
+    if any(splitter in value for value in values):
+        raise ValueError("a repeatable value contains its environment-variable splitter")
+    return splitter.join(values)
+
+
+def _with_child_secret(
+    child_env: dict[str, str] | None,
+    envvar: str,
+    value: str,
+) -> dict[str, str]:
+    """Return a child-only environment containing one prompted secret."""
+    if child_env is None:
+        child_env = dict(os.environ)
+    child_env[envvar] = value
+    return child_env
+
+
 def _execute_cli_command(cmd: object) -> None:
     """Prompt for params and run an sccfm-cli leaf command."""
     from cisco_sccfm_scripts.cli_commands import CliCommand, CliParam
@@ -178,6 +223,7 @@ def _execute_cli_command(cmd: object) -> None:
     if not isinstance(cmd, CliCommand):
         return
     argv: list[str] = ["sccfm-cli", *cmd.args]
+    child_env: dict[str, str] | None = None
     for param in cmd.params:
         if not isinstance(param, CliParam):
             continue
@@ -185,31 +231,59 @@ def _execute_cli_command(cmd: object) -> None:
             confirmed = questionary.confirm(f"{param.label}?", default=False).unsafe_ask()
             if confirmed:
                 argv.append(param.flag)
-        elif param.multiple:
+            continue
+
+        secret_envvar = _primary_envvar(param.envvar) if param.sensitive else None
+        if param.sensitive and secret_envvar is None:
+            console.print(
+                f"[dim]{param.label} will be requested by sccfm-cli's hidden prompt "
+                "if needed.[/dim]"
+            )
+            continue
+
+        if param.multiple:
             console.print(f"[dim]{param.label} — enter one value per line, blank to finish:[/dim]")
-            has_value = False
+            values: list[str] = []
             while True:
-                value: str | None = questionary.text(f"  {param.flag}").unsafe_ask()
+                value = _prompt_cli_value(f"  {param.flag}", sensitive=param.sensitive)
                 normalized_value = (value or "").strip()
                 if not normalized_value:
                     break
-                argv.extend([param.flag, normalized_value])
-                has_value = True
-            if param.required and not has_value:
+                values.append(normalized_value)
+            if param.required and not values:
                 console.print(f"[red]{param.label} is required.[/red]")
                 return
+            if not values:
+                continue
+            if secret_envvar is not None:
+                try:
+                    encoded = _repeatable_envvar_value(values, param.envvar_list_splitter)
+                except ValueError as exc:
+                    console.print(f"[red]{param.label} cannot be passed securely: {exc}.[/red]")
+                    return
+                child_env = _with_child_secret(child_env, secret_envvar, encoded)
+            else:
+                for normalized_value in values:
+                    argv.extend([param.flag, normalized_value])
         else:
             prompt = f"{param.label}{'' if param.required else ' (leave blank to skip)'}"
-            single: str | None = questionary.text(prompt).unsafe_ask()
+            single = _prompt_cli_value(prompt, sensitive=param.sensitive)
             normalized_value = (single or "").strip()
             if normalized_value:
-                argv.extend([param.flag, normalized_value])
+                if secret_envvar is not None:
+                    child_env = _with_child_secret(
+                        child_env,
+                        secret_envvar,
+                        normalized_value,
+                    )
+                else:
+                    argv.extend([param.flag, normalized_value])
             elif param.required:
                 console.print(f"[red]{param.label} is required.[/red]")
                 return
 
     console.print(f"[bold cyan]$ {shlex.join(argv)}[/bold cyan]")
-    subprocess.call(argv, cwd=_project_root())
+    subprocess.call(argv, cwd=_project_root(), env=child_env)
 
 
 def _navigate_cli(children: list[object], title: str) -> None:
@@ -291,10 +365,100 @@ def _run_ansible_examples() -> None:
 # ── Manage tokens ─────────────────────────────────────────────────
 
 
+def _load_managed_tokens(
+    examples_path: Path,
+) -> tuple[VaultTokenStore, SavedToken | None, list[SavedToken]]:
+    """Load the store, prompting for compatibility region when migration needs one."""
+    from cisco_sccfm_scripts.setup_tokens import _prompt_region, _verify_ansible_vault
+    from cisco_sccfm_scripts.token_store import (
+        ActiveTokenRegionRequired,
+        VaultTokenStore,
+    )
+
+    _verify_ansible_vault()
+    store = VaultTokenStore(examples_path)
+    try:
+        active = store.active_token()
+        tokens = store.list_tokens()
+    except ActiveTokenRegionRequired:
+        console.print(
+            "[yellow]The existing active-only Vault token needs its SCCFM region before it "
+            "can be managed.[/yellow]"
+        )
+        store = VaultTokenStore(examples_path, migration_region=_prompt_region())
+        active = store.active_token()
+        tokens = store.list_tokens()
+    return store, active, tokens
+
+
+def _matching_cli_profiles(token: SavedToken | None) -> list[str]:
+    """Return CLI profiles currently associated with an active Vault token."""
+    from cisco_sccfm_cli.services import ConfigService
+
+    if token is None:
+        return []
+    config_path_value = os.environ.get("SCCFM_CONFIG")
+    config_path = Path(config_path_value).expanduser() if config_path_value else None
+    return [
+        profile.profile
+        for profile in ConfigService(path=config_path).list_profiles()
+        if profile.api_token == token.token
+    ]
+
+
+def _token_choices(tokens: list[SavedToken]) -> list[questionary.Choice]:
+    """Build opaque menu values so legacy token labels cannot collide with actions."""
+    return [
+        questionary.Choice(
+            title=f"{token.name}  ({token.region})",
+            value=f"token:{index}",
+        )
+        for index, token in enumerate(tokens)
+    ]
+
+
+def _selected_token(tokens: list[SavedToken], answer: str) -> SavedToken | None:
+    """Resolve an opaque menu value to its token without trusting a user label."""
+    if not answer.startswith("token:"):
+        return None
+    try:
+        return tokens[int(answer.removeprefix("token:"))]
+    except (ValueError, IndexError):
+        return None
+
+
+def _sync_active_token(
+    examples_path: Path,
+    token: SavedToken,
+    profiles: list[str],
+) -> None:
+    """Synchronize every local credential surface after the active token changes."""
+    from cisco_sccfm_scripts.setup_tokens import (
+        _update_cli_config,
+        _update_vars_region,
+        _write_env_file,
+    )
+
+    root = _project_root()
+    _write_env_file(root, token.region, token.token)
+    _update_vars_region(examples_path, token.region)
+    for profile in profiles:
+        _update_cli_config(token.region, token.token, profile=profile)
+    if not profiles:
+        console.print(
+            "[yellow]No CLI profile used the previous active token; CLI profiles were left "
+            "unchanged.[/yellow]"
+        )
+
+
 def _update_token() -> None:
     """Prompt for a new API token for an existing named token."""
-    from cisco_sccfm_scripts.setup_tokens import _resolve_examples_path
-    from cisco_sccfm_scripts.token_store import SavedToken, VaultTokenStore
+    from cisco_sccfm_scripts.setup_tokens import (
+        _credential_transaction,
+        _credential_transaction_paths,
+        _resolve_examples_path,
+    )
+    from cisco_sccfm_scripts.token_store import SavedToken
 
     try:
         examples_path = _resolve_examples_path(None)
@@ -302,35 +466,30 @@ def _update_token() -> None:
         console.print(f"[red]{exc}[/red]")
         return
 
-    store = VaultTokenStore(examples_path)
-    tokens = store.list_tokens()
+    store, active_before, tokens = _load_managed_tokens(examples_path)
 
     if not tokens:
         console.print("[yellow]No saved tokens found in vault.[/yellow]")
         return
 
-    token_choices: list[questionary.Choice | str] = [
-        questionary.Choice(
-            title=f"{t.name}  ({t.region})",
-            value=t.name,
-        )
-        for t in tokens
-    ]
-    token_choices.append("back")
+    token_choices: list[questionary.Choice | str] = [*_token_choices(tokens), "back"]
 
     answer = _ask(token_choices, "Select a token to update:")
     if answer is None or answer == "back":
         return
 
-    token_to_update = next((t for t in tokens if t.name == answer), None)
+    token_to_update = _selected_token(tokens, answer)
     if token_to_update is None:
         console.print("[red]Token not found.[/red]")
         return
 
-    new_token_value = questionary.password(
+    new_token_answer = questionary.password(
         f"Paste new API token for '{token_to_update.name}':",
     ).unsafe_ask()
-    new_token_value = new_token_value.strip()
+    if not isinstance(new_token_answer, str):
+        console.print("[dim]Cancelled.[/dim]")
+        return
+    new_token_value = new_token_answer.strip()
     if not new_token_value:
         console.print("[red]Token cannot be empty.[/red]")
         return
@@ -341,15 +500,42 @@ def _update_token() -> None:
         token=new_token_value,
     )
     all_tokens = [updated if t.name == updated.name else t for t in tokens]
-    vault_path = store.save_active_and_tokens(updated, all_tokens)
+    active_after = (
+        updated if active_before is None or active_before.name == updated.name else active_before
+    )
+    changed_profiles = (
+        _matching_cli_profiles(active_before)
+        if active_before is not None and active_after.token != active_before.token
+        else []
+    )
+    active_changed = active_before is None or active_after.token != active_before.token
+    transaction_paths = (
+        _credential_transaction_paths(_project_root(), examples_path)
+        if active_changed
+        else [
+            examples_path / "group_vars" / "all" / "vault.yml",
+            examples_path / ".vault_pass",
+        ]
+    )
+    with _credential_transaction(transaction_paths):
+        vault_path = store.save_active_and_tokens(
+            active_after,
+            all_tokens,
+            preserve_omitted_active=False,
+        )
+        if active_changed:
+            _sync_active_token(examples_path, active_after, changed_profiles)
     console.print(f"[green]Updated token '{updated.name}'.[/green]")
     console.print(f"[dim]Vault updated: {vault_path}[/dim]")
 
 
 def _remove_token() -> None:
     """Remove a saved token from the Ansible vault store."""
-    from cisco_sccfm_scripts.setup_tokens import _resolve_examples_path
-    from cisco_sccfm_scripts.token_store import VaultTokenStore
+    from cisco_sccfm_scripts.setup_tokens import (
+        _credential_transaction,
+        _credential_transaction_paths,
+        _resolve_examples_path,
+    )
 
     try:
         examples_path = _resolve_examples_path(None)
@@ -357,8 +543,7 @@ def _remove_token() -> None:
         console.print(f"[red]{exc}[/red]")
         return
 
-    store = VaultTokenStore(examples_path)
-    tokens = store.list_tokens()
+    store, active_before, tokens = _load_managed_tokens(examples_path)
 
     if not tokens:
         console.print("[yellow]No saved tokens found in vault.[/yellow]")
@@ -369,24 +554,42 @@ def _remove_token() -> None:
         return
 
     # Use Choice so the display shows region context but the value is just the name.
-    token_choices: list[questionary.Choice | str] = [
-        questionary.Choice(
-            title=f"{t.name}  ({t.region})",
-            value=t.name,
-        )
-        for t in tokens
-    ]
-    token_choices.append("back")
+    token_choices: list[questionary.Choice | str] = [*_token_choices(tokens), "back"]
 
     answer = _ask(token_choices, "Select a token to remove:")
     if answer is None or answer == "back":
         return
 
-    token_to_remove = next((t for t in tokens if t.name == answer), None)
+    token_to_remove = _selected_token(tokens, answer)
     if token_to_remove is None:
         console.print("[red]Token not found.[/red]")
         return
 
+    remaining = [t for t in tokens if t.name != token_to_remove.name]
+    if active_before is None or active_before.name == token_to_remove.name:
+        if len(remaining) == 1:
+            new_active = remaining[0]
+        else:
+            replacement_choices: list[questionary.Choice | str] = [
+                *_token_choices(remaining),
+                "back",
+            ]
+            replacement_name = _ask(
+                replacement_choices,
+                "Select the replacement active token:",
+            )
+            if replacement_name is None or replacement_name == "back":
+                console.print("[dim]Cancelled.[/dim]")
+                return
+            replacement = _selected_token(remaining, replacement_name)
+            if replacement is None:
+                console.print("[red]Replacement token not found.[/red]")
+                return
+            new_active = replacement
+        active_changed = True
+    else:
+        new_active = active_before
+        active_changed = False
     confirmed = questionary.confirm(
         f"Remove token '{token_to_remove.name}' (region={token_to_remove.region})?",
         default=True,
@@ -394,14 +597,29 @@ def _remove_token() -> None:
     if not confirmed:
         console.print("[dim]Cancelled.[/dim]")
         return
-
-    remaining = [t for t in tokens if t.name != token_to_remove.name]
-    new_active = remaining[0]
-    vault_path = store.save_active_and_tokens(new_active, remaining)
-    console.print(f"[green]Removed token '{token_to_remove.name}'.[/green]")
-    console.print(
-        f"[green]Active token is now '{new_active.name}' (region={new_active.region}).[/green]"
+    changed_profiles = _matching_cli_profiles(active_before) if active_changed else []
+    transaction_paths = (
+        _credential_transaction_paths(_project_root(), examples_path)
+        if active_changed
+        else [
+            examples_path / "group_vars" / "all" / "vault.yml",
+            examples_path / ".vault_pass",
+        ]
     )
+    with _credential_transaction(transaction_paths):
+        vault_path = store.save_active_and_tokens(
+            new_active,
+            remaining,
+            preserve_omitted_active=False,
+        )
+        if active_changed:
+            _sync_active_token(examples_path, new_active, changed_profiles)
+    console.print(f"[green]Removed token '{token_to_remove.name}'.[/green]")
+    if active_changed:
+        console.print(
+            f"[green]Active token is now '{new_active.name}' "
+            f"(region={new_active.region}).[/green]"
+        )
     console.print(f"[dim]Vault updated: {vault_path}[/dim]")
 
 

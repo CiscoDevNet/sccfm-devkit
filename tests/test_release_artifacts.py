@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -216,6 +217,11 @@ def test_workflows_promote_release_assets_without_rebuilding() -> None:
 
     assert "gh release create" in draft
     assert "--draft" in draft
+    assert "--json isDraft,isPrerelease,tagName" in draft
+    assert "\"${RELEASE_TAG}\"$'\\ttrue\\tfalse'" in draft
+    assert "\"${RELEASE_TAG}\"$'\\tfalse\\tfalse'" in draft
+    assert "RELEASE_IS_DRAFT=false" in draft
+    assert "public release is missing immutable asset" in draft
     assert "release_artifacts verify" in draft
     for publisher in (pypi, galaxy):
         assert "actions/download-artifact" in publisher
@@ -226,11 +232,118 @@ def test_workflows_promote_release_assets_without_rebuilding() -> None:
 
     assert "environment: pypi" in pypi
     assert "pypa/gh-action-pypi-publish" in pypi
-    assert "skip-existing: true" in pypi
+    assert "skip-existing:" not in pypi
+    assert 'MISSING_FILES="${PYPI_VERIFICATION##* missing=}"' in pypi
+    assert 'test "$(find dist -mindepth 1 -maxdepth 1 -type f' in pypi
+    assert '2)\n              cp "${WHEEL_PATH}" "${SDIST_PATH}" dist/' in pypi
+    assert "3)\n              MISSING_FILES=" in pypi
+    assert (
+        'cp "${WHEEL_PATH}" "${SDIST_PATH}" dist/'
+        not in pypi.split("3)\n              MISSING_FILES=", maxsplit=1)[1]
+    )
     assert "- publish-to-pypi" in galaxy
     assert "environment: ansible-galaxy" in galaxy
     assert "ansible-galaxy collection publish" in galaxy
     assert "--import-timeout 600" in galaxy
+    assert "LOOKUP_ATTEMPTS=121" in galaxy
+    assert "GITHUB_RUN_ATTEMPT" in galaxy
     assert "--no-wait" not in galaxy
     assert "- publish-to-galaxy" in finalizer
+    assert "actions: read" in finalizer
+    assert "actions/checkout" in finalizer
+    assert "actions/download-artifact" in finalizer
+    assert 'test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"' in finalizer
+    assert finalizer.count("release_artifacts verify") == 2
+    assert 'gh release download "${RELEASE_TAG}"' in finalizer
+    assert 'cmp -s "${local_asset}" "${RELEASE_ASSETS_DIR}/${asset_name}"' in finalizer
+    assert "--json isDraft,isPrerelease,tagName" in finalizer
+    assert 'test "${RELEASE_TAG_NAME}" = "${RELEASE_TAG}"' in finalizer
+    assert 'test "${IS_PRERELEASE}" = "false"' in finalizer
+    assert "select(.draft == false and .prerelease == false) | .tag_name" in finalizer
+    assert "any(version > current for version in public_versions)" in finalizer
+    assert '[[ "${MAKE_LATEST}" = "true" ]]' in finalizer
     assert "--draft=false" in finalizer
+    assert "--latest=false" in finalizer
+    assert finalizer.index("--latest=false") < finalizer.index('[[ "${IS_DRAFT}" = "false" ]]')
+
+
+def test_release_workflow_refreshes_metadata_after_files_only_bump() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    synchronization = release.split(
+        "      - name: Synchronize exact release version\n", maxsplit=1
+    )[1].split("      - name: Build release artifacts once\n", maxsplit=1)[0]
+
+    bump = synchronization.index('poetry run cz bump "${RELEASE_VERSION}"')
+    reinstall = synchronization.index("poetry install --only-root --no-interaction")
+    metadata_check = synchronization.index('test "${INSTALLED_VERSION}" = "${RELEASE_VERSION}"')
+
+    assert bump < reinstall < metadata_check
+    assert 'version("cisco-sccfm-devkit")' in synchronization
+
+
+def test_release_changed_path_validation_reads_tracked_and_untracked_paths() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    commit_step = release.split("      - name: Commit and tag verified source\n", maxsplit=1)[
+        1
+    ].split("      - name: Create and verify release manifest\n", maxsplit=1)[0]
+
+    validation = re.compile(
+        r"while IFS= read -r changed_path; do.*?done < <\(\s*\{\s*"
+        r"git diff --name-only\s*git ls-files --others --exclude-standard\s*"
+        r"\} \| sort -u\s*\)",
+        re.DOTALL,
+    )
+    assert validation.search(commit_step) is not None
+    assert re.search(r"\} \| sort -u \| while", commit_step) is None
+    paired_runtime = "sccfm-ansible/plugins/module_utils/dependencies.py"
+    assert paired_runtime in commit_step
+    assert re.search(rf"git add .*?{re.escape(paired_runtime)}", commit_step, re.DOTALL)
+
+
+def test_release_retry_resumes_only_same_run_manifest_bound_artifacts() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    build = release.split("  build-release:\n", maxsplit=1)[1].split(
+        "  create-draft-release:\n", maxsplit=1
+    )[0]
+    validation = build.split("      - name: Validate requested release\n", maxsplit=1)[1].split(
+        "      - name: Synchronize exact release version\n", maxsplit=1
+    )[0]
+
+    assert "actions: read" in build
+    assert '[[ "${GITHUB_RUN_ATTEMPT}" -le 1 ]]' in validation
+    assert "actions/runs/${GITHUB_RUN_ID}/artifacts" in validation
+    assert 'gh run download "${GITHUB_RUN_ID}"' in validation
+    assert "cisco_sccfm_scripts.release_artifacts verify" in validation
+    assert 'git merge-base --is-ancestor "${SOURCE_COMMIT}" HEAD' in validation
+    assert "--json isDraft,isPrerelease,tagName" in validation
+    assert ".isPrerelease == false" in validation
+    assert "select(.isPrerelease == false) | .tagName" in validation
+    assert '[[ "${RELEASE_IDENTITY}" != "${RELEASE_TAG}" ]]' in validation
+    assert "select(.draft == true) | .tag_name" in validation
+    assert '[[ "${RESUME_RELEASE}" != "true" || "${draft_tag}" != "${RELEASE_TAG}" ]]' in validation
+    assert "unresolved draft release blocks a new production release" in validation
+    registry_resume = re.search(
+        r'200\)\s+if \[\[ "\$\{RESUME_RELEASE\}" != "true" \]\]; then\s+'
+        r'echo "::error::\$\{registry\} already contains version',
+        validation,
+    )
+    assert registry_resume is not None
+    assert "steps.source.outputs.source_commit || steps.version.outputs.source_commit" in build
+    assert "steps.source.outputs.bundle_name || steps.version.outputs.bundle_name" in build
+
+
+def test_release_push_reconciles_an_accepted_remote_update() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    push = release.split("      - name: Push release commit and tag atomically\n", maxsplit=1)[
+        1
+    ].split("\n  create-draft-release:\n", maxsplit=1)[0]
+
+    assert "if git push --atomic origin" in push
+    assert "git ls-remote --refs origin" in push
+    assert '[[ "${REMOTE_TAG_COMMIT}" = "${SOURCE_COMMIT}" ]]' in push
+    assert 'git merge-base --is-ancestor "${SOURCE_COMMIT}" FETCH_HEAD' in push
+    assert "the atomic remote update was verified" in push

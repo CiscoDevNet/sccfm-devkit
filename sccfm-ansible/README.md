@@ -176,8 +176,10 @@ printf "\n"
 export SCCFM_API_TOKEN
 ```
 
-For long-lived automation, use a secret manager or an Ansible Vault variable in a playbook-local
-file. For example, create `vault.yml` with `ansible-vault create vault.yml` and store:
+For long-lived automation, use a secret manager or an Ansible Vault variable. The packaged
+examples automatically use a non-empty `vault_sccfm_api_token` from their adjacent encrypted
+`group_vars/all/vault.yml`; otherwise they fall back to `SCCFM_API_TOKEN`. For a standalone
+playbook, create `vault.yml` with `ansible-vault create vault.yml` and store:
 
 ```yaml
 ---
@@ -189,10 +191,14 @@ Reference it without exposing the token:
 ```yaml
 vars_files:
   - vault.yml
+vars:
+  sccfm_api_token_effective: >-
+    {{ vault_sccfm_api_token |
+       default(lookup('env', 'SCCFM_API_TOKEN'), true) }}
 module_defaults:
   group/cisco.sccfm.all:
     region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ vault_sccfm_api_token }}"
+    api_token: "{{ sccfm_api_token_effective }}"
 ```
 
 Run vault-backed playbooks with `--ask-vault-pass` or with your organization's approved vault
@@ -276,7 +282,7 @@ Onboard an ASA device to your SCCFM tenant.
   hosts: localhost
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   
   tasks:
@@ -337,7 +343,8 @@ documentation.
 
 Ansible Vault encrypts sensitive data such as API tokens and passwords. The local `vault.yml` and
 `.vault_pass` files are Git-ignored and excluded from collection artifacts; do not commit either
-file, even when the vault is encrypted.
+file, even when the vault is encrypted. Store the active API token as
+`vault_sccfm_api_token`; packaged examples prefer a non-empty value over `SCCFM_API_TOKEN`.
 
 ### Vault Commands Reference
 
@@ -388,10 +395,14 @@ Instead of repeating `region` and `api_token` for every task, use `module_defaul
 ```yaml
 - name: Manage SCCFM devices
   hosts: localhost
+  vars:
+    sccfm_api_token_effective: >-
+      {{ vault_sccfm_api_token |
+         default(lookup('env', 'SCCFM_API_TOKEN'), true) }}
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ sccfm_api_token_effective }}"
   
   tasks:
     - name: Onboard device 1
@@ -407,15 +418,25 @@ Instead of repeating `region` and `api_token` for every task, use `module_defaul
 
 ## Authentication Methods
 
-Three ways to provide credentials (in order of precedence):
+Packaged examples resolve authentication in this order:
 
-1. **Module parameters** (explicit in task)
-2. **Module defaults** (recommended - set once per playbook)
-3. **Environment variables**:
+1. A non-empty encrypted **`vault_sccfm_api_token`** value
+2. The controller **`SCCFM_API_TOKEN`** environment variable
+
+The resolved token is passed once through `module_defaults`; do not repeat it in each task.
+Region remains controller-environment based:
+
    ```bash
    export SCCFM_REGION=us
-   # Inject SCCFM_API_TOKEN through your shell or secret manager as shown above.
+   # Inject SCCFM_API_TOKEN unless vault_sccfm_api_token is configured.
    ```
+
+`change-tokens` continues to write `sccfm_region` for compatibility with existing local projects,
+but the packaged examples intentionally read `SCCFM_REGION`.
+
+For a one-time migration of an active-only Vault whose original region is unavailable, set
+`SCCFM_LEGACY_REGION` to the old token's region. Do not infer it from the region of a newly added
+token; the tool fails closed when the old region cannot be established safely.
 
 ## Security Best Practices
 
@@ -436,14 +457,14 @@ Three ways to provide credentials (in order of precedence):
 - Ensure you're using the right vault password file
 
 ### "region is required" error
-- Verify `sccfm_region` is set in `group_vars/all/vars.yml`
-- Or set `SCCFM_REGION` environment variable
+- Verify `SCCFM_REGION` is set in the controller environment
 - Or provide `region` parameter in module defaults
 
 ### "api_token is required" error
-- Verify `SCCFM_API_TOKEN` is set in the controller environment
-- Or provide a Vault-backed `api_token` parameter in module defaults; keep the Vault
-  playbook-local instead of placing it in inventory or `group_vars`
+- Verify `SCCFM_API_TOKEN` is set in the controller environment, or set a non-empty
+  `vault_sccfm_api_token` in the encrypted Vault file loaded by the playbook
+- If you maintain your own `module_defaults`, pass the effective token there instead of placing a
+  token directly in inventory
 
 ### Inventory returns no hosts
 - Check your API token has proper permissions
@@ -462,9 +483,11 @@ are Git-ignored and excluded from collection artifacts:
 - **`execute_ftd_cli.yml`** - Execute show commands on cdFMC-managed FTD devices
 - **`asa_ha_check.yml`** - Run HA health checks on ASA failover devices
 - **`change_asa_boot_image.yml`** - Change the configured ASA boot image
-- **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
-- **`group_vars/all/vault.yml`** - Locally generated encrypted secrets; never packaged
-- **`group_vars/all/vault.yml.example`** - Template for vault structure
+- **`group_vars/all/vars.yml`** - Compatibility variables and non-secret defaults; packaged
+  examples read region from `SCCFM_REGION`
+- **`group_vars/all/vault.yml`** - Locally generated encrypted secrets, including
+  `vault_sccfm_api_token`; never packaged
+- **`group_vars/all/vault.yml.example`** - Template using the supported Vault variable names
 
 ## Additional Resources
 

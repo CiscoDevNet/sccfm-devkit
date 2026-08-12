@@ -84,8 +84,8 @@ EXAMPLES:
 - name: Find FTDs not on 7.4.1
   cisco.sccfm.list_ftd_not_on_version:
     version: "7.4.1"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: result
 
 - name: Show devices that need upgrading
@@ -117,8 +117,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Find FTDs not on target version
       cisco.sccfm.list_ftd_not_on_version:

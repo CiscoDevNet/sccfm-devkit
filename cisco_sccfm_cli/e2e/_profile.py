@@ -29,6 +29,10 @@ from cisco_sccfm_cli.models import Config
 from cisco_sccfm_cli.services import ConfigService
 
 E2E_PROFILE_NAME = "e2e"
+_REGION_ENV_LOOKUPS = {
+    "{{ lookup('env', 'SCCFM_REGION') }}",
+    '{{ lookup("env", "SCCFM_REGION") }}',
+}
 
 
 @dataclass(frozen=True)
@@ -67,9 +71,8 @@ def _decode_vault(vault_file: Path, vault_pass: Path) -> dict[str, Any]:
     completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         raise RuntimeError(
-            f"ansible-vault view failed (rc={completed.returncode}):\n"
-            f"--- stdout ---\n{completed.stdout}\n"
-            f"--- stderr ---\n{completed.stderr}"
+            f"ansible-vault could not decrypt the E2E credential Vault "
+            f"(exit {completed.returncode})"
         )
     parsed = yaml.safe_load(completed.stdout) or {}
     if not isinstance(parsed, dict):
@@ -111,11 +114,15 @@ def bootstrap_profile(config_dir: Path) -> ProfileContext:
     vault_vars = _decode_vault(vault_file, vault_pass)
 
     region = plain_vars.get("sccfm_region")
-    api_token = vault_vars.get("sccfm_api_token")
+    if region in _REGION_ENV_LOOKUPS:
+        region = os.environ.get("SCCFM_REGION")
+    api_token = vault_vars.get("vault_sccfm_api_token") or vault_vars.get("sccfm_api_token")
     if not region:
         raise RuntimeError(f"sccfm_region missing from {vars_file}")
     if not api_token:
-        raise RuntimeError(f"sccfm_api_token missing from {vault_file}")
+        raise RuntimeError(
+            f"vault_sccfm_api_token (or legacy sccfm_api_token) missing from {vault_file}"
+        )
 
     config_dir.mkdir(parents=True, exist_ok=True)
     config_path = config_dir / "config.json"

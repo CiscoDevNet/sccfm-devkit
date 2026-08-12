@@ -1,5 +1,6 @@
 ---
 ancestor: null
+# sccfm-release-retarget-seed: 0.38.0
 releases:
   0.38.0:
     changes:

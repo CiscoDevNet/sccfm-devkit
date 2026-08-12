@@ -46,9 +46,11 @@ Set the active profile once via the global option: `sccfm-cli --profile lab stat
 Every command lives in `cisco_sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
 
 By default, configuration is stored in `~/.sccfm-cli/config.json`. On POSIX systems the CLI
-enforces mode `0700` on `~/.sccfm-cli` and `0600` on the configuration file, including existing
-storage. On Windows, keep the configuration in your user profile and rely on the filesystem's
-per-user access controls. Keep custom configuration paths private on every platform.
+requires mode `0700` on `~/.sccfm-cli` and `0600` on the configuration file. Read-only commands
+fail without changing metadata when those modes are unsafe; `sccfm-cli configure` repairs them
+while updating a profile. Custom configuration files must also use mode `0600`, but the CLI does
+not change an existing custom parent directory. On Windows, keep the configuration in your user
+profile and rely on the filesystem's per-user access controls.
 
 Generated CLI reference docs can be previewed locally:
 
@@ -99,11 +101,17 @@ The package root exports the supported public service classes and response model
 - Set up tokens interactively with `devkit` and select **change-tokens**. By default this writes
   `.vault_pass` and encrypted `group_vars/all/vault.yml` under `sccfm-ansible/examples`; both are
   Git-ignored and explicitly excluded from collection artifacts. Use `--path` to override the
-  examples directory when needed.
+  examples directory when needed. Packaged playbooks use `SCCFM_API_TOKEN` by default and prefer
+  the non-empty encrypted `vault_sccfm_api_token` value when the Vault file is loaded. The tool
+  still writes `sccfm_region` for compatibility, while packaged examples read `SCCFM_REGION`.
+  When migrating an older active-only Vault whose region cannot be resolved, set
+  `SCCFM_LEGACY_REGION` to that existing token's region; it is deliberately separate from the
+  new token's `--region` value.
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
-- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus
-  `SCCFM_API_TOKEN` in the controller environment. Never commit a plaintext token to an inventory
-  source.
+- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) in the controller
+  environment. Also set `SCCFM_API_TOKEN` unless an API playbook loads the Vault override; the
+  packaged inventory source always reads both values from the environment. Never commit a
+  plaintext token to an inventory source.
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
 - The inventory plugin consumes its API token only during refresh and never exports it as a host
   or group variable. Do not use inventory output modes that render vars when your own

@@ -48,5 +48,7 @@ def test_missing_dependency_uses_actionable_ansible_failure(
         dependencies.ensure_required_dependencies(_FakeModule())
 
     payload = exc_info.value.payload
-    assert "cisco_sccfm_core" in payload["msg"]
+    assert dependencies._PAIRED_DEVKIT_REQUIREMENT in payload["msg"]
+    assert dependencies._PAIRED_DEVKIT_REQUIREMENT.startswith("cisco-sccfm-devkit==")
+    assert "cisco_sccfm_core" not in payload["msg"]
     assert payload["exception"] == "synthetic import traceback"

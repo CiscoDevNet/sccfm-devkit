@@ -2,8 +2,8 @@
 # Plain variables (not sensitive)
 # These can be committed to version control
 
-# SCCFM connection settings
-sccfm_region: int
+# Compatibility setting for existing projects; packaged examples read SCCFM_REGION directly
+sccfm_region: "{{ lookup('env', 'SCCFM_REGION') }}"
 
 # Common ASA configuration
 default_asa_username: asavuser

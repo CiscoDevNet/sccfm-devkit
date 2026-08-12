@@ -13,9 +13,12 @@ Infrastructure options that are not useful in an interactive session
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import click
+
+from cisco_sccfm_cli.option_metadata import is_sensitive_option
 
 # Options that are wired up at the infrastructure level and should not be
 # prompted for interactively.
@@ -29,6 +32,9 @@ class CliParam:
     required: bool
     is_flag: bool = False  # True for boolean toggle options (e.g. --check)
     multiple: bool = False  # True for repeatable options (e.g. --labels, --tags)
+    sensitive: bool = False  # True when the option value must be handled as a secret
+    envvar: str | tuple[str, ...] | None = None
+    envvar_list_splitter: str | None = None
 
 
 @dataclass
@@ -53,6 +59,13 @@ def _first_line(text: str | None) -> str:
     return text.strip().splitlines()[0].rstrip(".")
 
 
+def _envvar_metadata(envvar: str | Sequence[str] | None) -> str | tuple[str, ...] | None:
+    """Return immutable Click envvar metadata for the interactive runner."""
+    if envvar is None or isinstance(envvar, str):
+        return envvar
+    return tuple(envvar)
+
+
 def _build_tree(group: click.Group, args_prefix: list[str]) -> list[CliGroup | CliCommand]:
     """Recursively build a CliGroup/CliCommand tree from a Click group."""
     result: list[CliGroup | CliCommand] = []
@@ -66,7 +79,7 @@ def _build_tree(group: click.Group, args_prefix: list[str]) -> list[CliGroup | C
                     children=children,
                 )
             )
-        elif isinstance(cmd, click.BaseCommand):
+        elif isinstance(cmd, click.Command):
             params: list[CliParam] = []
             for param in cmd.params:
                 if not isinstance(param, click.Option):
@@ -83,6 +96,9 @@ def _build_tree(group: click.Group, args_prefix: list[str]) -> list[CliGroup | C
                         required=bool(param.required),
                         is_flag=bool(param.is_flag),
                         multiple=bool(param.multiple),
+                        sensitive=is_sensitive_option(param),
+                        envvar=_envvar_metadata(param.envvar),
+                        envvar_list_splitter=param.type.envvar_list_splitter,
                     )
                 )
             result.append(

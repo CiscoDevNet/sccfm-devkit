@@ -85,8 +85,8 @@ EXAMPLES = r"""
   cisco.sccfm.update_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
     rule_action: DENY
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Update remark and networks using module_defaults
 - name: Update access rules
@@ -94,7 +94,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Update rule remark and source

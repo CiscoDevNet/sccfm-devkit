@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
 
 _IMPORT_ERRORS: list[tuple[str, str]] = []
+_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit==0.38.0"
 
 
 def record_import_error(error: ImportError) -> None:
@@ -28,8 +29,11 @@ def ensure_required_dependencies(module: "AnsibleModule") -> None:
     if not _IMPORT_ERRORS:
         return
 
-    library, import_traceback = _IMPORT_ERRORS[0]
+    _, import_traceback = _IMPORT_ERRORS[0]
     module.fail_json(
-        msg=missing_required_lib(library),
+        msg=missing_required_lib(
+            _PAIRED_DEVKIT_REQUIREMENT,
+            reason="by this cisco.sccfm collection release",
+        ),
         exception=import_traceback,
     )

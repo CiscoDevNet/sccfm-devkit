@@ -44,15 +44,15 @@ EXAMPLES = r"""
 - name: Delete network object by UID
   cisco.sccfm.delete_network_object:
     uid: "abc-123-def-456"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Delete a network object by name
 - name: Delete network object by name
   cisco.sccfm.delete_network_object:
     name: "old-web-server"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 3: Delete multiple objects using module_defaults
 - name: Delete network objects
@@ -60,7 +60,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Delete obsolete network objects

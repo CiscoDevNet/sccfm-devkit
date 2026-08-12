@@ -37,8 +37,8 @@ EXAMPLES:
 - name: Get object
   cisco.sccfm.get_object:
     uid: "fd526e22-12ff-4fa0-a88d-7375c5d1e144"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: obj
 
 - name: Show object
@@ -51,7 +51,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Get object details

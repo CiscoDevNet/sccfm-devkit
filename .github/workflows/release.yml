@@ -31,12 +31,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: release-bot
     permissions:
+      actions: read
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
-      source_commit: ${{ steps.source.outputs.source_commit }}
-      bundle_name: ${{ steps.source.outputs.bundle_name }}
+      source_commit: ${{ steps.source.outputs.source_commit || steps.version.outputs.source_commit }}
+      bundle_name: ${{ steps.source.outputs.bundle_name || steps.version.outputs.bundle_name }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -78,7 +79,16 @@ jobs:
           fi
 
           CURRENT_VERSION="$(poetry version -s)"
-          python - "${CURRENT_VERSION}" "${RELEASE_VERSION}" <<'PY'
+          RELEASE_TAG="v${RELEASE_VERSION}"
+          RESUME_RELEASE=false
+          if [[ "${CURRENT_VERSION}" = "${RELEASE_VERSION}" ]]; then
+            if [[ "${GITHUB_RUN_ATTEMPT}" -le 1 ]]; then
+              echo "::error::version ${RELEASE_VERSION} is already current; only a retry of the original workflow run can resume it"
+              exit 1
+            fi
+            RESUME_RELEASE=true
+          else
+            python - "${CURRENT_VERSION}" "${RELEASE_VERSION}" <<'PY'
           import re
           import sys
 
@@ -93,16 +103,42 @@ jobs:
                   f"release version must be greater than current version {current}"
               )
           PY
+          fi
 
-          RELEASE_TAG="v${RELEASE_VERSION}"
-          if git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-            echo "::error::tag ${RELEASE_TAG} already exists; retry the original workflow run"
+          if [[ "${RESUME_RELEASE}" = "true" ]]; then
+            if ! git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+              echo "::error::cannot resume without existing tag ${RELEASE_TAG}"
+              exit 1
+            fi
+          elif git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            echo "::error::tag ${RELEASE_TAG} already exists"
             exit 1
           fi
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "::error::GitHub release ${RELEASE_TAG} already exists"
-            exit 1
+            if [[ "${RESUME_RELEASE}" != "true" ]]; then
+              echo "::error::GitHub release ${RELEASE_TAG} already exists"
+              exit 1
+            fi
+            RELEASE_IDENTITY="$(gh release view "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json isDraft,isPrerelease,tagName \
+              --jq 'select(.isPrerelease == false) | .tagName')"
+            if [[ "${RELEASE_IDENTITY}" != "${RELEASE_TAG}" ]]; then
+              echo "::error::existing GitHub release is not the expected stable release for ${RELEASE_TAG}"
+              exit 1
+            fi
           fi
+
+          DRAFT_RELEASE_TAGS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == true) | .tag_name')"
+          while IFS= read -r draft_tag; do
+            [[ -z "${draft_tag}" ]] && continue
+            if [[ "${RESUME_RELEASE}" != "true" || "${draft_tag}" != "${RELEASE_TAG}" ]]; then
+              echo "::error::unresolved draft release blocks a new production release: ${draft_tag}"
+              exit 1
+            fi
+          done <<< "${DRAFT_RELEASE_TAGS}"
 
           for registry_and_url in \
             "PyPI|https://pypi.org/pypi/cisco-sccfm-devkit/${RELEASE_VERSION}/json" \
@@ -119,8 +155,10 @@ jobs:
               404)
                 ;;
               200)
-                echo "::error::${registry} already contains version ${RELEASE_VERSION}"
-                exit 1
+                if [[ "${RESUME_RELEASE}" != "true" ]]; then
+                  echo "::error::${registry} already contains version ${RELEASE_VERSION}"
+                  exit 1
+                fi
                 ;;
               *)
                 echo "::error::${registry} preflight failed with HTTP ${http_status}"
@@ -129,11 +167,52 @@ jobs:
             esac
           done
 
+          if [[ "${RESUME_RELEASE}" = "true" ]]; then
+            SOURCE_COMMIT="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+            if ! git merge-base --is-ancestor "${SOURCE_COMMIT}" HEAD; then
+              echo "::error::tag ${RELEASE_TAG} is not contained in checked-out main"
+              exit 1
+            fi
+
+            BUNDLE_PREFIX="sccfm-release-${RELEASE_VERSION}-${SOURCE_COMMIT}-attempt-"
+            RESUME_BUNDLES=()
+            while IFS= read -r artifact_name; do
+              if [[ "${artifact_name}" = "${BUNDLE_PREFIX}"* ]] \
+                && [[ "${artifact_name#${BUNDLE_PREFIX}}" =~ ^[1-9][0-9]*$ ]]; then
+                RESUME_BUNDLES+=("${artifact_name}")
+              fi
+            done < <(
+              gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+                --jq '.artifacts[] | select(.expired == false) | .name'
+            )
+            if [[ "${#RESUME_BUNDLES[@]}" -ne 1 ]]; then
+              echo "::error::expected exactly one unexpired manifest-bound bundle from this workflow run"
+              exit 1
+            fi
+            BUNDLE_NAME="${RESUME_BUNDLES[0]}"
+            RESUME_ROOT="${RUNNER_TEMP}/release-resume-bundle"
+            mkdir -p "${RESUME_ROOT}"
+            gh run download "${GITHUB_RUN_ID}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --name "${BUNDLE_NAME}" \
+              --dir "${RESUME_ROOT}"
+            poetry run python -m cisco_sccfm_scripts.release_artifacts verify \
+              "${RESUME_ROOT}" \
+              --version "${RELEASE_VERSION}" \
+              --tag "${RELEASE_TAG}" \
+              --source-commit "${SOURCE_COMMIT}"
+            echo "source_commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
+            echo "bundle_name=${BUNDLE_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
           echo "version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
           echo "previous_version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "resume=${RESUME_RELEASE}" >> "$GITHUB_OUTPUT"
 
       - name: Synchronize exact release version
+        if: steps.version.outputs.resume != 'true'
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           PREVIOUS_VERSION: ${{ steps.version.outputs.previous_version }}
@@ -145,6 +224,10 @@ jobs:
             --files-only \
             --check-consistency
           test "$(poetry version -s)" = "${RELEASE_VERSION}"
+          poetry install --only-root --no-interaction
+          INSTALLED_VERSION="$(poetry run python -c \
+            'from importlib.metadata import version; print(version("cisco-sccfm-devkit"))')"
+          test "${INSTALLED_VERSION}" = "${RELEASE_VERSION}"
           poetry run python -m cisco_sccfm_scripts.prepare_ansible_release \
             sccfm-ansible \
             --previous-version "${PREVIOUS_VERSION}" \
@@ -155,6 +238,7 @@ jobs:
           poetry run generate-ansible-docs
 
       - name: Build release artifacts once
+        if: steps.version.outputs.resume != 'true'
         id: artifacts
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
@@ -189,6 +273,7 @@ jobs:
           echo "collection_path=${COLLECTION_PATH}" >> "$GITHUB_OUTPUT"
 
       - name: Run source gates
+        if: steps.version.outputs.resume != 'true'
         run: |
           set -euo pipefail
           poetry check --strict --lock
@@ -210,6 +295,7 @@ jobs:
           poetry run check-doc-artifacts
 
       - name: Install pinned Gitleaks
+        if: steps.version.outputs.resume != 'true'
         run: |
           GITLEAKS_BIN_DIR="${RUNNER_TEMP}/gitleaks-bin"
           mkdir -p "${GITLEAKS_BIN_DIR}"
@@ -217,6 +303,7 @@ jobs:
           echo "${GITLEAKS_BIN_DIR}" >> "$GITHUB_PATH"
 
       - name: Scan exact release artifacts
+        if: steps.version.outputs.resume != 'true'
         run: |
           set -euo pipefail
           WHEEL_SCAN_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-wheel-scan.XXXXXX")"
@@ -237,6 +324,7 @@ jobs:
           done
 
       - name: Verify exact wheel and sdist installations
+        if: steps.version.outputs.resume != 'true'
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -313,6 +401,7 @@ jobs:
             "${GITHUB_WORKSPACE}/${{ steps.artifacts.outputs.sdist_path }}" sdist
 
       - name: Verify exact wheel and collection pair
+        if: steps.version.outputs.resume != 'true'
         run: |
           poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
             "${{ steps.artifacts.outputs.wheel_path }}" \
@@ -320,6 +409,7 @@ jobs:
             --expected-version "${{ steps.version.outputs.version }}"
 
       - name: Run sanity against exact collection artifact
+        if: steps.version.outputs.resume != 'true'
         run: |
           set -euo pipefail
           VENV_PATH="$(poetry env info --path)"
@@ -334,19 +424,18 @@ jobs:
             "${VENV_PATH}/bin/ansible-test" sanity --local --truncate 0
 
       - name: Commit and tag verified source
+        if: steps.version.outputs.resume != 'true'
         id: source
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          {
-            git diff --name-only
-            git ls-files --others --exclude-standard
-          } | sort -u | while IFS= read -r changed_path; do
+          while IFS= read -r changed_path; do
             case "${changed_path}" in
               CHANGELOG.md|pyproject.toml|sccfm-ansible/CHANGELOG.rst|\
               sccfm-ansible/changelogs/changelog.yaml|sccfm-ansible/galaxy.yml|\
+              sccfm-ansible/plugins/module_utils/dependencies.py|\
               sccfm-ansible/requirements.txt|docs/cli/*|docs/man/*|docs/ansible/*)
                 ;;
               *)
@@ -354,7 +443,12 @@ jobs:
                 exit 1
                 ;;
             esac
-          done < <(git diff --name-only)
+          done < <(
+            {
+              git diff --name-only
+              git ls-files --others --exclude-standard
+            } | sort -u
+          )
 
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.cisco.com"
@@ -364,6 +458,7 @@ jobs:
             sccfm-ansible/CHANGELOG.rst \
             sccfm-ansible/changelogs/changelog.yaml \
             sccfm-ansible/galaxy.yml \
+            sccfm-ansible/plugins/module_utils/dependencies.py \
             sccfm-ansible/requirements.txt \
             docs/cli \
             docs/man \
@@ -378,6 +473,7 @@ jobs:
           echo "bundle_name=${BUNDLE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Create and verify release manifest
+        if: steps.version.outputs.resume != 'true'
         id: manifest
         run: |
           poetry run python -m cisco_sccfm_scripts.release_artifacts create dist \
@@ -387,6 +483,7 @@ jobs:
           echo "path=dist/release-manifest.json" >> "$GITHUB_OUTPUT"
 
       - name: Preserve exact release bundle
+        if: steps.version.outputs.resume != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.source.outputs.bundle_name }}
@@ -400,12 +497,36 @@ jobs:
           retention-days: 30
 
       - name: Push release commit and tag atomically
+        if: steps.version.outputs.resume != 'true'
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.source_commit }}
         run: |
-          git push --atomic origin \
+          set -euo pipefail
+          if git push --atomic origin \
             HEAD:refs/heads/main \
-            "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+            "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"; then
+            exit 0
+          fi
+
+          for attempt in 1 2 3; do
+            if REMOTE_REFS="$(git ls-remote --refs origin \
+              refs/heads/main "refs/tags/${RELEASE_TAG}")"; then
+              REMOTE_TAG_COMMIT="$(awk -v ref="refs/tags/${RELEASE_TAG}" \
+                '$2 == ref { print $1 }' <<< "${REMOTE_REFS}")"
+              if [[ "${REMOTE_TAG_COMMIT}" = "${SOURCE_COMMIT}" ]] \
+                && git fetch --no-tags origin refs/heads/main \
+                && git merge-base --is-ancestor "${SOURCE_COMMIT}" FETCH_HEAD; then
+                echo "::warning::push reported failure, but the atomic remote update was verified"
+                exit 0
+              fi
+            fi
+            if [[ "${attempt}" -lt 3 ]]; then
+              sleep 2
+            fi
+          done
+          echo "::error::atomic push failed and the intended remote state could not be verified"
+          exit 1
 
   create-draft-release:
     needs: build-release
@@ -445,9 +566,20 @@ jobs:
             --tag "${RELEASE_TAG}" \
             --source-commit "${SOURCE_COMMIT}"
 
+          RELEASE_IS_DRAFT=true
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
-            --json isDraft --jq '.isDraft' > "${RUNNER_TEMP}/release-is-draft" 2>/dev/null; then
-            test "$(cat "${RUNNER_TEMP}/release-is-draft")" = "true"
+            --json isDraft,isPrerelease,tagName \
+            --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring)' \
+              > "${RUNNER_TEMP}/release-identity" 2>/dev/null; then
+            RELEASE_IDENTITY="$(cat "${RUNNER_TEMP}/release-identity")"
+            case "${RELEASE_IDENTITY}" in
+              "${RELEASE_TAG}"$'\ttrue\tfalse') RELEASE_IS_DRAFT=true ;;
+              "${RELEASE_TAG}"$'\tfalse\tfalse') RELEASE_IS_DRAFT=false ;;
+              *)
+                echo "::error::existing release is not the expected stable release"
+                exit 1
+                ;;
+            esac
           else
             gh release create "${RELEASE_TAG}" \
               --repo "${GITHUB_REPOSITORY}" \
@@ -470,6 +602,10 @@ jobs:
                 exit 1
               }
             else
+              if [[ "${RELEASE_IS_DRAFT}" != "true" ]]; then
+                echo "::error::public release is missing immutable asset ${asset_name}"
+                exit 1
+              fi
               gh release upload "${RELEASE_TAG}" "${local_asset}" \
                 --repo "${GITHUB_REPOSITORY}"
             fi
@@ -537,17 +673,48 @@ jobs:
           python -m twine check --strict "${WHEEL_PATH}" "${SDIST_PATH}"
 
           set +e
-          python -m cisco_sccfm_scripts.verify_pypi_release "${BUNDLE_DIR}" \
+          PYPI_VERIFICATION="$(python -m cisco_sccfm_scripts.verify_pypi_release "${BUNDLE_DIR}" \
             --version "${RELEASE_VERSION}" \
             --tag "${RELEASE_TAG}" \
-            --source-commit "${SOURCE_COMMIT}"
+            --source-commit "${SOURCE_COMMIT}")"
           PYPI_STATUS=$?
           set -e
+          printf '%s\n' "${PYPI_VERIFICATION}"
+
+          test ! -e dist
+          mkdir dist
           case "${PYPI_STATUS}" in
             0)
               echo "publish=false" >> "$GITHUB_OUTPUT"
               ;;
-            2|3)
+            2)
+              cp "${WHEEL_PATH}" "${SDIST_PATH}" dist/
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              ;;
+            3)
+              MISSING_FILES="${PYPI_VERIFICATION##* missing=}"
+              if [[ "${MISSING_FILES}" = "${PYPI_VERIFICATION}" ]] \
+                || [[ -z "${MISSING_FILES}" ]] \
+                || [[ "${MISSING_FILES}" = *$'\n'* ]]; then
+                echo "::error::partial PyPI verification did not identify a missing artifact"
+                exit 1
+              fi
+              IFS=',' read -r -a MISSING_ARTIFACTS <<< "${MISSING_FILES}"
+              for missing_artifact in "${MISSING_ARTIFACTS[@]}"; do
+                case "${missing_artifact}" in
+                  "$(basename "${WHEEL_PATH}")")
+                    cp "${WHEEL_PATH}" dist/
+                    ;;
+                  "$(basename "${SDIST_PATH}")")
+                    cp "${SDIST_PATH}" dist/
+                    ;;
+                  *)
+                    echo "::error::partial PyPI verification named an unexpected artifact"
+                    exit 1
+                    ;;
+                esac
+              done
+              test "$(find dist -mindepth 1 -maxdepth 1 -type f | wc -l | tr -d ' ')" = "1"
               echo "publish=true" >> "$GITHUB_OUTPUT"
               ;;
             *)
@@ -555,9 +722,6 @@ jobs:
               ;;
           esac
 
-          test ! -e dist
-          mkdir dist
-          cp "${WHEEL_PATH}" "${SDIST_PATH}" dist/
           echo "packages_dir=dist/" >> "$GITHUB_OUTPUT"
 
       - name: Publish exact Python artifacts
@@ -566,7 +730,6 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages-dir: ${{ steps.pypi.outputs.packages_dir }}
-          skip-existing: true
 
       - name: Verify published PyPI release
         env:
@@ -655,7 +818,10 @@ jobs:
           GALAXY_URL="https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/index/cisco/sccfm/versions/${RELEASE_VERSION}/"
           LOOKUP_ATTEMPTS=1
           if [[ "${GITHUB_RUN_ATTEMPT}" -gt 1 ]]; then
-            LOOKUP_ATTEMPTS=12
+            # A previous upload can be accepted while Galaxy is still importing it.
+            # Wait through the same ten-minute window used by collection publish before
+            # treating a retry-time 404 as proof that the immutable version is absent.
+            LOOKUP_ATTEMPTS=121
           fi
           for attempt in $(seq 1 "${LOOKUP_ATTEMPTS}"); do
             HTTP_STATUS="$(curl --silent --show-error --location \
@@ -776,24 +942,102 @@ jobs:
     runs-on: ubuntu-latest
     environment: release-bot
     permissions:
+      actions: read
       contents: write
     steps:
-      - name: Publish verified GitHub release
+      - name: Checkout verified release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.build-release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Download exact release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-release.outputs.bundle_name }}
+          path: ${{ runner.temp }}/release-bundle
+
+      - name: Reverify assets and publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.build-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.build-release.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.build-release.outputs.source_commit }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
         run: |
           set -euo pipefail
-          IS_DRAFT="$(gh release view "${RELEASE_TAG}" \
+          test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+
+          RELEASE_ASSETS_DIR="${RUNNER_TEMP}/final-release-assets"
+          mkdir -p "${RELEASE_ASSETS_DIR}"
+          gh release download "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --json isDraft \
-            --jq '.isDraft')"
-          if [[ "${IS_DRAFT}" = "true" ]]; then
+            --dir "${RELEASE_ASSETS_DIR}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${RELEASE_ASSETS_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+          for local_asset in "${BUNDLE_DIR}"/*; do
+            asset_name="$(basename "${local_asset}")"
+            cmp -s "${local_asset}" "${RELEASE_ASSETS_DIR}/${asset_name}" || {
+              echo "::error::GitHub release asset differs from verified bundle: ${asset_name}"
+              exit 1
+            }
+          done
+
+          RELEASE_IDENTITY="$(gh release view "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --json isDraft,isPrerelease,tagName \
+            --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring)')"
+          RELEASE_TAG_NAME="${RELEASE_IDENTITY%%$'\t'*}"
+          RELEASE_FLAGS="${RELEASE_IDENTITY#*$'\t'}"
+          IS_DRAFT="${RELEASE_FLAGS%%$'\t'*}"
+          IS_PRERELEASE="${RELEASE_FLAGS#*$'\t'}"
+          test "${RELEASE_TAG_NAME}" = "${RELEASE_TAG}"
+          test "${IS_PRERELEASE}" = "false"
+
+          PUBLIC_RELEASE_TAGS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')"
+          MAKE_LATEST="$(PUBLIC_RELEASE_TAGS="${PUBLIC_RELEASE_TAGS}" \
+            python - "${RELEASE_VERSION}" <<'PY'
+          import os
+          import re
+          import sys
+
+          pattern = re.compile(
+              r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$"
+          )
+          current = tuple(int(part) for part in sys.argv[1].split("."))
+          public_versions = []
+          for tag in os.environ.get("PUBLIC_RELEASE_TAGS", "").splitlines():
+              match = pattern.fullmatch(tag)
+              if match is not None:
+                  public_versions.append(tuple(int(part) for part in match.groups()))
+          print("false" if any(version > current for version in public_versions) else "true")
+          PY
+          )"
+          if [[ "${MAKE_LATEST}" = "true" ]]; then
             gh release edit "${RELEASE_TAG}" \
               --repo "${GITHUB_REPOSITORY}" \
               --draft=false \
               --latest
           else
-            test "${IS_DRAFT}" = "false"
+            gh release edit "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft=false \
+              --latest=false
+          fi
+          if [[ "${IS_DRAFT}" = "false" ]]; then
             echo "GitHub release ${RELEASE_TAG} is already public."
+          else
+            test "${IS_DRAFT}" = "true"
           fi

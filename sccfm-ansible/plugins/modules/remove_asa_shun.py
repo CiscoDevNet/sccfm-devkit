@@ -83,8 +83,8 @@ EXAMPLES = r"""
   cisco.sccfm.remove_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Remove multiple shuns in a single transaction
 - name: Remove multiple attacker IPs in one call
@@ -94,8 +94,8 @@ EXAMPLES = r"""
       - "203.0.113.40"
       - "203.0.113.50"
       - "203.0.113.60"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 3: Remove a shun on specific devices by UID
 - name: Remove shun on specific ASA
@@ -110,8 +110,8 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Remove shun for attacker
       cisco.sccfm.remove_asa_shun:

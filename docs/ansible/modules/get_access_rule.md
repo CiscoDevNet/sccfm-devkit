@@ -35,8 +35,8 @@ EXAMPLES:
 - name: Get access rule
   cisco.sccfm.get_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: result
 
 - name: Show rule
@@ -49,7 +49,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Get access rule details

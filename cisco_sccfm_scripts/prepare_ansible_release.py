@@ -24,6 +24,11 @@ _RELEASE_KEY = re.compile(
 _RST_VERSION = re.compile(
     r"^v(?P<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))$"
 )
+_INITIAL_SEED = re.compile(
+    r"^# sccfm-release-retarget-seed: "
+    r"(?P<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))$"
+)
+_IMMUTABLE_INITIAL_SEED_VERSION = "0.38.0"
 _MAINTAINER_GUIDANCE = "prepare the Ansible changelog in source before releasing"
 
 
@@ -93,6 +98,12 @@ def _validate_version(value: str, label: str) -> None:
     """Require a canonical stable semantic version."""
     if _SEMVER.fullmatch(value) is None:
         raise AnsibleReleaseError(f"{label} must be a canonical stable semantic version")
+
+
+def _version_tuple(value: str) -> tuple[int, int, int]:
+    """Return comparable components for an already validated stable version."""
+    major, minor, patch = value.split(".")
+    return int(major), int(minor), int(patch)
 
 
 def _resolved_date(value: str | None) -> str:
@@ -186,6 +197,24 @@ def _release_blocks(lines: list[str]) -> dict[str, _ReleaseBlock]:
             raise AnsibleReleaseError(f"duplicate release blocks; {_MAINTAINER_GUIDANCE}")
         blocks[version] = _ReleaseBlock(version, start, end)
     return blocks
+
+
+def _initial_seed_version(lines: list[str]) -> str:
+    """Return the one release version explicitly marked as the retargetable seed."""
+    versions = [
+        match.group("version")
+        for line in lines
+        if (match := _INITIAL_SEED.fullmatch(line.rstrip("\r\n"))) is not None
+    ]
+    if len(versions) != 1:
+        raise AnsibleReleaseError(
+            f"initial release seed is not marked safely; {_MAINTAINER_GUIDANCE}"
+        )
+    if versions[0] != _IMMUTABLE_INITIAL_SEED_VERSION:
+        raise AnsibleReleaseError(
+            f"initial release seed marker is not immutable; {_MAINTAINER_GUIDANCE}"
+        )
+    return versions[0]
 
 
 def _replace_release_date(lines: list[str], block: _ReleaseBlock, release_date: str) -> None:
@@ -284,6 +313,8 @@ def prepare_ansible_release(
     """Align existing collection changelogs with one manually selected version."""
     _validate_version(previous_version, "previous version")
     _validate_version(release_version, "release version")
+    if _version_tuple(release_version) <= _version_tuple(previous_version):
+        raise AnsibleReleaseError("release version must be greater than previous version")
     resolved_date = _resolved_date(release_date)
     if collection_root.is_symlink() or not collection_root.is_dir():
         raise AnsibleReleaseError("collection root must be a regular directory")
@@ -293,12 +324,20 @@ def prepare_ansible_release(
     original_yaml = _read_regular_file(yaml_path)
     original_rst = _read_regular_file(rst_path)
     releases = _load_releases(original_yaml)
+    if any(_version_tuple(version) > _version_tuple(release_version) for version in releases):
+        raise AnsibleReleaseError(
+            f"release version must remain the newest changelog entry; {_MAINTAINER_GUIDANCE}"
+        )
     yaml_lines = original_yaml.splitlines(keepends=True)
     rst_lines = original_rst.splitlines(keepends=True)
     blocks = _release_blocks(yaml_lines)
     headings = _rst_headings(rst_lines)
     if set(blocks) != set(releases):
         raise AnsibleReleaseError(f"release blocks cannot be edited safely; {_MAINTAINER_GUIDANCE}")
+    if set(releases) != set(headings):
+        raise AnsibleReleaseError(
+            f"changelog files disagree on release history; {_MAINTAINER_GUIDANCE}"
+        )
 
     yaml_has_target = release_version in releases
     rst_has_target = release_version in headings
@@ -308,12 +347,30 @@ def prepare_ansible_release(
         )
 
     if yaml_has_target:
+        seed_version = _initial_seed_version(yaml_lines)
+        if release_version != previous_version:
+            previous_is_present = previous_version in releases
+            consumed_initial_seed = (
+                set(releases) == {release_version} and seed_version == previous_version
+            )
+            if previous_is_present and seed_version == previous_version:
+                raise AnsibleReleaseError(
+                    f"initial release seed was not retargeted; {_MAINTAINER_GUIDANCE}"
+                )
+            if not previous_is_present and not consumed_initial_seed:
+                raise AnsibleReleaseError(
+                    f"previous release is missing from changelog history; {_MAINTAINER_GUIDANCE}"
+                )
         _validate_entry(releases[release_version], release_version)
         _replace_release_date(yaml_lines, blocks[release_version], resolved_date)
     else:
         if set(releases) != {previous_version} or set(headings) != {previous_version}:
             raise AnsibleReleaseError(
                 f"only a single initial release can be retargeted; {_MAINTAINER_GUIDANCE}"
+            )
+        if _initial_seed_version(yaml_lines) != previous_version:
+            raise AnsibleReleaseError(
+                f"initial release seed was already retargeted; {_MAINTAINER_GUIDANCE}"
             )
         entry = _validate_entry(releases[previous_version], previous_version)
         block = blocks[previous_version]

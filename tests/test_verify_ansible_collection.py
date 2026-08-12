@@ -50,7 +50,7 @@ _MINIMUM_FILES = {
     "changelogs/changelog.yaml": b"---\nancestor: null\nreleases: {}\n",
     "changelogs/config.yaml": b"---\ntitle: Cisco SCCFM Collection\n",
     "examples/.vault_pass.example": b"replace-me\n",
-    "examples/group_vars/all/vault.yml.example": b"---\nsccfm_api_token: placeholder\n",
+    "examples/group_vars/all/vault.yml.example": (b"---\nvault_sccfm_api_token: placeholder\n"),
     "examples/show_devices.yml": b"---\n- name: Synthetic example\n  hosts: localhost\n",
     "meta/execution-environment.yml": b"---\ndependencies:\n  python: requirements.txt\n",
     "meta/runtime.yml": b"requires_ansible: '>=2.20.0,<2.22.0'\n",
@@ -347,11 +347,16 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
     artifact = output_dir / f"cisco-sccfm-{_COLLECTION_VERSION}.tar.gz"
     with tarfile.open(artifact, mode="r:gz") as archive:
         member_names = {member.name for member in archive.getmembers()}
+        vault_template_member = archive.extractfile("examples/group_vars/all/vault.yml.example")
+        assert vault_template_member is not None
+        packaged_vault_template = yaml.safe_load(vault_template_member.read())
 
     for sentinel in sentinel_paths:
         assert sentinel.relative_to(collection_copy).as_posix() not in member_names
     assert "examples/.vault_pass.example" in member_names
     assert "examples/group_vars/all/vault.yml.example" in member_names
+    assert "vault_sccfm_api_token" in packaged_vault_template
+    assert "sccfm_api_token" not in packaged_vault_template
 
     verify_collection_artifact(artifact, expected_version=_COLLECTION_VERSION)
 
@@ -373,6 +378,15 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
     )
     assert install.returncode == 0, install.stderr
 
+    installed_collection = install_root / "ansible_collections" / "cisco" / "sccfm"
+    installed_vault_template = yaml.safe_load(
+        (installed_collection / "examples" / "group_vars" / "all" / "vault.yml.example").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "vault_sccfm_api_token" in installed_vault_template
+    assert "sccfm_api_token" not in installed_vault_template
+
     discovery_environment = {
         **environment,
         "ANSIBLE_COLLECTIONS_PATH": str(install_root),
@@ -392,6 +406,42 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
         if module.name != "__init__.py"
     }
     assert set(discovered_modules) == expected_modules
+
+    documentation = subprocess.run(
+        ["ansible-doc", "-j", *sorted(expected_modules)],
+        capture_output=True,
+        text=True,
+        env=discovery_environment,
+        check=False,
+    )
+    assert documentation.returncode == 0, documentation.stderr
+    module_documentation = json.loads(documentation.stdout)
+    assert set(module_documentation) == expected_modules
+
+    expected_auth_examples = (
+        "region: \"{{ lookup('env', 'SCCFM_REGION') }}\"",
+        "api_token: \"{{ lookup('env', 'SCCFM_API_TOKEN') }}\"",
+    )
+    undocumented_auth = {
+        module_name: [
+            expected
+            for expected in expected_auth_examples
+            if expected not in details.get("examples", "")
+        ]
+        for module_name, details in module_documentation.items()
+        if any(expected not in details.get("examples", "") for expected in expected_auth_examples)
+    }
+    assert undocumented_auth == {}
+
+    legacy_auth_variables = ("{{ sccfm_region }}", "{{ sccfm_api_token }}")
+    legacy_auth_examples = {
+        module_name: [
+            legacy for legacy in legacy_auth_variables if legacy in details.get("examples", "")
+        ]
+        for module_name, details in module_documentation.items()
+        if any(legacy in details.get("examples", "") for legacy in legacy_auth_variables)
+    }
+    assert legacy_auth_examples == {}
 
     inventory_discovery = subprocess.run(
         ["ansible-doc", "-j", "-l", "-t", "inventory", "cisco.sccfm"],

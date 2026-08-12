@@ -6,7 +6,7 @@
 #
 # PREREQUISITES:
 #   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
-#   - Region and API token in group_vars/all/vars.yml
+#   - SCCFM_REGION set and vault_sccfm_api_token in encrypted group_vars/all/vault.yml
 #   - Run the create network_objects.yml playbook first to create any referenced network objects
 
 
@@ -17,10 +17,11 @@
   # Use module_defaults to avoid repeating region and api_token
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ sccfm_api_token_effective }}"
 
   vars:
+    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
     network_groups:
       - name: web-servers
         # network_literals can be IP addresses or CIDR subnets

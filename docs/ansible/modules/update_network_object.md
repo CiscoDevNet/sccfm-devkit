@@ -73,16 +73,16 @@ EXAMPLES:
   cisco.sccfm.update_network_object:
     uid: "abc-123-def"
     value: "192.168.1.0/24"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Rename a network object by name
 - name: Rename a network object
   cisco.sccfm.update_network_object:
     name: old-object-name
     new_name: new-object-name
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 3: Update multiple fields using module_defaults
 - name: Update network objects
@@ -90,7 +90,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Update web server object

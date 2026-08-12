@@ -79,8 +79,8 @@ EXAMPLES = r"""
     query: "name:branch-* AND connectivityState:ONLINE"
     username: admin
     new_password: "{{ vault_new_asa_password }}"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   register: password_results
 
 # Example 2: Change password on specific devices by UID
@@ -99,8 +99,8 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Change admin password on all online ASAs
       cisco.sccfm.change_asa_local_password:

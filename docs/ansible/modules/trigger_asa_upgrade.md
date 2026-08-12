@@ -109,8 +109,8 @@ EXAMPLES:
       - "12345678-1234-1234-1234-123456789abc"
     software_version: "9.18(4)"
     asdm_version: "7.18(1.152)"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Stage-only upgrade using a query
 - name: Stage ASA upgrade for branch devices
@@ -142,8 +142,8 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
+      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Stage ASA upgrade for branch devices
       cisco.sccfm.trigger_asa_upgrade:

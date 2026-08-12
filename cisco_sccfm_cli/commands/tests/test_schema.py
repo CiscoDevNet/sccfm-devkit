@@ -89,7 +89,11 @@ def test_schema_export_should_emit_machine_readable_command_tree(
     assert _option(payload["global_options"], "profile")["placement"] == "before_command_path"
 
     commands = _commands_by_name(payload)
-    assert "sccfm-cli schema export" in commands
+    schema_export = commands["sccfm-cli schema export"]
+    assert schema_export["readonly"] is True
+    assert schema_export["side_effects"] == [
+        "May write or overwrite the local file specified by --output."
+    ]
     assert "sccfm-cli inventory devices asa upgrade trigger" in commands
     assert "sccfm-cli configure" in commands
     assert any(command["kind"] == "group" for command in payload["command_tree"])
@@ -109,7 +113,7 @@ def test_schema_export_should_describe_options_and_auth_requirements(
 
     assert configure["readonly"] is True
     assert configure["side_effects"] == [
-        "Writes the selected profile to the local sccfm-cli configuration file."
+        "Writes the selected profile and repairs local POSIX configuration permissions."
     ]
     assert configure["auth"]["mode"] == "none"
     assert configure["auth"]["requires_profile"] is False
@@ -126,6 +130,8 @@ def test_schema_export_should_describe_options_and_auth_requirements(
     assert status["auth"]["mode"] == "sccfm_profile"
     assert status["auth"]["requires_profile"] is True
     assert status["auth"]["requires_api_token"] is True
+    assert status["readonly"] is True
+    assert status["side_effects"] == []
 
 
 def test_schema_export_should_include_mutation_and_handler_constraints(
@@ -137,7 +143,9 @@ def test_schema_export_should_include_mutation_and_handler_constraints(
     commands = _commands_by_name(json.loads(result.output))
     asa_cli = commands["sccfm-cli inventory devices asa cli execute"]
     ftd_cli = commands["sccfm-cli inventory devices cdfmc-managed-ftd cli execute"]
+    configure_manager = commands["sccfm-cli inventory devices cdfmc-managed-ftd configure-manager"]
     ftd_onboard = commands["sccfm-cli inventory devices cdfmc-managed-ftd onboard"]
+    ftd_onboard_ztp = commands["sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp"]
     network_update = commands["sccfm-cli objects network update"]
     smartlicense = commands["sccfm-cli inventory devices asa smartlicense"]
 
@@ -202,6 +210,34 @@ def test_schema_export_should_include_mutation_and_handler_constraints(
     assert "--token" not in smartlicense["examples"][1]
     assert "--token-file" not in smartlicense["examples"][1]
     assert "--feature-tier standard" in smartlicense["examples"][1]
+    configure_manager_credentials = {
+        name: _option(configure_manager["options"], name)
+        for name in ("ftd_password", "cli_key", "jump_password")
+    }
+    assert all(option["sensitive"] is True for option in configure_manager_credentials.values())
+    assert configure_manager_credentials["ftd_password"]["envvar"] == "SCCFM_FTD_PASSWORD"
+    assert configure_manager_credentials["jump_password"]["envvar"] == "SCCFM_JUMP_PASSWORD"
+    assert configure_manager_credentials["cli_key"]["envvar"] == "SCCFM_CLI_KEY"
+    assert configure_manager_credentials["cli_key"]["required"] is False
+    assert _constraint_for_options(
+        configure_manager["constraints"], "required_unless", ["cli_key"]
+    ) == {
+        "type": "required_unless",
+        "options": ["cli_key"],
+        "unless": "check",
+        "description": "Required unless --check is set.",
+    }
+    assert "--cli-key" not in configure_manager["examples"][1]
+    assert configure_manager["auth"]["mode"] == "none"
+    assert configure_manager["auth"]["requires_profile"] is False
+    assert configure_manager["auth"]["requires_api_token"] is False
+    assert configure_manager["readonly"] is False
+    assert configure_manager["side_effects"] == [
+        "May change state in SCC Firewall Manager or on managed devices."
+    ]
+    admin_password = _option(ftd_onboard_ztp["options"], "admin_password")
+    assert admin_password["sensitive"] is True
+    assert admin_password["envvar"] == "SCCFM_FTD_ADMIN_PASSWORD"
     ftd_virtual_dependency = _constraint(ftd_onboard["constraints"], "depends_on")
     assert ftd_virtual_dependency["option"] == "virtual"
     assert ftd_virtual_dependency["requires"] == "performance_tier"

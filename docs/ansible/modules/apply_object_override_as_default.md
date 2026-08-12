@@ -44,8 +44,8 @@ EXAMPLES:
   cisco.sccfm.apply_object_override_as_default:
     uid: "abc-123-def"
     target_id: "897b293f-132e-4678-9d78-0f0947629500"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    region: "{{ lookup('env', 'SCCFM_REGION') }}"
+    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
 
 # Example 2: Using module_defaults
 - name: Apply object override as default
@@ -53,7 +53,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
+      region: "{{ lookup('env', 'SCCFM_REGION') }}"
       api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
   tasks:
     - name: Apply override as default

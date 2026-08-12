@@ -53,6 +53,7 @@ class PyPIReleaseVerification:
     version: str
     file_count: int
     status: PyPIReleaseStatus
+    missing_filenames: tuple[str, ...] = ()
 
 
 def _python_artifact_names(version: str) -> tuple[str, str]:
@@ -201,6 +202,7 @@ def verify_pypi_release(
         version=version,
         file_count=len(remote_hashes),
         status=status,
+        missing_filenames=tuple(sorted(set(local_hashes) - set(remote_hashes))),
     )
 
 
@@ -233,7 +235,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if result.status is PyPIReleaseStatus.PARTIAL:
         print(
-            f"PyPI release partially published: version={result.version} files={result.file_count}"
+            f"PyPI release partially published: version={result.version} files={result.file_count} "
+            f"missing={','.join(result.missing_filenames)}"
         )
         return 3
     print(f"PyPI release verified: version={result.version} files={result.file_count}")

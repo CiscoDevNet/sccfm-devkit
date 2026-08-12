@@ -26,10 +26,17 @@ maintainer policy.
 
 1. Merge all intended changes and confirm CI passes on the exact `main` commit to release.
 2. Confirm the changelogs and documentation describe the intended public release.
-3. Choose an unused exact version such as `0.39.0`. Enter it without a leading `v`.
-4. Confirm that the version and its `v<version>` tag do not already exist on PyPI, Ansible Galaxy,
+3. Prepare the Ansible changelog history. The workflow may retarget the marked `0.38.0` seed for
+   the first release only; do not move or replace the seed marker afterward. For every later
+   release, add and review the new version entry in
+   `sccfm-ansible/changelogs/changelog.yaml` and its matching `v<version>` section in
+   `sccfm-ansible/CHANGELOG.rst` on `main`, preserving all earlier releases. The YAML entry must
+   contain non-empty `changes`, a `fragments` list, and a valid `release_date`. The workflow fails
+   closed instead of converting the previous release entry when the requested version is absent.
+4. Choose an unused exact version such as `0.39.0`. Enter it without a leading `v`.
+5. Confirm that the version and its `v<version>` tag do not already exist on PyPI, Ansible Galaxy,
    or GitHub Releases.
-5. Confirm the PyPI account and Galaxy account still have the required namespace permissions.
+6. Confirm the PyPI account and Galaxy account still have the required namespace permissions.
 
 Published registry versions are immutable. Never reuse a version for different contents.
 
@@ -83,8 +90,12 @@ ANSIBLE_COLLECTIONS_PATH="${RELEASE_CHECK_ROOT}/collections" \
 
 - Use **Re-run failed jobs**. Do not use **Re-run all jobs** after any registry publication may
   have succeeded.
+- If the release commit and tag reached GitHub but the build job lost the push response, re-run
+  the failed job in the same workflow run. The workflow resumes only when the tag is contained in
+  `main` and exactly one unexpired artifact bundle from that run matches and verifies against the
+  tag commit. A new workflow dispatch cannot adopt an older run's artifacts.
 - If PyPI succeeds and Galaxy fails, retry only the failed Galaxy path. It downloads and verifies
-  the collection from the draft GitHub Release; it must not rebuild it.
+  the preserved Actions artifact from the original workflow run; it must not rebuild it.
 - A draft GitHub Release after a failed run is expected. Do not publish it manually while either
   registry is incomplete or unverified.
 - If a checksum, version, tag, or published-file verification fails, stop and investigate. Do not
@@ -92,4 +103,3 @@ ANSIBLE_COLLECTIONS_PATH="${RELEASE_CHECK_ROOT}/collections" \
 - Before starting a new workflow run after a failure, inspect the tag, draft release, PyPI, and
   Galaxy state. If any registry accepted the version, continue only by promoting the existing
   manifest-bound artifacts.
-

@@ -13,7 +13,7 @@
   module_defaults:
     group/cisco.sccfm.all:
       region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      api_token: "{{ vault_sccfm_api_token }}"
 
   tasks:
     - name: Run HA checks with limit of 1

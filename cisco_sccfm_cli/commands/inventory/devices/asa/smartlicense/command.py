@@ -21,6 +21,7 @@ from cisco_sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from cisco_sccfm_cli.commands.inventory.options import config_path_option, format_option
+from cisco_sccfm_cli.option_metadata import sensitive_option
 from cisco_sccfm_cli.utils import with_spinner
 from cisco_sccfm_core import AsaCommandLineService
 from cisco_sccfm_core.types import ConfigLike
@@ -56,6 +57,7 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
         check = cast(bool, kwargs.get("check", False))
         response_format = cast(str, kwargs.get("format"))
+        self._validate_token_sources(ctx=ctx, **kwargs)
 
         config = self.get_profile(ctx=ctx, **kwargs)
         targets = self._resolve_targets(ctx=ctx, kwargs=kwargs, config=config)
@@ -81,7 +83,6 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
         )
 
         token = self._resolve_token(ctx=ctx, **kwargs)
-        self._register_sensitive_value(ctx, token)
         script_commands = self._build_script(feature_tier, throughput_level, token)
         results = self._execute_cli(
             config=config,
@@ -131,12 +132,6 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
         token = cast(str | None, kwargs.get("token"))
         token_file = cast(Path | None, kwargs.get("token_file"))
 
-        if token is not None and token_file is not None:
-            ctx.fail(
-                "Use only one Smart Licensing token source: --token, "
-                f"{self._TOKEN_ENVVAR}, or --token-file."
-            )
-
         if token_file is not None:
             token = self._read_token_file(ctx=ctx, token_file=token_file)
         elif token is None:
@@ -146,9 +141,19 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
                     f"{self._TOKEN_ENVVAR}, use --token-file, or run interactively "
                     "for a hidden prompt."
                 )
-            token = click.prompt("Smart Licensing token", hide_input=True)
+            token = self._prompt_sensitive("Smart Licensing token")
 
+        self._register_sensitive_value(ctx, token)
         return self._validate_token(ctx=ctx, token=token)
+
+    def _validate_token_sources(self, ctx: click.Context, **kwargs: Any) -> None:
+        token = cast(str | None, kwargs.get("token"))
+        token_file = cast(Path | None, kwargs.get("token_file"))
+        if token is not None and token_file is not None:
+            ctx.fail(
+                "Use only one Smart Licensing token source: --token, "
+                f"{self._TOKEN_ENVVAR}, or --token-file."
+            )
 
     def _read_token_file(self, ctx: click.Context, token_file: Path) -> str:
         try:
@@ -240,18 +245,21 @@ class SmartlicenseCommand(AsaDeviceTargetCommand):
             asa_check_option(),
             format_option(),
             config_path_option(),
-            click.Option(
-                ["--token", "-t"],
-                type=str,
-                required=False,
-                default=None,
-                envvar=self._TOKEN_ENVVAR,
-                show_envvar=True,
-                hide_input=True,
-                help=(
-                    "Smart Licensing token for your virtual account. Passing it directly is "
-                    "supported for compatibility but may expose it in process listings and shell "
-                    f"history; prefer {self._TOKEN_ENVVAR}, --token-file, or the hidden prompt."
+            sensitive_option(
+                click.Option(
+                    ["--token", "-t"],
+                    type=str,
+                    required=False,
+                    default=None,
+                    envvar=self._TOKEN_ENVVAR,
+                    show_envvar=True,
+                    hide_input=True,
+                    help=(
+                        "Smart Licensing token for your virtual account. Passing it directly is "
+                        "supported for compatibility but may expose it in process listings and "
+                        f"shell history; prefer {self._TOKEN_ENVVAR}, --token-file, or the hidden "
+                        "prompt."
+                    ),
                 ),
             ),
             click.Option(

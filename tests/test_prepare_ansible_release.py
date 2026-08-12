@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,7 @@ def _yaml_release(
 ) -> str:
     return f"""---
 ancestor: null
+# sccfm-release-retarget-seed: {_INITIAL_VERSION}
 releases:
   {version}:
     changes:
@@ -104,6 +106,28 @@ def test_retargets_only_the_initial_release_metadata(tmp_path: Path) -> None:
     assert _SUMMARY in rst
 
 
+def test_checked_in_changelog_can_be_prepared_once(tmp_path: Path) -> None:
+    repository = Path(__file__).resolve().parents[1]
+    source = repository / "sccfm-ansible"
+    root = tmp_path / "sccfm-ansible"
+    (root / "changelogs").mkdir(parents=True)
+    shutil.copy2(source / "changelogs" / "changelog.yaml", root / "changelogs")
+    shutil.copy2(source / "CHANGELOG.rst", root)
+
+    result = prepare_ansible_release(
+        root,
+        _INITIAL_VERSION,
+        _RELEASE_VERSION,
+        _RELEASE_DATE,
+    )
+
+    assert result.changed
+    assert set(
+        yaml.safe_load((root / "changelogs" / "changelog.yaml").read_text())["releases"]
+    ) == {_RELEASE_VERSION}
+    assert f"v{_RELEASE_VERSION}" in (root / "CHANGELOG.rst").read_text(encoding="utf-8")
+
+
 def test_preserves_a_fragment_not_named_after_the_previous_version(tmp_path: Path) -> None:
     root = _collection(tmp_path, yaml_content=_yaml_release(fragment="initial-release.yml"))
 
@@ -113,11 +137,8 @@ def test_preserves_a_fragment_not_named_after_the_previous_version(tmp_path: Pat
 
 
 def test_an_already_prepared_release_is_idempotent(tmp_path: Path) -> None:
-    root = _collection(
-        tmp_path,
-        yaml_content=_yaml_release(_RELEASE_VERSION, _RELEASE_DATE, "1.0.0.yml"),
-        rst_content=_rst_release(_RELEASE_VERSION),
-    )
+    root = _collection(tmp_path)
+    prepare_ansible_release(root, _INITIAL_VERSION, _RELEASE_VERSION, _RELEASE_DATE)
     yaml_before = (root / "changelogs" / "changelog.yaml").read_bytes()
     rst_before = (root / "CHANGELOG.rst").read_bytes()
 
@@ -134,11 +155,8 @@ def test_an_already_prepared_release_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_an_already_prepared_release_only_updates_its_date(tmp_path: Path) -> None:
-    root = _collection(
-        tmp_path,
-        yaml_content=_yaml_release(_RELEASE_VERSION, "2026-08-01", "1.0.0.yml"),
-        rst_content=_rst_release(_RELEASE_VERSION),
-    )
+    root = _collection(tmp_path)
+    prepare_ansible_release(root, _INITIAL_VERSION, _RELEASE_VERSION, "2026-08-01")
     rst_before = (root / "CHANGELOG.rst").read_bytes()
 
     result = prepare_ansible_release(
@@ -171,6 +189,80 @@ def test_accepts_an_existing_target_among_historical_releases(tmp_path: Path) ->
     assert not result.changed
 
 
+def test_rejects_a_target_that_replaced_published_history_without_writing(
+    tmp_path: Path,
+) -> None:
+    root = _collection(
+        tmp_path,
+        yaml_content=_yaml_release("2.0.0", _RELEASE_DATE, "2.0.0.yml"),
+        rst_content=_rst_release("2.0.0"),
+    )
+    yaml_path = root / "changelogs" / "changelog.yaml"
+    rst_path = root / "CHANGELOG.rst"
+    before = (yaml_path.read_bytes(), rst_path.read_bytes())
+
+    with pytest.raises(AnsibleReleaseError, match="previous release is missing.*prepare"):
+        prepare_ansible_release(root, _RELEASE_VERSION, "2.0.0", _RELEASE_DATE)
+
+    assert (yaml_path.read_bytes(), rst_path.read_bytes()) == before
+
+
+def test_rejects_an_unconsumed_seed_alongside_the_first_target(tmp_path: Path) -> None:
+    target = _yaml_release(_RELEASE_VERSION, _RELEASE_DATE, "1.0.0.yml").split(
+        "releases:\n", maxsplit=1
+    )[1]
+    target_rst = (
+        _rst_release(_RELEASE_VERSION).split(".. contents:: Topics\n", maxsplit=1)[1].lstrip()
+    )
+    root = _collection(
+        tmp_path,
+        yaml_content=_yaml_release() + target,
+        rst_content=_rst_release() + "\n" + target_rst,
+    )
+
+    with pytest.raises(AnsibleReleaseError, match="seed was not retargeted.*prepare"):
+        prepare_ansible_release(root, _INITIAL_VERSION, _RELEASE_VERSION, _RELEASE_DATE)
+
+
+def test_second_release_cannot_retarget_and_erase_published_history(tmp_path: Path) -> None:
+    root = _collection(tmp_path)
+    prepare_ansible_release(root, _INITIAL_VERSION, _RELEASE_VERSION, _RELEASE_DATE)
+    yaml_path = root / "changelogs" / "changelog.yaml"
+    rst_path = root / "CHANGELOG.rst"
+    before = (yaml_path.read_bytes(), rst_path.read_bytes())
+
+    with pytest.raises(AnsibleReleaseError, match="seed was already retargeted.*prepare"):
+        prepare_ansible_release(root, _RELEASE_VERSION, "2.0.0", "2026-09-01")
+
+    assert (yaml_path.read_bytes(), rst_path.read_bytes()) == before
+    assert set(yaml.safe_load(yaml_path.read_text())["releases"]) == {_RELEASE_VERSION}
+    assert f"v{_RELEASE_VERSION}" in rst_path.read_text(encoding="utf-8")
+
+
+def test_moved_seed_marker_cannot_authorize_history_retarget(tmp_path: Path) -> None:
+    yaml_content = _yaml_release(_RELEASE_VERSION).replace(
+        f"sccfm-release-retarget-seed: {_INITIAL_VERSION}",
+        f"sccfm-release-retarget-seed: {_RELEASE_VERSION}",
+    )
+    root = _collection(
+        tmp_path,
+        yaml_content=yaml_content,
+        rst_content=_rst_release(_RELEASE_VERSION),
+    )
+    before = (
+        (root / "changelogs" / "changelog.yaml").read_bytes(),
+        (root / "CHANGELOG.rst").read_bytes(),
+    )
+
+    with pytest.raises(AnsibleReleaseError, match="seed marker is not immutable"):
+        prepare_ansible_release(root, _RELEASE_VERSION, "2.0.0", "2026-09-01")
+
+    assert (
+        (root / "changelogs" / "changelog.yaml").read_bytes(),
+        (root / "CHANGELOG.rst").read_bytes(),
+    ) == before
+
+
 @pytest.mark.parametrize(
     "version",
     ["01.2.3", "1.02.3", "1.2.03", "v1.2.3", "1.2", "1.2.3-rc.1", "1.2.3+1"],
@@ -180,6 +272,31 @@ def test_rejects_noncanonical_or_unstable_versions(tmp_path: Path, version: str)
 
     with pytest.raises(AnsibleReleaseError, match="canonical stable semantic version"):
         prepare_ansible_release(root, _INITIAL_VERSION, version, _RELEASE_DATE)
+
+
+@pytest.mark.parametrize("release_version", ["0.38.0", "0.37.9"])
+def test_rejects_non_increasing_release_versions(
+    tmp_path: Path,
+    release_version: str,
+) -> None:
+    root = _collection(tmp_path)
+
+    with pytest.raises(AnsibleReleaseError, match="greater than previous"):
+        prepare_ansible_release(root, _INITIAL_VERSION, release_version, _RELEASE_DATE)
+
+
+def test_rejects_release_when_changelog_contains_a_newer_entry(tmp_path: Path) -> None:
+    target = _yaml_release("1.0.0", _RELEASE_DATE, "1.0.0.yml")
+    future = _yaml_release("2.0.0", "2026-09-01", "2.0.0.yml").split("releases:\n", maxsplit=1)[1]
+    future_rst = _rst_release("2.0.0").split(".. contents:: Topics\n", maxsplit=1)[1].lstrip()
+    root = _collection(
+        tmp_path,
+        yaml_content=target + future,
+        rst_content=_rst_release("1.0.0") + "\n" + future_rst,
+    )
+
+    with pytest.raises(AnsibleReleaseError, match="newest changelog entry"):
+        prepare_ansible_release(root, "0.9.0", "1.0.0", _RELEASE_DATE)
 
 
 @pytest.mark.parametrize("release_date", ["2026-02-29", "2026-8-12", "12-08-2026"])
@@ -204,7 +321,12 @@ def test_rejects_mixed_yaml_and_rst_versions_without_writing(tmp_path: Path) -> 
 
 def test_rejects_multiple_initial_entries_without_writing(tmp_path: Path) -> None:
     extra = _yaml_release("0.37.0", "2026-06-01", "0.37.0.yml").split("releases:\n", maxsplit=1)[1]
-    root = _collection(tmp_path, yaml_content=_yaml_release() + extra)
+    extra_rst = _rst_release("0.37.0").split(".. contents:: Topics\n", maxsplit=1)[1].lstrip()
+    root = _collection(
+        tmp_path,
+        yaml_content=_yaml_release() + extra,
+        rst_content=_rst_release() + "\n" + extra_rst,
+    )
     yaml_path = root / "changelogs" / "changelog.yaml"
     before = yaml_path.read_bytes()
 
