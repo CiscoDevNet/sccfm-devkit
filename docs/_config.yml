@@ -1,7 +1,7 @@
 title: SCCFM Devkit Documentation
 description: Generated references for sccfm-cli and the cisco.sccfm Ansible collection.
-url: ""
-baseurl: ""
+url: "https://ciscodevnet.github.io"
+baseurl: "/sccfm-devkit"
 theme: minima
 markdown: kramdown
 
