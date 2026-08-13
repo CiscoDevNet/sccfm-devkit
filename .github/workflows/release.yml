@@ -30,7 +30,6 @@ env:
 jobs:
   build-release:
     runs-on: ubuntu-latest
-    environment: release-bot
     permissions:
       actions: read
       contents: write
@@ -527,7 +526,6 @@ jobs:
   create-draft-release:
     needs: build-release
     runs-on: ubuntu-latest
-    environment: release-bot
     permissions:
       contents: write
     steps:
@@ -622,7 +620,6 @@ jobs:
       - build-release
       - create-draft-release
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
       contents: read
     steps:
@@ -766,7 +763,6 @@ jobs:
       - build-release
       - publish-to-pypi
     runs-on: ubuntu-latest
-    environment: ansible-galaxy
     permissions:
       contents: read
     steps:
@@ -936,7 +932,6 @@ jobs:
       - build-release
       - publish-to-galaxy
     runs-on: ubuntu-latest
-    environment: release-bot
     permissions:
       actions: read
       contents: write

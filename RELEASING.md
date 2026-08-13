@@ -10,17 +10,17 @@ verified files to GitHub Releases, PyPI, and Ansible Galaxy without rebuilding t
 
 ## One-time repository setup
 
-Configure these protected GitHub environments, ideally with required reviewers:
+Configure these GitHub Actions repository secrets under **Settings > Secrets and variables >
+Actions**:
 
-- `release-bot`: `SCCFM_CI_DEPLOY_KEY`, with permission to push the release commit and tag.
-- `pypi`: `PYPI_API_TOKEN`, authorized to publish `cisco-sccfm-devkit`. For the first release, the
-  token must be allowed to create the project.
-- `ansible-galaxy`: `GALAXY_API_KEY`, owned by an account authorized to publish in the `cisco`
-  namespace.
+- `SCCFM_CI_DEPLOY_KEY`, with permission to push the release commit and tag.
+- `PYPI_API_TOKEN`, authorized to publish `cisco-sccfm-devkit`. For the first release, the token
+  must be allowed to create the project.
+- `GALAXY_API_KEY`, owned by an account authorized to publish in the `cisco` namespace.
 
-Store credentials only as environment secrets. Do not put them in workflow inputs or repository
-files. Protect `main`, the release environments, and release tags according to the repository's
-maintainer policy.
+Store credentials only as repository Actions secrets. Do not put them in workflow inputs or
+repository files. Protect `main` and release tags, and limit repository write access to maintainers
+authorized to release. Repository secrets do not add a separate publication approval step.
 
 ## Before a release
 
@@ -44,8 +44,7 @@ Published registry versions are immutable. Never reuse a version for different c
 
 1. Open **Actions** in `CiscoDevNet/sccfm-devkit` and select **Release**.
 2. Select **Run workflow**, choose the `main` branch, and enter the exact `version`.
-3. Review and approve the protected environments as each publication stage is reached.
-4. Keep the run open until every job succeeds.
+3. Keep the run open until every job succeeds.
 
 The workflow performs these operations in order:
 

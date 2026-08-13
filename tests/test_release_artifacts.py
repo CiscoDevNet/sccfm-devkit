@@ -237,8 +237,10 @@ def test_workflows_promote_release_assets_without_rebuilding() -> None:
         assert "poetry build" not in publisher
         assert "build-ansible-collection" not in publisher
 
-    assert "environment: pypi" in pypi
+    assert "\n    environment:" not in release
+    assert "secrets.SCCFM_CI_DEPLOY_KEY" in build
     assert "pypa/gh-action-pypi-publish" in pypi
+    assert "secrets.PYPI_API_TOKEN" in pypi
     assert "skip-existing:" not in pypi
     assert 'MISSING_FILES="${PYPI_VERIFICATION##* missing=}"' in pypi
     assert 'test "$(find dist -mindepth 1 -maxdepth 1 -type f' in pypi
@@ -249,7 +251,7 @@ def test_workflows_promote_release_assets_without_rebuilding() -> None:
         not in pypi.split("3)\n              MISSING_FILES=", maxsplit=1)[1]
     )
     assert "- publish-to-pypi" in galaxy
-    assert "environment: ansible-galaxy" in galaxy
+    assert "secrets.GALAXY_API_KEY" in galaxy
     assert "ansible-galaxy collection publish" in galaxy
     assert "--import-timeout 600" in galaxy
     assert "LOOKUP_ATTEMPTS=121" in galaxy
