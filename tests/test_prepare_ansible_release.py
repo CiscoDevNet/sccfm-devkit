@@ -106,7 +106,7 @@ def test_retargets_only_the_initial_release_metadata(tmp_path: Path) -> None:
     assert _SUMMARY in rst
 
 
-def test_checked_in_changelog_can_be_prepared_once(tmp_path: Path) -> None:
+def test_checked_in_changelog_supports_initial_and_later_releases(tmp_path: Path) -> None:
     repository = Path(__file__).resolve().parents[1]
     source = repository / "sccfm-ansible"
     root = tmp_path / "sccfm-ansible"
@@ -114,18 +114,40 @@ def test_checked_in_changelog_can_be_prepared_once(tmp_path: Path) -> None:
     shutil.copy2(source / "changelogs" / "changelog.yaml", root / "changelogs")
     shutil.copy2(source / "CHANGELOG.rst", root)
 
+    checked_in_versions = set(
+        yaml.safe_load((root / "changelogs" / "changelog.yaml").read_text())["releases"]
+    )
+    versions = sorted(
+        checked_in_versions,
+        key=lambda version: tuple(int(part) for part in version.split(".")),
+    )
+    is_unprepared_seed = versions == [_INITIAL_VERSION]
+    if is_unprepared_seed:
+        previous_version = _INITIAL_VERSION
+        release_version = _RELEASE_VERSION
+        release_date = _RELEASE_DATE
+        expected_versions = {_RELEASE_VERSION}
+    else:
+        previous_version = versions[-2] if len(versions) > 1 else _INITIAL_VERSION
+        release_version = versions[-1]
+        checked_in_date = _parsed_release(root, release_version)["release_date"]
+        assert isinstance(checked_in_date, str)
+        release_date = checked_in_date
+        expected_versions = checked_in_versions
+
     result = prepare_ansible_release(
         root,
-        _INITIAL_VERSION,
-        _RELEASE_VERSION,
-        _RELEASE_DATE,
+        previous_version,
+        release_version,
+        release_date,
     )
 
-    assert result.changed
-    assert set(
-        yaml.safe_load((root / "changelogs" / "changelog.yaml").read_text())["releases"]
-    ) == {_RELEASE_VERSION}
-    assert f"v{_RELEASE_VERSION}" in (root / "CHANGELOG.rst").read_text(encoding="utf-8")
+    assert result.changed is is_unprepared_seed
+    assert (
+        set(yaml.safe_load((root / "changelogs" / "changelog.yaml").read_text())["releases"])
+        == expected_versions
+    )
+    assert f"v{release_version}" in (root / "CHANGELOG.rst").read_text(encoding="utf-8")
 
 
 def test_preserves_a_fragment_not_named_after_the_previous_version(tmp_path: Path) -> None:

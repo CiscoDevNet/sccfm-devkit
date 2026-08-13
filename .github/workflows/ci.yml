@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'production-release' || format('ci-{0}', github.run_id) }}
+  cancel-in-progress: false
+
 env:
   PIP_AUDIT_VERSION: "2.10.1"
   # The pinned SCCFM SDK requires urllib3<2.1; keep these explicit until the SDK
@@ -124,3 +128,547 @@ jobs:
           test -f "${COLLECTION_PATH}"
           poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
             "${WHEEL_PATH}" "${COLLECTION_PATH}" --expected-version "${PACKAGE_VERSION}"
+
+  prepare-release:
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      bumped: ${{ steps.version.outputs.bumped }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      source_commit: ${{ steps.source.outputs.source_commit || steps.version.outputs.source_commit }}
+      bundle_name: ${{ steps.source.outputs.bundle_name || steps.version.outputs.bundle_name }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.SCCFM_CI_DEPLOY_KEY }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pipx and Poetry
+        run: |
+          python -m pip install --upgrade pip pipx
+          python -m pipx ensurepath
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --with dev,build
+
+      - name: Infer and synchronize release version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REPOSITORY}" = "CiscoDevNet/sccfm-devkit"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain)"
+
+          PREVIOUS_VERSION="$(poetry version -s)"
+          REMOTE_MAIN="$(git rev-parse origin/main)"
+          RECOVERY_SOURCE=""
+          RECOVERY_VERSION=""
+          if [[ "${GITHUB_RUN_ATTEMPT}" -gt 1 && "${REMOTE_MAIN}" != "${GITHUB_SHA}" ]]; then
+            mapfile -t ANCESTRY_COMMITS < <(
+              git rev-list --ancestry-path --reverse "${GITHUB_SHA}..${REMOTE_MAIN}"
+            )
+            if [[ "${#ANCESTRY_COMMITS[@]}" -gt 0 ]]; then
+              CANDIDATE_SOURCE="${ANCESTRY_COMMITS[0]}"
+              CANDIDATE_SUBJECT="$(git show -s --format=%s "${CANDIDATE_SOURCE}")"
+              if [[ "${CANDIDATE_SUBJECT}" =~ ^bump:\ version\ ((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$ ]]; then
+                RECOVERY_SOURCE="${CANDIDATE_SOURCE}"
+                RECOVERY_VERSION="${BASH_REMATCH[1]}"
+              fi
+            fi
+          fi
+          if [[ -n "${RECOVERY_SOURCE}" ]]; then
+            RECOVERY_TAG="v${RECOVERY_VERSION}"
+            test "$(git rev-parse "${RECOVERY_SOURCE}^")" = "${GITHUB_SHA}"
+            git merge-base --is-ancestor "${RECOVERY_SOURCE}" "${REMOTE_MAIN}"
+            test "$(git rev-parse "refs/tags/${RECOVERY_TAG}^{commit}")" = "${RECOVERY_SOURCE}"
+            BUNDLE_PREFIX="sccfm-release-${RECOVERY_VERSION}-${RECOVERY_SOURCE}-attempt-"
+            RESUME_BUNDLES=()
+            while IFS= read -r artifact_name; do
+              if [[ "${artifact_name}" = "${BUNDLE_PREFIX}"* ]] \
+                && [[ "${artifact_name#${BUNDLE_PREFIX}}" =~ ^[1-9][0-9]*$ ]]; then
+                RESUME_BUNDLES+=("${artifact_name}")
+              fi
+            done < <(
+              gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+                --jq '.artifacts[] | select(.expired == false) | .name'
+            )
+            if [[ "${#RESUME_BUNDLES[@]}" -ne 1 ]]; then
+              echo "::error::expected one unexpired manifest-bound bundle for release recovery"
+              exit 1
+            fi
+            BUNDLE_NAME="${RESUME_BUNDLES[0]}"
+            RESUME_ROOT="${RUNNER_TEMP}/release-resume-bundle"
+            mkdir -p "${RESUME_ROOT}"
+            gh run download "${GITHUB_RUN_ID}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --name "${BUNDLE_NAME}" \
+              --dir "${RESUME_ROOT}"
+            poetry run python -m cisco_sccfm_scripts.release_artifacts verify \
+              "${RESUME_ROOT}" \
+              --version "${RECOVERY_VERSION}" \
+              --tag "${RECOVERY_TAG}" \
+              --source-commit "${RECOVERY_SOURCE}"
+            RECOVERY_MANIFEST_SHA256="$(sha256sum \
+              "${RESUME_ROOT}/release-manifest.json" | awk '{print $1}')"
+            RECOVERY_TAG_MESSAGE="$(git for-each-ref \
+              --format='%(contents)' "refs/tags/${RECOVERY_TAG}")"
+            test "${RECOVERY_TAG_MESSAGE}" \
+              = "release-manifest-sha256: ${RECOVERY_MANIFEST_SHA256}"
+            echo "Recovered the verified ${RECOVERY_TAG} bundle from this workflow run."
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "resume=true" >> "$GITHUB_OUTPUT"
+            echo "version=${RECOVERY_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag=${RECOVERY_TAG}" >> "$GITHUB_OUTPUT"
+            echo "source_commit=${RECOVERY_SOURCE}" >> "$GITHUB_OUTPUT"
+            echo "bundle_name=${BUNDLE_NAME}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          test "${REMOTE_MAIN}" = "${GITHUB_SHA}"
+
+          set +e
+          RELEASE_VERSION="$(poetry run cz bump --get-next --yes --check-consistency 2>&1)"
+          CZ_STATUS=$?
+          set -e
+          case "${CZ_STATUS}" in
+            0) ;;
+            3|21)
+              printf '%s\n' "${RELEASE_VERSION}"
+              echo "No release-eligible conventional commits were found."
+              echo "bumped=false" >> "$GITHUB_OUTPUT"
+              echo "resume=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            *)
+              printf '%s\n' "${RELEASE_VERSION}"
+              exit "${CZ_STATUS}"
+              ;;
+          esac
+
+          if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Commitizen inferred a non-stable or invalid release version"
+            exit 1
+          fi
+          RELEASE_TAG="v${RELEASE_VERSION}"
+          if git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}" \
+            || gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "::error::inferred release ${RELEASE_TAG} already exists"
+            exit 1
+          fi
+
+          poetry run cz bump --yes --changelog --files-only --check-consistency
+          test "$(poetry version -s)" = "${RELEASE_VERSION}"
+          poetry install --only-root --no-interaction
+          INSTALLED_VERSION="$(poetry run python -c \
+            'from importlib.metadata import version; print(version("cisco-sccfm-devkit"))')"
+          test "${INSTALLED_VERSION}" = "${RELEASE_VERSION}"
+          poetry run python -m cisco_sccfm_scripts.prepare_ansible_release \
+            sccfm-ansible \
+            --previous-version "${PREVIOUS_VERSION}" \
+            --release-version "${RELEASE_VERSION}" \
+            --release-date "$(date -u +%F)"
+          poetry run generate-cli-docs
+          poetry run generate-cli-man-docs
+          poetry run generate-ansible-docs
+
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
+          echo "resume=false" >> "$GITHUB_OUTPUT"
+          echo "previous_version=${PREVIOUS_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release artifacts once
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        id: artifacts
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          test ! -e dist
+          poetry run build-ansible-collection
+          poetry build
+
+          WHEEL_PATH="dist/cisco_sccfm_devkit-${RELEASE_VERSION}-py3-none-any.whl"
+          SDIST_PATH="dist/cisco_sccfm_devkit-${RELEASE_VERSION}.tar.gz"
+          COLLECTION_PATH="dist/cisco-sccfm-${RELEASE_VERSION}.tar.gz"
+          test -f "${WHEEL_PATH}"
+          test -f "${SDIST_PATH}"
+          test -f "${COLLECTION_PATH}"
+
+          ARTIFACT_COUNT="$(find dist -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')"
+          if [[ "${ARTIFACT_COUNT}" != "3" ]]; then
+            echo "::error::expected exactly three release artifacts, found ${ARTIFACT_COUNT}"
+            exit 1
+          fi
+
+          poetry run python -m cisco_sccfm_scripts.verify_python_artifacts \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
+          pipx run --spec "twine==6.2.0" twine check --strict \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
+          poetry run python -m cisco_sccfm_scripts.verify_ansible_collection \
+            "${COLLECTION_PATH}" --expected-version "${RELEASE_VERSION}"
+
+          echo "wheel_path=${WHEEL_PATH}" >> "$GITHUB_OUTPUT"
+          echo "sdist_path=${SDIST_PATH}" >> "$GITHUB_OUTPUT"
+          echo "collection_path=${COLLECTION_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Run source gates
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        run: |
+          set -euo pipefail
+          poetry check --strict --lock
+          git ls-files '*.py' | xargs poetry run reuse lint-file
+          poetry run black --check .
+          poetry run isort --check-only .
+          poetry run mypy \
+            cisco_sccfm_cli \
+            cisco_sccfm_core \
+            cisco_sccfm_scripts/build_ansible_collection.py \
+            cisco_sccfm_scripts/prepare_ansible_release.py \
+            cisco_sccfm_scripts/release_artifacts.py \
+            cisco_sccfm_scripts/verify_ansible_collection.py \
+            cisco_sccfm_scripts/verify_clean_controller.py \
+            cisco_sccfm_scripts/verify_pypi_release.py \
+            cisco_sccfm_scripts/verify_python_artifacts.py
+          poetry run pytest --color=yes
+          poetry run check-doc-links
+          poetry run check-doc-artifacts
+
+      - name: Install pinned Gitleaks
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        run: |
+          GITLEAKS_BIN_DIR="${RUNNER_TEMP}/gitleaks-bin"
+          mkdir -p "${GITLEAKS_BIN_DIR}"
+          GOBIN="${GITLEAKS_BIN_DIR}" go install github.com/gitleaks/gitleaks/v8@v8.30.1
+          echo "${GITLEAKS_BIN_DIR}" >> "$GITHUB_PATH"
+
+      - name: Scan exact release artifacts
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        run: |
+          set -euo pipefail
+          WHEEL_SCAN_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-wheel-scan.XXXXXX")"
+          python -m zipfile -e \
+            "${{ steps.artifacts.outputs.wheel_path }}" \
+            "${WHEEL_SCAN_ROOT}"
+          gitleaks dir --no-banner --no-color --redact=100 "${WHEEL_SCAN_ROOT}"
+
+          for artifact in \
+            "${{ steps.artifacts.outputs.sdist_path }}" \
+            "${{ steps.artifacts.outputs.collection_path }}"; do
+            gitleaks dir \
+              --no-banner \
+              --no-color \
+              --redact=100 \
+              --max-archive-depth=1 \
+              "${artifact}"
+          done
+
+      - name: Verify exact wheel and sdist installations
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          read -r -a AUDIT_EXCEPTION_ARGS <<< "${DEP002_PIP_AUDIT_EXCEPTIONS}"
+
+          verify_python_distribution() {
+            local artifact_path="$1"
+            local artifact_kind="$2"
+            local smoke_root
+            smoke_root="$(mktemp -d "${RUNNER_TEMP}/sccfm-${artifact_kind}-smoke.XXXXXX")"
+            python -m venv "${smoke_root}/venv"
+            local smoke_python="${smoke_root}/venv/bin/python"
+            local smoke_cli="${smoke_root}/venv/bin/sccfm-cli"
+
+            cd "${smoke_root}"
+            "${smoke_python}" -I -m pip install --no-cache-dir "${artifact_path}"
+            "${smoke_python}" -I -m pip check
+            local requirements="${smoke_root}/runtime-requirements.txt"
+            "${smoke_python}" -I -m pip freeze \
+              --exclude cisco-sccfm-devkit \
+              > "${requirements}"
+            test -s "${requirements}"
+            pipx run --spec "pip-audit==${PIP_AUDIT_VERSION}" pip-audit \
+              --strict \
+              --no-deps \
+              --disable-pip \
+              --vulnerability-service osv \
+              --progress-spinner off \
+              --aliases on \
+              --desc off \
+              "${AUDIT_EXCEPTION_ARGS[@]}" \
+              --requirement "${requirements}"
+            "${smoke_python}" -I - "${artifact_kind}" <<'PY'
+          import importlib
+          import sys
+          from importlib.metadata import distribution, version
+          from importlib.util import find_spec
+
+          artifact_kind = sys.argv[1]
+          if version("scc-firewall-manager-sdk") != "1.17.27":
+              raise SystemExit("the installed SDK version is not the supported release pin")
+          for package in (
+              "scc_firewall_manager_sdk",
+              "cisco_sccfm_cli",
+              "cisco_sccfm_core",
+          ):
+              importlib.import_module(package)
+          if find_spec("cisco_sccfm_scripts") is not None:
+              raise SystemExit(f"repository scripts leaked into the public {artifact_kind}")
+          console_scripts = {
+              entry.name: entry.value
+              for entry in distribution("cisco-sccfm-devkit").entry_points
+              if entry.group == "console_scripts"
+          }
+          expected = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+          if console_scripts != expected:
+              raise SystemExit(f"unexpected public console scripts: {console_scripts}")
+          PY
+            "${smoke_cli}" --help >/dev/null
+            "${smoke_cli}" schema export --format json | "${smoke_python}" -I -c \
+              'from importlib.metadata import version; import json, sys; payload = json.load(sys.stdin); commands = payload.get("commands"); assert payload.get("version") == version("cisco-sccfm-devkit"); assert isinstance(commands, list) and len(commands) == 57'
+          }
+
+          unset PYTHONHOME PYTHONPATH POETRY_ACTIVE
+          verify_python_distribution \
+            "${GITHUB_WORKSPACE}/${{ steps.artifacts.outputs.wheel_path }}" wheel
+          verify_python_distribution \
+            "${GITHUB_WORKSPACE}/${{ steps.artifacts.outputs.sdist_path }}" sdist
+
+      - name: Verify exact wheel and collection pair
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        run: |
+          poetry run python -m cisco_sccfm_scripts.verify_clean_controller \
+            "${{ steps.artifacts.outputs.wheel_path }}" \
+            "${{ steps.artifacts.outputs.collection_path }}" \
+            --expected-version "${{ steps.version.outputs.version }}"
+
+      - name: Run sanity against exact collection artifact
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        run: |
+          set -euo pipefail
+          VENV_PATH="$(poetry env info --path)"
+          SANITY_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-release-sanity.XXXXXX")"
+          COLLECTION_ROOT="${SANITY_ROOT}/ansible_collections/cisco/sccfm"
+          mkdir -p "${COLLECTION_ROOT}" "${SANITY_ROOT}/home" "${SANITY_ROOT}/local"
+          tar -xzf "${{ steps.artifacts.outputs.collection_path }}" -C "${COLLECTION_ROOT}"
+          cd "${COLLECTION_ROOT}"
+          HOME="${SANITY_ROOT}/home" \
+            XDG_CACHE_HOME="${SANITY_ROOT}/home/.cache" \
+            ANSIBLE_LOCAL_TEMP="${SANITY_ROOT}/local" \
+            "${VENV_PATH}/bin/ansible-test" sanity --local --truncate 0
+
+      - name: Commit verified source
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        id: source
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r changed_path; do
+            case "${changed_path}" in
+              CHANGELOG.md|pyproject.toml|sccfm-ansible/CHANGELOG.rst|\
+              sccfm-ansible/changelogs/changelog.yaml|sccfm-ansible/galaxy.yml|\
+              sccfm-ansible/plugins/module_utils/dependencies.py|\
+              sccfm-ansible/requirements.txt|docs/cli/*|docs/man/*|docs/ansible/*)
+                ;;
+              *)
+                echo "::error::release preparation changed unexpected path: ${changed_path}"
+                exit 1
+                ;;
+            esac
+          done < <(
+            {
+              git diff --name-only
+              git ls-files --others --exclude-standard
+            } | sort -u
+          )
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.cisco.com"
+          git add \
+            CHANGELOG.md \
+            pyproject.toml \
+            sccfm-ansible/CHANGELOG.rst \
+            sccfm-ansible/changelogs/changelog.yaml \
+            sccfm-ansible/galaxy.yml \
+            sccfm-ansible/plugins/module_utils/dependencies.py \
+            sccfm-ansible/requirements.txt \
+            docs/cli \
+            docs/man \
+            docs/ansible
+          git commit -m "bump: version ${RELEASE_VERSION}" -m "[skip ci]"
+          test -z "$(git status --porcelain)"
+
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          BUNDLE_NAME="sccfm-release-${RELEASE_VERSION}-${SOURCE_COMMIT}-attempt-${GITHUB_RUN_ATTEMPT}"
+          echo "source_commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "bundle_name=${BUNDLE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and verify release manifest
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        id: manifest
+        run: |
+          poetry run python -m cisco_sccfm_scripts.release_artifacts create dist \
+            --version "${{ steps.version.outputs.version }}" \
+            --tag "${{ steps.version.outputs.tag }}" \
+            --source-commit "${{ steps.source.outputs.source_commit }}"
+          MANIFEST_SHA256="$(sha256sum dist/release-manifest.json | awk '{print $1}')"
+          git tag -a "${{ steps.version.outputs.tag }}" \
+            -m "release-manifest-sha256: ${MANIFEST_SHA256}"
+          TAG_MESSAGE="$(git for-each-ref \
+            --format='%(contents)' "refs/tags/${{ steps.version.outputs.tag }}")"
+          test "${TAG_MESSAGE}" = "release-manifest-sha256: ${MANIFEST_SHA256}"
+          echo "path=dist/release-manifest.json" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve exact release bundle
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.bundle_name }}
+          path: |
+            ${{ steps.artifacts.outputs.wheel_path }}
+            ${{ steps.artifacts.outputs.sdist_path }}
+            ${{ steps.artifacts.outputs.collection_path }}
+            ${{ steps.manifest.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Push release commit and tag atomically
+        if: steps.version.outputs.bumped == 'true' && steps.version.outputs.resume != 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+          if git push --atomic origin \
+            HEAD:refs/heads/main \
+            "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"; then
+            exit 0
+          fi
+
+          for attempt in 1 2 3; do
+            if git fetch --no-tags origin \
+              refs/heads/main:refs/remotes/origin/main \
+              && git fetch --no-tags origin \
+                "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}" \
+              && [[ "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "${SOURCE_COMMIT}" ]] \
+              && git merge-base --is-ancestor \
+                "${SOURCE_COMMIT}" refs/remotes/origin/main; then
+                echo "::warning::push reported failure, but the atomic remote update was verified"
+                exit 0
+            fi
+            if [[ "${attempt}" -lt 3 ]]; then
+              sleep 2
+            fi
+          done
+          echo "::error::atomic push failed and the intended remote state could not be verified"
+          exit 1
+
+  create-draft-release:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.bumped == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout verified release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Download exact release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare-release.outputs.bundle_name }}
+          path: ${{ runner.temp }}/release-bundle
+
+      - name: Verify bundle and upload draft assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.prepare-release.outputs.source_commit }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"
+          MANIFEST_SHA256="$(sha256sum \
+            "${BUNDLE_DIR}/release-manifest.json" | awk '{print $1}')"
+          TAG_MESSAGE="$(git for-each-ref \
+            --format='%(contents)' "refs/tags/${RELEASE_TAG}")"
+          test "${TAG_MESSAGE}" = "release-manifest-sha256: ${MANIFEST_SHA256}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --json isDraft,isPrerelease,tagName \
+            --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring)' \
+              > "${RUNNER_TEMP}/release-identity" 2>/dev/null; then
+            RELEASE_IDENTITY="$(cat "${RUNNER_TEMP}/release-identity")"
+            if [[ "${RELEASE_IDENTITY}" != "${RELEASE_TAG}"$'\ttrue\tfalse' ]]; then
+              echo "::error::existing release is not the expected stable draft release"
+              exit 1
+            fi
+          else
+            gh release create "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --draft \
+              --generate-notes \
+              --title "${RELEASE_TAG}"
+          fi
+
+          for local_asset in "${BUNDLE_DIR}"/*; do
+            asset_name="$(basename "${local_asset}")"
+            existing_root="${RUNNER_TEMP}/existing-${asset_name}"
+            mkdir -p "${existing_root}"
+            if gh release download "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --pattern "${asset_name}" \
+              --dir "${existing_root}" >/dev/null 2>&1; then
+              cmp -s "${local_asset}" "${existing_root}/${asset_name}" || {
+                echo "::error::draft release asset differs: ${asset_name}"
+                exit 1
+              }
+            else
+              gh release upload "${RELEASE_TAG}" "${local_asset}" \
+                --repo "${GITHUB_REPOSITORY}"
+            fi
+          done
+
+          VERIFY_ROOT="${RUNNER_TEMP}/verified-draft-assets"
+          mkdir -p "${VERIFY_ROOT}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir "${VERIFY_ROOT}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${VERIFY_ROOT}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"

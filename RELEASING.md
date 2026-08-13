@@ -1,12 +1,18 @@
 # Releasing
 
-Releases are deliberate maintainer operations. Merging or pushing to `main` runs CI but does not
-bump a version, create a tag, or publish a package. A maintainer starts the GitHub Actions
-**Release** workflow manually and supplies the exact version to publish.
+Releases have two separate stages:
 
-The workflow publishes the Python package first and the matching Ansible collection second. It
-builds the wheel, source distribution, and collection tarball once, then promotes those exact
-verified files to GitHub Releases, PyPI, and Ansible Galaxy without rebuilding them.
+1. After CI succeeds for a push to `main`, Commitizen inspects the conventional commits since the
+   last release. When a version bump is required, CI infers the next version, creates the release
+   commit and `v<version>` tag, builds and verifies the wheel, source distribution, and Ansible
+   collection once, and stores those files with their SHA-256 manifest in a **draft** GitHub
+   Release. This stage does not publish to PyPI or Ansible Galaxy.
+2. When the draft is ready, a maintainer manually runs the GitHub Actions **Release** workflow for
+   that existing version. It promotes the exact draft-release assets to PyPI and Ansible Galaxy,
+   then makes the GitHub Release public.
+
+Merging does not publish packages. The manual workflow dispatch is the publication gate; it does
+not choose or create a new version.
 
 ## One-time repository setup
 
@@ -19,49 +25,57 @@ Actions**:
 - `GALAXY_API_KEY`, owned by an account authorized to publish in the `cisco` namespace.
 
 Store credentials only as repository Actions secrets. Do not put them in workflow inputs or
-repository files. Protect `main` and release tags, and limit repository write access to maintainers
-authorized to release. Repository secrets do not add a separate publication approval step.
+repository files. Protect `main` and release tags, ensure the release key can perform its narrowly
+scoped push, and limit repository write access to maintainers authorized to release. This setup
+does not use GitHub environments or per-environment approvals.
 
-## Before a release
+## Before merging a release
 
-1. Merge all intended changes and confirm CI passes on the exact `main` commit to release.
-2. Confirm the changelogs and documentation describe the intended public release.
-3. Prepare the Ansible changelog history. The workflow may retarget the marked `0.38.0` seed for
-   the first release only; do not move or replace the seed marker afterward. For every later
-   release, add and review the new version entry in
-   `sccfm-ansible/changelogs/changelog.yaml` and its matching `v<version>` section in
-   `sccfm-ansible/CHANGELOG.rst` on `main`, preserving all earlier releases. The YAML entry must
-   contain non-empty `changes`, a `fragments` list, and a valid `release_date`. The workflow fails
-   closed instead of converting the previous release entry when the requested version is absent.
-4. Choose an unused exact version such as `0.39.0`. Enter it without a leading `v`.
-5. Confirm that the version and its `v<version>` tag do not already exist on PyPI, Ansible Galaxy,
-   or GitHub Releases.
-6. Confirm the PyPI account and Galaxy account still have the required namespace permissions.
+1. Confirm PR CI passes and the intended conventional commit will produce the correct bump. You
+   can preview Commitizen's inference without changing files:
+
+   ```bash
+   poetry run cz bump --dry-run --yes --changelog
+   ```
+
+2. Confirm the public documentation and changelogs describe the intended release.
+3. Prepare the Ansible changelog for the version Commitizen will infer. For the first public
+   release only, CI may retarget the checked-in `0.38.0` seed to that inferred version. Do not move
+   or replace the seed marker afterward. Before every later release, commit the inferred version
+   as the newest entry in `sccfm-ansible/changelogs/changelog.yaml` and the matching
+   `v<version>` section in `sccfm-ansible/CHANGELOG.rst`, preserving all published history. The
+   YAML entry must have non-empty `changes`, a `fragments` list, and a valid `release_date`.
+4. Confirm the inferred version and its `v<version>` tag are unused on PyPI, Ansible Galaxy, and
+   GitHub Releases, and confirm both registry accounts still have publishing permission.
 
 Published registry versions are immutable. Never reuse a version for different contents.
 
-## Run the release
+## Confirm automatic preparation
+
+After the release change reaches `main` and CI succeeds, confirm that:
+
+- Commitizen created the expected version commit and `v<version>` tag;
+- the tag identifies a commit contained in `main`;
+- a draft GitHub Release exists for the tag; and
+- the draft contains one wheel, one source distribution, one collection tarball, and
+  `release-manifest.json`.
+
+Do not edit the tag or replace draft-release assets after preparation.
+
+## Publish the prepared release
 
 1. Open **Actions** in `CiscoDevNet/sccfm-devkit` and select **Release**.
-2. Select **Run workflow**, choose the `main` branch, and enter the exact `version`.
+2. Select **Run workflow** on `main` and enter the prepared version without the leading `v`.
 3. Keep the run open until every job succeeds.
 
-The workflow performs these operations in order:
-
-1. Validates the requested version and release source, synchronizes version metadata, and runs the
-   release gates.
-2. Builds the wheel, source distribution, and Galaxy tarball once; scans and verifies all three.
-3. Creates the release commit and `v<version>` tag, then uploads the three artifacts and their
-   SHA-256 manifest to a draft GitHub Release.
-4. Downloads and re-verifies the draft-release assets, publishes the wheel and source distribution
-   to PyPI, and verifies the published files.
-5. Downloads and re-verifies the same collection tarball, publishes it to Ansible Galaxy, and
-   waits for Galaxy import validation.
-6. Publishes the GitHub Release only after both registries succeed.
+The workflow validates the existing tag and draft release, downloads and re-verifies its assets,
+publishes the wheel and source distribution to PyPI, publishes the same collection tarball to
+Ansible Galaxy, waits for registry validation, and finally makes the GitHub Release public. It
+does not rebuild or retag the release.
 
 ## Verify the release
 
-The successful run is the authoritative publication record. Confirm that:
+The successful deployment run is the authoritative publication record. Confirm that:
 
 - the GitHub Release is public and contains the wheel, source distribution, collection tarball,
   and `release-manifest.json`;
@@ -87,18 +101,18 @@ ANSIBLE_COLLECTIONS_PATH="${RELEASE_CHECK_ROOT}/collections" \
 
 ## Failures and retries
 
-- Use **Re-run failed jobs**. Do not use **Re-run all jobs** after any registry publication may
-  have succeeded.
-- If the release commit and tag reached GitHub but the build job lost the push response, re-run
-  the failed job in the same workflow run. The workflow resumes only when the tag is contained in
-  `main` and exactly one unexpired artifact bundle from that run matches and verifies against the
-  tag commit. A new workflow dispatch cannot adopt an older run's artifacts.
-- If PyPI succeeds and Galaxy fails, retry only the failed Galaxy path. It downloads and verifies
-  the preserved Actions artifact from the original workflow run; it must not rebuild it.
-- A draft GitHub Release after a failed run is expected. Do not publish it manually while either
-  registry is incomplete or unverified.
-- If a checksum, version, tag, or published-file verification fails, stop and investigate. Do not
-  replace an artifact, delete a registry release, or bypass a verification gate.
-- Before starting a new workflow run after a failure, inspect the tag, draft release, PyPI, and
-  Galaxy state. If any registry accepted the version, continue only by promoting the existing
-  manifest-bound artifacts.
+- If automatic preparation fails after pushing the release commit and tag, use **Re-run failed
+  jobs** on that same CI run. The retry accepts only the matching manifest-bound bundle already
+  produced by that run and completes the draft Release without rebuilding it.
+- A failed deployment leaves the GitHub Release as a draft. Do not publish it manually while
+  either registry is incomplete or unverified.
+- Re-run the failed deployment jobs or dispatch **Release** again for the same prepared version.
+  Every attempt downloads and verifies the manifest-bound draft-release assets; it must not
+  rebuild them.
+- If PyPI succeeded and Galaxy failed, retry the same version. The workflow must verify the files
+  already on PyPI against the manifest before continuing to Galaxy; it must not upload different
+  contents under that version.
+- If a checksum, version, tag, draft asset, or published-file verification fails, stop and
+  investigate. Do not replace an asset, move a tag, delete a registry release, or bypass a gate.
+- Before retrying, inspect the tag, draft release, PyPI, and Galaxy. If either registry accepted
+  the version, continue only by promoting the existing draft-release assets.

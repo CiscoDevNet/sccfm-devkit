@@ -49,6 +49,16 @@ def _manifest(bundle: Path) -> dict[str, Any]:
     return value
 
 
+def _workflow_job(source: str, name: str) -> str:
+    match = re.search(
+        rf"^  {re.escape(name)}:\n.*?(?=^  [a-z0-9-]+:\n|\Z)",
+        source,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert match is not None, f"workflow job {name!r} is missing"
+    return match.group(0)
+
+
 def test_create_and_verify_release_bundle(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
 
@@ -177,68 +187,86 @@ def test_verify_rejects_symlinked_artifact(tmp_path: Path) -> None:
         verify_release_bundle(bundle, _VERSION, _TAG, _COMMIT)
 
 
-def test_workflows_promote_release_assets_without_rebuilding() -> None:
+def test_workflows_separate_automatic_preparation_from_manual_deployment() -> None:
     repository = Path(__file__).resolve().parents[1]
     ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
 
-    assert "  release:\n" not in ci
+    prepare = _workflow_job(ci, "prepare-release")
+    draft = _workflow_job(ci, "create-draft-release")
+    validation = _workflow_job(release, "validate-release")
+    pypi = _workflow_job(release, "publish-to-pypi")
+    galaxy = _workflow_job(release, "publish-to-galaxy")
+    finalizer = _workflow_job(release, "publish-github-release")
+
+    assert "needs: lint-and-test" in prepare
+    assert "github.event_name == 'push'" in prepare
+    assert "github.ref == 'refs/heads/main'" in prepare
+    assert "production-release" in ci
+    assert "cancel-in-progress: false" in ci
     assert "  publish-to-pypi:\n" not in ci
     assert "  publish-to-galaxy:\n" not in ci
-    assert '"${COLLECTION_ROOT}/build.sh"' in ci
+    assert "pypa/gh-action-pypi-publish" not in ci
+    assert "ansible-galaxy collection publish" not in ci
+    assert "secrets.PYPI_API_TOKEN" not in ci
+    assert "secrets.GALAXY_API_KEY" not in ci
+    assert "secrets.SCCFM_CI_DEPLOY_KEY" in prepare
+    assert "contents: read" in prepare
+    assert "contents: write" not in prepare
+
+    assert prepare.count("poetry build") == 1
+    assert prepare.count("poetry run build-ansible-collection") == 1
+    assert "release_artifacts create" in prepare
+    assert 'git tag -a "${{ steps.version.outputs.tag }}"' in prepare
+    assert "release-manifest-sha256:" in prepare
+    assert "release-manifest.json" in prepare
+    assert "python -m zipfile -e" in prepare
+    assert prepare.count("pip-audit \\") == 1
+    assert prepare.count("verify_python_distribution \\") == 2
+    assert 'steps.artifacts.outputs.wheel_path }}" wheel' in prepare
+    assert 'steps.artifacts.outputs.sdist_path }}" sdist' in prepare
+    assert "git push --atomic" in prepare
+    assert "actions/upload-artifact" in prepare
+
+    assert "needs: prepare-release" in draft
+    assert "actions/download-artifact" in draft
+    assert "gh release create" in draft
+    assert "--verify-tag" in draft
+    assert "--draft" in draft
+    assert "release_artifacts verify" in draft
+
     assert "workflow_dispatch:" in release
     assert "release:\n    types:" not in release
     assert release.count("${{ inputs.version }}") == 1
-    assert "RELEASE_VERSION: ${{ inputs.version }}" in release
-    assert "DEP002_EXCEPTION_EXPIRES" not in ci
-    assert "DEP002_EXCEPTION_EXPIRES" not in release
-    assert "exceptions expired" not in ci
-    assert "exceptions expired" not in release
-    assert ci.count("--ignore-vuln PYSEC-2026-") == 6
-    assert release.count("--ignore-vuln PYSEC-2026-") == 6
+    assert "REQUESTED_RELEASE: ${{ inputs.version }}" in validation
+    assert "production-release" in release
+    assert "cancel-in-progress: false" in release
+    assert 'test "${GITHUB_REPOSITORY}" = "CiscoDevNet/sccfm-devkit"' in validation
+    assert 'test "${GITHUB_REF}" = "refs/heads/main"' in validation
+    assert "must identify an existing stable GitHub release" in validation
+    assert 'git rev-parse "refs/tags/${RELEASE_TAG}^{commit}"' in validation
+    assert "release-manifest-sha256:" in validation
+    assert "release_artifacts verify" in validation
 
-    build = release.split("  build-release:\n", maxsplit=1)[1].split(
-        "  create-draft-release:\n", maxsplit=1
-    )[0]
-    draft = release.split("  create-draft-release:\n", maxsplit=1)[1].split(
-        "  publish-to-pypi:\n", maxsplit=1
-    )[0]
-    pypi = release.split("  publish-to-pypi:\n", maxsplit=1)[1].split(
-        "  publish-to-galaxy:\n", maxsplit=1
-    )[0]
-    galaxy = release.split("  publish-to-galaxy:\n", maxsplit=1)[1].split(
-        "  publish-github-release:\n", maxsplit=1
-    )[0]
-    finalizer = release.split("  publish-github-release:\n", maxsplit=1)[1]
+    prohibited_deploy_commands = (
+        "poetry build",
+        "python -m build",
+        "build-ansible-collection",
+        "cz bump",
+        "git commit ",
+        "git tag ",
+        "git push ",
+        "actions/upload-artifact",
+        "actions/download-artifact",
+        "SCCFM_CI_DEPLOY_KEY",
+    )
+    for command in prohibited_deploy_commands:
+        assert command not in release
 
-    assert build.count("poetry build") == 1
-    assert build.count("poetry run build-ansible-collection") == 1
-    assert "release_artifacts create" in build
-    assert "release-manifest.json" in build
-    assert "python -m zipfile -e" in build
-    assert build.count("pip-audit \\") == 1
-    assert build.count("verify_python_distribution \\") == 2
-    assert 'steps.artifacts.outputs.wheel_path }}" wheel' in build
-    assert 'steps.artifacts.outputs.sdist_path }}" sdist' in build
-    assert "git push --atomic" in build
+    for job in (validation, pypi, galaxy, finalizer):
+        assert 'gh release download "${RELEASE_TAG}"' in job
+        assert "release_artifacts verify" in job
 
-    assert "gh release create" in draft
-    assert "--draft" in draft
-    assert "--json isDraft,isPrerelease,tagName" in draft
-    assert "\"${RELEASE_TAG}\"$'\\ttrue\\tfalse'" in draft
-    assert "\"${RELEASE_TAG}\"$'\\tfalse\\tfalse'" in draft
-    assert "RELEASE_IS_DRAFT=false" in draft
-    assert "public release is missing immutable asset" in draft
-    assert "release_artifacts verify" in draft
-    for publisher in (pypi, galaxy):
-        assert "actions/download-artifact" in publisher
-        assert "release_artifacts verify" in publisher
-        assert "python -m build" not in publisher
-        assert "poetry build" not in publisher
-        assert "build-ansible-collection" not in publisher
-
-    assert "\n    environment:" not in release
-    assert "secrets.SCCFM_CI_DEPLOY_KEY" in build
     assert "pypa/gh-action-pypi-publish" in pypi
     assert "secrets.PYPI_API_TOKEN" in pypi
     assert "skip-existing:" not in pypi
@@ -250,53 +278,47 @@ def test_workflows_promote_release_assets_without_rebuilding() -> None:
         'cp "${WHEEL_PATH}" "${SDIST_PATH}" dist/'
         not in pypi.split("3)\n              MISSING_FILES=", maxsplit=1)[1]
     )
+
     assert "- publish-to-pypi" in galaxy
     assert "secrets.GALAXY_API_KEY" in galaxy
     assert "ansible-galaxy collection publish" in galaxy
     assert "--import-timeout 600" in galaxy
-    assert "LOOKUP_ATTEMPTS=121" in galaxy
-    assert "GITHUB_RUN_ATTEMPT" in galaxy
     assert "--no-wait" not in galaxy
     assert "- publish-to-galaxy" in finalizer
-    assert "actions: read" in finalizer
-    assert "actions/checkout" in finalizer
-    assert "actions/download-artifact" in finalizer
-    assert 'test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"' in finalizer
-    assert finalizer.count("release_artifacts verify") == 2
-    assert 'gh release download "${RELEASE_TAG}"' in finalizer
-    assert 'cmp -s "${local_asset}" "${RELEASE_ASSETS_DIR}/${asset_name}"' in finalizer
-    assert "--json isDraft,isPrerelease,tagName" in finalizer
-    assert 'test "${RELEASE_TAG_NAME}" = "${RELEASE_TAG}"' in finalizer
-    assert 'test "${IS_PRERELEASE}" = "false"' in finalizer
-    assert "select(.draft == false and .prerelease == false) | .tag_name" in finalizer
-    assert "any(version > current for version in public_versions)" in finalizer
-    assert '[[ "${MAKE_LATEST}" = "true" ]]' in finalizer
     assert "--draft=false" in finalizer
     assert "--latest=false" in finalizer
-    assert finalizer.index("--latest=false") < finalizer.index('[[ "${IS_DRAFT}" = "false" ]]')
+    assert "DEP002_EXCEPTION_EXPIRES" not in ci
+    assert "DEP002_EXCEPTION_EXPIRES" not in release
+    assert "exceptions expired" not in ci
+    assert "exceptions expired" not in release
+    assert ci.count("--ignore-vuln PYSEC-2026-") == 6
+    assert "--ignore-vuln PYSEC-2026-" not in release
+    assert "\n    environment:" not in release
+    assert "\n    environment:" not in ci
 
 
-def test_release_workflow_refreshes_metadata_after_files_only_bump() -> None:
+def test_ci_refreshes_metadata_after_inferred_files_only_bump() -> None:
     repository = Path(__file__).resolve().parents[1]
-    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
-    synchronization = release.split(
-        "      - name: Synchronize exact release version\n", maxsplit=1
-    )[1].split("      - name: Build release artifacts once\n", maxsplit=1)[0]
+    ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    synchronization = ci.split("      - name: Infer and synchronize release version\n", maxsplit=1)[
+        1
+    ].split("      - name: Build release artifacts once\n", maxsplit=1)[0]
 
-    bump = synchronization.index('poetry run cz bump "${RELEASE_VERSION}"')
+    inference = synchronization.index("poetry run cz bump --get-next")
+    bump = synchronization.index("poetry run cz bump --yes --changelog --files-only")
     reinstall = synchronization.index("poetry install --only-root --no-interaction")
     metadata_check = synchronization.index('test "${INSTALLED_VERSION}" = "${RELEASE_VERSION}"')
 
-    assert bump < reinstall < metadata_check
+    assert inference < bump < reinstall < metadata_check
     assert 'version("cisco-sccfm-devkit")' in synchronization
 
 
-def test_release_changed_path_validation_reads_tracked_and_untracked_paths() -> None:
+def test_ci_release_changed_path_validation_reads_tracked_and_untracked_paths() -> None:
     repository = Path(__file__).resolve().parents[1]
-    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
-    commit_step = release.split("      - name: Commit and tag verified source\n", maxsplit=1)[
-        1
-    ].split("      - name: Create and verify release manifest\n", maxsplit=1)[0]
+    ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    commit_step = ci.split("      - name: Commit verified source\n", maxsplit=1)[1].split(
+        "      - name: Create and verify release manifest\n", maxsplit=1
+    )[0]
 
     validation = re.compile(
         r"while IFS= read -r changed_path; do.*?done < <\(\s*\{\s*"
@@ -311,48 +333,56 @@ def test_release_changed_path_validation_reads_tracked_and_untracked_paths() -> 
     assert re.search(rf"git add .*?{re.escape(paired_runtime)}", commit_step, re.DOTALL)
 
 
-def test_release_retry_resumes_only_same_run_manifest_bound_artifacts() -> None:
+def test_draft_release_and_registry_retries_are_manifest_bound() -> None:
     repository = Path(__file__).resolve().parents[1]
+    ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
-    build = release.split("  build-release:\n", maxsplit=1)[1].split(
-        "  create-draft-release:\n", maxsplit=1
-    )[0]
-    validation = build.split("      - name: Validate requested release\n", maxsplit=1)[1].split(
-        "      - name: Synchronize exact release version\n", maxsplit=1
-    )[0]
+    draft = _workflow_job(ci, "create-draft-release")
+    prepare = _workflow_job(ci, "prepare-release")
+    pypi = _workflow_job(release, "publish-to-pypi")
+    galaxy = _workflow_job(release, "publish-to-galaxy")
 
-    assert "actions: read" in build
-    assert '[[ "${GITHUB_RUN_ATTEMPT}" -le 1 ]]' in validation
-    assert "actions/runs/${GITHUB_RUN_ID}/artifacts" in validation
-    assert 'gh run download "${GITHUB_RUN_ID}"' in validation
-    assert "cisco_sccfm_scripts.release_artifacts verify" in validation
-    assert 'git merge-base --is-ancestor "${SOURCE_COMMIT}" HEAD' in validation
-    assert "--json isDraft,isPrerelease,tagName" in validation
-    assert ".isPrerelease == false" in validation
-    assert "select(.isPrerelease == false) | .tagName" in validation
-    assert '[[ "${RELEASE_IDENTITY}" != "${RELEASE_TAG}" ]]' in validation
-    assert "select(.draft == true) | .tag_name" in validation
-    assert '[[ "${RESUME_RELEASE}" != "true" || "${draft_tag}" != "${RELEASE_TAG}" ]]' in validation
-    assert "unresolved draft release blocks a new production release" in validation
-    registry_resume = re.search(
-        r'200\)\s+if \[\[ "\$\{RESUME_RELEASE\}" != "true" \]\]; then\s+'
-        r'echo "::error::\$\{registry\} already contains version',
-        validation,
-    )
-    assert registry_resume is not None
-    assert "steps.source.outputs.source_commit || steps.version.outputs.source_commit" in build
-    assert "steps.source.outputs.bundle_name || steps.version.outputs.bundle_name" in build
+    assert "actions: read" in prepare
+    assert '[[ "${GITHUB_RUN_ATTEMPT}" -gt 1' in prepare
+    assert 'test "$(git rev-parse "${RECOVERY_SOURCE}^")" = "${GITHUB_SHA}"' in prepare
+    assert "actions/runs/${GITHUB_RUN_ID}/artifacts" in prepare
+    assert 'gh run download "${GITHUB_RUN_ID}"' in prepare
+    assert "release_artifacts verify" in prepare
+    assert "RECOVERY_TAG_MESSAGE" in prepare
+    assert "release-manifest-sha256:" in prepare
+    assert "expected one unexpired manifest-bound bundle" in prepare
+    assert "steps.source.outputs.source_commit || steps.version.outputs.source_commit" in prepare
+    assert "steps.source.outputs.bundle_name || steps.version.outputs.bundle_name" in prepare
+
+    assert "gh release view" in draft
+    assert 'cmp -s "${local_asset}" "${existing_root}/${asset_name}"' in draft
+    assert "gh release upload" in draft
+    assert draft.count('gh release download "${RELEASE_TAG}"') == 2
+    assert draft.count("release_artifacts verify") == 2
+
+    assert "verify_pypi_release" in pypi
+    assert 'case "${PYPI_STATUS}" in' in pypi
+    assert re.search(r"\n\s+0\)\n\s+echo \"publish=false\"", pypi) is not None
+    assert re.search(r"\n\s+2\)\n.*?echo \"publish=true\"", pypi, re.DOTALL) is not None
+    assert re.search(r"\n\s+3\)\n.*?echo \"publish=true\"", pypi, re.DOTALL) is not None
+
+    assert 'case "${HTTP_STATUS}" in' in galaxy
+    assert "200)" in galaxy
+    assert "jq -er '.artifact.sha256'" in galaxy
+    assert 'echo "publish=false"' in galaxy
+    assert '404) echo "publish=true"' in galaxy
 
 
-def test_release_push_reconciles_an_accepted_remote_update() -> None:
+def test_ci_release_push_reconciles_an_accepted_remote_update() -> None:
     repository = Path(__file__).resolve().parents[1]
-    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
-    push = release.split("      - name: Push release commit and tag atomically\n", maxsplit=1)[
-        1
-    ].split("\n  create-draft-release:\n", maxsplit=1)[0]
+    ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    push = ci.split("      - name: Push release commit and tag atomically\n", maxsplit=1)[1].split(
+        "\n  create-draft-release:\n", maxsplit=1
+    )[0]
 
     assert "if git push --atomic origin" in push
-    assert "git ls-remote --refs origin" in push
-    assert '[[ "${REMOTE_TAG_COMMIT}" = "${SOURCE_COMMIT}" ]]' in push
-    assert 'git merge-base --is-ancestor "${SOURCE_COMMIT}" FETCH_HEAD' in push
+    assert "refs/heads/main:refs/remotes/origin/main" in push
+    assert '[[ "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"' in push
+    assert "git merge-base --is-ancestor \\" in push
+    assert '"${SOURCE_COMMIT}" refs/remotes/origin/main' in push
     assert "the atomic remote update was verified" in push
