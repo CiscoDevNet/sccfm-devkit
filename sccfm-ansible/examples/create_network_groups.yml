@@ -5,8 +5,7 @@
 #   ansible-playbook examples/create_network_groups.yml
 #
 # PREREQUISITES:
-#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
-#   - Region and API token in group_vars/all/vars.yml
+#   - Configure the default profile with `sccfm-cli configure`
 #   - Run the create network_objects.yml playbook first to create any referenced network objects
 
 
@@ -17,8 +16,7 @@
   # Use module_defaults to avoid repeating region and api_token
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
 
   vars:
     network_groups:

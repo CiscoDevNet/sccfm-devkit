@@ -7,19 +7,14 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    DevicePage,
-    EntityType,
-    FtdVersion,
-)
+from scc_firewall_manager_sdk import ApiException, DevicePage, FtdVersion
 
 from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
 from cisco_sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, base_argument_spec, create_config
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -71,19 +66,15 @@ options:
     required: false
     type: bool
     default: false
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -94,8 +85,7 @@ EXAMPLES = r"""
   cisco.sccfm.list_ftd_compatible_versions:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: compat_versions
 
 - name: Show compatible versions
@@ -134,8 +124,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get compatible versions for branch FTDs
       cisco.sccfm.list_ftd_compatible_versions:

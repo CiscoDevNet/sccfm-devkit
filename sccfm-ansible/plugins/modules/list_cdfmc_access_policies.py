@@ -38,19 +38,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -60,8 +56,7 @@ EXAMPLES = r"""
 - name: List cdFMC access policies
   cisco.sccfm.list_cdfmc_access_policies:
     domain_uid: "e276abec-e0f2-11e3-8169-6d9ed49b625f"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show access policies
@@ -74,8 +69,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List access policies for a domain
       cisco.sccfm.list_cdfmc_access_policies:

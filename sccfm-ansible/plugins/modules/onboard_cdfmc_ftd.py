@@ -70,19 +70,15 @@ options:
     required: false
     type: list
     elements: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -95,8 +91,7 @@ EXAMPLES = r"""
     fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
     licenses:
       - BASE
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Onboard a virtual FTD with multiple licenses
 - name: Onboard virtual FTD
@@ -128,8 +123,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:

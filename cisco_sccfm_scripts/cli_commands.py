@@ -4,7 +4,7 @@
 
 """Dynamic sccfm-cli command tree built by introspecting the Click group.
 
-Any command added to sccfm-cli is automatically available in the devkit
+Any command added to sccfm-cli is automatically available in the interactive CLI
 interactive runner — no changes to this file are required.
 
 Infrastructure options that are not useful in an interactive session

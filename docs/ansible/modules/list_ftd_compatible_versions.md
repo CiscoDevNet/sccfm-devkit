@@ -22,13 +22,10 @@ $ ansible-doc -t module cisco.sccfm.list_ftd_compatible_versions
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
@@ -50,17 +47,14 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter FTD devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with FTD device type
            filters.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -78,8 +72,7 @@ EXAMPLES:
   cisco.sccfm.list_ftd_compatible_versions:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: compat_versions
 
 - name: Show compatible versions
@@ -118,8 +111,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get compatible versions for branch FTDs
       cisco.sccfm.list_ftd_compatible_versions:

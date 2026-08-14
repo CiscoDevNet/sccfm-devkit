@@ -34,21 +34,15 @@ options:
     required: false
     type: bool
     default: false
-  region:
-    description:
-      - The SCC Firewall Manager region.
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description:
-      - The SCC Firewall Manager API token.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -59,8 +53,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Complete the FTD registration
       cisco.sccfm.register_cdfmc_ftd:

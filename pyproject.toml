@@ -41,12 +41,12 @@ click-option-group = "^0.5.9"
 scc-firewall-manager-sdk = "^1.17.27"
 questionary = "^2.1.1"
 paramiko = "^3.5.0"
+pyyaml = "^6.0.0"
 
 [tool.poetry.scripts]
 sccfm-cli = "cisco_sccfm_cli.cli:cli"
-devkit = "cisco_sccfm_scripts.devkit_cli:main"
+sccfm-cli-interactive = "cisco_sccfm_scripts.interactive_cli:main"
 build-ansible-collection = "cisco_sccfm_scripts.build_ansible_collection:main"
-change-tokens = "cisco_sccfm_scripts.setup_tokens:main"
 generate-ansible-docs = "cisco_sccfm_scripts.generate_ansible_docs:main"
 generate-cli-docs = "cisco_sccfm_scripts.generate_cli_docs:main"
 generate-cli-man-docs = "cisco_sccfm_scripts.generate_cli_man_docs:main"
@@ -67,9 +67,6 @@ pre-commit = "^4.5.0"
 flake8 = "^7.1.1"
 commitizen = "^3.27.0"
 reuse = "^6.2.0"
-
-[tool.poetry.group.build.dependencies]
-pyyaml = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]

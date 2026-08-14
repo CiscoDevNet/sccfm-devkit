@@ -10,10 +10,8 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - [Installation](#installation)
   - [Local Development](#local-development)
 - [Trying out examples](#trying-out-examples)
-  - [1. Set Up Ansible Vault](#1-set-up-ansible-vault)
+  - [1. Configure an SCCFM Profile](#1-configure-an-sccfm-profile)
   - [2. Edit playbook](#2-edit-playbook)
-  - [2. Create Encrypted Secrets](#2-create-encrypted-secrets)
-  - [3. Configure Plain Variables](#3-configure-plain-variables)
   - [4. Run Examples](#4-run-examples)
   - [Test Inventory](#test-inventory)
   - [Host Variables](#host-variables)
@@ -27,12 +25,11 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
   - [What is Ansible Vault?](#what-is-ansible-vault)
   - [Vault Commands Reference](#vault-commands-reference)
 - [Module Defaults Pattern](#module-defaults-pattern)
-- [Authentication Methods](#authentication-methods)
+- [Authentication](#authentication)
 - [Security Best Practices](#security-best-practices)
 - [Troubleshooting](#troubleshooting)
   - ["Decryption failed" error](#decryption-failed-error)
-  - ["region is required" error](#region-is-required-error)
-  - ["api_token is required" error](#api_token-is-required-error)
+  - ["profile not found" error](#profile-not-found-error)
   - [Inventory returns no hosts](#inventory-returns-no-hosts)
 - [Examples](#examples)
 - [Additional Resources](#additional-resources)
@@ -48,8 +45,9 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 - **ASA HA Health Check Module**: Validate ASA failover health and common HA issues
 - **ASA Boot Image Module**: Change the configured next-boot ASA image
 - **Device Grouping**: Automatically group devices by type (ASA, CDFMC_MANAGED_FTD, etc.)
-- **Ansible Vault Integration**: Secure credential management for API tokens and device passwords
-- **Module Defaults Support**: Set region/API token once for all tasks
+- **Canonical SCCFM Profiles**: Share one named region/token profile with both CLI surfaces
+- **Ansible Vault Integration**: Secure device passwords and other playbook-specific secrets
+- **Module Defaults Support**: Select one profile for all tasks
 
 ## Installation
 
@@ -59,7 +57,7 @@ See instructions in the [INSTALL.md](INSTALL.md) file.
 
 **Build and install (recommended):**
 ```bash
-devkit
+sccfm-cli-interactive
 # then select "build-collection" from the menu
 ```
 
@@ -75,37 +73,36 @@ This will:
 
 ## Trying out examples
 
-### 1. Set Up Tokens (Recommended — interactive)
+### 1. Configure an SCCFM Profile
 
-The fastest way to configure your tokens, `.env`, vault, and region is with the devkit CLI:
+The CLI and Ansible collection use the same named profile store. Configure it directly:
 
 ```bash
-devkit
-# then select "change-tokens" from the menu
+sccfm-cli --profile default configure --region us
 ```
 
-Or run the token setup directly:
+Or use the interactive flow:
+
 ```bash
-change-tokens
+sccfm-cli-interactive
+# select "configure-profile"
 ```
 
-This will interactively:
-1. Let you pick a previously saved token or create a new one
-2. Ask which SCCFM region you're connecting to (for new tokens)
-3. Prompt you to paste your API token
-4. Save the token for future reuse
-5. Create the `.env` file with `SCCFM_REGION` and `SCCFM_API_TOKEN`
-6. Create the `.vault_pass` password file (if it doesn't exist)
-7. Write and encrypt `group_vars/all/vault.yml`
-8. Update `group_vars/all/vars.yml` with the selected region
+Profiles live at `~/.sccfm-cli/config.json`. The containing directory is restricted to
+the current user (`0700`) and the file is owner read/write (`0600`). Ansible modules
+and inventory load the selected profile directly; do not duplicate its API token in
+environment variables or Ansible Vault.
 
-You can also point the standalone command at a custom examples directory:
+If you used a release that stored SCCFM tokens in Ansible Vault, import them without
+modifying the source vault:
+
 ```bash
-change-tokens --path /path/to/examples
+sccfm-cli-interactive
+# select "import-legacy-vault"
 ```
 
 <details>
-<summary><strong>Manual setup (alternative)</strong></summary>
+<summary><strong>Set up Ansible-specific device secrets</strong></summary>
 
 Create a vault password file (do NOT commit this!):
 
@@ -123,10 +120,9 @@ cp group_vars/all/vault.yml.example group_vars/all/vault.yml.temp
 vim group_vars/all/vault.yml.temp
 ```
 
-Add your secrets:
+Add only playbook-specific secrets:
 ```yaml
 ---
-sccfm_api_token: "your-actual-api-token-here"
 vault_asa_branch_office_01_password: "ActualPassword1"
 ```
 
@@ -139,12 +135,6 @@ ansible-vault encrypt group_vars/all/vault.yml.temp \
 rm group_vars/all/vault.yml.temp
 ```
 
-Edit `group_vars/all/vars.yml`:
-
-```yaml
-sccfm_region: us  # Change to your region (int, us, eu, apj, au, uae, in, or ci)
-```
-
 </details>
 
 ### 2. Edit playbook
@@ -155,8 +145,6 @@ Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to m
 
 **Graph inventory:**
 ```bash
-export SCCFM_REGION=int
-export SCCFM_API_TOKEN=$(ansible-vault view ./examples/group_vars/all/vault.yml --vault-password-file ./examples/.vault_pass | grep sccfm_api_token | cut -d '"' -f2)
 ansible-inventory -i examples/inventory.sccfm.yml \
   --graph \
   --playbook-dir examples
@@ -217,8 +205,8 @@ Onboard an ASA device to your SCCFM tenant.
 - `ignore_certificate`: Skip certificate validation (default: false)
 - `grouped_labels`: Dictionary of label groups
 - `ungrouped_labels`: List of labels
-- `region`: SCCFM region (optional, uses vault/env)
-- `api_token`: API token (optional, uses vault/env)
+- `profile`: Named SCCFM profile (optional, defaults to `default`)
+- `config_path`: Optional path to the canonical profile file
 
 **Example:**
 ```yaml
@@ -226,8 +214,7 @@ Onboard an ASA device to your SCCFM tenant.
   hosts: localhost
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   
   tasks:
     - name: Onboard branch ASA
@@ -285,7 +272,7 @@ documentation.
 
 ### What is Ansible Vault?
 
-Ansible Vault encrypts sensitive data (API tokens, passwords) so you can safely commit them to version control. The encrypted `vault.yml` file is committed, but the `.vault_pass` password file is **never** committed.
+Ansible Vault encrypts playbook-specific secrets such as managed-device passwords so you can safely commit them to version control. SCCFM API tokens belong only in the canonical profile store. The encrypted `vault.yml` file may be committed, but the `.vault_pass` password file is **never** committed.
 
 ### Vault Commands Reference
 
@@ -331,39 +318,32 @@ head -1 group_vars/all/vault.yml
 
 ## Module Defaults Pattern
 
-Instead of repeating `region` and `api_token` for every task, use `module_defaults`:
+Select a non-default profile once with `module_defaults`:
 
 ```yaml
 - name: Manage SCCFM devices
   hosts: localhost
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: production
   
   tasks:
     - name: Onboard device 1
       cisco.sccfm.onboard_asa:
         name: device-1
-        # No need to specify region/api_token here!
+        # No need to repeat the profile here.
         
     - name: Onboard device 2
       cisco.sccfm.onboard_asa:
         name: device-2
-        # Still no region/api_token needed!
+        # The same profile is used here.
 ```
 
-## Authentication Methods
+## Authentication
 
-Three ways to provide credentials (in order of precedence):
-
-1. **Module parameters** (explicit in task)
-2. **Module defaults** (recommended - set once per playbook)
-3. **Environment variables**:
-   ```bash
-   export SCCFM_REGION=us
-   export SCCFM_API_TOKEN=your-token-here
-   ```
+Configure credentials once with `sccfm-cli configure`. Modules and inventory use the
+`default` profile unless `profile` selects another name. `config_path` selects a custom
+canonical profile file when needed.
 
 ## Security Best Practices
 
@@ -371,7 +351,7 @@ Three ways to provide credentials (in order of precedence):
 2. **Always encrypt vault files** before committing
 3. **Store `.vault_pass` securely** and never commit it
 4. **Use different vault passwords** for different environments (dev/prod)
-5. **Rotate API tokens regularly** and update vault files accordingly
+5. **Rotate API tokens regularly** with `sccfm-cli configure`
 6. **Use `.gitignore`** to prevent accidental commits of sensitive files
 7. **Use `no_log: true`** for password parameters in custom tasks
 
@@ -381,20 +361,15 @@ Three ways to provide credentials (in order of precedence):
 - Check your vault password is correct
 - Ensure you're using the right vault password file
 
-### "region is required" error
-- Verify `sccfm_region` is set in `group_vars/all/vars.yml`
-- Or set `SCCFM_REGION` environment variable
-- Or provide `region` parameter in module defaults
-
-### "api_token is required" error
-- Verify `sccfm_api_token` is in encrypted `group_vars/all/vault.yml`
-- Or set `SCCFM_API_TOKEN` environment variable
-- Or provide `api_token` parameter in module defaults
+### "profile not found" error
+- Run `sccfm-cli --profile <name> configure`.
+- Ensure the playbook's `profile` value matches the configured name.
+- If using `config_path`, ensure it points to the same canonical profile file.
 
 ### Inventory returns no hosts
 - Check your API token has proper permissions
 - Verify the region is correct
-- Test API access: `curl -H "Authorization: Bearer $SCCFM_API_TOKEN" https://<region>.cdo.cisco.com/api/rest/v1/inventory/devices`
+- Test API access without exposing the token: `sccfm-cli --profile <name> status`
 
 ## Examples
 
@@ -407,8 +382,8 @@ See the `examples/` directory for complete working examples:
 - **`execute_ftd_cli.yml`** - Execute show commands on cdFMC-managed FTD devices
 - **`asa_ha_check.yml`** - Run HA health checks on ASA failover devices
 - **`change_asa_boot_image.yml`** - Change the configured ASA boot image
-- **`group_vars/all/vars.yml`** - Plain variables (region, defaults)
-- **`group_vars/all/vault.yml`** - Encrypted secrets (API token, passwords)
+- **`group_vars/all/vars.yml`** - Plain playbook variables
+- **`group_vars/all/vault.yml`** - Encrypted playbook-specific secrets
 - **`group_vars/all/vault.yml.example`** - Template for vault structure
 
 ## Additional Resources

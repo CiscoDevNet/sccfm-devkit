@@ -50,13 +50,12 @@ reserve breaking changes until the next major version release.
    direnv allow
    ```
 
-3. Set up your SCCFM credentials:
+3. Set up your SCCFM profile:
    ```bash
-   cp .env.example .env
-   # Edit .env with your API token
+   sccfm-cli configure --region us  # securely prompts for the token
    ```
 
-Now whenever you `cd` into the project, the virtualenv activates and env vars load automatically.
+Now whenever you `cd` into the project, the virtualenv activates automatically.
 
 ## Committing Changes
 

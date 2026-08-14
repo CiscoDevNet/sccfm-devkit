@@ -30,7 +30,7 @@ Evidence:
 - Ansible shared config uses
   `ALLOWED_REGIONS = ("int", "us", "eu", "apj", "aus", "uae", "in", "ci")`
   in `sccfm-ansible/plugins/module_utils/config.py`.
-- `.env.example` also documents `aus` and `ci`.
+- Resolved: region vocabulary now comes from the canonical profile configuration flow.
 
 Impact:
 - A region value can be presented as valid in one surface and invalid in another.
@@ -815,7 +815,7 @@ Evidence:
 Impact:
 - Equivalent values such as `US` or `Eu` are normalized in the CLI flow but rejected
   in the Ansible flow.
-- Cross-surface behavior for `SCCFM_REGION` is inconsistent.
+- Resolved: CLI and Ansible now share canonical profile resolution.
 
 Recommendation:
 - Normalize region values to lowercase in the Ansible config path before validation,
@@ -840,7 +840,7 @@ into the main priority stack because they are mostly mechanical style cleanup:
   It is present in much of the repo, but missing from several scripts and service/package
   files, including `cisco_sccfm_scripts/build_ansible_collection.py`,
   `cisco_sccfm_scripts/validate_regex.py`,
-  `cisco_sccfm_scripts/_test_setup_tokens.py`,
+  `cisco_sccfm_scripts/test_import_legacy_vault.py`,
   `cisco_sccfm_core/__init__.py`,
   and a number of command group / service files.
 - Region ordering/spelling presentation also drifts beyond the core value split.

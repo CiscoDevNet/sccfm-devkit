@@ -28,13 +28,10 @@ $ ansible-doc -t module cisco.sccfm.list_ftd_not_on_version
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - limit   Maximum number of devices to fetch when using `query' or no
            filter.
@@ -46,6 +43,10 @@ OPTIONS (= indicates it is required):
            Ignored when using `uids'.
         default: 0
         type: int
+
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
 
 - query   Lucene query to narrow the set of FTD devices to check.
            Mutually exclusive with `uids'.
@@ -61,13 +62,6 @@ OPTIONS (= indicates it is required):
                 Mutually exclusive with `version'.
         default: false
         type: bool
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
-        type: str
 
 - uids    List of device UIDs to check.
            Mutually exclusive with `query'.
@@ -91,8 +85,7 @@ EXAMPLES:
 - name: Find FTDs not on 7.4.1
   cisco.sccfm.list_ftd_not_on_version:
     version: "7.4.1"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show devices that need upgrading
@@ -124,8 +117,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Find FTDs not on target version
       cisco.sccfm.list_ftd_not_on_version:

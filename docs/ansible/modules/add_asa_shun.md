@@ -31,13 +31,10 @@ $ ansible-doc -t module cisco.sccfm.add_asa_shun
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - dest_ip  Destination IP of a specific connection to drop
             immediately.
@@ -97,6 +94,10 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - protocol  Protocol of the connection to drop (tcp or udp).
              Requires `dest_ip'.
              Only valid when using `source_ip' (not `entries').
@@ -107,13 +108,6 @@ OPTIONS (= indicates it is required):
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -142,8 +136,7 @@ EXAMPLES:
   cisco.sccfm.add_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Shun with connection tuple to drop an existing connection
 - name: Block attacker and drop active connection
@@ -168,8 +161,7 @@ EXAMPLES:
         dest_port: 443
         protocol: tcp
       - source_ip: "203.0.113.60"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 4: Using module_defaults (recommended)
 - name: Add shun entries
@@ -177,8 +169,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Shun attacker IP
       cisco.sccfm.add_asa_shun:

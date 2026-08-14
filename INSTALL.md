@@ -133,18 +133,14 @@ After sourcing, tab completion will work for all `sccfm` commands and options.
 The same PyPI package exposes the typed `cisco_sccfm_core` library for Python automation:
 
 ```python
-from dataclasses import dataclass
-
 from cisco_sccfm_core import InventoryService
+from cisco_sccfm_core.services import ProfileService
 
+profile = ProfileService().load("default")
+if profile is None:
+    raise RuntimeError("Configure the default profile with sccfm-cli configure")
 
-@dataclass(frozen=True)
-class Config:
-    region: str
-    api_token: str
-
-
-inventory = InventoryService(Config(region="us", api_token="..."))
+inventory = InventoryService(profile)
 devices = inventory.get_devices(limit=10, offset=0, query=None)
 ```
 
@@ -174,19 +170,19 @@ ansible-galaxy collection list | grep cisco.sccfm
 
 ### Try out examples
 
-The fastest way to get going is to use the interactive devkit menu:
+The fastest way to get going is to use the interactive CLI menu:
 
 ```bash
-devkit
-# select "change-tokens" from the menu
+sccfm-cli-interactive
+# select "configure-profile" from the menu
 ```
 
-Or run the token setup directly:
+Or configure the canonical profile directly:
 
 ```bash
-change-tokens
+sccfm-cli configure --region us  # securely prompts for the token
 ```
 
-This will prompt for your region, API token, and vault password, then create all the required files (.env, vars.yml, vault.yml).
+The profile is shared by `sccfm-cli`, `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection. Ansible Vault remains available separately for managed-device passwords and other playbook-specific secrets.
 
 See the [Trying out examples](sccfm-ansible/README.md#trying-out-examples) section in the Ansible collection README for the full walkthrough including how to run playbooks.

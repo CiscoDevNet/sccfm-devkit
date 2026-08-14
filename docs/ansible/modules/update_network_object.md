@@ -23,13 +23,10 @@ $ ansible-doc -t module cisco.sccfm.update_network_object
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - description  New description for the network object.
         default: null
@@ -49,11 +46,8 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - tags    New mapping of tag keys to lists of tag values. For
@@ -80,16 +74,14 @@ EXAMPLES:
   cisco.sccfm.update_network_object:
     uid: "abc-123-def"
     value: "192.168.1.0/24"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Rename a network object by name
 - name: Rename a network object
   cisco.sccfm.update_network_object:
     name: old-object-name
     new_name: new-object-name
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 3: Update multiple fields using module_defaults
 - name: Update network objects
@@ -97,8 +89,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Update web server object
       cisco.sccfm.update_network_object:

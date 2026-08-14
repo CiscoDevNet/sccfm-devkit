@@ -62,6 +62,8 @@ class ConfigureCommand(BaseCommand):
                 help="API token for the chosen region",
                 group=credential_group,
                 required=True,
+                prompt="API token",
+                hide_input=True,
             ),
         ]
 

@@ -1,10 +1,7 @@
-# Credentials can be provided in two ways:
-# 1. Set environment variables SCCFM_REGION and SCCFM_API_TOKEN (recommended)
-#    - Create a .env file from .env.example and use direnv to auto-load
-# 2. Use the lookup syntax below (falls back to env vars if not set)
+# Configure the selected profile first:
+#   sccfm-cli --profile default configure --region us
 plugin: cisco.sccfm.sccfm
-region: "{{ lookup('env', 'SCCFM_REGION') }}"
-api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+profile: default
 group_by_device_type: true
 # limit: 100
 # query: "deviceType:ASA"

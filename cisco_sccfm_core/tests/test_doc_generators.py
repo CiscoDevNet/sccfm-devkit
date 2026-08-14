@@ -152,7 +152,7 @@ def test_ansible_docs_refuse_to_overwrite_non_empty_custom_directory(tmp_path: P
 
 
 def test_ansible_docs_wrap_output_in_liquid_raw_tags() -> None:
-    output = "api_token: \"{{ lookup('env', 'SCCFM_API_TOKEN') }}\""
+    output = 'profile: "{{ selected_profile }}"'
 
     page = generate_ansible_docs._render_page(
         "cisco.sccfm.sccfm",
@@ -163,6 +163,17 @@ def test_ansible_docs_wrap_output_in_liquid_raw_tags() -> None:
     assert "{% raw %}\n```text" in page
     assert "```\n{% endraw %}\n" in page
     assert output in page
+
+
+def test_ansible_index_includes_lookup_plugins() -> None:
+    index = generate_ansible_docs._render_index(
+        (),
+        (),
+        ("cisco.sccfm.profile",),
+    )
+
+    assert "## Lookup Plugins" in index
+    assert "[cisco.sccfm.profile](lookup/profile.html)" in index
 
 
 def test_generated_docs_include_jekyll_front_matter() -> None:

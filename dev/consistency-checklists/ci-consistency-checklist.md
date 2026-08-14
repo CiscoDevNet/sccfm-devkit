@@ -54,12 +54,12 @@ Advisory families are listed in section 6.
 
 If the PR touches one of these areas, check all related siblings and fail the review if the PR introduces or worsens drift.
 
-### A. Region, auth, and environment contract
+### A. Region and canonical profile contract
 
 Check when touching:
 - `cisco_sccfm_cli/commands/configure.py`
 - `sccfm-ansible/plugins/module_utils/config.py`
-- `.env.example`
+- `cisco_sccfm_core/services/profile_service.py`
 - `README.md`
 - `INSTALL.md`
 - Ansible module region docs
@@ -67,7 +67,7 @@ Check when touching:
 Verify:
 - One canonical region vocabulary is used everywhere.
 - Region casing behavior is aligned across CLI and Ansible.
-- `SCCFM_REGION`, `SCCFM_API_TOKEN`, and `SCCFM_CONFIG` semantics remain aligned.
+- CLI and Ansible resolve the same named profile and optional `SCCFM_CONFIG` path.
 - Docs/examples do not advertise different region names or availability.
 
 Fail if:

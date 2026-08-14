@@ -25,19 +25,15 @@ options:
     description: Unique identifier (UID) of the access group to retrieve.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -47,8 +43,7 @@ EXAMPLES = r"""
 - name: Get access group
   cisco.sccfm.get_access_group:
     uid: "c6fa254e-db7a-447e-a58f-95df1e09c2af"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show access group name
@@ -61,8 +56,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get access group
       cisco.sccfm.get_access_group:

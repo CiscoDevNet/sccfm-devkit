@@ -135,7 +135,11 @@ def _link(plugin_type: str, fqcn: str) -> str:
     return f"- [{fqcn}]({plugin_type}/{name}.html)"
 
 
-def _render_index(modules: Sequence[str], inventory_plugins: Sequence[str]) -> str:
+def _render_index(
+    modules: Sequence[str],
+    inventory_plugins: Sequence[str],
+    lookup_plugins: Sequence[str] = (),
+) -> str:
     lines = [
         GENERATED_HEADER,
         "",
@@ -147,6 +151,8 @@ def _render_index(modules: Sequence[str], inventory_plugins: Sequence[str]) -> s
         "",
     ]
     lines.extend(_link("inventory", name) for name in inventory_plugins)
+    lines.extend(["", "## Lookup Plugins", ""])
+    lines.extend(_link("lookup", name) for name in lookup_plugins)
     lines.extend(["", "## Modules", ""])
     lines.extend(_link("modules", name) for name in modules)
     lines.append("")
@@ -157,9 +163,10 @@ def _generate_files(project_root: Path, docs_root: Path) -> Mapping[Path, str]:
     with _source_collection_path(project_root) as collection_path:
         modules = _list_plugins(project_root, collection_path, "module")
         inventory_plugins = _list_plugins(project_root, collection_path, "inventory")
+        lookup_plugins = _list_plugins(project_root, collection_path, "lookup")
 
         files: dict[Path, str] = {
-            docs_root / "index.md": _render_index(modules, inventory_plugins),
+            docs_root / "index.md": _render_index(modules, inventory_plugins, lookup_plugins),
         }
         for fqcn in modules:
             output = _run_ansible_doc(project_root, collection_path, ["-t", "module", fqcn])
@@ -175,6 +182,14 @@ def _generate_files(project_root: Path, docs_root: Path) -> Mapping[Path, str]:
             files[docs_root / "inventory" / f"{name}.md"] = _render_page(
                 fqcn,
                 f"ansible-doc -t inventory {fqcn}",
+                output,
+            )
+        for fqcn in lookup_plugins:
+            output = _run_ansible_doc(project_root, collection_path, ["-t", "lookup", fqcn])
+            name = fqcn.removeprefix(f"{COLLECTION_FQCN}.")
+            files[docs_root / "lookup" / f"{name}.md"] = _render_page(
+                fqcn,
+                f"ansible-doc -t lookup {fqcn}",
                 output,
             )
         return files

@@ -9,13 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from plugins.modules import onboard_cdfmc_ftd  # noqa: E402
-from scc_firewall_manager_sdk import (
-    ConfigState,
-    ConnectivityState,
-    Device,
-    DevicePage,
-    EntityType,
-)
+from scc_firewall_manager_sdk import ConfigState, ConnectivityState, Device, DevicePage, EntityType
 
 
 @pytest.fixture
@@ -41,8 +35,7 @@ def base_module_params() -> dict[str, Any]:
         "performance_tier": None,
         "grouped_labels": {"environment": ["production"]},
         "ungrouped_labels": ["branch", "firewall"],
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 

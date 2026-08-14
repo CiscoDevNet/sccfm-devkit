@@ -33,19 +33,15 @@ options:
     description: UID of the target device whose override value to promote as the new default.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -56,8 +52,7 @@ EXAMPLES = r"""
   cisco.sccfm.apply_object_override_as_default:
     uid: "abc-123-def"
     target_id: "897b293f-132e-4678-9d78-0f0947629500"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Using module_defaults
 - name: Apply object override as default
@@ -65,8 +60,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Apply override as default
       cisco.sccfm.apply_object_override_as_default:
@@ -123,7 +117,10 @@ def run_module() -> None:
     if module.check_mode:
         module.exit_json(
             changed=True,
-            msg=f"Would apply override as default for target '{target_id}' to default on object '{uid}'.",
+            msg=(
+                f"Would apply override as default for target '{target_id}' "
+                f"to default on object '{uid}'."
+            ),
             object_override={},
         )
         return
@@ -136,7 +133,10 @@ def run_module() -> None:
         )
         module.exit_json(
             changed=True,
-            msg=f"Successfully applied override as default for target '{target_id}' to default on object '{result.name}'.",
+            msg=(
+                f"Successfully applied override as default for target '{target_id}' "
+                f"to default on object '{result.name}'."
+            ),
             object_override=result.to_dict(),
         )
     except ValueError as e:

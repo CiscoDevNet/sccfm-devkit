@@ -41,19 +41,15 @@ options:
       For URL objects this should be the URL string.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -65,8 +61,7 @@ EXAMPLES = r"""
     uid: "abc-123-def"
     target_id: "70bde3c9-328c-4a4b-bdc9-a4d4042bf09a"
     override_value: "10.20.30.40"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Using module_defaults
 - name: Edit object overrides
@@ -74,8 +69,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Edit override
       cisco.sccfm.edit_object_override:
@@ -149,7 +143,10 @@ def run_module() -> None:
         )
         module.exit_json(
             changed=True,
-            msg=f"Successfully updated override for target '{target_id}' on object '{result.name}'.",
+            msg=(
+                f"Successfully updated override for target '{target_id}' "
+                f"on object '{result.name}'."
+            ),
             object_override=result.to_dict(),
         )
     except ValueError as e:

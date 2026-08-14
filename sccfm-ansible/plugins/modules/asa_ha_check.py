@@ -61,19 +61,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -83,8 +79,7 @@ EXAMPLES = r"""
 - name: Run HA checks on production ASAs
   cisco.sccfm.asa_ha_check:
     query: "name:prod-ha-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: ha_results
 
 # Example 2: Check HA status on a specific device by UID
@@ -111,8 +106,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Run HA checks
       cisco.sccfm.asa_ha_check:

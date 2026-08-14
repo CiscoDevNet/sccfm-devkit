@@ -9,8 +9,7 @@
 #   ansible-playbook examples/delete_network_objects.yml
 #
 # PREREQUISITES:
-#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
-#   - Region and API token in group_vars/all/vars.yml
+#   - Configure the default profile with `sccfm-cli configure`
 
 - name: Delete network objects in SCC Firewall Manager
   hosts: localhost
@@ -19,8 +18,7 @@
   # Use module_defaults to avoid repeating region and api_token
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
 
   vars:
     # Define network objects to delete by name

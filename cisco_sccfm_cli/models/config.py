@@ -2,13 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from __future__ import annotations
+from cisco_sccfm_core.models.profile import Profile as Config
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class Config:
-    profile: str
-    region: str
-    api_token: str
+__all__ = ["Config"]

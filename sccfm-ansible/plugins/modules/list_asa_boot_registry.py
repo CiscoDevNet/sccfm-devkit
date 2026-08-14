@@ -62,19 +62,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -84,8 +80,7 @@ EXAMPLES = r"""
 - name: List boot registry on production ASAs
   cisco.sccfm.list_asa_boot_registry:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: boot_registry
 
 # Example 2: Get boot registry info for specific devices by UID
@@ -102,8 +97,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List boot registry on branch ASAs
       cisco.sccfm.list_asa_boot_registry:

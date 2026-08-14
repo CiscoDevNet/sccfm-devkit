@@ -27,7 +27,8 @@ description:
     password command, and verifies the user is still present afterward.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
   - The query uses the same syntax as the Get Devices API.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/).
     for query documentation.
 options:
   query:
@@ -69,19 +70,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -93,8 +90,7 @@ EXAMPLES = r"""
     query: "name:branch-* AND connectivityState:ONLINE"
     username: admin
     new_password: "{{ vault_new_asa_password }}"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: password_results
 
 # Example 2: Change password on specific devices by UID
@@ -113,8 +109,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Change admin password on all online ASAs
       cisco.sccfm.change_asa_local_password:

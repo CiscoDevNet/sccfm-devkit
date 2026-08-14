@@ -21,19 +21,13 @@ $ ansible-doc -t module cisco.sccfm.apply_object_override_as_default
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = target_id  UID of the target device whose override value to promote
@@ -51,8 +45,7 @@ EXAMPLES:
   cisco.sccfm.apply_object_override_as_default:
     uid: "abc-123-def"
     target_id: "897b293f-132e-4678-9d78-0f0947629500"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Using module_defaults
 - name: Apply object override as default
@@ -60,8 +53,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Apply override as default
       cisco.sccfm.apply_object_override_as_default:

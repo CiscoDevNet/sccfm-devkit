@@ -1,3 +1,16 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [sccfm-cli E2E Integration Tests](#sccfm-cli-e2e-integration-tests)
+  - [Structure](#structure)
+  - [Why This Shape](#why-this-shape)
+  - [Prerequisites](#prerequisites)
+  - [Running](#running)
+  - [Opt-in upgrade phases](#opt-in-upgrade-phases)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # sccfm-cli E2E Integration Tests
 
 Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `sccfm-ansible/e2e/` 1:1 so the same scenarios are exercised through both surfaces.
@@ -22,17 +35,17 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
 - Jenkins gets one test case per lifecycle phase instead of one large pass/fail result.
 - Phases shell out to the installed `sccfm-cli` entrypoint, so the suite exercises argv parsing, exit codes, and stdout/stderr the way real users see them — exactly the contract that unit tests with `CliRunner` skip.
 - Test data per suite lives in one file (`phases/test_data.py`), reducing drift between create / verify / update / delete phases.
-- Credentials reuse the Ansible suite's vault (`cisco_sccfm_scripts/setup_tokens.py`).  One CI bootstrap, two test surfaces.
+- Credentials use the same canonical named profile as the CLI and Ansible collection.
 
 ## Prerequisites
 
 1. Run the credential bootstrap once:
 
    ```
-   poetry run change-tokens
+   sccfm-cli --profile default configure --region ci
    ```
 
-   This creates `sccfm-ansible/examples/.vault_pass` and an encrypted `vault.yml`.
+   Create `sccfm-ansible/examples/.vault_pass` and encrypted `vault.yml` separately only when the test workflow needs Ansible-specific device secrets.
 
 2. Install dev dependencies so `ansible-vault` is available for the runner to decode the vault:
 

@@ -20,7 +20,6 @@ results/
 /.vscode/
 /.env
 /.env.*
-!/.env.example
 /.tox/
 /.eggs/
 .poetry_cache/

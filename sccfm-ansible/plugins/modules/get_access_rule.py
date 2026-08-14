@@ -25,19 +25,15 @@ options:
     description: Unique identifier (UID) of the access rule to retrieve.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -47,8 +43,7 @@ EXAMPLES = r"""
 - name: Get access rule
   cisco.sccfm.get_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show rule
@@ -61,8 +56,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Get access rule details
       cisco.sccfm.get_access_rule:

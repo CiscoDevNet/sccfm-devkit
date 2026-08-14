@@ -7,12 +7,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    CdoTransaction,
-    DevicePage,
-    EntityType,
-)
+from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage, EntityType
 
 from cisco_sccfm_core import InventoryService, SccApiError
 from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
@@ -88,19 +83,15 @@ options:
     required: false
     type: int
     default: 3600
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -111,8 +102,7 @@ EXAMPLES = r"""
   cisco.sccfm.deploy_cdfmc_ftd:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Deploy with notes
 - name: Deploy FTD changes with deployment notes
@@ -136,8 +126,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Deploy branch FTD changes
       cisco.sccfm.deploy_cdfmc_ftd:

@@ -11,13 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from plugins.modules import asa_ha_check  # noqa: E402
-from scc_firewall_manager_sdk import (
-    ConfigState,
-    ConnectivityState,
-    Device,
-    DevicePage,
-    EntityType,
-)
+from scc_firewall_manager_sdk import ConfigState, ConnectivityState, Device, DevicePage, EntityType
 
 from cisco_sccfm_core.models.asa_failover_status import (
     AsaFailoverInterface,
@@ -85,8 +79,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
         "uids": [UID_1],
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -97,8 +90,7 @@ def base_module_params_with_query() -> dict[str, Any]:
         "uids": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 

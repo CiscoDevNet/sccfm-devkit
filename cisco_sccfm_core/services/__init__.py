@@ -34,6 +34,7 @@ from cisco_sccfm_core.services.policy import (
     AccessRuleResponse,
     AccessRuleService,
 )
+from cisco_sccfm_core.services.profile_service import ProfileService
 
 __all__ = [
     "AsaBootImageService",
@@ -62,5 +63,6 @@ __all__ = [
     "NetworkObjectListResponse",
     "NetworkObjectResponse",
     "NetworkObjectService",
+    "ProfileService",
     "ShunEntrySpec",
 ]
