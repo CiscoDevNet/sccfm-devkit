@@ -88,8 +88,9 @@ sccfm-cli-interactive
 # select "configure-profile"
 ```
 
-Profiles live at `~/.sccfm-cli/config.json`. The containing directory is restricted to
-the current user (`0700`) and the file is owner read/write (`0600`). Ansible modules
+Profiles live at `~/.sccfm-cli/config.json`. On POSIX systems, the containing directory is
+restricted to the current user (`0700`) and the file is owner read/write (`0600`); on
+Windows, the store inherits the user's profile-directory ACLs. Ansible modules
 and inventory load the selected profile directly; do not duplicate its API token in
 environment variables or Ansible Vault.
 

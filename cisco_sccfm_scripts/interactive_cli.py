@@ -220,6 +220,19 @@ def _render_command(argv: list[str], secret_flags: set[str]) -> str:
     return shlex.join(rendered)
 
 
+def _invoke_cli(argv: list[str], secret_flags: set[str]) -> None:
+    """Invoke secret-bearing commands without exposing values through OS argv."""
+    if secret_flags.intersection(argv):
+        from cisco_sccfm_cli.cli import cli
+
+        try:
+            cli.main(args=argv[1:], prog_name=argv[0], standalone_mode=False)
+        except click.ClickException as exc:
+            exc.show()
+        return
+    subprocess.call(argv, cwd=_project_root())
+
+
 def _execute_cli_command(cmd: object) -> None:
     """Prompt for params and run an sccfm-cli leaf command."""
     from cisco_sccfm_scripts.cli_commands import CliCommand, CliParam
@@ -259,7 +272,7 @@ def _execute_cli_command(cmd: object) -> None:
                 return
 
     console.print(f"[bold cyan]$ {_render_command(argv, secret_flags)}[/bold cyan]")
-    subprocess.call(argv, cwd=_project_root())
+    _invoke_cli(argv, secret_flags)
 
 
 def _navigate_cli(children: list[object], title: str) -> None:

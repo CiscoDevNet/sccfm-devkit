@@ -69,7 +69,7 @@ The only SCCFM token configuration source is the named profile store:
 sccfm-cli --profile default configure --region us
 ```
 
-Profiles are stored in `~/.sccfm-cli/config.json` with owner-only permissions. Override the path with `--config-path` or `SCCFM_CONFIG`. Do not configure SCCFM tokens through `.env`, inline Ansible parameters, or Ansible Vault. Vault remains appropriate for Ansible-specific device secrets.
+Profiles are stored in `~/.sccfm-cli/config.json` with owner-only POSIX permissions or inherited Windows user-profile ACLs. Override the path with `--config-path` or `SCCFM_CONFIG`. Do not configure SCCFM tokens through `.env`, inline Ansible parameters, or Ansible Vault. Vault remains appropriate for Ansible-specific device secrets.
 
 ## Testing instructions
 

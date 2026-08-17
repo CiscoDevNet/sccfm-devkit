@@ -114,21 +114,38 @@ def test_execute_cli_command_masks_secrets_and_uses_password_prompt(
     monkeypatch.setattr(interactive_cli.console, "print", lambda message: printed.append(message))
     call = MagicMock(return_value=0)
     monkeypatch.setattr(interactive_cli.subprocess, "call", call)
+    cli_main = MagicMock()
+    monkeypatch.setattr("cisco_sccfm_cli.cli.cli.main", cli_main)
 
     interactive_cli._execute_cli_command(command)
 
     password_prompt.assert_called_once()
-    assert call.call_args.args[0] == [
-        "sccfm-cli",
-        "configure",
-        "--region",
-        "us",
-        "--api-token",
-        "super-secret",
-    ]
+    call.assert_not_called()
+    cli_main.assert_called_once_with(
+        args=["configure", "--region", "us", "--api-token", "super-secret"],
+        prog_name="sccfm-cli",
+        standalone_mode=False,
+    )
     rendered = " ".join(printed)
     assert "super-secret" not in rendered
     assert "--api-token '***'" in rendered
+
+
+def test_execute_cli_command_without_secrets_uses_subprocess(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    command = CliCommand(
+        name="status",
+        description="Show status",
+        args=["status"],
+        params=[],
+    )
+    call = MagicMock(return_value=0)
+    monkeypatch.setattr(interactive_cli.subprocess, "call", call)
+
+    interactive_cli._execute_cli_command(command)
+
+    call.assert_called_once_with(["sccfm-cli", "status"], cwd=interactive_cli._project_root())
 
 
 def test_run_ansible_examples_omits_vault_argument_when_not_required(

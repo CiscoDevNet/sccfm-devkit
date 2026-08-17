@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from _pytest.monkeypatch import MonkeyPatch
 
 from cisco_sccfm_core.models.profile import Profile
+from cisco_sccfm_core.services import profile_service
 from cisco_sccfm_core.services.profile_service import ProfileService
 
 
@@ -94,3 +96,21 @@ def test_should_honor_canonical_config_path_override(
 
     assert ProfileService().load("lab") == Profile(profile="lab", region="eu", api_token="token")
     assert config_path.is_file()
+
+
+def test_should_save_profile_without_posix_mode_apis(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    config_path = tmp_path / "config.json"
+    monkeypatch.setattr(profile_service, "_SUPPORTS_POSIX_MODES", False)
+    fchmod = MagicMock()
+    monkeypatch.setattr(profile_service.os, "fchmod", fchmod, raising=False)
+
+    ProfileService(path=config_path).save(
+        Profile(profile="default", region="us", api_token="secret-token")
+    )
+
+    fchmod.assert_not_called()
+    assert ProfileService(path=config_path).load("default") == Profile(
+        profile="default", region="us", api_token="secret-token"
+    )

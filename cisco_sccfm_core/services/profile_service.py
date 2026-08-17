@@ -16,6 +16,7 @@ _CONFIG_DIR = Path.home() / ".sccfm-cli"
 _CONFIG_FILE = _CONFIG_DIR / "config.json"
 _CONFIG_DIR_MODE = 0o700
 _CONFIG_FILE_MODE = 0o600
+_SUPPORTS_POSIX_MODES = os.name == "posix"
 
 
 class ProfileService:
@@ -79,14 +80,15 @@ class ProfileService:
         )
         temporary_path = Path(temporary_name)
         try:
-            os.fchmod(file_descriptor, _CONFIG_FILE_MODE)
+            if _SUPPORTS_POSIX_MODES:
+                os.fchmod(file_descriptor, _CONFIG_FILE_MODE)
             with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
                 json.dump(payload, handle, indent=2)
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
             temporary_path.replace(self._path)
-            self._path.chmod(_CONFIG_FILE_MODE)
+            self._set_posix_mode(self._path, _CONFIG_FILE_MODE)
         except Exception:
             temporary_path.unlink(missing_ok=True)
             raise
@@ -95,10 +97,16 @@ class ProfileService:
         created = not self._path.parent.exists()
         self._path.parent.mkdir(parents=True, mode=_CONFIG_DIR_MODE, exist_ok=True)
         if created or self._path.parent == _CONFIG_DIR:
-            self._path.parent.chmod(_CONFIG_DIR_MODE)
+            self._set_posix_mode(self._path.parent, _CONFIG_DIR_MODE)
 
     def _harden_existing_path(self) -> None:
         if self._path.is_file():
-            self._path.chmod(_CONFIG_FILE_MODE)
+            self._set_posix_mode(self._path, _CONFIG_FILE_MODE)
         if self._path.parent == _CONFIG_DIR and self._path.parent.is_dir():
-            self._path.parent.chmod(_CONFIG_DIR_MODE)
+            self._set_posix_mode(self._path.parent, _CONFIG_DIR_MODE)
+
+    @staticmethod
+    def _set_posix_mode(path: Path, mode: int) -> None:
+        """Apply owner-only mode bits where the platform supports POSIX permissions."""
+        if _SUPPORTS_POSIX_MODES:
+            path.chmod(mode)

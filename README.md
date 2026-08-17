@@ -36,7 +36,7 @@ sccfm-cli-interactive          # interactive CLI and developer workflow menu
 
 ## Commands
 
-- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) in the canonical profile store at `~/.sccfm-cli/config.json`. The directory is restricted to the current user (`0700`) and the file to owner read/write (`0600`). Override the path with `--config-path` or `SCCFM_CONFIG`.
+- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) in the canonical profile store at `~/.sccfm-cli/config.json`. On POSIX systems, the directory is restricted to the current user (`0700`) and the file to owner read/write (`0600`). On Windows, the store inherits the user's profile-directory ACLs. Override the path with `--config-path` or `SCCFM_CONFIG`.
 - `sccfm-cli status [--config-path PATH]`: Shows the current profile plus SCCFM connectivity health using Rich tables.
 - `sccfm-cli inventory devices list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists device inventory with pagination and optional name filtering.
 - `sccfm-cli inventory manager list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
