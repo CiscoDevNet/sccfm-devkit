@@ -442,6 +442,8 @@ def test_ci_runs_pinned_workflow_lints_and_a_no_push_release_rehearsal() -> None
     assert "github.com/rhysd/actionlint/cmd/actionlint@v1.7.12" in ci
     assert "SHELLCHECK_OPTS: --severity=warning" in ci
     assert '-shellcheck "$(command -v shellcheck)"' in ci
+    assert "go install github.com/zricethezav/gitleaks/v8@v8.30.1" in prepare
+    assert "go install github.com/gitleaks/gitleaks/v8@v8.30.1" not in prepare
 
     assert "github.event_name == 'pull_request'" in prepare
     assert 'git commit --allow-empty -m "fix: rehearse release preparation"' in prepare
