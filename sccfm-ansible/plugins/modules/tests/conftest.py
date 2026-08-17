@@ -87,8 +87,10 @@ sys.modules["plugins.module_utils.operations"] = operations_submodule
 
 
 @pytest.fixture(autouse=True)
-def configured_sccfm_profile(monkeypatch: MonkeyPatch) -> None:
+def configured_sccfm_profile(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Keep module tests isolated from the user's canonical profile file."""
+    # Set before construction so ProfileService.__init__ never touches the real config.
+    monkeypatch.setenv("SCCFM_CONFIG", str(tmp_path / "config.json"))
     monkeypatch.setattr(
         config_module.ProfileService,
         "load",

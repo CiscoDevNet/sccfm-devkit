@@ -15,7 +15,7 @@ from cisco_sccfm_core.services.profile_service import ProfileService
 DOCUMENTATION = r"""
 name: profile
 author: Cisco SCCFM Team
-version_added: "1.0.0"
+version_added: "0.39.0"
 short_description: Read a value from a configured SCCFM profile
 description:
   - Reads a region or API token from the canonical SCCFM profile store.

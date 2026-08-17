@@ -204,6 +204,22 @@ def _run_e2e() -> None:
 # ── Run CLI commands ──────────────────────────────────────────────
 
 
+def _prompt_param(message: str, hide_input: bool) -> str | None:
+    """Prompt for a parameter value, masking input for secrets."""
+    prompt = questionary.password(message) if hide_input else questionary.text(message)
+    answer: object = prompt.unsafe_ask()
+    return answer if isinstance(answer, str) else None
+
+
+def _render_command(argv: list[str], secret_flags: set[str]) -> str:
+    """Render *argv* for display with secret option values replaced by ``***``."""
+    rendered = list(argv)
+    for index, token in enumerate(rendered[:-1]):
+        if token in secret_flags:
+            rendered[index + 1] = "***"
+    return shlex.join(rendered)
+
+
 def _execute_cli_command(cmd: object) -> None:
     """Prompt for params and run an sccfm-cli leaf command."""
     from cisco_sccfm_scripts.cli_commands import CliCommand, CliParam
@@ -211,6 +227,7 @@ def _execute_cli_command(cmd: object) -> None:
     if not isinstance(cmd, CliCommand):
         return
     argv: list[str] = ["sccfm-cli", *cmd.args]
+    secret_flags = {p.flag for p in cmd.params if isinstance(p, CliParam) and p.hide_input}
     for param in cmd.params:
         if not isinstance(param, CliParam):
             continue
@@ -222,7 +239,7 @@ def _execute_cli_command(cmd: object) -> None:
             console.print(f"[dim]{param.label} — enter one value per line, blank to finish:[/dim]")
             has_value = False
             while True:
-                value: str | None = questionary.text(f"  {param.flag}").unsafe_ask()
+                value: str | None = _prompt_param(f"  {param.flag}", param.hide_input)
                 normalized_value = (value or "").strip()
                 if not normalized_value:
                     break
@@ -233,7 +250,7 @@ def _execute_cli_command(cmd: object) -> None:
                 return
         else:
             prompt = f"{param.label}{'' if param.required else ' (leave blank to skip)'}"
-            single: str | None = questionary.text(prompt).unsafe_ask()
+            single: str | None = _prompt_param(prompt, param.hide_input)
             normalized_value = (single or "").strip()
             if normalized_value:
                 argv.extend([param.flag, normalized_value])
@@ -241,7 +258,7 @@ def _execute_cli_command(cmd: object) -> None:
                 console.print(f"[red]{param.label} is required.[/red]")
                 return
 
-    console.print(f"[bold cyan]$ {shlex.join(argv)}[/bold cyan]")
+    console.print(f"[bold cyan]$ {_render_command(argv, secret_flags)}[/bold cyan]")
     subprocess.call(argv, cwd=_project_root())
 
 
@@ -287,6 +304,17 @@ def _run_cli_commands() -> None:
 # ── Run Ansible examples ──────────────────────────────────────────
 
 
+def _playbook_requires_vault(playbook: Path) -> bool:
+    """Return whether *playbook* references vault variables outside comments."""
+    try:
+        content = playbook.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return any(
+        "vault_" in line for line in content.splitlines() if not line.lstrip().startswith("#")
+    )
+
+
 def _run_ansible_examples() -> None:
     """Interactively select and run an Ansible example playbook."""
     examples_dir = _project_root() / "sccfm-ansible" / "examples"
@@ -314,9 +342,16 @@ def _run_ansible_examples() -> None:
         answer,
         "-i",
         "inventory.sccfm.yml",
-        "--vault-password-file",
-        ".vault_pass",
     ]
+    vault_password_file = examples_dir / ".vault_pass"
+    if _playbook_requires_vault(examples_dir / answer):
+        if not vault_password_file.exists():
+            console.print(
+                f"[yellow]{answer} uses vault variables but "
+                f"{vault_password_file} was not found — running without Vault.[/yellow]"
+            )
+        else:
+            cmd.extend(["--vault-password-file", vault_password_file.name])
     console.print(f"[bold cyan]$ {shlex.join(cmd)}[/bold cyan]")
     subprocess.call(cmd, cwd=str(examples_dir))
 

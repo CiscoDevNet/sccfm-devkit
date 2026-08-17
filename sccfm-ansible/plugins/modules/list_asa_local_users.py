@@ -77,7 +77,7 @@ EXAMPLES = r"""
 - name: List local users using a query
   cisco.sccfm.list_asa_local_users:
     query: "name:branch-* AND connectivityState:ONLINE"
-    region: "us"
+    profile: default
 
 - name: List local users with shared auth
   hosts: localhost

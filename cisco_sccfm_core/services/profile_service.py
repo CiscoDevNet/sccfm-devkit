@@ -8,7 +8,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any, Mapping
 
 from cisco_sccfm_core.models.profile import Profile
 
@@ -63,7 +63,7 @@ class ProfileService:
         self._persist({"profiles": profiles})
         return True
 
-    def _load_profiles(self) -> Dict[str, Dict[str, Any]]:
+    def _load_profiles(self) -> dict[str, dict[str, Any]]:
         if not self._path.exists():
             return {}
         with self._path.open("r", encoding="utf-8") as handle:

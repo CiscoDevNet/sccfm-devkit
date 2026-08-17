@@ -96,7 +96,7 @@ EXAMPLES:
     password: "{{ vault_asa_password }}"
     connector_type: SDC
     connector_name: branch-sdc-1
-    region: us
+    profile: default
 
 # Example 3: Using the default configured profile
 - name: Onboard branch-asa-1

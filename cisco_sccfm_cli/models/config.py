@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 from cisco_sccfm_core.models.profile import Profile as Config
 
 __all__ = ["Config"]

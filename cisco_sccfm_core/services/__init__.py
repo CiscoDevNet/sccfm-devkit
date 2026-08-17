@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 from cisco_sccfm_core.services.health_service import HealthService, HealthStatus
 from cisco_sccfm_core.services.inventory import (
     AsaBootImageService,
