@@ -410,7 +410,7 @@ def _capture_posix_files(paths: list[Path]) -> list[_PosixFileSnapshot]:
 def _platform_normalized_path(path: Path) -> Path:
     """Normalize only macOS's fixed root aliases, never user-controlled links."""
     absolute = path.expanduser().absolute()
-    if sys.platform == "darwin" and absolute.parts[:2] == ("/", "var"):
+    if sys.platform == "darwin" and absolute.parts[1:2] in (("tmp",), ("var",)):
         return Path("/private").joinpath(*absolute.parts[1:])
     return absolute
 
@@ -911,21 +911,18 @@ def _run_headless(
     # ── Build token ──────────────────────────────────────────────
     selected = _saved_token(name=name, region=region, token=api_token)
 
-    # ── Vault password ───────────────────────────────────────────
-    vault_pass_path = _ensure_vault_pass_headless(examples_path, vault_password)
-
-    # ── Merge with existing saved tokens ─────────────────────────
     store = VaultTokenStore(examples_path, migration_region=legacy_region)
-    try:
-        all_tokens = _merge_token(store, selected)
-    except ActiveTokenRegionRequired as exc:
-        raise click.ClickException(
-            f"{exc}. Set SCCFM_LEGACY_REGION or pass --legacy-region with the region of the "
-            "existing active-only Vault token."
-        ) from None
 
-    # ── Write files ──────────────────────────────────────────────
+    # ── Credential transaction ───────────────────────────────────
     with _credential_transaction(_credential_transaction_paths(root, examples_path)):
+        vault_pass_path = _ensure_vault_pass_headless(examples_path, vault_password)
+        try:
+            all_tokens = _merge_token(store, selected)
+        except ActiveTokenRegionRequired as exc:
+            raise click.ClickException(
+                f"{exc}. Set SCCFM_LEGACY_REGION or pass --legacy-region with the region of the "
+                "existing active-only Vault token."
+            ) from None
         env_path = _write_env_file(root, region, api_token)
         _update_vars_region(examples_path, region)
         vault_path = store.save_active_and_tokens(selected, all_tokens)
@@ -1099,28 +1096,24 @@ def _run_setup(path: Path | None) -> None:
 
     _verify_ansible_vault()
 
-    # ── Vault password (needed before we can read saved tokens) ──
-    vault_pass_path = _ensure_vault_pass(examples_path)
-
-    # ── Token selection ──────────────────────────────────────────
-    store = VaultTokenStore(examples_path)
-    try:
-        selected, all_tokens = _select_or_create_token(store)
-    except ActiveTokenRegionRequired:
-        console.print(
-            "[yellow]The existing active-only Vault token needs its SCCFM region before it "
-            "can be preserved.[/yellow]"
-        )
-        migration_region = _prompt_region()
-        store = VaultTokenStore(examples_path, migration_region=migration_region)
-        selected, all_tokens = _select_or_create_token(store)
-
-    region = selected.region
-    api_token = selected.token
-    token_name = selected.name
-
-    # ── Write files ──────────────────────────────────────────────
+    # ── Credential transaction ───────────────────────────────────
     with _credential_transaction(_credential_transaction_paths(root, examples_path)):
+        vault_pass_path = _ensure_vault_pass(examples_path)
+        store = VaultTokenStore(examples_path)
+        try:
+            selected, all_tokens = _select_or_create_token(store)
+        except ActiveTokenRegionRequired:
+            console.print(
+                "[yellow]The existing active-only Vault token needs its SCCFM region before it "
+                "can be preserved.[/yellow]"
+            )
+            migration_region = _prompt_region()
+            store = VaultTokenStore(examples_path, migration_region=migration_region)
+            selected, all_tokens = _select_or_create_token(store)
+
+        region = selected.region
+        api_token = selected.token
+        token_name = selected.name
         env_path = _write_env_file(root, region, api_token)
         _update_vars_region(examples_path, region)
         vault_path = store.save_active_and_tokens(selected, all_tokens)

@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   commit-generated-docs:
@@ -27,7 +27,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.SCCFM_CI_DEPLOY_KEY }}
+          persist-credentials: false
 
       - name: Refresh branch
         run: git pull --ff-only origin main
@@ -60,7 +60,9 @@ jobs:
           poetry run check-doc-artifacts
 
       - name: Commit generated docs
+        id: docs
         run: |
+          echo "changed=false" >> "$GITHUB_OUTPUT"
           if [ -z "$(git status --porcelain docs/cli docs/man docs/ansible)" ]; then
             echo "Generated docs are up to date."
             exit 0
@@ -70,4 +72,30 @@ jobs:
           git config user.email "github-actions@users.noreply.cisco.com"
           git add docs/cli docs/man docs/ansible
           git commit -m "docs: update generated references"
-          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push generated docs
+        if: steps.docs.outputs.changed == 'true'
+        env:
+          SCCFM_CI_DEPLOY_KEY: ${{ secrets.SCCFM_CI_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          SSH_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-docs-ssh.XXXXXX")"
+          cleanup_ssh() {
+            rm -rf "${SSH_ROOT}"
+          }
+          trap cleanup_ssh EXIT
+          umask 077
+          DEPLOY_KEY_PATH="${SSH_ROOT}/deploy-key"
+          KNOWN_HOSTS_PATH="${SSH_ROOT}/known-hosts"
+          test -n "${SCCFM_CI_DEPLOY_KEY}"
+          printf '%s\n' "${SCCFM_CI_DEPLOY_KEY}" > "${DEPLOY_KEY_PATH}"
+          chmod 600 "${DEPLOY_KEY_PATH}"
+          unset SCCFM_CI_DEPLOY_KEY
+          curl --fail --silent --show-error --location \
+            https://api.github.com/meta \
+            | jq -er '.ssh_keys[] | "github.com " + .' > "${KNOWN_HOSTS_PATH}"
+          test -s "${KNOWN_HOSTS_PATH}"
+          GIT_SSH_COMMAND="ssh -i ${DEPLOY_KEY_PATH} -o IdentitiesOnly=yes -o UserKnownHostsFile=${KNOWN_HOSTS_PATH} -o StrictHostKeyChecking=yes"
+          PUSH_REMOTE="git@github.com:${GITHUB_REPOSITORY}.git"
+          GIT_SSH_COMMAND="${GIT_SSH_COMMAND}" git push "${PUSH_REMOTE}" HEAD:main

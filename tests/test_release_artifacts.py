@@ -201,6 +201,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
 
     assert "needs: lint-and-test" in prepare
     assert "github.event_name == 'push'" in prepare
+    assert "github.event_name == 'pull_request'" in prepare
     assert "github.ref == 'refs/heads/main'" in prepare
     assert "production-release" in ci
     assert "cancel-in-progress: false" in ci
@@ -267,7 +268,8 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
         assert 'gh release download "${RELEASE_TAG}"' in job
         assert "release_artifacts verify" in job
 
-    assert "pypa/gh-action-pypi-publish" in pypi
+    assert "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33" in pypi
+    assert "pypa/gh-action-pypi-publish@release/v1" not in pypi
     assert "secrets.PYPI_API_TOKEN" in pypi
     assert "skip-existing:" not in pypi
     assert 'MISSING_FILES="${PYPI_VERIFICATION##* missing=}"' in pypi
@@ -380,9 +382,89 @@ def test_ci_release_push_reconciles_an_accepted_remote_update() -> None:
         "\n  create-draft-release:\n", maxsplit=1
     )[0]
 
-    assert "if git push --atomic origin" in push
+    assert 'PUSH_REMOTE="git@github.com:${GITHUB_REPOSITORY}.git"' in push
+    assert 'git push --atomic "${PUSH_REMOTE}"' in push
     assert "refs/heads/main:refs/remotes/origin/main" in push
     assert '[[ "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"' in push
     assert "git merge-base --is-ancestor \\" in push
     assert '"${SOURCE_COMMIT}" refs/remotes/origin/main' in push
     assert "the atomic remote update was verified" in push
+
+
+def test_release_workflows_limit_deploy_key_to_push_steps() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    generated_docs = (repository / ".github/workflows/generated-docs.yml").read_text(
+        encoding="utf-8"
+    )
+    prepare = _workflow_job(ci, "prepare-release")
+
+    for workflow in (ci, release, generated_docs):
+        assert workflow.count("uses: actions/checkout@v7") == workflow.count(
+            "persist-credentials: false"
+        )
+
+    prepare_before_push, prepare_push = prepare.split(
+        "      - name: Push release commit and tag atomically\n", maxsplit=1
+    )
+    assert "persist-credentials: false" in prepare_before_push
+    assert "ssh-key:" not in prepare_before_push
+    assert "SCCFM_CI_DEPLOY_KEY" not in prepare_before_push
+    assert prepare_push.count("secrets.SCCFM_CI_DEPLOY_KEY") == 1
+    assert 'chmod 600 "${DEPLOY_KEY_PATH}"' in prepare_push
+    assert "trap cleanup_ssh EXIT" in prepare_push
+    assert "unset SCCFM_CI_DEPLOY_KEY" in prepare_push
+    assert "https://api.github.com/meta" in prepare_push
+    assert "StrictHostKeyChecking=yes" in prepare_push
+
+    docs_before_push, docs_push = generated_docs.split(
+        "      - name: Push generated docs\n", maxsplit=1
+    )
+    assert "persist-credentials: false" in docs_before_push
+    assert "permissions:\n  contents: read" in docs_before_push
+    assert "ssh-key:" not in docs_before_push
+    assert "SCCFM_CI_DEPLOY_KEY" not in docs_before_push
+    assert docs_push.count("secrets.SCCFM_CI_DEPLOY_KEY") == 1
+    assert 'chmod 600 "${DEPLOY_KEY_PATH}"' in docs_push
+    assert "trap cleanup_ssh EXIT" in docs_push
+    assert "unset SCCFM_CI_DEPLOY_KEY" in docs_push
+    assert "StrictHostKeyChecking=yes" in docs_push
+
+
+def test_ci_runs_pinned_workflow_lints_and_a_no_push_release_rehearsal() -> None:
+    repository = Path(__file__).resolve().parents[1]
+    ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    prepare = _workflow_job(ci, "prepare-release")
+    draft = _workflow_job(ci, "create-draft-release")
+
+    assert "shellcheck-py==0.11.0.1" in ci
+    assert "github.com/rhysd/actionlint/cmd/actionlint@v1.7.12" in ci
+    assert "SHELLCHECK_OPTS: --severity=warning" in ci
+    assert '-shellcheck "$(command -v shellcheck)"' in ci
+
+    assert "github.event_name == 'pull_request'" in prepare
+    assert 'git commit --allow-empty -m "fix: rehearse release preparation"' in prepare
+    assert "poetry run cz bump --get-next" in prepare
+    assert "poetry run cz bump --yes --changelog --files-only" in prepare
+    assert "prepare_ansible_release" in prepare
+    assert "poetry run generate-cli-docs" in prepare
+    assert "poetry run generate-cli-man-docs" in prepare
+    assert "poetry run generate-ansible-docs" in prepare
+    assert "poetry run build-ansible-collection" in prepare
+    assert "poetry build" in prepare
+    assert "verify_python_artifacts" in prepare
+    assert "verify_ansible_collection" in prepare
+    assert 'git commit -m "bump: version ${RELEASE_VERSION}"' in prepare
+    assert "release_artifacts create" in prepare
+    assert 'git tag -a "${{ steps.version.outputs.tag }}"' in prepare
+    assert "Complete credential-free release rehearsal" in prepare
+    assert "without uploading or pushing" in prepare
+
+    preserve = prepare.split("      - name: Preserve exact release bundle\n", maxsplit=1)[1]
+    preserve = preserve.split("      - name: Push release commit", maxsplit=1)[0]
+    push = prepare.split("      - name: Push release commit and tag atomically\n", maxsplit=1)[1]
+    push = push.split("      - name: Complete credential-free", maxsplit=1)[0]
+    assert "github.event_name == 'push'" in preserve
+    assert "github.event_name == 'push'" in push
+    assert "github.event_name == 'push'" in draft

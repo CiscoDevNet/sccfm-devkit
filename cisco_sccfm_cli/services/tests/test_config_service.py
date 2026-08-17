@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -24,6 +25,10 @@ POSIX_ONLY = pytest.mark.skipif(
 
 def _mode(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
+
+
+def _temporary_files(config_path: Path) -> list[Path]:
+    return list(config_path.parent.glob(f".{config_path.name}.*.tmp"))
 
 
 def _write_config(path: Path, profile: str = "default") -> Config:
@@ -116,7 +121,68 @@ def test_save_rejects_configuration_directory_symlink(tmp_path: Path) -> None:
     assert _mode(target_directory) == original_mode
 
 
-def test_write_validates_opened_file_before_truncating(
+@pytest.mark.parametrize(
+    ("provided", "normalized"),
+    [
+        (Path("/tmp/sccfm/config.json"), Path("/private/tmp/sccfm/config.json")),
+        (Path("/var/sccfm/config.json"), Path("/private/var/sccfm/config.json")),
+    ],
+)
+def test_macos_fixed_directory_aliases_are_normalized(
+    provided: Path,
+    normalized: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only macOS's fixed /tmp and /var aliases should use their physical paths."""
+    monkeypatch.setattr(config_service_module.sys, "platform", "darwin")
+
+    service = ConfigService(path=provided)
+
+    assert service._path == normalized
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        Path("/private/tmp/sccfm/config.json"),
+        Path("/opt/tmp/sccfm/config.json"),
+        Path("relative/tmp/sccfm/config.json"),
+    ],
+)
+def test_macos_path_normalization_is_narrow(
+    path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Normalization must not resolve or rewrite arbitrary path components."""
+    monkeypatch.setattr(config_service_module.sys, "platform", "darwin")
+
+    service = ConfigService(path=path)
+
+    assert service._path == path
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS fixed aliases are platform-specific")
+def test_macos_alias_normalization_still_rejects_user_controlled_symlink(
+    tmp_path: Path,
+) -> None:
+    """Allowing the fixed /var alias must not allow a later user-created symlink."""
+    if tmp_path.parts[1:3] != ("private", "var"):
+        pytest.skip("pytest temporary storage is not below macOS /private/var")
+    target_directory = tmp_path / "target"
+    target_directory.mkdir()
+    linked_directory = tmp_path / "linked"
+    linked_directory.symlink_to(target_directory, target_is_directory=True)
+    alias_root = Path(tmp_path.anchor).joinpath(*tmp_path.parts[2:])
+
+    with pytest.raises(ValueError, match="must not contain symbolic links"):
+        ConfigService(path=alias_root / "linked" / "config.json").save(
+            Config(profile="default", region="us", api_token="example-token")
+        )
+
+    assert not (target_directory / "config.json").exists()
+
+
+def test_save_validates_opened_file_before_updating(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -136,7 +202,7 @@ def test_write_validates_opened_file_before_truncating(
     monkeypatch.setattr(service, "_ensure_regular_descriptor", reject_descriptor)
 
     with pytest.raises(ValueError, match="synthetic non-regular"):
-        service._open_directly_for_update()
+        service.save(Config(profile="default", region="us", api_token="example-token"))
 
     assert config_path.read_text(encoding="utf-8") == original_payload
 
@@ -163,7 +229,149 @@ def test_save_preserves_invalid_existing_payload_before_rewrite(
 
 
 @POSIX_ONLY
-def test_write_rejects_path_swap_before_truncating(
+def test_save_preserves_existing_config_when_serialization_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A serialization failure must leave the installed configuration untouched."""
+    config_path = tmp_path / "config.json"
+    _write_config(config_path, profile="existing")
+    config_path.chmod(0o600)
+    original_payload = config_path.read_bytes()
+
+    def fail_dump(payload: Any, handle: TextIO, *, indent: int) -> None:
+        raise TypeError("synthetic serialization failure")
+
+    monkeypatch.setattr(config_service_module.json, "dump", fail_dump)
+
+    with pytest.raises(TypeError, match="synthetic serialization failure"):
+        ConfigService(path=config_path).save(
+            Config(profile="added", region="eu", api_token="must-not-be-installed")
+        )
+
+    assert config_path.read_bytes() == original_payload
+    assert _temporary_files(config_path) == []
+
+
+@POSIX_ONLY
+def test_save_preserves_existing_config_after_partial_temporary_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A partial temporary write must not corrupt or replace live configuration."""
+    config_path = tmp_path / "config.json"
+    _write_config(config_path, profile="existing")
+    config_path.chmod(0o600)
+    original_payload = config_path.read_bytes()
+
+    def fail_dump(payload: Any, handle: TextIO, *, indent: int) -> None:
+        handle.write('{"profiles":')
+        raise OSError("synthetic write failure")
+
+    monkeypatch.setattr(config_service_module.json, "dump", fail_dump)
+
+    with pytest.raises(OSError, match="synthetic write failure"):
+        ConfigService(path=config_path).save(
+            Config(profile="added", region="eu", api_token="must-not-be-installed")
+        )
+
+    assert config_path.read_bytes() == original_payload
+    assert _temporary_files(config_path) == []
+
+
+@POSIX_ONLY
+def test_save_preserves_existing_config_when_temporary_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A temporary-file fsync failure must abort before replacing live configuration."""
+    config_path = tmp_path / "config.json"
+    _write_config(config_path, profile="existing")
+    config_path.chmod(0o600)
+    original_payload = config_path.read_bytes()
+    real_fsync = os.fsync
+
+    def fail_regular_file_fsync(descriptor: int) -> None:
+        if stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError("synthetic fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(config_service_module.os, "fsync", fail_regular_file_fsync)
+
+    with pytest.raises(OSError, match="synthetic fsync failure"):
+        ConfigService(path=config_path).save(
+            Config(profile="added", region="eu", api_token="must-not-be-installed")
+        )
+
+    assert config_path.read_bytes() == original_payload
+    assert _temporary_files(config_path) == []
+
+
+@POSIX_ONLY
+def test_save_syncs_temporary_file_and_parent_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A successful atomic save must make both content and replacement durable."""
+    config_path = tmp_path / "config.json"
+    real_fsync = os.fsync
+    synced_modes: list[int] = []
+
+    def observe_fsync(descriptor: int) -> None:
+        synced_modes.append(os.fstat(descriptor).st_mode)
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(config_service_module.os, "fsync", observe_fsync)
+
+    ConfigService(path=config_path).save(
+        Config(profile="default", region="us", api_token="example-token")
+    )
+
+    assert len(synced_modes) == 2
+    assert stat.S_ISREG(synced_modes[0])
+    assert stat.S_ISDIR(synced_modes[1])
+    assert _temporary_files(config_path) == []
+
+
+@POSIX_ONLY
+def test_save_uses_descriptor_relative_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The final replace must stay anchored to the validated parent descriptor."""
+    config_path = tmp_path / "config.json"
+    real_replace = os.replace
+    replace_descriptors: list[tuple[int | None, int | None]] = []
+
+    def observe_replace(
+        source: str | os.PathLike[str],
+        destination: str | os.PathLike[str],
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+    ) -> None:
+        replace_descriptors.append((src_dir_fd, dst_dir_fd))
+        real_replace(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(config_service_module.os, "replace", observe_replace)
+
+    ConfigService(path=config_path).save(
+        Config(profile="default", region="us", api_token="example-token")
+    )
+
+    assert len(replace_descriptors) == 1
+    source_descriptor, destination_descriptor = replace_descriptors[0]
+    assert source_descriptor is not None
+    assert source_descriptor == destination_descriptor
+
+
+@POSIX_ONLY
+def test_save_rejects_path_swap_before_atomic_update(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -188,7 +396,7 @@ def test_write_rejects_path_swap_before_truncating(
         nonlocal swapped
         descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
         is_config_open = Path(path) in (config_path, Path(config_path.name))
-        if is_config_open and flags & os.O_RDWR and not swapped:
+        if is_config_open and dir_fd is not None and not flags & os.O_CREAT and not swapped:
             config_path.rename(opened_path)
             replacement_path.rename(config_path)
             swapped = True
@@ -197,7 +405,9 @@ def test_write_rejects_path_swap_before_truncating(
     monkeypatch.setattr(config_service_module.os, "open", swap_after_open)
 
     with pytest.raises(ValueError, match="changed while being opened"):
-        ConfigService(path=config_path)._open_directly_for_update()
+        ConfigService(path=config_path).save(
+            Config(profile="added", region="eu", api_token="must-not-be-written")
+        )
 
     assert opened_path.read_text(encoding="utf-8") == original_payload
     assert config_path.read_text(encoding="utf-8") == replacement_payload
@@ -431,7 +641,7 @@ def test_new_custom_storage_is_private_before_payload_is_written(
     modes_during_write: list[int] = []
 
     def observe_mode(payload: Any, handle: TextIO, *, indent: int) -> None:
-        modes_during_write.append(_mode(config_path))
+        modes_during_write.append(stat.S_IMODE(os.fstat(handle.fileno()).st_mode))
         original_dump(payload, handle, indent=indent)
 
     monkeypatch.setattr(config_service_module.json, "dump", observe_mode)
@@ -501,7 +711,7 @@ def test_save_repairs_custom_file_and_preserves_profiles_without_changing_parent
     service = ConfigService(path=config_path)
     service.save(added)
 
-    assert config_path.stat().st_ino == original_inode
+    assert config_path.stat().st_ino != original_inode
     assert _mode(config_path) == 0o600
     assert _mode(custom_parent) == 0o750
     assert service.load(existing.profile) == existing

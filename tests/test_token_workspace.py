@@ -548,6 +548,19 @@ def test_platform_path_normalization_does_not_require_uname(
     )
 
 
+@pytest.mark.parametrize("root_alias", ["tmp", "var"])
+def test_platform_path_normalization_maps_macos_fixed_root_aliases(
+    root_alias: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(setup_tokens.sys, "platform", "darwin")
+
+    assert (
+        setup_tokens._platform_normalized_path(Path("/") / root_alias / "sccfm" / "credential")
+        == Path("/private") / root_alias / "sccfm" / "credential"
+    )
+
+
 def test_transaction_absent_vault_does_not_fall_back_to_injected_path(
     tmp_path: Path,
 ) -> None:
@@ -668,6 +681,81 @@ def test_headless_setup_routes_env_to_project_root(
     )
 
     assert captured == {"store": examples.resolve(), "env": root}
+
+
+@pytest.mark.parametrize("existing_password", [False, True], ids=["new", "existing"])
+def test_headless_token_merge_failure_rolls_back_vault_password(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing_password: bool,
+) -> None:
+    root = tmp_path / "project"
+    workspace = root / "sccfm-ansible" / "examples"
+    workspace.mkdir(parents=True)
+    vault_pass_path = workspace / ".vault_pass"
+    original = b"existing-synthetic-password\n"
+    if existing_password:
+        vault_pass_path.write_bytes(original)
+        vault_pass_path.chmod(0o640)
+
+    monkeypatch.setattr(setup_tokens, "_project_root", lambda: root)
+    monkeypatch.setattr(setup_tokens, "_verify_ansible_vault", lambda: None)
+    monkeypatch.setattr(
+        setup_tokens,
+        "_merge_token",
+        lambda *args: (_ for _ in ()).throw(RuntimeError("injected token merge failure")),
+    )
+
+    with pytest.raises(RuntimeError, match="injected token merge failure"):
+        setup_tokens._run_headless(
+            region="us",
+            api_token="synthetic-token",
+            name="default",
+            profile="default",
+            vault_password="new-synthetic-password",
+            legacy_region=None,
+            path=workspace,
+        )
+
+    if existing_password:
+        assert vault_pass_path.read_bytes() == original
+        assert _mode(vault_pass_path) == 0o640
+    else:
+        assert not vault_pass_path.exists()
+
+
+@pytest.mark.parametrize("existing_password", [False, True], ids=["new", "existing"])
+def test_interactive_selection_abort_rolls_back_vault_password(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing_password: bool,
+) -> None:
+    root = tmp_path / "project"
+    workspace = root / "sccfm-ansible" / "examples"
+    workspace.mkdir(parents=True)
+    vault_pass_path = workspace / ".vault_pass"
+    original = b"existing-synthetic-password\n"
+    if existing_password:
+        vault_pass_path.write_bytes(original)
+        vault_pass_path.chmod(0o640)
+
+    monkeypatch.setattr(setup_tokens, "_project_root", lambda: root)
+    monkeypatch.setattr(setup_tokens, "_verify_ansible_vault", lambda: None)
+    monkeypatch.setattr(setup_tokens.click, "prompt", lambda *args, **kwargs: "new-password")
+    monkeypatch.setattr(
+        setup_tokens,
+        "_select_or_create_token",
+        lambda store: (_ for _ in ()).throw(click.Abort()),
+    )
+
+    with pytest.raises(click.Abort):
+        setup_tokens._run_setup(workspace)
+
+    if existing_password:
+        assert vault_pass_path.read_bytes() == original
+        assert _mode(vault_pass_path) == 0o640
+    else:
+        assert not vault_pass_path.exists()
 
 
 def test_vault_store_encrypts_atomically_with_private_mode(
@@ -1030,7 +1118,7 @@ def test_dangling_vault_symlink_fails_before_other_headless_writes(
     monkeypatch.setattr(setup_tokens, "_project_root", lambda: root)
     monkeypatch.setattr(setup_tokens, "_verify_ansible_vault", lambda: None)
 
-    with pytest.raises(RuntimeError, match="symlinked vault"):
+    with pytest.raises(click.ClickException, match="symbolic link"):
         setup_tokens._run_headless(
             region="us",
             api_token="new-token",
@@ -1059,7 +1147,7 @@ def test_dangling_vars_symlink_fails_before_other_headless_writes(
     monkeypatch.setattr(setup_tokens, "_project_root", lambda: root)
     monkeypatch.setattr(setup_tokens, "_verify_ansible_vault", lambda: None)
 
-    with pytest.raises(RuntimeError, match="symlinked vars.yml"):
+    with pytest.raises(click.ClickException, match="symbolic link"):
         setup_tokens._run_headless(
             region="us",
             api_token="new-token",
