@@ -1,3 +1,11 @@
+## v0.39.0 (2026-08-18)
+
+### Feat
+
+-  comment fix
+- bug and comment fix
+- unify SCCFM interactive command and token configuration
+
 ## v0.38.0 (2026-07-27)
 
 ### Feat
