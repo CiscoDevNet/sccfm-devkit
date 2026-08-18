@@ -4,23 +4,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
-
-from ansible.errors import AnsibleParserError
-from ansible.plugins.inventory import BaseInventoryPlugin
-from ansible.utils.display import Display
-from scc_firewall_manager_sdk import Device
-
-from cisco_sccfm_core.services.profile_service import ProfileService
-
-from ..module_utils.config import Config
-from ..plugin_utils.inventory_host_builder import InventoryHostBuilder
-from ..plugin_utils.inventory_loader import InventoryLoader
-
 DOCUMENTATION = r"""
-name: cisco.sccfm.sccfm
-plugin_type: inventory
+name: sccfm
 short_description: Load devices in SCC Firewall Manager as inventory hosts.
 description:
   - Uses Cisco Security Cloud Control Firewall Manager (SCCFM) to enumerate
@@ -71,6 +56,27 @@ group_by_device_type: true
 """
 
 
+from pathlib import Path
+from typing import Any, Dict, List, Optional, cast
+
+from ansible.errors import AnsibleParserError
+from ansible.plugins.inventory import BaseInventoryPlugin
+from ansible.utils.display import Display
+
+try:
+    from scc_firewall_manager_sdk import Device
+
+    from cisco_sccfm_core.services.profile_service import ProfileService
+except ImportError as exc:
+    _DEPENDENCY_IMPORT_ERROR: ImportError | None = exc
+else:
+    _DEPENDENCY_IMPORT_ERROR = None
+
+from ..module_utils.config import Config
+from ..plugin_utils.inventory_host_builder import InventoryHostBuilder
+from ..plugin_utils.inventory_loader import InventoryLoader
+
+
 class InventoryModule(BaseInventoryPlugin):
     NAME = "cisco.sccfm.sccfm"
 
@@ -87,6 +93,12 @@ class InventoryModule(BaseInventoryPlugin):
 
     def parse(self, inventory: Any, loader: Any, path: str, cache: bool = True) -> None:
         super().parse(inventory, loader, path, cache=cache)
+
+        if _DEPENDENCY_IMPORT_ERROR is not None:
+            raise AnsibleParserError(
+                "cisco-sccfm-devkit must be installed on the Ansible controller "
+                "to use the cisco.sccfm inventory plugin"
+            ) from _DEPENDENCY_IMPORT_ERROR
 
         config_data: Dict[str, Any] = self._read_config_data(path)
         profile = (

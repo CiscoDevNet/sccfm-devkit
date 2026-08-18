@@ -4,33 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException
-
-    from cisco_sccfm_core.errors import NotFoundError, SccApiError
-    from cisco_sccfm_core.services.object_management import (
-        NetworkObjectResponse,
-        NetworkObjectService,
-    )
-except ImportError as exc:
-    record_import_error(exc)
-    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
-
-
-from ..module_utils.config import (
-    Config,
-    base_argument_spec,
-    create_config,
-    identifier_argument_spec,
-)
-from ..module_utils.operations import fetch_object_by_identifier, fields_need_update
-
 DOCUMENTATION = r"""
 ---
 module: update_network_object
@@ -88,7 +61,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -166,6 +139,36 @@ network_object:
       description: Literal value of the network object.
       type: str
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import NotFoundError, SccApiError
+    from cisco_sccfm_core.services.object_management import (
+        NetworkObjectResponse,
+        NetworkObjectService,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import (
+    Config,
+    base_argument_spec,
+    create_config,
+    identifier_argument_spec,
+)
+from ..module_utils.operations import fetch_object_by_identifier, fields_need_update
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

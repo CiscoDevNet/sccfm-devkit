@@ -4,26 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
-
-    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
-    from cisco_sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
-    from cisco_sccfm_core.types import ConfigLike
-except ImportError as exc:
-    record_import_error(exc)
-    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
-
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: change_asa_local_password
@@ -63,7 +43,6 @@ options:
       - The new password to set for the user.
     required: true
     type: str
-    no_log: true
   limit:
     description:
       - Maximum number of devices to return when using C(query).
@@ -88,7 +67,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -153,6 +132,29 @@ results:
       description: Human-readable description of the outcome.
       type: str
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
+    from cisco_sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

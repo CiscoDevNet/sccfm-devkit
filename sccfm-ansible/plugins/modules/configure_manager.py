@@ -4,23 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule, env_fallback
-
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from cisco_sccfm_core.services.inventory import (
-        FtdConfigureManagerError,
-        FtdConfigureManagerService,
-        parse_jump_host,
-    )
-except ImportError as exc:
-    record_import_error(exc)
-    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
-
-
 DOCUMENTATION = r"""
 ---
 module: configure_manager
@@ -56,8 +39,6 @@ options:
       - Can also be supplied via the C(SCCFM_FTD_PASSWORD) environment variable.
     required: false
     type: str
-    env:
-      - name: SCCFM_FTD_PASSWORD
   cli_key:
     description:
       - The full C(configure manager add ...) string returned by C(onboard_cdfmc_ftd).
@@ -78,15 +59,13 @@ options:
       - Leave unset to use SSH key/agent authentication for the jump host.
     required: false
     type: str
-    env:
-      - name: SCCFM_JUMP_PASSWORD
   ssh_timeout:
     description: SSH connect and read timeout in seconds.
     required: false
     type: int
     default: 30
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -153,6 +132,25 @@ msg:
   returned: always
   type: str
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule, env_fallback
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from cisco_sccfm_core.services.inventory import (
+        FtdConfigureManagerError,
+        FtdConfigureManagerService,
+        parse_jump_host,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = RuntimeError
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

@@ -1,4 +1,5 @@
 plugins/inventory/sccfm.py validate-modules:missing-gplv3-license # Apache-2.0; legal review is tracked separately
+plugins/lookup/profile.py validate-modules:missing-gplv3-license # Apache-2.0; legal review is tracked separately
 plugins/modules/add_asa_shun.py validate-modules:missing-gplv3-license # Apache-2.0; legal review is tracked separately
 plugins/modules/add_network_group_members.py validate-modules:missing-gplv3-license # Apache-2.0; legal review is tracked separately
 plugins/modules/add_object_override.py validate-modules:missing-gplv3-license # Apache-2.0; legal review is tracked separately

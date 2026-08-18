@@ -11,6 +11,7 @@ from typing import ClassVar, cast
 
 import pytest
 import yaml
+from ansible.errors import AnsibleParserError
 from ansible.inventory.data import InventoryData
 from ansible.parsing.dataloader import DataLoader
 from plugins.inventory import sccfm as inventory_plugin
@@ -116,6 +117,26 @@ def test_inventory_profile_token_is_consumed_but_never_exported(
 
     group_vars = cast(dict[str, object], cast(dict[str, object], payload["sccfm"])["vars"])
     assert group_vars == {"sccfm_profile": "default", "sccfm_region": "us"}
+
+
+def test_inventory_reports_missing_devkit_dependency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inventory_path = tmp_path / "inventory.sccfm.yml"
+    _write_inventory_config(inventory_path, tmp_path / "profiles.json")
+    monkeypatch.setattr(
+        inventory_plugin,
+        "_DEPENDENCY_IMPORT_ERROR",
+        ImportError("cisco_sccfm_core is unavailable"),
+    )
+
+    with pytest.raises(AnsibleParserError, match="cisco-sccfm-devkit must be installed"):
+        inventory_plugin.InventoryModule().parse(
+            InventoryData(),
+            DataLoader(),
+            str(inventory_path),
+        )
 
 
 def test_packaged_examples_use_profiles_without_sccfm_api_tokens() -> None:

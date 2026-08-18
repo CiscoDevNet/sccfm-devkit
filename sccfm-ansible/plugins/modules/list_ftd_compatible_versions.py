@@ -4,26 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException, DevicePage, FtdVersion
-
-    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
-    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
-    from cisco_sccfm_core.types import ConfigLike
-except ImportError as exc:
-    record_import_error(exc)
-    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
-
-
-from ..module_utils.config import base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_ftd_compatible_versions
@@ -84,7 +64,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -168,6 +148,29 @@ skipped:
   returned: success (check mode or when devices are skipped)
   type: dict
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, DevicePage, FtdVersion
+
+    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
+    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

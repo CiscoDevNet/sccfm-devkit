@@ -4,24 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException
-
-    from cisco_sccfm_core.errors import SccApiError
-    from cisco_sccfm_core.services.policy import AccessRuleService
-except ImportError as exc:
-    record_import_error(exc)
-    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
-
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: update_access_rule
@@ -91,7 +73,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -153,6 +135,27 @@ access_rule:
       description: Destination network details.
       type: dict
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.policy import AccessRuleService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 _UPDATE_FIELDS = [
     "index",
