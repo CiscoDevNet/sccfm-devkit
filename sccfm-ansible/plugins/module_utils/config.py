@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from cisco_sccfm_core.constants import SCCFM_REGIONS, normalize_sccfm_region
+from cisco_sccfm_core.services.profile_service import ProfileService
 
 if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
@@ -19,19 +20,14 @@ ALLOWED_REGIONS_TEXT = ", ".join(ALLOWED_REGIONS)
 
 @dataclass(frozen=True)
 class Config:
-    """SCCFM API configuration.
-
-    If region or api_token are empty, falls back to environment variables.
-    Validates region and api_token on construction.
-    """
+    """Validated SCCFM API configuration resolved from a named profile."""
 
     region: str = ""
     api_token: str = ""
 
     def __post_init__(self) -> None:
-        # Resolve from environment if not provided
-        resolved_region = normalize_sccfm_region(self.region or os.getenv("SCCFM_REGION"))
-        resolved_token = self.api_token or os.getenv("SCCFM_API_TOKEN")
+        resolved_region = normalize_sccfm_region(self.region)
+        resolved_token = self.api_token
 
         # Use object.__setattr__ since dataclass is frozen
         object.__setattr__(self, "region", resolved_region)
@@ -40,30 +36,29 @@ class Config:
         # Validate
         if not self.api_token:
             raise ValueError(
-                "api_token is required. Provide it via module parameter, module_defaults, or "
-                "SCCFM_API_TOKEN environment variable. "
+                "The selected SCCFM profile does not contain an API token. "
                 "Generate an API token following instructions in "
                 "https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/"
                 "authentication/"
             )
         if not self.region:
             raise ValueError(
-                f"region is required. Provide it via module parameter, module_defaults, or "
-                f"SCCFM_REGION environment variable. Allowed regions: {ALLOWED_REGIONS_TEXT}"
+                "The selected SCCFM profile does not contain a region. "
+                f"Allowed regions: {ALLOWED_REGIONS_TEXT}"
             )
         if self.region not in ALLOWED_REGIONS:
             raise ValueError(f"SCCFM region must be one of: {ALLOWED_REGIONS_TEXT}")
 
 
 def base_argument_spec() -> dict[str, dict[str, Any]]:
-    """Return common argument spec for region and api_token.
+    """Return common argument spec for canonical SCCFM profile selection.
 
     Returns:
         Dictionary suitable for merging into build_argument_spec().
     """
     return {
-        "region": {"type": "str", "required": False},
-        "api_token": {"type": "str", "required": False, "no_log": True},
+        "profile": {"type": "str", "required": False, "default": "default"},
+        "config_path": {"type": "path", "required": False},
     }
 
 
@@ -80,7 +75,7 @@ def identifier_argument_spec() -> dict[str, dict[str, Any]]:
 
 
 def create_config(module: "AnsibleModule") -> Config:
-    """Create a Config from module params, with error handling.
+    """Resolve a named profile and create a Config, with error handling.
 
     Args:
         module: The AnsibleModule instance.
@@ -92,10 +87,15 @@ def create_config(module: "AnsibleModule") -> Config:
         On validation error, calls module.fail_json() and does not return.
     """
     try:
-        return Config(
-            region=module.params.get("region") or "",
-            api_token=module.params.get("api_token") or "",
-        )
-    except ValueError as e:
+        profile = module.params.get("profile") or "default"
+        raw_path = module.params.get("config_path")
+        stored = ProfileService(path=Path(raw_path) if raw_path else None).load(profile)
+        if stored is None:
+            raise ValueError(
+                f"SCCFM profile '{profile}' not found. "
+                f"Run 'sccfm-cli --profile {profile} configure' to set it up."
+            )
+        return Config(region=stored.region, api_token=stored.api_token)
+    except (OSError, ValueError) as e:
         module.fail_json(msg=str(e))
         raise

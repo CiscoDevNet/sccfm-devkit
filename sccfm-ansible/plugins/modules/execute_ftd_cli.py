@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device, DevicePage
@@ -28,7 +28,9 @@ description:
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
   - Only show commands are supported (e.g. show version, show failover, show route).
   - The command runs via the cdFMC bulk command proxy endpoint.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/create-bulk-command/) for endpoint documentation.
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/create-bulk-command/)
+    endpoint details.
 options:
   query:
     description:
@@ -72,19 +74,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -95,8 +93,7 @@ EXAMPLES = r"""
   cisco.sccfm.execute_ftd_cli:
     query: "name:prod-* AND connectivityState:ONLINE"
     command: "show failover"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: cli_results
 
 # Example 2: Execute a command on specific devices by UID
@@ -114,8 +111,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Show route on branch FTDs
       cisco.sccfm.execute_ftd_cli:

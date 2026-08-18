@@ -35,19 +35,15 @@ options:
       For URL objects this should be the URL string.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -58,8 +54,7 @@ EXAMPLES = r"""
   cisco.sccfm.update_object_default:
     uid: "abc-123-def"
     value: "10.10.10.10"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Using module_defaults to avoid repeating credentials
 - name: Update object default values
@@ -67,8 +62,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Update default value
       cisco.sccfm.update_object_default:
@@ -86,8 +80,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Update shared default value
       cisco.sccfm.update_object_default:
@@ -155,7 +148,10 @@ def run_module() -> None:
         result = service.update_default_value(uid=uid, new_value=value)
         module.exit_json(
             changed=True,
-            msg=f"Successfully updated default value of object '{result.name}' to '{result.default_value}'.",
+            msg=(
+                f"Successfully updated default value of object '{result.name}' "
+                f"to '{result.default_value}'."
+            ),
             object_default=result.to_dict(),
         )
     except ValueError as e:

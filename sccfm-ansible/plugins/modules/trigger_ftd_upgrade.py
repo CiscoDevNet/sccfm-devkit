@@ -7,12 +7,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    CdoTransaction,
-    DevicePage,
-    EntityType,
-)
+from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
 
 from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
@@ -26,7 +21,7 @@ from cisco_sccfm_core.services.inventory.asa_upgrade_version_service import is_v
 from cisco_sccfm_core.services.transaction_service import TransactionService
 from cisco_sccfm_core.types import ConfigLike
 
-from ..module_utils.config import Config, base_argument_spec, create_config
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -110,19 +105,15 @@ options:
     required: false
     type: int
     default: 3600
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -134,8 +125,7 @@ EXAMPLES = r"""
     uids:
       - "12345678-1234-1234-1234-123456789abc"
     software_version: "7.4.1"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Stage-only upgrade using a query
 - name: Stage FTD upgrade for branch devices
@@ -159,8 +149,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Stage FTD upgrade for branch devices
       cisco.sccfm.trigger_ftd_upgrade:

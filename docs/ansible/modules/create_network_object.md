@@ -20,13 +20,10 @@ $ ansible-doc -t module cisco.sccfm.create_network_object
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - description  Optional description for the network object.
         default: null
@@ -40,11 +37,8 @@ OPTIONS (= indicates it is required):
 = name    Name of the network object.
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - tags    Mapping of tag keys to lists of tag values. For example,
@@ -69,8 +63,7 @@ EXAMPLES:
     labels:
       - production
       - web
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Create a subnet network object using module_defaults
 - name: Create network objects
@@ -78,8 +71,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Create branch office subnet
       cisco.sccfm.create_network_object:
@@ -93,7 +85,7 @@ EXAMPLES:
           environment:
             - production
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Create a range network object
   cisco.sccfm.create_network_object:
     name: dhcp-pool

@@ -49,19 +49,15 @@ options:
     required: true
     type: list
     elements: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -74,8 +70,7 @@ EXAMPLES = r"""
     referenced_objects:
       - web-server-01
       - web-server-02
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Add members by UID
 - name: Add members to a network group by UID
@@ -91,8 +86,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Add web servers to group
       cisco.sccfm.add_network_group_members:
@@ -181,7 +175,10 @@ def run_module() -> None:
                 )
             module.exit_json(
                 changed=False,
-                msg=f"Network group '{result.network_group.name}' already contains all requested members.",
+                msg=(
+                    f"Network group '{result.network_group.name}' already contains all "
+                    "requested members."
+                ),
                 network_group=result.network_group.to_dict(),
             )
             return
@@ -196,7 +193,10 @@ def run_module() -> None:
 
         module.exit_json(
             changed=False,
-            msg=f"Network group '{result.network_group.name}' already contains all requested members.",
+            msg=(
+                f"Network group '{result.network_group.name}' already contains all "
+                "requested members."
+            ),
             network_group=result.network_group.to_dict(),
         )
     except NotFoundError as e:

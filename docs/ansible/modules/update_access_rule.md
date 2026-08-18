@@ -24,13 +24,10 @@ OPTIONS (= indicates it is required):
         default: null
         type: bool
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - destination_network  Destination network object name.
         default: null
@@ -52,14 +49,11 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-- protocol  Protocol (e.g. tcp, udp, ip).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
+- protocol  Protocol (e.g. tcp, udp, ip).
         default: null
         type: str
 
@@ -91,8 +85,7 @@ EXAMPLES:
   cisco.sccfm.update_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
     rule_action: DENY
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Update remark and networks using module_defaults
 - name: Update access rules
@@ -100,8 +93,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Update rule remark and source
       cisco.sccfm.update_access_rule:

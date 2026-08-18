@@ -20,23 +20,17 @@ $ ansible-doc -t module cisco.sccfm.register_cdfmc_ftd
 
 OPTIONS (= indicates it is required):
 
-- api_token  The SCC Firewall Manager API token.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 = ftd_uid  The UID of the FTD device in SCC Firewall Manager to
             register.
         type: str
 
-- region  The SCC Firewall Manager region.
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - skip_initial_deployment  If true, the initial configuration
@@ -53,8 +47,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Complete the FTD registration
       cisco.sccfm.register_cdfmc_ftd:

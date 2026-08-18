@@ -4,7 +4,7 @@
 
 """Dynamic sccfm-cli command tree built by introspecting the Click group.
 
-Any command added to sccfm-cli is automatically available in the devkit
+Any command added to sccfm-cli is automatically available in the interactive CLI
 interactive runner — no changes to this file are required.
 
 Infrastructure options that are not useful in an interactive session
@@ -29,6 +29,7 @@ class CliParam:
     required: bool
     is_flag: bool = False  # True for boolean toggle options (e.g. --check)
     multiple: bool = False  # True for repeatable options (e.g. --labels, --tags)
+    hide_input: bool = False  # True for secrets (e.g. --api-token, --password)
 
 
 @dataclass
@@ -83,6 +84,7 @@ def _build_tree(group: click.Group, args_prefix: list[str]) -> list[CliGroup | C
                         required=bool(param.required),
                         is_flag=bool(param.is_flag),
                         multiple=bool(param.multiple),
+                        hide_input=bool(getattr(param, "hide_input", False)),
                     )
                 )
             result.append(

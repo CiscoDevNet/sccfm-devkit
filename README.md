@@ -29,14 +29,14 @@ Python scripts, and collection can reuse the same SDK integrations.
 cisco_sccfm_scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
 source cisco_sccfm_scripts/activate.sh     # activates the project virtualenv
 sccfm-cli --help               # the main SCCFM CLI
-devkit                         # interactive developer toolkit menu
+sccfm-cli-interactive          # interactive CLI and developer workflow menu
 ```
 
 `setup_environment.sh` keeps everything local to the repository: pyenv provides Python 3.12.4, `.venv/` hosts the runtime, and Poetry installs the project plus dev dependencies.
 
 ## Commands
 
-- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) and stores it under `~/.sccfm-cli/` (override with `--config-path` or `SCCFM_CONFIG`).
+- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) in the canonical profile store at `~/.sccfm-cli/config.json`. On POSIX systems, the directory is restricted to the current user (`0700`) and the file to owner read/write (`0600`). On Windows, the store inherits the user's profile-directory ACLs. Override the path with `--config-path` or `SCCFM_CONFIG`.
 - `sccfm-cli status [--config-path PATH]`: Shows the current profile plus SCCFM connectivity health using Rich tables.
 - `sccfm-cli inventory devices list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists device inventory with pagination and optional name filtering.
 - `sccfm-cli inventory manager list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
@@ -69,18 +69,14 @@ Installing the `cisco-sccfm-devkit` package also exposes `cisco_sccfm_core`, a t
 Python automation library built on top of the generated `scc-firewall-manager-sdk`.
 
 ```python
-from dataclasses import dataclass
-
 from cisco_sccfm_core import InventoryService
+from cisco_sccfm_core.services import ProfileService
 
+profile = ProfileService().load("default")
+if profile is None:
+    raise RuntimeError("Configure the default profile with sccfm-cli configure")
 
-@dataclass(frozen=True)
-class Config:
-    region: str
-    api_token: str
-
-
-inventory = InventoryService(Config(region="us", api_token="..."))
+inventory = InventoryService(profile)
 devices = inventory.get_devices(limit=10, offset=0, query=None)
 ```
 
@@ -91,27 +87,32 @@ The package root exports the supported public service classes and response model
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
 - Build and install the collection locally: `build-ansible-collection`.
-- Set up tokens interactively: `devkit` and select **change-tokens** (saves your API token, creates `.env`, `.vault_pass`, encrypts `group_vars/all/vault.yml`, and sets the region).
+- Configure profiles interactively: run `sccfm-cli-interactive` and select **configure-profile**.
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
-- Configure SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus `SCCFM_API_TOKEN`; you can set them via env vars or inline (i.e., write the values directly in the inventory file—useful for local dev, but prefer env vars or Ansible Vault for anything shared).
+- Ansible modules and inventory select the same named SCCFM profile; they do not duplicate its region or API token in environment variables, playbooks, or Ansible Vault.
+- Keep Ansible Vault for playbook-specific secrets such as managed-device passwords.
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
 - Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](docs/README.md) for details.
 
 ## Development
 
-All common development tasks are available through the interactive `devkit` menu:
+All common development tasks are available through the interactive CLI menu:
 
 ```bash
 source cisco_sccfm_scripts/activate.sh
-devkit
+sccfm-cli-interactive
 ```
 
 This presents an interactive selector with the following tasks:
 
 | Task | Description |
 |------|-------------|
-| **change-tokens** | Set up SCCFM API tokens, .env, and Ansible Vault |
+| **configure-profile** | Create or replace a canonical SCCFM profile |
+| **manage-profiles** | Update or remove SCCFM profiles |
+| **import-legacy-vault** | Copy profiles from the former vault token store without modifying it |
+| **run-cli** | Discover and run an `sccfm-cli` command interactively |
+| **run-ansible** | Select and run an example playbook |
 | **build-collection** | Build the cisco.sccfm Ansible collection tarball |
 | **generate-ansible-docs** | Generate Ansible reference docs from ansible-doc output |
 | **generate-cli-docs** | Generate CLI reference docs from Click help output |

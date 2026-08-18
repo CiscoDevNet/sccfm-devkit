@@ -75,8 +75,7 @@ def query_params() -> dict[str, Any]:
         "uids": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -87,8 +86,7 @@ def uids_params() -> dict[str, Any]:
         "uids": ["uid-1", "uid-2"],
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 

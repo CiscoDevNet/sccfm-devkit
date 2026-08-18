@@ -73,7 +73,7 @@ jobs:
           pipx install commitizen
 
       - name: Install dependencies
-        run: poetry install --no-interaction --with dev,build
+        run: poetry install --no-interaction --with dev
 
       - name: Bump version and build collection
         id: bump

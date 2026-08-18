@@ -19,13 +19,10 @@ $ ansible-doc -t module cisco.sccfm.list_access_groups
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - limit   Maximum number of results to return.
         default: 50
@@ -35,14 +32,11 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
-- query   Optional Lucene query string to filter results.
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
+- query   Optional Lucene query string to filter results.
         default: null
         type: str
 
@@ -52,8 +46,7 @@ EXAMPLES:
 # List all access groups
 - name: List access groups
   cisco.sccfm.list_access_groups:
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Display access groups
@@ -66,8 +59,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List access groups
       cisco.sccfm.list_access_groups:

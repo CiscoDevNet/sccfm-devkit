@@ -31,8 +31,7 @@ def base_module_params() -> dict[str, Any]:
         "fmc_access_policy_uid": "policy-uid-abc",
         "admin_password": None,
         "device_group_uid": None,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 

@@ -54,19 +54,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -81,16 +77,14 @@ EXAMPLES = r"""
 - name: List local users using a query
   cisco.sccfm.list_asa_local_users:
     query: "name:branch-* AND connectivityState:ONLINE"
-    region: "us"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 - name: List local users with shared auth
   hosts: localhost
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List local users on branch ASAs
       cisco.sccfm.list_asa_local_users:

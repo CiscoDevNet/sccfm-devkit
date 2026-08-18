@@ -20,13 +20,10 @@ $ ansible-doc -t module cisco.sccfm.list_asa_local_users
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
         default: 50
@@ -36,15 +33,12 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
-- query   Lucene query to filter ASA devices.
-           Mutually exclusive with `uids'.
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
+- query   Lucene query to filter ASA devices.
+           Mutually exclusive with `uids'.
         default: null
         type: str
 
@@ -66,16 +60,14 @@ EXAMPLES:
 - name: List local users using a query
   cisco.sccfm.list_asa_local_users:
     query: "name:branch-* AND connectivityState:ONLINE"
-    region: "us"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 - name: List local users with shared auth
   hosts: localhost
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List local users on branch ASAs
       cisco.sccfm.list_asa_local_users:

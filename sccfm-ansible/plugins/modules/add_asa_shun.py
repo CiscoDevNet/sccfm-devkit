@@ -29,7 +29,8 @@ description:
     immediately.
   - C(source_ip) and C(entries) are mutually exclusive.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/).
     for API documentation.
 options:
   query:
@@ -130,19 +131,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -153,8 +150,7 @@ EXAMPLES = r"""
   cisco.sccfm.add_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Shun with connection tuple to drop an existing connection
 - name: Block attacker and drop active connection
@@ -179,8 +175,7 @@ EXAMPLES = r"""
         dest_port: 443
         protocol: tcp
       - source_ip: "203.0.113.60"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 4: Using module_defaults (recommended)
 - name: Add shun entries
@@ -188,8 +183,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Shun attacker IP
       cisco.sccfm.add_asa_shun:

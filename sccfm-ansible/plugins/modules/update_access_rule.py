@@ -73,19 +73,15 @@ options:
     description: Whether the rule is active.
     required: false
     type: bool
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -96,8 +92,7 @@ EXAMPLES = r"""
   cisco.sccfm.update_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
     rule_action: DENY
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Update remark and networks using module_defaults
 - name: Update access rules
@@ -105,8 +100,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Update rule remark and source
       cisco.sccfm.update_access_rule:

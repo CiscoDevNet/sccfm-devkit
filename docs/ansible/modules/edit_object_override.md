@@ -21,13 +21,10 @@ $ ansible-doc -t module cisco.sccfm.edit_object_override
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 = override_value  The new value for the override. For network objects
                    this can be an IP address (e.g., `10.0.0.1'), a
@@ -35,11 +32,8 @@ OPTIONS (= indicates it is required):
                    For URL objects this should be the URL string.
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = target_id  UID of the target device whose override value to edit.
@@ -57,8 +51,7 @@ EXAMPLES:
     uid: "abc-123-def"
     target_id: "70bde3c9-328c-4a4b-bdc9-a4d4042bf09a"
     override_value: "10.20.30.40"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Using module_defaults
 - name: Edit object overrides
@@ -66,8 +59,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Edit override
       cisco.sccfm.edit_object_override:

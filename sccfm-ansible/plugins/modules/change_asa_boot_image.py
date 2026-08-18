@@ -71,19 +71,15 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -94,8 +90,7 @@ EXAMPLES = r"""
   cisco.sccfm.change_asa_boot_image:
     query: "name:branch-*"
     image_path: "disk0:/asa9-18-4-smp-k8.bin"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Change boot image on specific devices
 - name: Change boot image on specific ASA devices
@@ -120,8 +115,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Set boot image on branch ASAs
       cisco.sccfm.change_asa_boot_image:
@@ -292,7 +286,10 @@ def run_module() -> None:
 
             if isinstance(service_results, CdoTransaction):
                 module.fail_json(
-                    msg=f"Boot image change failed with status: {service_results.cdo_transaction_status}",
+                    msg=(
+                        "Boot image change failed with status: "
+                        f"{service_results.cdo_transaction_status}"
+                    ),
                     transaction_uid=service_results.transaction_uid,
                     error_message=service_results.error_message,
                     transaction_details=service_results.transaction_details,

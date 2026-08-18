@@ -4,10 +4,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unified devkit CLI — interactive entry-point for all helper scripts.
+"""Interactive entry point for SCCFM CLI and development workflows.
 
 Usage:
-    devkit          # interactive menu
+    sccfm-cli-interactive
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+import click
 import questionary
 from rich.console import Console
 from rich.panel import Panel
@@ -50,11 +51,43 @@ def _ask(
 # ── Task implementations ─────────────────────────────────────────
 
 
-def _run_change_tokens() -> None:
-    """Set up SCCFM API tokens, .env, and Ansible Vault (interactive)."""
-    from cisco_sccfm_scripts.setup_tokens import main as _setup_tokens
+def _configure_profile() -> None:
+    """Create or replace a profile in the canonical SCCFM config store."""
+    from cisco_sccfm_cli.models import Config
+    from cisco_sccfm_cli.services import ConfigService
+    from cisco_sccfm_core.constants import SCCFM_REGIONS
 
-    _setup_tokens(standalone_mode=False)
+    profile_answer = questionary.text("Profile name:", default="default").unsafe_ask()
+    profile = (profile_answer or "").strip()
+    if not profile:
+        console.print("[red]Profile name cannot be empty.[/red]")
+        return
+
+    region_answer = questionary.select(
+        "SCCFM region:",
+        choices=list(SCCFM_REGIONS),
+        default="us",
+    ).unsafe_ask()
+    region = region_answer if isinstance(region_answer, str) else ""
+    if not region:
+        console.print("[dim]Cancelled.[/dim]")
+        return
+
+    token_answer = questionary.password("SCCFM API token:").unsafe_ask()
+    api_token = (token_answer or "").strip()
+    if not api_token:
+        console.print("[red]API token cannot be empty.[/red]")
+        return
+
+    ConfigService().save(Config(profile=profile, region=region, api_token=api_token))
+    console.print(f"[green]Profile '{profile}' configured for region '{region}'.[/green]")
+
+
+def _import_legacy_vault() -> None:
+    """Import SCCFM profiles from the former Ansible Vault token store."""
+    from cisco_sccfm_scripts.import_legacy_vault import main as _import
+
+    _import(standalone_mode=False)
 
 
 def _run_build_collection() -> None:
@@ -171,6 +204,35 @@ def _run_e2e() -> None:
 # ── Run CLI commands ──────────────────────────────────────────────
 
 
+def _prompt_param(message: str, hide_input: bool) -> str | None:
+    """Prompt for a parameter value, masking input for secrets."""
+    prompt = questionary.password(message) if hide_input else questionary.text(message)
+    answer: object = prompt.unsafe_ask()
+    return answer if isinstance(answer, str) else None
+
+
+def _render_command(argv: list[str], secret_flags: set[str]) -> str:
+    """Render *argv* for display with secret option values replaced by ``***``."""
+    rendered = list(argv)
+    for index, token in enumerate(rendered[:-1]):
+        if token in secret_flags:
+            rendered[index + 1] = "***"
+    return shlex.join(rendered)
+
+
+def _invoke_cli(argv: list[str], secret_flags: set[str]) -> None:
+    """Invoke secret-bearing commands without exposing values through OS argv."""
+    if secret_flags.intersection(argv):
+        from cisco_sccfm_cli.cli import cli
+
+        try:
+            cli.main(args=argv[1:], prog_name=argv[0], standalone_mode=False)
+        except click.ClickException as exc:
+            exc.show()
+        return
+    subprocess.call(argv, cwd=_project_root())
+
+
 def _execute_cli_command(cmd: object) -> None:
     """Prompt for params and run an sccfm-cli leaf command."""
     from cisco_sccfm_scripts.cli_commands import CliCommand, CliParam
@@ -178,6 +240,7 @@ def _execute_cli_command(cmd: object) -> None:
     if not isinstance(cmd, CliCommand):
         return
     argv: list[str] = ["sccfm-cli", *cmd.args]
+    secret_flags = {p.flag for p in cmd.params if isinstance(p, CliParam) and p.hide_input}
     for param in cmd.params:
         if not isinstance(param, CliParam):
             continue
@@ -189,7 +252,7 @@ def _execute_cli_command(cmd: object) -> None:
             console.print(f"[dim]{param.label} — enter one value per line, blank to finish:[/dim]")
             has_value = False
             while True:
-                value: str | None = questionary.text(f"  {param.flag}").unsafe_ask()
+                value: str | None = _prompt_param(f"  {param.flag}", param.hide_input)
                 normalized_value = (value or "").strip()
                 if not normalized_value:
                     break
@@ -200,7 +263,7 @@ def _execute_cli_command(cmd: object) -> None:
                 return
         else:
             prompt = f"{param.label}{'' if param.required else ' (leave blank to skip)'}"
-            single: str | None = questionary.text(prompt).unsafe_ask()
+            single: str | None = _prompt_param(prompt, param.hide_input)
             normalized_value = (single or "").strip()
             if normalized_value:
                 argv.extend([param.flag, normalized_value])
@@ -208,8 +271,8 @@ def _execute_cli_command(cmd: object) -> None:
                 console.print(f"[red]{param.label} is required.[/red]")
                 return
 
-    console.print(f"[bold cyan]$ {shlex.join(argv)}[/bold cyan]")
-    subprocess.call(argv, cwd=_project_root())
+    console.print(f"[bold cyan]$ {_render_command(argv, secret_flags)}[/bold cyan]")
+    _invoke_cli(argv, secret_flags)
 
 
 def _navigate_cli(children: list[object], title: str) -> None:
@@ -254,6 +317,17 @@ def _run_cli_commands() -> None:
 # ── Run Ansible examples ──────────────────────────────────────────
 
 
+def _playbook_requires_vault(playbook: Path) -> bool:
+    """Return whether *playbook* references vault variables outside comments."""
+    try:
+        content = playbook.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return any(
+        "vault_" in line for line in content.splitlines() if not line.lstrip().startswith("#")
+    )
+
+
 def _run_ansible_examples() -> None:
     """Interactively select and run an Ansible example playbook."""
     examples_dir = _project_root() / "sccfm-ansible" / "examples"
@@ -281,9 +355,16 @@ def _run_ansible_examples() -> None:
         answer,
         "-i",
         "inventory.sccfm.yml",
-        "--vault-password-file",
-        ".vault_pass",
     ]
+    vault_password_file = examples_dir / ".vault_pass"
+    if _playbook_requires_vault(examples_dir / answer):
+        if not vault_password_file.exists():
+            console.print(
+                f"[yellow]{answer} uses vault variables but "
+                f"{vault_password_file} was not found — running without Vault.[/yellow]"
+            )
+        else:
+            cmd.extend(["--vault-password-file", vault_password_file.name])
     console.print(f"[bold cyan]$ {shlex.join(cmd)}[/bold cyan]")
     subprocess.call(cmd, cwd=str(examples_dir))
 
@@ -291,137 +372,97 @@ def _run_ansible_examples() -> None:
 # ── Manage tokens ─────────────────────────────────────────────────
 
 
-def _update_token() -> None:
-    """Prompt for a new API token for an existing named token."""
-    from cisco_sccfm_scripts.setup_tokens import _resolve_examples_path
-    from cisco_sccfm_scripts.token_store import SavedToken, VaultTokenStore
+def _select_profile(message: str) -> object | None:
+    """Select a configured SCCFM profile, returning its config."""
+    from cisco_sccfm_cli.services import ConfigService
 
-    try:
-        examples_path = _resolve_examples_path(None)
-    except Exception as exc:
-        console.print(f"[red]{exc}[/red]")
-        return
+    profiles = ConfigService().list_profiles()
+    if not profiles:
+        console.print("[yellow]No SCCFM profiles configured.[/yellow]")
+        return None
 
-    store = VaultTokenStore(examples_path)
-    tokens = store.list_tokens()
-
-    if not tokens:
-        console.print("[yellow]No saved tokens found in vault.[/yellow]")
-        return
-
-    token_choices: list[questionary.Choice | str] = [
-        questionary.Choice(
-            title=f"{t.name}  ({t.region})  …{t.token[-6:]}",
-            value=t.name,
-        )
-        for t in tokens
+    choices: list[questionary.Choice | str] = [
+        questionary.Choice(title=f"{item.profile}  ({item.region})", value=item.profile)
+        for item in profiles
     ]
-    token_choices.append("back")
-
-    answer = _ask(token_choices, "Select a token to update:")
+    choices.append("back")
+    answer = _ask(choices, message)
     if answer is None or answer == "back":
+        return None
+    return next((item for item in profiles if item.profile == answer), None)
+
+
+def _update_profile() -> None:
+    """Update the region and API token for an existing profile."""
+    from cisco_sccfm_cli.models import Config
+    from cisco_sccfm_cli.services import ConfigService
+    from cisco_sccfm_core.constants import SCCFM_REGIONS
+
+    selected = _select_profile("Select a profile to update:")
+    if not isinstance(selected, Config):
         return
 
-    token_to_update = next((t for t in tokens if t.name == answer), None)
-    if token_to_update is None:
-        console.print("[red]Token not found.[/red]")
-        return
-
-    new_token_value = questionary.text(
-        f"Paste new API token for '{token_to_update.name}':",
+    region_answer = questionary.select(
+        "SCCFM region:",
+        choices=list(SCCFM_REGIONS),
+        default=selected.region,
     ).unsafe_ask()
-    new_token_value = new_token_value.strip()
-    if not new_token_value:
-        console.print("[red]Token cannot be empty.[/red]")
+    region = region_answer if isinstance(region_answer, str) else ""
+    if not region:
+        console.print("[dim]Cancelled.[/dim]")
         return
 
-    updated = SavedToken(
-        name=token_to_update.name,
-        region=token_to_update.region,
-        token=new_token_value,
-    )
-    all_tokens = [updated if t.name == updated.name else t for t in tokens]
-    vault_path = store.save_active_and_tokens(updated, all_tokens)
-    console.print(f"[green]Updated token '{updated.name}'.[/green]")
-    console.print(f"[dim]Vault updated: {vault_path}[/dim]")
+    token_answer = questionary.password(
+        "New SCCFM API token (leave blank to keep the current token):"
+    ).unsafe_ask()
+    api_token = (token_answer or "").strip() or selected.api_token
+    ConfigService().save(Config(profile=selected.profile, region=region, api_token=api_token))
+    console.print(f"[green]Profile '{selected.profile}' updated.[/green]")
 
 
-def _remove_token() -> None:
-    """Remove a saved token from the Ansible vault store."""
-    from cisco_sccfm_scripts.setup_tokens import _resolve_examples_path
-    from cisco_sccfm_scripts.token_store import VaultTokenStore
+def _remove_profile() -> None:
+    """Remove an SCCFM profile from the canonical config store."""
+    from cisco_sccfm_cli.models import Config
+    from cisco_sccfm_cli.services import ConfigService
 
-    try:
-        examples_path = _resolve_examples_path(None)
-    except Exception as exc:
-        console.print(f"[red]{exc}[/red]")
-        return
-
-    store = VaultTokenStore(examples_path)
-    tokens = store.list_tokens()
-
-    if not tokens:
-        console.print("[yellow]No saved tokens found in vault.[/yellow]")
-        return
-
-    if len(tokens) == 1:
-        console.print("[yellow]Only one token saved — cannot remove the last token.[/yellow]")
-        return
-
-    # Use Choice so the display shows region/token context but the value is just the name.
-    token_choices: list[questionary.Choice | str] = [
-        questionary.Choice(
-            title=f"{t.name}  ({t.region})  …{t.token[-6:]}",
-            value=t.name,
-        )
-        for t in tokens
-    ]
-    token_choices.append("back")
-
-    answer = _ask(token_choices, "Select a token to remove:")
-    if answer is None or answer == "back":
-        return
-
-    token_to_remove = next((t for t in tokens if t.name == answer), None)
-    if token_to_remove is None:
-        console.print("[red]Token not found.[/red]")
+    selected = _select_profile("Select a profile to remove:")
+    if not isinstance(selected, Config):
         return
 
     confirmed = questionary.confirm(
-        f"Remove token '{token_to_remove.name}' (region={token_to_remove.region})?",
-        default=True,
+        f"Remove profile '{selected.profile}' (region={selected.region})?",
+        default=False,
     ).unsafe_ask()
     if not confirmed:
         console.print("[dim]Cancelled.[/dim]")
         return
 
-    remaining = [t for t in tokens if t.name != token_to_remove.name]
-    new_active = remaining[0]
-    vault_path = store.save_active_and_tokens(new_active, remaining)
-    console.print(f"[green]Removed token '{token_to_remove.name}'.[/green]")
-    console.print(
-        f"[green]Active token is now '{new_active.name}' (region={new_active.region}).[/green]"
-    )
-    console.print(f"[dim]Vault updated: {vault_path}[/dim]")
+    ConfigService().remove(selected.profile)
+    console.print(f"[green]Profile '{selected.profile}' removed.[/green]")
 
 
-def _manage_tokens() -> None:
-    """Token management sub-menu (update or remove)."""
-    answer = _ask(["update", "remove", "back"], "Manage tokens:")
+def _manage_profiles() -> None:
+    """Profile management sub-menu."""
+    answer = _ask(["update", "remove", "back"], "Manage profiles:")
     if answer is None or answer == "back":
         return
 
     if answer == "update":
-        _update_token()
+        _update_profile()
     elif answer == "remove":
-        _remove_token()
+        _remove_profile()
 
 
 # ── Menu definition ───────────────────────────────────────────────
 
 _TASKS: list[tuple[str, str, Callable[[], None]]] = [
-    ("change-tokens", "Set up SCCFM API tokens, .env, and Ansible Vault", _run_change_tokens),
-    ("manage-tokens", "Manage saved tokens (update / remove)", _manage_tokens),
+    ("configure-profile", "Create or replace an SCCFM profile", _configure_profile),
+    ("manage-profiles", "Update or remove SCCFM profiles", _manage_profiles),
+    (
+        "import-legacy-vault",
+        "Import profiles from the former Ansible Vault token store",
+        _import_legacy_vault,
+    ),
     ("run-cli", "Run an sccfm-cli command interactively", _run_cli_commands),
     ("run-ansible", "Run an Ansible example playbook", _run_ansible_examples),
     ("build-collection", "Build the cisco.sccfm Ansible collection tarball", _run_build_collection),
@@ -471,7 +512,7 @@ def _interactive_menu() -> None:
     """Show an interactive menu and run the selected task."""
     console.print(
         Panel(
-            "[bold]SCCFM Developer Toolkit[/bold]\n" "Select a task to run.",
+            "[bold]SCCFM CLI Interactive[/bold]\n" "Select a task to run.",
             border_style="cyan",
         )
     )
@@ -508,6 +549,7 @@ def _interactive_menu() -> None:
 # ── Entry-point ───────────────────────────────────────────────────
 
 
+@click.command(help="Open the interactive SCCFM CLI and development workflow menu.")
 def main() -> None:
     try:
         _interactive_menu()

@@ -24,14 +24,6 @@ $ ansible-doc -t module cisco.sccfm.execute_asa_cli
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
-        default: null
-        no_log: true
-        type: str
-
 - command  Single ASA CLI command to execute.
             Mutually exclusive with `commands'. Use `commands' to run
             more than one command.
@@ -45,6 +37,11 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
+        default: null
+        type: path
+
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
         default: 50
@@ -55,16 +52,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -84,8 +78,7 @@ EXAMPLES:
     commands:
       - "show version"
       - "show running-config"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: cli_results
 
 # Example 2: Execute commands on specific devices by UID
@@ -104,8 +97,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Show version on branch ASAs
       cisco.sccfm.execute_asa_cli:

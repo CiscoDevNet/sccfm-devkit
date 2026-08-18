@@ -73,6 +73,17 @@ def test_sccfm_ansible_skill_documents_safety_and_secret_rules() -> None:
     assert "EXECUTE cisco.sccfm <module-fqcn> <target-summary>" in skill
 
 
+def test_sccfm_ansible_skill_only_documents_canonical_profile_auth() -> None:
+    skill = _skill_text()
+
+    assert "sccfm-cli --profile <name> configure" in skill
+    assert "profile: production" in skill
+    assert "SCCFM_API_TOKEN" not in skill
+    assert "SCCFM_REGION" not in skill
+    assert "change-tokens" not in skill
+    assert "Bash(devkit *)" not in skill
+
+
 def test_sccfm_ansible_skill_blocks_made_up_query_semantics() -> None:
     skill = _skill_text()
 

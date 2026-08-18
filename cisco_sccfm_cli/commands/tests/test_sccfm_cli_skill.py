@@ -79,6 +79,10 @@ def test_cisco_sccfm_cli_skill_should_cover_schema_driven_operation() -> None:
     for fragment in expected_fragments:
         assert fragment in body
 
+    assert "sccfm-cli-interactive" in body
+    assert "SCCFM_API_TOKEN" not in body
+    assert "SCCFM_REGION" not in body
+
 
 def test_cisco_sccfm_cli_skill_should_reference_fields_emitted_by_schema(
     cli_runner: CliRunner,

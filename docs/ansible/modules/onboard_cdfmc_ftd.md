@@ -21,13 +21,10 @@ $ ansible-doc -t module cisco.sccfm.onboard_cdfmc_ftd
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 = fmc_access_policy_uid  UUID of the FMC access policy to apply to
                           this device.
@@ -52,11 +49,8 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - ungrouped_labels  List of free-form labels to assign to the device.
@@ -79,8 +73,7 @@ EXAMPLES:
     fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
     licenses:
       - BASE
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Onboard a virtual FTD with multiple licenses
 - name: Onboard virtual FTD
@@ -112,8 +105,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:

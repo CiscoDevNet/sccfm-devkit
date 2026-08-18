@@ -7,11 +7,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    AsaCompatibleVersion,
-    DevicePage,
-)
+from scc_firewall_manager_sdk import ApiException, AsaCompatibleVersion, DevicePage
 
 from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
 from cisco_sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
@@ -31,7 +27,8 @@ description:
   - Uses the C(GET /v1/inventory/devices/asas/{deviceUid}/upgrades/versions) API
     endpoint for each device, then returns the common set of versions that every
     device in the group can upgrade to.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/).
     for API documentation.
 options:
   query:
@@ -72,19 +69,15 @@ options:
     required: false
     type: bool
     default: false
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
   - Cisco SCCFM Team
 """
@@ -95,8 +88,7 @@ EXAMPLES = r"""
   cisco.sccfm.list_asa_compatible_versions:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: compat_versions
 
 - name: Show compatible versions
@@ -135,8 +127,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get compatible versions for branch ASAs
       cisco.sccfm.list_asa_compatible_versions:

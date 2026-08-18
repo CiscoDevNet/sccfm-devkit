@@ -58,6 +58,9 @@ _ANSIBLE_META_RETURN_KEYS: frozenset[str] = frozenset(
         "ansible_facts",
     }
 )
+# Modules that talk straight to a device (e.g. over SSH) instead of the SCCFM API, so they
+# have no profile/auth options and are deliberately outside the cisco.sccfm.all action group.
+_DEVICE_DIRECT_ANSIBLE_MODULES: frozenset[str] = frozenset({"configure_manager"})
 _TASK_CTRL_KEYS: frozenset[str] = frozenset(
     {
         "name",
@@ -707,14 +710,13 @@ def _parse_example_tasks(source: str) -> list[tuple[int, dict[str, Any]]]:
     return tasks
 
 
-def _extract_example_return_lines(source: str) -> dict[str, int]:
+def _extract_example_return_lines(source: str, module_stem: str) -> dict[str, int]:
     block = _extract_triple_quoted_assignment(source, "EXAMPLES")
     if block is None:
         return {}
     lines: dict[str, int] = {}
-    register_names = set(
-        re.findall(r"^\s*register:\s*([A-Za-z_]\w*)\s*$", block.body, re.MULTILINE)
-    )
+    # Only registers produced by this module can be checked against its own RETURN block.
+    register_names = _example_self_register_names(source, module_stem)
     if not register_names:
         return lines
 
@@ -727,6 +729,33 @@ def _extract_example_return_lines(source: str) -> dict[str, int]:
             line = block.start_line + block.body[: match.start()].count("\n")
             lines.setdefault(key, line)
     return lines
+
+
+def _iter_example_task_dicts(node: Any) -> Iterable[dict[str, Any]]:
+    if isinstance(node, list):
+        for item in node:
+            yield from _iter_example_task_dicts(item)
+    elif isinstance(node, dict):
+        yield node
+        for nested_key in ("tasks", "pre_tasks", "post_tasks", "block"):
+            nested = node.get(nested_key)
+            if nested is not None:
+                yield from _iter_example_task_dicts(nested)
+
+
+def _example_self_register_names(source: str, module_stem: str) -> set[str]:
+    block = _extract_triple_quoted_assignment(source, "EXAMPLES")
+    if block is None:
+        return set()
+    parsed = _safe_yaml_load(block.body)
+    names: set[str] = set()
+    for task in _iter_example_task_dicts(parsed):
+        if _task_module_options(task, module_stem) is None:
+            continue
+        register = task.get("register")
+        if isinstance(register, str):
+            names.add(register)
+    return names
 
 
 def _build_ansible_metadata(file: Path) -> AnsibleModuleMetadata:
@@ -748,7 +777,7 @@ def _build_ansible_metadata(file: Path) -> AnsibleModuleMetadata:
         option_lines=option_lines,
         return_lines=return_lines,
         example_option_lines=example_option_lines,
-        example_return_lines=_extract_example_return_lines(source),
+        example_return_lines=_extract_example_return_lines(source, file.stem),
         exit_json_keys=exit_json_keys,
         operation_key=_ansible_operation_key(file),
         device_family=_ansible_device_family(file),
@@ -791,7 +820,7 @@ def check_ansible_examples(file: Path, metadata: AnsibleModuleMetadata) -> list[
 
 def check_ansible_return_contract(file: Path, metadata: AnsibleModuleMetadata) -> list[Issue]:
     issues: list[Issue] = []
-    documented = set(metadata.return_lines)
+    documented = set(metadata.return_lines) - _ANSIBLE_META_RETURN_KEYS
     actual = set(metadata.exit_json_keys) - _ANSIBLE_META_RETURN_KEYS
 
     undocumented = sorted(actual - documented)
@@ -1671,7 +1700,8 @@ def check_datetime_as_str(file: Path) -> list[Issue]:
 
 # ── Check C: Ansible argument_spec vs DOCUMENTATION options ──────────────────
 
-_ANSIBLE_BASE_KEYS: frozenset[str] = frozenset({"api_token", "region"})
+# Mirrors base_argument_spec() in sccfm-ansible/plugins/module_utils/config.py.
+_ANSIBLE_BASE_KEYS: frozenset[str] = frozenset({"profile", "config_path"})
 
 
 def _extract_argument_spec_keys(tree: ast.AST) -> frozenset[str]:
@@ -1786,6 +1816,16 @@ def check_service_list_signatures(files: Sequence[Path]) -> list[Issue]:
 
                 args = item.args
                 kwonly_names = [a.arg for a in args.kwonlyargs]
+
+                takes_only_self = (
+                    not args.posonlyargs
+                    and len(args.args) <= 1
+                    and args.vararg is None
+                    and args.kwarg is None
+                    and not args.kwonlyargs
+                )
+                if takes_only_self:
+                    continue  # nothing to make keyword-only
 
                 # 1. keyword-only separator
                 if not args.kwonlyargs:
@@ -2021,6 +2061,8 @@ def check_ansible_module_contract(file: Path) -> list[Issue]:
     """Check G — new/edited Ansible modules must follow the shared module contract."""
     if not _is_ansible_module(file):
         return []
+    if file.stem in _DEVICE_DIRECT_ANSIBLE_MODULES:
+        return []
 
     tree = _safe_parse(file)
     if tree is None:
@@ -2107,6 +2149,8 @@ def check_ansible_runtime_membership(files: Sequence[Path]) -> list[Issue]:
         if not _is_ansible_module(file) or not file.exists():
             continue
         module_name = file.stem
+        if module_name in _DEVICE_DIRECT_ANSIBLE_MODULES:
+            continue
         if module_name not in action_group:
             issues.append(
                 Issue(

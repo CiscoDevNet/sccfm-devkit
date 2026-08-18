@@ -4,11 +4,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from cisco_sccfm_core.models.profile import Profile as Config
 
-
-@dataclass(frozen=True)
-class Config:
-    profile: str
-    region: str
-    api_token: str
+__all__ = ["Config"]

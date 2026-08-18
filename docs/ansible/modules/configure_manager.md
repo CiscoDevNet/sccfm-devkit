@@ -114,8 +114,7 @@ EXAMPLES:
     fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
     licenses:
       - BASE
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: onboard_result
 
 - name: Complete registration over SSH
