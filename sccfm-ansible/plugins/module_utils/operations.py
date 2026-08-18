@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 
 class HasUid(Protocol):
@@ -36,10 +37,16 @@ class DeleteFunction(Protocol):
     def __call__(self, *, uid: str | None, name: str | None) -> str: ...
 
 
-class ResolveFunction(Protocol):
-    """Protocol for functions that check existence (returns object or None)."""
+class LookupByName(Protocol[T_co]):
+    """Protocol for object lookups with a keyword-only name."""
 
-    def __call__(self, uid: str) -> HasUid | None: ...
+    def __call__(self, *, name: str) -> T_co | None: ...
+
+
+class LookupByUid(Protocol[T_co]):
+    """Protocol for object lookups with a keyword-only UID."""
+
+    def __call__(self, *, uid: str) -> T_co | None: ...
 
 
 def fetch_object_by_identifier(
@@ -47,7 +54,7 @@ def fetch_object_by_identifier(
     uid: str | None,
     name: str | None,
     list_fn: Callable[[str, int], Any],
-    get_by_name_fn: Callable[[str], T | None],
+    get_by_name_fn: LookupByName[T],
     entity_name: str,
 ) -> T:
     """Fetch an object by UID or name.
@@ -73,7 +80,7 @@ def fetch_object_by_identifier(
         return result.items[0]
 
     if name:
-        obj = get_by_name_fn(name)
+        obj = get_by_name_fn(name=name)
         if not obj:
             raise NotFoundError(f"{entity_name} with name '{name}' not found.")
         return obj
@@ -88,8 +95,8 @@ def run_delete_with_idempotency(
     uid: str | None,
     name: str | None,
     entity_name: str,
-    get_by_uid_fn: Callable[[str], HasUid | None] | None = None,
-    get_by_name_fn: Callable[[str], HasUid | None] | None = None,
+    get_by_uid_fn: LookupByUid[HasUid] | None = None,
+    get_by_name_fn: LookupByName[HasUid] | None = None,
 ) -> None:
     """Run a delete operation with idempotency and check_mode handling.
 
@@ -152,16 +159,16 @@ def _handle_delete_check_mode(
     name: str | None,
     entity_name: str,
     identifier: str | None,
-    get_by_uid_fn: Callable[[str], HasUid | None] | None,
-    get_by_name_fn: Callable[[str], HasUid | None] | None,
+    get_by_uid_fn: LookupByUid[HasUid] | None,
+    get_by_name_fn: LookupByName[HasUid] | None,
 ) -> None:
     """Report what a delete would do without performing it."""
     entity: HasUid | None = None
     try:
         if uid and get_by_uid_fn:
-            entity = get_by_uid_fn(uid)
+            entity = get_by_uid_fn(uid=uid)
         elif name and get_by_name_fn:
-            entity = get_by_name_fn(name)
+            entity = get_by_name_fn(name=name)
     except NotFoundError:
         entity = None
     except ApiException as e:

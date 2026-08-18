@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid as uuid_mod
-from typing import Any, Callable, Literal, Protocol
+from typing import Any, Literal, Protocol
 
 import click
 from rich.console import Console
@@ -27,6 +27,14 @@ class _NetworkObjectLookup(Protocol):
     def get_network_object(self, *, uid: str) -> _HasUid | None: ...
 
     def get_network_object_by_name(self, *, name: str) -> _HasUid | None: ...
+
+
+class _LookupByName(Protocol):
+    def __call__(self, *, name: str) -> _HasUid | None: ...
+
+
+class _LookupByUid(Protocol):
+    def __call__(self, *, uid: str) -> _HasUid | None: ...
 
 
 CheckOperation = Literal["create", "update", "delete"]
@@ -101,8 +109,8 @@ def check_object_exists(
     console: Console,
     uid: str | None,
     name: str | None,
-    get_by_uid_fn: Callable[[str], _HasUid | None] | None,
-    get_by_name_fn: Callable[[str], _HasUid | None],
+    get_by_uid_fn: _LookupByUid | None,
+    get_by_name_fn: _LookupByName,
     object_name: str,
     output_format: str = "table",
     operation: CheckOperation = "update",
@@ -131,9 +139,9 @@ def check_object_exists(
     entity: _HasUid | None = None
 
     if uid and get_by_uid_fn:
-        entity = get_by_uid_fn(uid)
+        entity = get_by_uid_fn(uid=uid)
     elif name:
-        entity = get_by_name_fn(name)
+        entity = get_by_name_fn(name=name)
 
     exists = entity is not None
     found_uid = entity.uid if entity else None

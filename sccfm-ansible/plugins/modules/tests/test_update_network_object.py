@@ -118,6 +118,7 @@ def test_should_update_when_value_differs(
     assert call_kwargs["changed"] is True
     assert call_kwargs["network_object"]["literal"] == "192.168.1.0/24"
     assert "Successfully updated" in call_kwargs["msg"]
+    mock_service.get_network_object_by_name.assert_called_once_with(name="test-network-object")
 
 
 @patch("plugins.modules.update_network_object.Config")
