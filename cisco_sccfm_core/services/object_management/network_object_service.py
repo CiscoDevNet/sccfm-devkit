@@ -14,7 +14,10 @@ from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValu
 from scc_firewall_manager_sdk.models.update_request import UpdateRequest
 
 from cisco_sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
-from cisco_sccfm_core.services.object_management.utils import build_filtered_query, resolve_uid
+from cisco_sccfm_core.services.object_management.utils import (
+    build_filtered_query,
+    resolve_uid,
+)
 from cisco_sccfm_core.types import ConfigLike
 
 

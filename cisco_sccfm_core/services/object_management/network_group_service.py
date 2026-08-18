@@ -23,8 +23,16 @@ from scc_firewall_manager_sdk.models.url_object_content import UrlObjectContent
 from cisco_sccfm_core.errors import NotFoundError
 from cisco_sccfm_core.services.object_management.network_object_service import NetworkObjectService
 from cisco_sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
-from cisco_sccfm_core.services.object_management.utils import build_filtered_query, resolve_uid
+from cisco_sccfm_core.services.object_management.utils import (
+    build_filtered_query,
+    resolve_uid,
+)
 from cisco_sccfm_core.types import ConfigLike
+
+
+def _string_or_empty(value: Any) -> str:
+    """Normalize missing API values to the response model's empty-string sentinel."""
+    return str(value or "")
 
 
 @dataclass
@@ -59,13 +67,13 @@ class NetworkGroupResponse:
         ]
 
         return cls(
-            uid=str(data.get("uid") or ""),
-            name=str(data.get("name") or ""),
+            uid=_string_or_empty(data.get("uid")),
+            name=_string_or_empty(data.get("name")),
             description=data.get("description"),
             elements=list(data.get("elements") or []),
             labels=list(data.get("labels") or []),
             tags=dict(data.get("tags") or {}),
-            object_type=str(value.get("objectType") or ""),
+            object_type=_string_or_empty(value.get("objectType")),
             literals=literals,
             referenced_object_uids=list(raw_refs),
         )
@@ -135,7 +143,7 @@ class NetworkGroupService:
         self._object_api = self._helper.api
         self._network_object_service = NetworkObjectService(config)
 
-    def get_network_group(self, uid: str) -> NetworkGroupResponse | None:
+    def get_network_group(self, *, uid: str) -> NetworkGroupResponse | None:
         """Fetch a network group by UID.
 
         Returns ``None`` when the UID does not exist **or** when it
@@ -185,7 +193,7 @@ class NetworkGroupService:
             raise NotFoundError(f"Network group with UID '{uid}' not found.")
         return self._helper.read_raw_response(response)
 
-    def get_network_group_by_name(self, name: str) -> NetworkGroupResponse | None:
+    def get_network_group_by_name(self, *, name: str) -> NetworkGroupResponse | None:
         """Search for a network group object by name.
 
         Uses an objectType filter so that plain network objects with the
@@ -260,8 +268,8 @@ class NetworkGroupService:
         return resolve_uid(
             uid=uid,
             name=name,
-            get_by_name_fn=self.get_network_group_by_name,
-            get_by_uid_fn=self.get_network_group,
+            get_by_name_fn=lambda group_name: self.get_network_group_by_name(name=group_name),
+            get_by_uid_fn=lambda group_uid: self.get_network_group(uid=group_uid),
             entity_name="Network group",
         )
 

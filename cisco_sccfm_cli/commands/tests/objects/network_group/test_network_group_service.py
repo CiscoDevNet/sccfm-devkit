@@ -365,7 +365,7 @@ class TestNetworkGroupTypeValidation:
             },
         }
 
-        result = service.get_network_group("obj-123")
+        result = service.get_network_group(uid="obj-123")
 
         assert result is None
 

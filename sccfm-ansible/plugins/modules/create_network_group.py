@@ -188,7 +188,7 @@ def run_module() -> None:
 
     try:
         service = NetworkGroupService(config=config)
-        existing = service.get_network_group_by_name(params["name"])
+        existing = service.get_network_group_by_name(name=params["name"])
         if existing:
             module.exit_json(
                 changed=False,
