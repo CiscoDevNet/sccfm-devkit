@@ -24,9 +24,9 @@ class _HasUid(Protocol):
 
 
 class _NetworkObjectLookup(Protocol):
-    def get_network_object(self, uid: str) -> _HasUid | None: ...
+    def get_network_object(self, *, uid: str) -> _HasUid | None: ...
 
-    def get_network_object_by_name(self, name: str) -> _HasUid | None: ...
+    def get_network_object_by_name(self, *, name: str) -> _HasUid | None: ...
 
 
 CheckOperation = Literal["create", "update", "delete"]
@@ -205,9 +205,9 @@ def check_referenced_objects_exist(
     for ref in referenced_objects:
         try:
             uid = str(uuid_mod.UUID(ref))
-            entity = obj_service.get_network_object(uid)
+            entity = obj_service.get_network_object(uid=uid)
         except ValueError:
-            entity = obj_service.get_network_object_by_name(ref)
+            entity = obj_service.get_network_object_by_name(name=ref)
 
         exists = entity is not None
         found_uid = entity.uid if entity else None

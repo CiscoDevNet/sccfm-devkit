@@ -298,7 +298,7 @@ class AccessRuleService:
 
     def _resolve_network_object(self, name: str) -> tuple[str, str]:
         """Resolve a network object name to (uid, name) tuple."""
-        obj = self._network_object_service.get_network_object_by_name(name)
+        obj = self._network_object_service.get_network_object_by_name(name=name)
         if not obj:
             raise NotFoundError(f"Network object with name '{name}' not found.")
         return obj.uid, obj.name

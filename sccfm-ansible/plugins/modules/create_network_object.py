@@ -168,7 +168,7 @@ def run_module() -> None:
     try:
         service = NetworkObjectService(config=config)
 
-        existing = service.get_network_object_by_name(name)
+        existing = service.get_network_object_by_name(name=name)
 
         if existing:
             module.exit_json(

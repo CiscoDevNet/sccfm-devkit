@@ -592,12 +592,12 @@ class NetworkGroupService:
         resolved: list[str] = []
         for ref in referenced_objects:
             if self._is_uuid(ref):
-                obj = self._network_object_service.get_network_object(ref)
+                obj = self._network_object_service.get_network_object(uid=ref)
                 if not obj:
                     raise NotFoundError(f"Network object with UID '{ref}' not found.")
                 resolved.append(obj.uid)
             else:
-                obj = self._network_object_service.get_network_object_by_name(ref)
+                obj = self._network_object_service.get_network_object_by_name(name=ref)
                 if not obj:
                     raise NotFoundError(f"Network object with name '{ref}' not found.")
                 resolved.append(obj.uid)

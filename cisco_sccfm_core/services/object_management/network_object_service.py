@@ -18,6 +18,11 @@ from cisco_sccfm_core.services.object_management.utils import build_filtered_que
 from cisco_sccfm_core.types import ConfigLike
 
 
+def _string_or_empty(value: Any) -> str:
+    """Normalize missing API values to the response model's empty-string sentinel."""
+    return str(value or "")
+
+
 @dataclass
 class NetworkObjectResponse:
     """Simplified response for network object operations.
@@ -40,14 +45,14 @@ class NetworkObjectResponse:
         value: dict[str, Any] = data.get("value") or {}
         default_content: dict[str, Any] = value.get("defaultContent") or {}
         return cls(
-            uid=str(data.get("uid") or ""),
-            name=str(data.get("name") or ""),
+            uid=_string_or_empty(data.get("uid")),
+            name=_string_or_empty(data.get("name")),
             description=data.get("description"),
             elements=list(data.get("elements") or []),
             labels=list(data.get("labels") or []),
             tags=dict(data.get("tags") or {}),
-            object_type=str(value.get("objectType") or ""),
-            literal=str(default_content.get("literal") or ""),
+            object_type=_string_or_empty(value.get("objectType")),
+            literal=_string_or_empty(default_content.get("literal")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -140,7 +145,7 @@ class NetworkObjectService:
         data = self._helper.read_raw_response(response)
         return NetworkObjectResponse.from_dict(data)
 
-    def get_network_object(self, uid: str) -> NetworkObjectResponse | None:
+    def get_network_object(self, *, uid: str) -> NetworkObjectResponse | None:
         """Fetch a network object by UID.
 
         Returns ``None`` when the UID does not exist **or** when it
@@ -164,7 +169,7 @@ class NetworkObjectService:
             return None
         return parsed
 
-    def get_network_object_by_name(self, name: str) -> NetworkObjectResponse | None:
+    def get_network_object_by_name(self, *, name: str) -> NetworkObjectResponse | None:
         """Search for a network object by name.
 
         Uses an objectType filter so that network groups with the same
@@ -286,8 +291,8 @@ class NetworkObjectService:
         return resolve_uid(
             uid=uid,
             name=name,
-            get_by_name_fn=self.get_network_object_by_name,
-            get_by_uid_fn=self.get_network_object,
+            get_by_name_fn=lambda object_name: self.get_network_object_by_name(name=object_name),
+            get_by_uid_fn=lambda object_uid: self.get_network_object(uid=object_uid),
             entity_name="Network object",
         )
 

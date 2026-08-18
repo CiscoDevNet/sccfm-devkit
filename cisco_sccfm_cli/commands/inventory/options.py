@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import click
 
 from cisco_sccfm_cli.commands.shared_options import (
@@ -44,7 +42,7 @@ def query_option(help_text: str | None = None) -> click.Option:
     )
 
 
-def inventory_list_params() -> List[click.Parameter]:
+def inventory_list_params() -> list[click.Parameter]:
     """Complete set of options for inventory list commands."""
     return [
         limit_option(),

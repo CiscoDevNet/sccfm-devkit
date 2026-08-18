@@ -300,7 +300,9 @@ class TestReferencedObjectNameResolution:
         result = service._resolve_referenced_object_uids([self.VALID_UUID])
 
         assert result == [self.VALID_UUID]
-        service._network_object_service.get_network_object.assert_called_once_with(self.VALID_UUID)
+        service._network_object_service.get_network_object.assert_called_once_with(
+            uid=self.VALID_UUID
+        )
         service._network_object_service.get_network_object_by_name.assert_not_called()
 
     def test_resolve_looks_up_names(self) -> None:
@@ -315,7 +317,7 @@ class TestReferencedObjectNameResolution:
 
         assert result == ["resolved-uid-abc"]
         service._network_object_service.get_network_object_by_name.assert_called_once_with(
-            "my-object"
+            name="my-object"
         )
 
     def test_resolve_mixed_uids_and_names(self) -> None:
