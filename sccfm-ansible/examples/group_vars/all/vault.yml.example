@@ -12,6 +12,7 @@
 
 # ASA device passwords - each device can have its own password
 # Use descriptive names that match your device naming in the playbook
+vault_vasa_password: "ReplaceWithYourVasaPassword"
 vault_asa_branch_office_01_password: "BranchOffice01-SecurePass!"
 vault_asa_datacenter_01_password: "Datacenter01-SecurePass!"
 vault_asa_dmz_01_password: "DMZ01-SecurePass!"
