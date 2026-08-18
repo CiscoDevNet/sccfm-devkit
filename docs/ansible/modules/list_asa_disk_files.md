@@ -90,7 +90,10 @@ EXAMPLES:
 
     - name: Show only AnyConnect packages
       ansible.builtin.debug:
-        msg: "{{ disk_files.results | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE') | list }}"
+        msg: >-
+          {{ disk_files.results
+          | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE')
+          | list }}
 
 RETURN VALUES:
 

@@ -37,8 +37,8 @@ OPTIONS (= indicates it is required):
 
 NOTES:
       * Either `uid' or `name' must be provided, but not both.
-      * When using `name', the module will search for the object
-        and resolve it to a UID before deletion.
+      * When using `name', the module searches for the object
+        and resolves it to a UID before deletion.
 
 AUTHOR: Cisco SCCFM Team
 

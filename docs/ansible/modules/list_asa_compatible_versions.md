@@ -20,8 +20,8 @@ $ ansible-doc -t module cisco.sccfm.list_asa_compatible_versions
   /v1/inventory/devices/asas/{deviceUid}/upgrades/versions' API
   endpoint for each device, then returns the common set of versions
   that every device in the group can upgrade to.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/.
   for API documentation.
 
 OPTIONS (= indicates it is required):

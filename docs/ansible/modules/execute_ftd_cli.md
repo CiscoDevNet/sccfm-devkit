@@ -19,9 +19,9 @@ $ ansible-doc -t module cisco.sccfm.execute_ftd_cli
   Only show commands are supported (e.g. show version, show failover,
   show route).
   The command runs via the cdFMC bulk command proxy endpoint.
-  See
+  See the SCC Firewall Manager API documentation for
   https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/create-bulk-command/
-  for endpoint documentation.
+  endpoint details.
 
 OPTIONS (= indicates it is required):
 

@@ -21,8 +21,8 @@ $ ansible-doc -t module cisco.sccfm.show_asa_shun
   instead and returns per-interface shun/received counters.
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/.
   for API documentation.
 
 OPTIONS (= indicates it is required):

@@ -101,7 +101,9 @@ EXAMPLES:
 
 - name: Show non-compliant devices
   ansible.builtin.debug:
-    msg: "{{ item.name }} is on {{ item.software_version }}, recommended: {{ item.recommended_version }}"
+    msg: >-
+      {{ item.name }} is on {{ item.software_version }},
+      recommended: {{ item.recommended_version }}
   loop: "{{ result.devices }}"
 
 # Example 3: Filter by name pattern

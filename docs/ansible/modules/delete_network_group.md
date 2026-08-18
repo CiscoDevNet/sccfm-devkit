@@ -39,8 +39,8 @@ OPTIONS (= indicates it is required):
 
 NOTES:
       * Either `uid' or `name' must be provided, but not both.
-      * When using `name', the module will search for the group
-        and resolve it to a UID before deletion.
+      * When using `name', the module searches for the group and
+        resolves it to a UID before deletion.
       * Network groups are filtered by objectType to avoid
         accidentally matching network objects with the same
         name.

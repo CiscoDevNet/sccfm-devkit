@@ -21,8 +21,8 @@ $ ansible-doc -t module cisco.sccfm.remove_asa_shun
   `source_ip' and `source_ips' are mutually exclusive.
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/.
   for API documentation.
 
 OPTIONS (= indicates it is required):

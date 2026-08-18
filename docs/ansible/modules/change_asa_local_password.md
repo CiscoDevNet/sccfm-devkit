@@ -21,8 +21,8 @@ $ ansible-doc -t module cisco.sccfm.change_asa_local_password
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
   The query uses the same syntax as the Get Devices API.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/.
   for query documentation.
 
 OPTIONS (= indicates it is required):
