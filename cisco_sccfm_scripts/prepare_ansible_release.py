@@ -28,7 +28,7 @@ _INITIAL_SEED = re.compile(
     r"^# sccfm-release-retarget-seed: "
     r"(?P<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))$"
 )
-_IMMUTABLE_INITIAL_SEED_VERSION = "0.38.0"
+_IMMUTABLE_INITIAL_SEED_VERSION = "0.39.0"
 _MAINTAINER_GUIDANCE = "prepare the Ansible changelog in source before releasing"
 
 

@@ -40,7 +40,7 @@ does not use GitHub environments or per-environment approvals.
 
 2. Confirm the public documentation and changelogs describe the intended release.
 3. Prepare the Ansible changelog for the version Commitizen will infer. For the first public
-   release only, CI may retarget the checked-in `0.38.0` seed to that inferred version. Do not move
+   release only, CI may retarget the checked-in `0.39.0` seed to that inferred version. Do not move
    or replace the seed marker afterward. Before every later release, commit the inferred version
    as the newest entry in `sccfm-ansible/changelogs/changelog.yaml` and the matching
    `v<version>` section in `sccfm-ansible/CHANGELOG.rst`, preserving all published history. The
@@ -85,7 +85,7 @@ The successful deployment run is the authoritative publication record. Confirm t
 For an independent clean-install check:
 
 ```bash
-RELEASE_VERSION=0.39.0
+RELEASE_VERSION=0.39.1
 RELEASE_CHECK_ROOT="$(mktemp -d)"
 python3.12 -m venv "${RELEASE_CHECK_ROOT}/venv"
 "${RELEASE_CHECK_ROOT}/venv/bin/python" -m pip install \

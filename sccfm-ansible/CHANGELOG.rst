@@ -4,7 +4,7 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
-v0.39.0
+v0.39.1
 =======
 
 Release Summary

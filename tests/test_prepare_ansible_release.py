@@ -18,7 +18,7 @@ from cisco_sccfm_scripts.prepare_ansible_release import (
     prepare_ansible_release,
 )
 
-_INITIAL_VERSION = "0.38.0"
+_INITIAL_VERSION = "0.39.0"
 _RELEASE_VERSION = "1.0.0"
 _RELEASE_DATE = "2026-08-12"
 _SUMMARY = (
@@ -30,7 +30,7 @@ _SUMMARY = (
 def _yaml_release(
     version: str = _INITIAL_VERSION,
     release_date: str = "2026-07-27",
-    fragment: str = "0.38.0.yml",
+    fragment: str = "0.39.0.yml",
 ) -> str:
     return f"""---
 ancestor: null
@@ -102,7 +102,7 @@ def test_retargets_only_the_initial_release_metadata(tmp_path: Path) -> None:
     assert release["changes"] == {"release_summary": _SUMMARY}
     rst = (root / "CHANGELOG.rst").read_text(encoding="utf-8")
     assert "v1.0.0\n======" in rst
-    assert "v0.38.0" not in rst
+    assert "v0.39.0" not in rst
     assert _SUMMARY in rst
 
 
@@ -296,7 +296,7 @@ def test_rejects_noncanonical_or_unstable_versions(tmp_path: Path, version: str)
         prepare_ansible_release(root, _INITIAL_VERSION, version, _RELEASE_DATE)
 
 
-@pytest.mark.parametrize("release_version", ["0.38.0", "0.37.9"])
+@pytest.mark.parametrize("release_version", ["0.39.0", "0.38.9"])
 def test_rejects_non_increasing_release_versions(
     tmp_path: Path,
     release_version: str,
@@ -359,7 +359,7 @@ def test_rejects_multiple_initial_entries_without_writing(tmp_path: Path) -> Non
 
 
 def test_rejects_malformed_rst_release_heading(tmp_path: Path) -> None:
-    malformed = _rst_release().replace("v0.38.0\n=======\n", "v0.38.0\n======\n")
+    malformed = _rst_release().replace("v0.39.0\n=======\n", "v0.39.0\n======\n")
     root = _collection(tmp_path, rst_content=malformed)
 
     with pytest.raises(AnsibleReleaseError, match="invalid RST release heading.*prepare"):
