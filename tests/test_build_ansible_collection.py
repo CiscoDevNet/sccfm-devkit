@@ -11,6 +11,7 @@ import pytest
 from cisco_sccfm_scripts.build_ansible_collection import (
     CollectionBuildError,
     _sync_paired_python_requirement,
+    _sync_runtime_requirement,
 )
 
 
@@ -50,3 +51,25 @@ def test_sync_paired_python_requirement_rejects_ambiguous_contract(
         _sync_paired_python_requirement(requirements, "0.38.0")
 
     assert requirements.read_text(encoding="utf-8") == content
+
+
+def test_sync_runtime_requirement_updates_the_dependency_error_pin(tmp_path: Path) -> None:
+    dependencies = tmp_path / "dependencies.py"
+    dependencies.write_text(
+        '_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit==0.38.0"\n',
+        encoding="utf-8",
+    )
+
+    _sync_runtime_requirement(dependencies, "0.39.0")
+
+    assert dependencies.read_text(encoding="utf-8") == (
+        '_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit==0.39.0"\n'
+    )
+
+
+def test_sync_runtime_requirement_rejects_missing_contract(tmp_path: Path) -> None:
+    dependencies = tmp_path / "dependencies.py"
+    dependencies.write_text("# no paired requirement\n", encoding="utf-8")
+
+    with pytest.raises(CollectionBuildError):
+        _sync_runtime_requirement(dependencies, "0.39.0")

@@ -50,3 +50,6 @@ results/
 # Local scratch / dev command files
 *.local.sh
 *.local.txt
+
+# Consistency checker report artifact
+/consistency-report.txt

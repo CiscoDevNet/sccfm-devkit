@@ -27,6 +27,11 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+from _pytest.monkeypatch import MonkeyPatch
+
+from cisco_sccfm_core.models.profile import Profile
+
 # Set environment variable that Ansible uses for module argument passing
 os.environ.setdefault("ANSIBLE_MODULE_ARGS", "{}")
 
@@ -75,3 +80,19 @@ operations_module = importlib.util.module_from_spec(ops_spec)
 sys.modules["plugins.module_utils.operations"] = operations_module
 sys.modules["operations"] = operations_module
 ops_spec.loader.exec_module(operations_module)
+
+
+@pytest.fixture(autouse=True)
+def configured_sccfm_profile(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Keep module tests isolated from the user's canonical profile file."""
+    # Set before construction so ProfileService.__init__ never touches the real config.
+    monkeypatch.setenv("SCCFM_CONFIG", str(tmp_path / "config.json"))
+    monkeypatch.setattr(
+        config_module.ProfileService,
+        "load",
+        lambda _service, profile: Profile(
+            profile=profile,
+            region="us",
+            api_token="test-token-123",
+        ),
+    )

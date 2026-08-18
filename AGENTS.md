@@ -49,7 +49,7 @@ This repository ships skill files that document how to interact with the CLI and
 source cisco_sccfm_scripts/activate.sh
 
 # Configure credentials once
-sccfm-cli configure --region us  # API token is entered at a hidden prompt
+sccfm-cli configure --region us  # securely prompts for the token
 
 # Check connectivity
 sccfm-cli status
@@ -58,22 +58,18 @@ sccfm-cli status
 sccfm-cli inventory devices list --format table
 
 # Interactive developer menu (test, lint, format, build collection, etc.)
-devkit
+sccfm-cli-interactive
 ```
 
-## Required environment variables
+## Credential configuration
 
-For non-interactive use, pre-set these values in the environment (loaded automatically by direnv):
+The only SCCFM token configuration source is the named profile store:
 
 ```bash
-export SCCFM_REGION=us          # int | us | eu | apj | au | uae | in | ci
-export SCCFM_API_TOKEN="..."    # from SCCFM UI > Settings > API Tokens
+sccfm-cli --profile default configure --region us
 ```
 
-Credentials are also stored under `~/.sccfm-cli/` after running `sccfm-cli configure`. On POSIX,
-the CLI enforces mode `0700` on that directory and `0600` on its configuration file. On Windows,
-keep it in the user profile and rely on filesystem ACLs. Override the path with `--config-path` or
-`SCCFM_CONFIG`, and keep custom paths private.
+Profiles are stored in `~/.sccfm-cli/config.json` with owner-only POSIX permissions or inherited Windows user-profile ACLs. Override the path with `--config-path` or `SCCFM_CONFIG`. Do not configure SCCFM tokens through `.env`, inline Ansible parameters, or Ansible Vault. Vault remains appropriate for Ansible-specific device secrets.
 
 ## Testing instructions
 
@@ -107,8 +103,8 @@ build-ansible-collection
 # Install the built artifact locally
 ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
 
-# Set up tokens and vault (generated credential files are ignored and excluded from builds)
-devkit   # select "change-tokens"
+# Configure or select profiles interactively
+sccfm-cli-interactive
 
 # Verify inventory plugin
 ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph
@@ -128,7 +124,7 @@ Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_
   git cz    # or: ./cisco_sccfm_scripts/cz.sh commit
   ```
   CI will fail on non-compliant commit messages.
-- **Security**: Never commit real credentials, tokens, or secrets. Use placeholders and document required env vars. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+- **Security**: Never commit real credentials, tokens, or secrets. Use placeholders and document the canonical profile flow. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 - New commands go in `cisco_sccfm_cli/commands/` as a `BaseCommand` subclass, registered in `cisco_sccfm_cli/cli.py`.
 - New SDK integrations go in `cisco_sccfm_core/services/`.
 - Every behavior change must be accompanied by tests.
@@ -144,5 +140,5 @@ Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_
   #
   # SPDX-License-Identifier: Apache-2.0
   ```
-- **Secrets**: never read or commit `.env`, `.env.*`, `.vault_pass`, or real `vault.yml` files — use the `*.example` templates. Keep tracked `.envrc` files secret-free. `gitleaks` and `detect-private-key` block secrets in pre-commit.
+- **Secrets**: never read or commit `.vault_pass`, real `vault.yml` files, or SCCFM profile files. Use the `*.example` vault templates for Ansible-specific secrets. Keep tracked `.envrc` files secret-free. `gitleaks` and `detect-private-key` block secrets in pre-commit.
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide.

@@ -180,18 +180,17 @@ Primary locations:
   and the global `--profile` behavior.
 - [ ] Ansible modules use `base_argument_spec()` and `create_config(module)`
   before adding custom auth handling.
-- [ ] Inventory plugin auth/env fallback stays aligned with module behavior.
-- [ ] Region vocabulary stays aligned across CLI, Ansible, `.env.example`,
+- [ ] Inventory plugin profile resolution stays aligned with module behavior.
+- [ ] Region vocabulary stays aligned across the profile service, CLI, Ansible,
   README, install docs, and examples.
-- [ ] Token/env variable names stay aligned:
-  `SCCFM_API_TOKEN`, `SCCFM_REGION`, `SCCFM_CONFIG`.
+- [ ] `SCCFM_CONFIG` remains the only environment-based configuration override.
 
 Primary locations:
 - `cisco_sccfm_cli/services/config_service.py`
 - `cisco_sccfm_cli/commands/configure.py`
 - `sccfm-ansible/plugins/module_utils/config.py`
 - `sccfm-ansible/plugins/inventory/sccfm.py`
-- `.env.example`
+- `cisco_sccfm_core/services/profile_service.py`
 - `README.md`
 - `INSTALL.md`
 
@@ -430,15 +429,15 @@ Main test locations:
 - Ansible unit: `sccfm-ansible/plugins/modules/tests/**`
 - Ansible e2e: `sccfm-ansible/e2e/**`
 
-## 22. Devkit and discoverability
+## 22. Interactive CLI and discoverability
 
 - [ ] New CLI commands remain discoverable through Click introspection, which
-  powers the devkit interactive runner.
-- [ ] New example playbooks remain runnable through the devkit example runner.
+  powers the `sccfm-cli-interactive` runner.
+- [ ] New example playbooks remain runnable through the interactive example runner.
 - [ ] Setup/lint/test/build workflows stay aligned between scripts and docs.
 
 Primary locations:
-- `cisco_sccfm_scripts/devkit_cli.py`
+- `cisco_sccfm_scripts/interactive_cli.py`
 - `cisco_sccfm_scripts/cli_commands.py`
 - `cisco_sccfm_scripts/setup_environment.sh`
 - `README.md`
@@ -545,7 +544,7 @@ against them so fixed consistency issues do not reappear.
   policy management, object override flows, or manager/access-policy flows.
 - [ ] CLI group commands and helper-only modules have less direct coverage than
   leaf commands. Any changes to group wiring should trigger an explicit review
-  of command registration and devkit introspection.
+  of command registration and interactive CLI introspection.
 
 ## 26. Default AI review prompt fragment
 

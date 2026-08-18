@@ -82,7 +82,7 @@ the expected behavior, the offending site(s), and a one-line fix.
 - **Offending sites:**
   - [cisco_sccfm_scripts/build_ansible_collection.py](cisco_sccfm_scripts/build_ansible_collection.py)
   - [cisco_sccfm_scripts/validate_regex.py](cisco_sccfm_scripts/validate_regex.py)
-  - [cisco_sccfm_scripts/_test_setup_tokens.py](cisco_sccfm_scripts/_test_setup_tokens.py)
+  - [cisco_sccfm_scripts/test_import_legacy_vault.py](cisco_sccfm_scripts/test_import_legacy_vault.py)
   - [cisco_sccfm_core/__init__.py](cisco_sccfm_core/__init__.py)
 - **Severity:** **Low**
 - **Fix:** Add the import line directly after each shebang / at the top.

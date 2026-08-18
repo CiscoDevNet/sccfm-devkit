@@ -24,12 +24,17 @@ $ ansible-doc -t module cisco.sccfm.remove_network_group_members
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - name    Name of the network group to update.
         default: null
+        type: str
+
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = referenced_objects  List of existing network object names or UIDs
@@ -38,15 +43,11 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
-        type: str
-
 - uid     Unique identifier (UID) of the network group to update.
         default: null
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Remove members by name
@@ -56,8 +57,7 @@ EXAMPLES:
     referenced_objects:
       - web-server-01
       - web-server-02
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Remove members by UID
 - name: Remove members from a network group by UID
@@ -73,8 +73,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Remove old web servers from group
       cisco.sccfm.remove_network_group_members:

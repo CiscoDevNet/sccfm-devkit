@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Sequence
-
 from rich.console import Console
 from rich.table import Table
 

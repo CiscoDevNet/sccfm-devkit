@@ -21,9 +21,10 @@ $ ansible-doc -t module cisco.sccfm.onboard_cdfmc_ftd
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 = fmc_access_policy_uid  UUID of the FMC access policy to apply to
                           this device.
@@ -48,8 +49,8 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - ungrouped_labels  List of free-form labels to assign to the device.
@@ -62,24 +63,23 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Onboard a physical cdFMC-managed FTD
 - name: Onboard FTD device
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My FTD"
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Onboard a virtual FTD with multiple licenses
 - name: Onboard virtual FTD
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My vFTD"
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
       - CARRIER
@@ -90,7 +90,7 @@ EXAMPLES:
 - name: Onboard FTD with labels
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "Branch FTD"
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
     ungrouped_labels:
@@ -105,13 +105,12 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:
         name: "Branch FTD"
-        fmc_access_policy_uid: "your-access-policy-uid"
+        fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
         licenses:
           - BASE
 

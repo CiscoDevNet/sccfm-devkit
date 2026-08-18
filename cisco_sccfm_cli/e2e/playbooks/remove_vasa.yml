@@ -11,14 +11,10 @@
   hosts: localhost
   gather_facts: false
 
-  # sccfm_region / vault_sccfm_api_token are supplied by run_e2e.sh via
-  # -e "@${VARS_FILE}" -e "@${VAULT_FILE}".  Do NOT add vars_files here:
-  # those are loaded/decrypted at parse time before the -e overrides
-  # apply, which would force the default example files to exist and share
-  # the same vault password even when the runner points elsewhere.
-
   vars:
     sccfm_api_base: "https://ci.manage.security.cisco.com/api/rest"
+    profile_region: "{{ lookup('cisco.sccfm.profile', 'default', field='region') }}"
+    profile_token: "{{ lookup('cisco.sccfm.profile', 'default', field='api_token') }}"
     asa_test_query_all: "name:ci-e2e-cli-asa-*"
 
   tasks:
@@ -30,30 +26,32 @@
     - name: Assert this is the CI region
       ansible.builtin.assert:
         that:
-          - (sccfm_region | default('')) == 'ci'
+          - profile_region == 'ci'
         fail_msg: >-
           remove_vasa.yml only supports the 'ci' region (sccfm_api_base is
-          hard-coded to the CI host); got sccfm_region='{{ sccfm_region | default('(unset)') }}'.
+          hard-coded to the CI host); got profile region '{{ profile_region }}'.
 
     - name: Find CI CLI vASA devices
       ansible.builtin.uri:
         url: "{{ sccfm_api_base }}/v1/inventory/devices?limit=50&offset=0&q={{ asa_test_query_all | urlencode }}"
         method: GET
         headers:
-          Authorization: "Bearer {{ vault_sccfm_api_token }}"
+          Authorization: "Bearer {{ profile_token }}"
           Content-Type: "application/json"
         status_code: [200]
       register: device_list
+      no_log: true
 
     - name: Delete each CI CLI vASA device
       ansible.builtin.uri:
         url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ item.uid }}"
         method: DELETE
         headers:
-          Authorization: "Bearer {{ vault_sccfm_api_token }}"
+          Authorization: "Bearer {{ profile_token }}"
           Content-Type: "application/json"
         status_code: [200, 202, 204, 404]
       loop: "{{ device_list.json['items'] | default([]) }}"
       loop_control:
         label: "{{ item.name }} ({{ item.uid }})"
       when: device_list.json['items'] | default([]) | length > 0
+      no_log: true

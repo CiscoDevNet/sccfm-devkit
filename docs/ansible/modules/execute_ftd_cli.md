@@ -19,15 +19,11 @@ $ ansible-doc -t module cisco.sccfm.execute_ftd_cli
   Only show commands are supported (e.g. show version, show failover,
   show route).
   The command runs via the cdFMC bulk command proxy endpoint.
-  See
+  See the SCC Firewall Manager API documentation for
   https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/create-bulk-command/
-  for endpoint documentation.
+  endpoint details.
 
 OPTIONS (= indicates it is required):
-
-- api_token  API token for SCCFM.
-        default: null
-        type: str
 
 - command  The show command to execute on the FTD devices.
             Only show commands are supported (e.g. show version, show
@@ -44,6 +40,11 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
+        default: null
+        type: path
+
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
         default: 50
@@ -54,14 +55,14 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter cdFMC-managed FTD devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with
            `deviceType:CDFMC_MANAGED_FTD'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -71,7 +72,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Execute a show command on devices matching a query
@@ -79,8 +80,7 @@ EXAMPLES:
   cisco.sccfm.execute_ftd_cli:
     query: "name:prod-* AND connectivityState:ONLINE"
     command: "show failover"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: cli_results
 
 # Example 2: Execute a command on specific devices by UID
@@ -98,8 +98,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Show route on branch FTDs
       cisco.sccfm.execute_ftd_cli:

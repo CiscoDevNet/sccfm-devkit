@@ -1,10 +1,35 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import (
+        ApiException,
+        CdoTransaction,
+        ConfigState,
+        ConnectivityState,
+        Device,
+        DevicePage,
+    )
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
+    from cisco_sccfm_core.services.inventory import AsaBootImageService
+    from cisco_sccfm_core.utils import validate_asa_image_path
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -54,18 +79,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -74,8 +98,7 @@ EXAMPLES = r"""
   cisco.sccfm.change_asa_boot_image:
     query: "name:branch-*"
     image_path: "disk0:/asa9-18-4-smp-k8.bin"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Change boot image on specific devices
 - name: Change boot image on specific ASA devices
@@ -100,8 +123,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Set boot image on branch ASAs
       cisco.sccfm.change_asa_boot_image:
@@ -140,31 +162,6 @@ results:
       type: list
       elements: str
 """
-
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import (
-        ApiException,
-        CdoTransaction,
-        ConfigState,
-        ConnectivityState,
-        Device,
-        DevicePage,
-    )
-
-    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.models.asa_boot_image_change_result import AsaBootImageChangeResult
-    from cisco_sccfm_core.services.inventory import AsaBootImageService
-    from cisco_sccfm_core.utils import validate_asa_image_path
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
@@ -297,7 +294,10 @@ def run_module() -> None:
 
             if isinstance(service_results, CdoTransaction):
                 module.fail_json(
-                    msg=f"Boot image change failed with status: {service_results.cdo_transaction_status}",
+                    msg=(
+                        "Boot image change failed with status: "
+                        f"{service_results.cdo_transaction_status}"
+                    ),
                     transaction_uid=service_results.transaction_uid,
                     error_message=service_results.error_message,
                     transaction_details=service_results.transaction_details,

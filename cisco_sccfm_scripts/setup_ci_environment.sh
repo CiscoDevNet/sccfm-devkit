@@ -110,7 +110,7 @@ create_venv() {
   fi
   ln -sfn "../.poetry/bin/poetry" "${VENV_DIR}/bin/poetry"
 
-  POETRY_VIRTUALENVS_IN_PROJECT=1 "${poetry_venv}/bin/poetry" install --with dev,build
+  POETRY_VIRTUALENVS_IN_PROJECT=1 "${poetry_venv}/bin/poetry" install --with dev
 
   if [[ ! -x "${VENV_DIR}/bin/cz" ]]; then
     echo "Commitizen did not install correctly." >&2

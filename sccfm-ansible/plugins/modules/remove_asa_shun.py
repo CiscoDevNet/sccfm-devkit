@@ -1,10 +1,30 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaShunService,
+        InventoryService,
+        SccApiError,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -18,7 +38,8 @@ description:
   - Executes C(no shun <source_ip>) on the target devices for each IP.
   - C(source_ip) and C(source_ips) are mutually exclusive.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/).
     for API documentation.
 options:
   query:
@@ -63,18 +84,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -83,8 +103,7 @@ EXAMPLES = r"""
   cisco.sccfm.remove_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Remove multiple shuns in a single transaction
 - name: Remove multiple attacker IPs in one call
@@ -94,8 +113,7 @@ EXAMPLES = r"""
       - "203.0.113.40"
       - "203.0.113.50"
       - "203.0.113.60"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 3: Remove a shun on specific devices by UID
 - name: Remove shun on specific ASA
@@ -110,8 +128,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Remove shun for attacker
       cisco.sccfm.remove_asa_shun:
@@ -139,26 +156,6 @@ results:
       description: The script that was executed.
       type: str
 """
-
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
-
-    from cisco_sccfm_core import (
-        ASA_DEVICE_TYPE_FILTER,
-        AsaShunService,
-        InventoryService,
-        SccApiError,
-    )
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

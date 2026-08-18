@@ -1,10 +1,28 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core import SccApiError
+    from cisco_sccfm_core.services.inventory.cdfmc_access_policy_service import (
+        CdfmcAccessPolicyService,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -30,18 +48,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -49,8 +66,7 @@ EXAMPLES = r"""
 - name: List cdFMC access policies
   cisco.sccfm.list_cdfmc_access_policies:
     domain_uid: "e276abec-e0f2-11e3-8169-6d9ed49b625f"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: result
 
 - name: Show access policies
@@ -63,8 +79,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: List access policies for a domain
       cisco.sccfm.list_cdfmc_access_policies:
@@ -99,24 +114,6 @@ offset:
   returned: success
   type: int
 """
-
-
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException
-
-    from cisco_sccfm_core import SccApiError
-    from cisco_sccfm_core.services.inventory.cdfmc_access_policy_service import (
-        CdfmcAccessPolicyService,
-    )
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

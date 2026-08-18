@@ -25,7 +25,10 @@ class ShowObjectCommand(BaseCommand):
 
     @property
     def help_text(self) -> str:
-        return "Show the full details of an object, including its default value, overrides, and targets."
+        return (
+            "Show the full details of an object, including its default value, "
+            "overrides, and targets."
+        )
 
     def build_params(self) -> Sequence[click.Parameter]:
         return [

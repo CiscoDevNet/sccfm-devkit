@@ -1,6 +1,6 @@
 namespace: cisco
 name: sccfm
-version: 0.38.0
+version: 0.39.0
 readme: README.md
 authors:
 - Cisco Security Cloud Control Firewall Manager Team
@@ -28,6 +28,7 @@ build_ignore:
 - ansible_collections
 - plugins/modules/tests
 - plugins/modules/tests/**
+- tests/test_profile_lookup.py
 - changelogs/.plugin-cache.yaml
 - .DS_Store
 - '**/.DS_Store'

@@ -17,6 +17,5 @@ ansible-galaxy collection install . --force
 echo "✅ Build complete!"
 echo ""
 echo "To use the collection, run:"
-echo "  export SCCFM_REGION=your-region"
-echo "  export SCCFM_API_TOKEN=your-token"
+echo "  sccfm-cli configure --region us  # securely prompts for the token"
 echo "  ansible-playbook -i examples/inventory.sccfm.yml examples/show_devices.yml"

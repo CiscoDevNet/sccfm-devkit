@@ -41,6 +41,9 @@ OPTIONS (= indicates it is required):
 - ftd_password  SSH password for the FTD VM.
                  Can also be supplied via the `SCCFM_FTD_PASSWORD'
                  environment variable.
+        set_via:
+          env:
+          - name: SCCFM_FTD_PASSWORD
         default: null
         type: str
 
@@ -64,6 +67,9 @@ OPTIONS (= indicates it is required):
                   environment variable.
                   Leave unset to use SSH key/agent authentication for
                   the jump host.
+        set_via:
+          env:
+          - name: SCCFM_JUMP_PASSWORD
         default: null
         type: str
 
@@ -71,7 +77,7 @@ OPTIONS (= indicates it is required):
         default: 30
         type: int
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Direct SSH to the FTD
@@ -108,8 +114,7 @@ EXAMPLES:
     fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
     licenses:
       - BASE
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: onboard_result
 
 - name: Complete registration over SSH

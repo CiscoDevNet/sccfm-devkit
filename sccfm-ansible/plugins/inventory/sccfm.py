@@ -1,36 +1,45 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any, Dict, List, Optional, cast
+
+from ansible.errors import AnsibleParserError
+from ansible.plugins.inventory import BaseInventoryPlugin
+from ansible.utils.display import Display
+from scc_firewall_manager_sdk import Device
+
+from cisco_sccfm_core.services.profile_service import ProfileService
+
+from ..module_utils.config import Config
+from ..plugin_utils.inventory_host_builder import InventoryHostBuilder
+from ..plugin_utils.inventory_loader import InventoryLoader
+
 DOCUMENTATION = r"""
-name: sccfm
+name: cisco.sccfm.sccfm
+plugin_type: inventory
 short_description: Load devices in SCC Firewall Manager as inventory hosts.
 description:
   - Uses Cisco Security Cloud Control Firewall Manager (SCCFM) to enumerate
     devices using the REST APIs.
   - Each device becomes an inventory host with SCCFM metadata attached as host variables.
-  - Authentication values are consumed only while refreshing inventory and are never attached
-    to groups or hosts.
 options:
   plugin:
-    description: Token that ensures this is a source file for the C(cisco.sccfm.sccfm) plugin.
+    description: Ensure this plugin gets loaded.
     required: true
     choices: ["cisco.sccfm.sccfm"]
-  region:
-    description: SCCFM region to target (int, us, eu, apj, au, uae, in, or ci).
-    env:
-      - name: SCCFM_REGION
-    required: true
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
+    required: false
     type: str
-  api_token:
-    description: API token for the SCCFM region.
-    env:
-      - name: SCCFM_API_TOKEN
-    required: true
-    type: str
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
+    required: false
+    type: path
   limit:
     description: Page size to use when fetching devices.
     required: false
@@ -54,27 +63,12 @@ options:
 
 EXAMPLES = r"""
 plugin: cisco.sccfm.sccfm
-region: us
-api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+profile: default
 limit: 100
 query: "asa"
 group: sccfm
 group_by_device_type: true
 """
-
-import os
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
-
-from ansible.errors import AnsibleParserError
-from ansible.plugins.inventory import BaseInventoryPlugin
-from ansible.utils.display import Display
-
-from ..module_utils.config import Config
-from ..plugin_utils.inventory_host_builder import InventoryHostBuilder
-from ..plugin_utils.inventory_loader import InventoryLoader
-
-if TYPE_CHECKING:
-    from scc_firewall_manager_sdk import Device
 
 
 class InventoryModule(BaseInventoryPlugin):
@@ -95,23 +89,17 @@ class InventoryModule(BaseInventoryPlugin):
         super().parse(inventory, loader, path, cache=cache)
 
         config_data: Dict[str, Any] = self._read_config_data(path)
-        region = self._template_string(cast(Optional[str], config_data.get("region")))
-        api_token = self._template_string(cast(Optional[str], config_data.get("api_token")))
-
-        if region is None:
-            region = os.getenv("SCCFM_REGION")
-        if api_token is None:
-            api_token = os.getenv("SCCFM_API_TOKEN")
-
-        if not region:
+        profile = (
+            self._template_string(cast(Optional[str], config_data.get("profile"))) or "default"
+        )
+        raw_config_path = self._template_string(cast(Optional[str], config_data.get("config_path")))
+        stored = ProfileService(path=Path(raw_config_path) if raw_config_path else None).load(
+            profile
+        )
+        if stored is None:
             raise AnsibleParserError(
-                "SCCFM region is required. Set 'region' in the inventory file or "
-                "export SCCFM_REGION."
-            )
-        if not api_token:
-            raise AnsibleParserError(
-                "SCCFM api_token is required. Set 'api_token' in the inventory file "
-                "or export SCCFM_API_TOKEN."
+                f"SCCFM profile '{profile}' not found. "
+                f"Run 'sccfm-cli --profile {profile} configure' to set it up."
             )
 
         limit = int(cast(int | None, config_data.get("limit")) or 100)
@@ -120,7 +108,7 @@ class InventoryModule(BaseInventoryPlugin):
         group_by_device_type = bool(config_data.get("group_by_device_type", False))
 
         try:
-            config = Config(region=region, api_token=api_token)
+            config = Config(region=stored.region, api_token=stored.api_token)
         except ValueError as exc:
             raise AnsibleParserError(str(exc)) from exc
 
@@ -133,6 +121,7 @@ class InventoryModule(BaseInventoryPlugin):
         if group:
             self.inventory.add_group(group)
             self.inventory.set_variable(group, "sccfm_region", region)
+            self.inventory.set_variable(group, "sccfm_profile", profile)
 
         host_builder = InventoryHostBuilder(inventory=self.inventory, region=region)
 

@@ -15,4 +15,4 @@ def test_config_repr_should_not_expose_api_token() -> None:
 
     if api_token in representation:
         raise AssertionError("Config repr exposed its API token")
-    assert representation == "Config(profile='default', region='us')"
+    assert representation == "Profile(profile='default', region='us')"

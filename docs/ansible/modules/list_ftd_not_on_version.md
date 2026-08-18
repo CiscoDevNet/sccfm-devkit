@@ -28,9 +28,10 @@ $ ansible-doc -t module cisco.sccfm.list_ftd_not_on_version
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - limit   Maximum number of devices to fetch when using `query' or no
            filter.
@@ -42,6 +43,10 @@ OPTIONS (= indicates it is required):
            Ignored when using `uids'.
         default: 0
         type: int
+
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
 
 - query   Lucene query to narrow the set of FTD devices to check.
            Mutually exclusive with `uids'.
@@ -58,10 +63,6 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
-        type: str
-
 - uids    List of device UIDs to check.
            Mutually exclusive with `query'.
            If omitted, all FTD devices are checked (or those matching
@@ -77,15 +78,14 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: List all FTDs not on a specific version
 - name: Find FTDs not on 7.4.1
   cisco.sccfm.list_ftd_not_on_version:
     version: "7.4.1"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: result
 
 - name: Show devices that need upgrading
@@ -101,7 +101,9 @@ EXAMPLES:
 
 - name: Show non-compliant devices
   ansible.builtin.debug:
-    msg: "{{ item.name }} is on {{ item.software_version }}, recommended: {{ item.recommended_version }}"
+    msg: >-
+      {{ item.name }} is on {{ item.software_version }},
+      recommended: {{ item.recommended_version }}
   loop: "{{ result.devices }}"
 
 # Example 3: Filter by name pattern
@@ -117,8 +119,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Find FTDs not on target version
       cisco.sccfm.list_ftd_not_on_version:

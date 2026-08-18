@@ -28,9 +28,10 @@ OPTIONS (= indicates it is required):
         default: null
         type: bool
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - destination_network  Destination network object name.
         default: null
@@ -54,11 +55,11 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-- protocol  Protocol (e.g. tcp, udp, ip).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+- protocol  Protocol (e.g. tcp, udp, ip).
         default: null
         type: str
 
@@ -79,7 +80,7 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Create a permit rule with explicit credentials
@@ -94,8 +95,7 @@ EXAMPLES:
     protocol: tcp
     destination_port: "443"
     remark: "Allow web to database"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Create a deny rule using module_defaults
 - name: Create access rules
@@ -103,8 +103,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Create a deny rule for a source subnet
       cisco.sccfm.create_access_rule:
@@ -118,7 +117,7 @@ EXAMPLES:
         destination_port: "1433"
         remark: "Block blocked-subnet to SQL"
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Create an inactive permit rule
   cisco.sccfm.create_access_rule:
     access_group_uid: "{{ access_group_uid }}"

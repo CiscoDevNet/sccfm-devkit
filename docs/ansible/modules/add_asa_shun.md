@@ -25,15 +25,16 @@ $ ansible-doc -t module cisco.sccfm.add_asa_shun
   `source_ip' and `entries' are mutually exclusive.
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/.
   for API documentation.
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - dest_ip  Destination IP of a specific connection to drop
             immediately.
@@ -93,6 +94,10 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - protocol  Protocol of the connection to drop (tcp or udp).
              Requires `dest_ip'.
              Only valid when using `source_ip' (not `entries').
@@ -103,10 +108,6 @@ OPTIONS (= indicates it is required):
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -127,7 +128,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Shun a single source IP on devices matching a query
@@ -135,8 +136,7 @@ EXAMPLES:
   cisco.sccfm.add_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Shun with connection tuple to drop an existing connection
 - name: Block attacker and drop active connection
@@ -161,8 +161,7 @@ EXAMPLES:
         dest_port: 443
         protocol: tcp
       - source_ip: "203.0.113.60"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 4: Using module_defaults (recommended)
 - name: Add shun entries
@@ -170,8 +169,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Shun attacker IP
       cisco.sccfm.add_asa_shun:

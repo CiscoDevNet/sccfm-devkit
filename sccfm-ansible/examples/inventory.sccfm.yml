@@ -1,11 +1,7 @@
-# Set SCCFM_REGION and SCCFM_API_TOKEN in the controller environment through
-# your shell, CI secret store, or Automation Controller credential. The lookups
-# below keep plaintext credentials out of this inventory source.
-# Authentication values are used only to refresh inventory. The plugin never
-# exports them as host or group variables.
+# Configure the selected profile first:
+#   sccfm-cli --profile default configure --region us
 plugin: cisco.sccfm.sccfm
-region: "{{ lookup('env', 'SCCFM_REGION') }}"
-api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+profile: default
 group_by_device_type: true
 # limit: 100
 # query: "deviceType:ASA"

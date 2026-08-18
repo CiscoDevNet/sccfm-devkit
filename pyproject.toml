@@ -1,6 +1,6 @@
 [project]
 name = "cisco-sccfm-devkit"
-version = "0.38.0"
+version = "0.39.0"
 description = "Cisco SCC Firewall Manager CLI and Python automation library"
 authors = [{ name = "Cisco Security Cloud Control Firewall Manager Team" }]
 license = "Apache-2.0"
@@ -78,9 +78,6 @@ flake8 = "^7.1.1"
 commitizen = "^3.27.0"
 reuse = "^6.2.0"
 questionary = "^2.1.1"
-
-[tool.poetry.group.build.dependencies]
-pyyaml = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.2.0,<3.0.0"]

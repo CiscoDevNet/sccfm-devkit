@@ -267,6 +267,31 @@ def test_should_normalize_legacy_region_aliases(cli_runner: CliRunner, config_pa
     assert stored.region == "au"
 
 
+def test_should_prompt_for_token_without_echoing_it(
+    cli_runner: CliRunner,
+    config_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ConfigureCommand, "_can_prompt", lambda _command: True)
+    result = cli_runner.invoke(
+        cli,
+        [
+            "configure",
+            "--region",
+            "us",
+            "--config-path",
+            str(config_path),
+        ],
+        input="prompted-secret\n",
+    )
+
+    assert result.exit_code == 0
+    assert "prompted-secret" not in result.output
+    stored = ConfigService(path=config_path).load("default")
+    assert stored is not None
+    assert stored.api_token == "prompted-secret"
+
+
 def _assert_not_exposed(output: str, api_token: str) -> None:
     if api_token in output:
         raise AssertionError("API token was exposed in command output")

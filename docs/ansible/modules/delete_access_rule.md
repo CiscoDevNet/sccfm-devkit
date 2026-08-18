@@ -19,26 +19,26 @@ $ ansible-doc -t module cisco.sccfm.delete_access_rule
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = uid     Unique identifier (UID) of the access rule to delete.
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Delete an access rule by UID
 - name: Delete access rule
   cisco.sccfm.delete_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Delete using module_defaults
 - name: Delete access rules
@@ -46,8 +46,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Delete old rule
       cisco.sccfm.delete_access_rule:

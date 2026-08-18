@@ -14,16 +14,12 @@
   hosts: localhost
   gather_facts: false
 
-  # sccfm_region / vault_sccfm_api_token are supplied by run_e2e.sh via
-  # -e "@${VARS_FILE}" -e "@${VAULT_FILE}".  Do NOT add vars_files here:
-  # those are loaded/decrypted at parse time before the -e overrides
-  # apply, which would force the default example files to exist and share
-  # the same vault password even when the runner points elsewhere.
-
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ vault_sccfm_api_token }}"
+      profile: default
+
+  vars:
+    profile_region: "{{ lookup('cisco.sccfm.profile', 'default', field='region') }}"
 
   tasks:
     # Onboarding here must agree with removal in remove_vasa.yml, whose
@@ -33,10 +29,10 @@
     - name: Assert this is the CI region
       ansible.builtin.assert:
         that:
-          - (sccfm_region | default('')) == 'ci'
+          - profile_region == 'ci'
         fail_msg: >-
           vASA onboarding only supports the 'ci' region (removal is hard-coded
-          to the CI host); got sccfm_region='{{ sccfm_region | default('(unset)') }}'.
+          to the CI host); got profile region '{{ profile_region }}'.
 
     - name: Validate required environment variables
       ansible.builtin.assert:

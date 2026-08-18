@@ -18,16 +18,17 @@ $ ansible-doc -t module cisco.sccfm.delete_network_object
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - name    Name of the network object to delete.
         default: null
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - uid     Unique identifier (UID) of the network object to delete.
@@ -36,25 +37,23 @@ OPTIONS (= indicates it is required):
 
 NOTES:
       * Either `uid' or `name' must be provided, but not both.
-      * When using `name', the module will search for the object
-        and resolve it to a UID before deletion.
+      * When using `name', the module searches for the object
+        and resolves it to a UID before deletion.
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Delete a network object by UID
 - name: Delete network object by UID
   cisco.sccfm.delete_network_object:
     uid: "abc-123-def-456"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Delete a network object by name
 - name: Delete network object by name
   cisco.sccfm.delete_network_object:
     name: "old-web-server"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 3: Delete multiple objects using module_defaults
 - name: Delete network objects
@@ -62,8 +61,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Delete obsolete network objects
       cisco.sccfm.delete_network_object:
@@ -73,7 +71,7 @@ EXAMPLES:
         - old-server-02
         - deprecated-subnet
 
-# Example 4: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 4: Using the default configured profile
 - name: Delete a network object
   cisco.sccfm.delete_network_object:
     name: "temporary-host"

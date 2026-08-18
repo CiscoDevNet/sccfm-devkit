@@ -25,15 +25,16 @@ $ ansible-doc -t module cisco.sccfm.trigger_asa_upgrade
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        default: null
-        type: str
-
 - asdm_version  Target ASDM version (e.g. `7.18(1.152')).
                  At least one of `software_version' or `asdm_version'
                  is required.
         default: null
         type: str
+
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
+        default: null
+        type: path
 
 - force_upgrade  Force upgrade even if a staged upgrade already
                   exists.
@@ -55,13 +56,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to select ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -99,7 +100,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Upgrade software and ASDM on specific devices
@@ -109,8 +110,7 @@ EXAMPLES:
       - "12345678-1234-1234-1234-123456789abc"
     software_version: "9.18(4)"
     asdm_version: "7.18(1.152)"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Stage-only upgrade using a query
 - name: Stage ASA upgrade for branch devices
@@ -142,8 +142,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Stage ASA upgrade for branch devices
       cisco.sccfm.trigger_asa_upgrade:

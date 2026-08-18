@@ -20,9 +20,10 @@ $ ansible-doc -t module cisco.sccfm.list_cdfmc_access_policies
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 = domain_uid  The FMC domain UID to query. Obtain this from the
                `fmc_domain_uid' field returned by the `list_managers'
@@ -37,19 +38,18 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: List access policies for a domain
 - name: List cdFMC access policies
   cisco.sccfm.list_cdfmc_access_policies:
     domain_uid: "e276abec-e0f2-11e3-8169-6d9ed49b625f"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: result
 
 - name: Show access policies
@@ -62,8 +62,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: List access policies for a domain
       cisco.sccfm.list_cdfmc_access_policies:

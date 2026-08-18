@@ -21,7 +21,7 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
 - `playbooks/onboard_vasa.yml` / `playbooks/remove_vasa.yml`: Ansible playbooks that mirror their `sccfm-ansible/e2e/asa/` counterparts but use the `ci-e2e-cli-asa-` name prefix so the CLI suite owns its own device.  The shared-device approach (a single `ci-e2e-asa-*` vASA) leaves the device NOT_SYNCED after the Ansible suite mutates it, which then blocks ASA CLI script pushes from this suite.
 - `conftest.py`: top-level suite ordering (`objects` → `asa` → `access_rules` → `ftd`) plus the session-scoped `e2e_profile` fixture that decodes the Ansible vault and writes a temp `sccfm-cli` profile.
 - `_runner.py`: `run_cli(...)` subprocess wrapper — the analog of Ansible's `run_playbook()`.  Asserts on rc, parses `--format json` stdout, and supports `expect_failure` / `tolerate_any_rc` for idempotency and cleanup paths.
-- `_profile.py`: bootstraps credentials by shelling out to `ansible-vault view` and writing a temp profile via `ConfigService.save()`. Reuses `examples/group_vars/all/vault.yml` from the Ansible suite — one source of truth.
+- `_profile.py`: bootstraps credentials by shelling out to `ansible-vault view` and writing a temp profile via `ConfigService.save()`.  Reuses `examples/group_vars/all/vault.yml` from the Ansible suite — one source of truth.
 - `_phases.py`: `PhaseCase` dataclass + `PhaseTracker` (skip-on-failed-deps, identical semantics to the Ansible suite).
 - `_state.py`: in-process cross-phase data store (replaces the `/tmp/ci_*_uid` files used by the Ansible suite).
 - Per-suite directories (`objects/`, `access_rules/`, `asa/`, `ftd/`):
@@ -35,18 +35,17 @@ Tenant-backed integration tests for the `sccfm-cli` binary.  The suite mirrors `
 - Jenkins gets one test case per lifecycle phase instead of one large pass/fail result.
 - Phases shell out to the installed `sccfm-cli` entrypoint, so the suite exercises argv parsing, exit codes, and stdout/stderr the way real users see them — exactly the contract that unit tests with `CliRunner` skip.
 - Test data per suite lives in one file (`phases/test_data.py`), reducing drift between create / verify / update / delete phases.
-- Credentials reuse the Ansible suite's vault (`cisco_sccfm_scripts/setup_tokens.py`).  One CI bootstrap, two test surfaces.
+- Credentials use the same canonical named profile as the CLI and Ansible collection.
 
 ## Prerequisites
 
 1. Run the credential bootstrap once:
 
    ```
-   poetry run change-tokens
+   sccfm-cli --profile default configure --region ci
    ```
 
-   This creates `sccfm-ansible/examples/.vault_pass` and an encrypted `vault.yml`. Both files are
-   Git-ignored and excluded from collection artifacts.
+   Create `sccfm-ansible/examples/.vault_pass` and encrypted `vault.yml` separately only when the test workflow needs Ansible-specific device secrets.
 
 2. Install dev dependencies so `ansible-vault` is available for the runner to decode the vault:
 

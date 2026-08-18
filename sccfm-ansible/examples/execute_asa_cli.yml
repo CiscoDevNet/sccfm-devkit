@@ -21,11 +21,9 @@
   # Use module_defaults to avoid repeating region and api_token
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ sccfm_api_token_effective }}"
+      profile: default
 
   vars:
-    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
     device_uid: ""
     show_commands:
       - "show version"

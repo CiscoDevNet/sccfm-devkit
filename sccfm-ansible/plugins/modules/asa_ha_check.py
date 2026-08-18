@@ -1,10 +1,31 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaHaCheckReport,
+        AsaHaCheckService,
+        InventoryService,
+        SccApiError,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -48,18 +69,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -67,8 +87,7 @@ EXAMPLES = r"""
 - name: Run HA checks on production ASAs
   cisco.sccfm.asa_ha_check:
     query: "name:prod-ha-* AND connectivityState:ONLINE"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: ha_results
 
 # Example 2: Check HA status on a specific device by UID
@@ -95,8 +114,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Run HA checks
       cisco.sccfm.asa_ha_check:
@@ -157,27 +175,6 @@ results:
           description: Interface nameif.
           type: str
 """
-
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
-
-    from cisco_sccfm_core import (
-        ASA_DEVICE_TYPE_FILTER,
-        AsaHaCheckReport,
-        AsaHaCheckService,
-        InventoryService,
-        SccApiError,
-    )
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

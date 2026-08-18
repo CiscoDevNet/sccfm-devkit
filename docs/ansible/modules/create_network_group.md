@@ -22,9 +22,10 @@ $ ansible-doc -t module cisco.sccfm.create_network_group
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - description  Optional description for the network group.
         default: null
@@ -45,16 +46,16 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - referenced_objects  List of existing network object names or UIDs
                        to include in the group. Names are resolved to
                        UIDs automatically.
         default: null
         elements: str
         type: list
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
-        type: str
 
 - tags    Mapping of tag keys to lists of tag values. For example,
            `{"environment": ["production", "staging"]}'.
@@ -67,7 +68,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Create a group with network literals
@@ -81,8 +82,7 @@ EXAMPLES:
     labels:
       - production
       - web
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Create a group with referenced objects using module_defaults
 - name: Create network groups
@@ -90,8 +90,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Create group from existing objects
       cisco.sccfm.create_network_group:
@@ -104,7 +103,7 @@ EXAMPLES:
           environment:
             - production
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Create a group with URL literals
   cisco.sccfm.create_network_group:
     name: trusted-urls

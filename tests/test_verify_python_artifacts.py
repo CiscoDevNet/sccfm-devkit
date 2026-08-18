@@ -130,10 +130,10 @@ def test_wheel_verifier_accepts_public_wheel_without_sdist(tmp_path: Path) -> No
 @pytest.mark.parametrize(
     ("artifact", "member"),
     [
-        ("wheel", "cisco_sccfm_scripts/devkit_cli.py"),
-        ("sdist", "cisco_sccfm_scripts/devkit_cli.py"),
-        ("wheel", "cisco_sccfm_scripts/bin/devkit"),
-        ("sdist", "cisco_sccfm_scripts/bin/devkit"),
+        ("wheel", "cisco_sccfm_scripts/interactive_cli.py"),
+        ("sdist", "cisco_sccfm_scripts/interactive_cli.py"),
+        ("wheel", "cisco_sccfm_scripts/bin/sccfm-cli-interactive"),
+        ("sdist", "cisco_sccfm_scripts/bin/sccfm-cli-interactive"),
         ("wheel", "devtools/pyproject.toml"),
         ("sdist", "devtools/pyproject.toml"),
         ("wheel", "cisco_sccfm_cli/commands/tests/test_command.py"),
@@ -157,7 +157,9 @@ def test_verifier_rejects_non_public_members(tmp_path: Path, artifact: str, memb
 
 
 def test_verifier_rejects_additional_wheel_entry_point(tmp_path: Path) -> None:
-    entry_points = _ENTRY_POINTS + b"devkit=cisco_sccfm_scripts.devkit_cli:main\n"
+    entry_points = (
+        _ENTRY_POINTS + b"sccfm-cli-interactive=cisco_sccfm_scripts.interactive_cli:main\n"
+    )
     wheel, sdist = _build_artifacts(tmp_path, entry_points=entry_points)
 
     with pytest.raises(PythonArtifactVerificationError, match="exactly the sccfm-cli"):
@@ -168,7 +170,7 @@ def test_verifier_rejects_additional_sdist_entry_point(tmp_path: Path) -> None:
     pyproject = _PYPROJECT.replace(
         b'sccfm-cli = "cisco_sccfm_cli.cli:cli"\n',
         b'sccfm-cli = "cisco_sccfm_cli.cli:cli"\n'
-        b'devkit = "cisco_sccfm_scripts.devkit_cli:main"\n',
+        b'sccfm-cli-interactive = "cisco_sccfm_scripts.interactive_cli:main"\n',
     )
     wheel, sdist = _build_artifacts(tmp_path, pyproject=pyproject)
 

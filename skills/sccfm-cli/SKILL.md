@@ -147,6 +147,9 @@ Use the selected command's `auth` object:
   available before executing.
 - Profiles contain a region and API token. Tokens come from developer.cisco.com
   or the SCC Firewall Manager UI.
+- The canonical profile store is `~/.sccfm-cli/config.json`, shared by
+  `sccfm-cli`, `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection.
+  Do not configure SCCFM tokens through `.env`, inline Ansible values, or Ansible Vault.
 
 #### Secret Handling Rules
 

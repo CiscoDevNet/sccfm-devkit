@@ -6,10 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 from cisco_sccfm_core.errors import SccApiError
 
@@ -22,7 +19,9 @@ def _create_mock_api_exception(
     exc = MagicMock()
     exc.status = status
     exc.body = body
-    exc.__str__ = MagicMock(return_value=f"({status})\nReason: Test error")  # type: ignore[method-assign]
+    exc.__str__ = MagicMock(  # type: ignore[method-assign]
+        return_value=f"({status})\nReason: Test error"
+    )
     return exc
 
 
@@ -31,7 +30,10 @@ class TestFromException:
 
     def test_should_parse_valid_json_body_with_all_fields(self) -> None:
         """from_exception should parse JSON body with all fields."""
-        body = '{"errorMsg": "Device not found", "errorCode": "NOT_FOUND", "details": {"deviceId": "123"}}'
+        body = (
+            '{"errorMsg": "Device not found", "errorCode": "NOT_FOUND", '
+            '"details": {"deviceId": "123"}}'
+        )
         exc = _create_mock_api_exception(status=404, body=body)
 
         error = SccApiError.from_exception(exc)

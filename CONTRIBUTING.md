@@ -50,17 +50,16 @@ reserve breaking changes until the next major version release.
    direnv allow
    ```
 
-3. Set up your SCCFM credentials:
+3. Set up your SCCFM profile:
 
    ```bash
-   devkit
-   # Select change-tokens; the API token is entered at a hidden prompt.
+   sccfm-cli configure --region us  # securely prompts for the token
    ```
 
-   This creates the local credential files with private POSIX permissions. On Windows, keep them
-   under your user profile and rely on the filesystem's per-user access controls.
+   The default profile store uses owner-only POSIX permissions. On Windows, keep it under your
+   user profile and rely on the filesystem's per-user access controls.
 
-Now whenever you `cd` into the project, the virtualenv activates and env vars load automatically.
+Now whenever you `cd` into the project, the virtualenv activates automatically.
 
 ## Committing Changes
 

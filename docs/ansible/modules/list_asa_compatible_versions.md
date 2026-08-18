@@ -20,15 +20,16 @@ $ ansible-doc -t module cisco.sccfm.list_asa_compatible_versions
   /v1/inventory/devices/asas/{deviceUid}/upgrades/versions' API
   endpoint for each device, then returns the common set of versions
   that every device in the group can upgrade to.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/.
   for API documentation.
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
@@ -50,13 +51,13 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -66,7 +67,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Get compatible versions for a single ASA (flat list output)
@@ -74,8 +75,7 @@ EXAMPLES:
   cisco.sccfm.list_asa_compatible_versions:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: compat_versions
 
 - name: Show compatible versions
@@ -114,8 +114,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Get compatible versions for branch ASAs
       cisco.sccfm.list_asa_compatible_versions:

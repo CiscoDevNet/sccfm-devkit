@@ -1,12 +1,9 @@
 - name: Change ASA boot image via SCCFM
   hosts: localhost
   gather_facts: false
-  vars:
-    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ sccfm_api_token_effective }}"
+      profile: default
 
   tasks:
     - name: Preview boot image change on branch ASAs

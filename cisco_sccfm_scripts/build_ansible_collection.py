@@ -24,6 +24,10 @@ _PAIRED_REQUIREMENT_PIN = re.compile(
     r"^[ \t]*cisco-sccfm-devkit[ \t]*==[ \t]*[^\s;#]+[ \t]*(?:#.*)?" r"(?P<newline>\r?\n)?$",
     re.IGNORECASE,
 )
+_RUNTIME_REQUIREMENT_PIN = re.compile(
+    r'^_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit==[^"]+"$',
+    re.MULTILINE,
+)
 
 
 class CollectionBuildError(RuntimeError):
@@ -67,6 +71,19 @@ def _sync_paired_python_requirement(requirements_path: Path, version: str) -> No
         requirements_path.write_text(updated, encoding="utf-8")
 
 
+def _sync_runtime_requirement(dependencies_path: Path, version: str) -> None:
+    """Synchronize the dependency error with the collection's paired wheel pin."""
+    content = dependencies_path.read_text(encoding="utf-8")
+    replacement = f'_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit=={version}"'
+    updated, count = _RUNTIME_REQUIREMENT_PIN.subn(replacement, content)
+    if count != 1:
+        raise CollectionBuildError(
+            "dependencies.py must declare exactly one paired cisco-sccfm-devkit requirement"
+        )
+    if updated != content:
+        dependencies_path.write_text(updated, encoding="utf-8")
+
+
 def main() -> int:
     """Build the Ansible collection tarball."""
     project_root = Path(__file__).parent.parent
@@ -75,6 +92,7 @@ def main() -> int:
     pyproject_path = project_root / "pyproject.toml"
     galaxy_path = collection_dir / "galaxy.yml"
     requirements_path = collection_dir / "requirements.txt"
+    dependencies_path = collection_dir / "plugins" / "module_utils" / "dependencies.py"
     license_src = project_root / "LICENSE"
     license_dst = collection_dir / "LICENSE"
 
@@ -93,10 +111,11 @@ def main() -> int:
 
     try:
         _sync_paired_python_requirement(requirements_path, version)
+        _sync_runtime_requirement(dependencies_path, version)
     except (CollectionBuildError, OSError) as exc:
         print(f"❌ Failed to synchronize Python requirements: {exc}", file=sys.stderr)
         return 1
-    print(f"✏️  Synchronized cisco-sccfm-devkit requirement to {version}")
+    print(f"✏️  Synchronized cisco-sccfm-devkit requirements to {version}")
 
     # Include the declared Apache license after all fail-closed source validation.
     shutil.copyfile(license_src, license_dst)

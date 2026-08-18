@@ -13,6 +13,10 @@ Generated from `ansible-doc` output.
 
 - [cisco.sccfm.sccfm](inventory/sccfm.html)
 
+## Lookup Plugins
+
+- [cisco.sccfm.profile](lookup/profile.html)
+
 ## Modules
 
 - [cisco.sccfm.add_asa_shun](modules/add_asa_shun.html)

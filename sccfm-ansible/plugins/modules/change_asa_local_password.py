@@ -1,10 +1,28 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
+    from cisco_sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -17,7 +35,8 @@ description:
     password command, and verifies the user is still present afterward.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
   - The query uses the same syntax as the Get Devices API.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/).
     for query documentation.
 options:
   query:
@@ -44,6 +63,7 @@ options:
       - The new password to set for the user.
     required: true
     type: str
+    no_log: true
   limit:
     description:
       - Maximum number of devices to return when using C(query).
@@ -58,18 +78,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -79,8 +98,7 @@ EXAMPLES = r"""
     query: "name:branch-* AND connectivityState:ONLINE"
     username: admin
     new_password: "{{ vault_new_asa_password }}"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: password_results
 
 # Example 2: Change password on specific devices by UID
@@ -99,8 +117,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Change admin password on all online ASAs
       cisco.sccfm.change_asa_local_password:
@@ -136,24 +153,6 @@ results:
       description: Human-readable description of the outcome.
       type: str
 """
-
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
-
-    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
-    from cisco_sccfm_core.services.inventory.asa_user_password_service import AsaUserPasswordService
-    from cisco_sccfm_core.types import ConfigLike
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

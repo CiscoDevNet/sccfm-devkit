@@ -27,8 +27,7 @@ def sample_access_group_response() -> MagicMock:
 def base_module_params() -> dict[str, Any]:
     return {
         "uid": "ag-uid-123",
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -123,5 +122,5 @@ def test_build_argument_spec() -> None:
     """build_argument_spec should include required keys."""
     spec = get_access_group.build_argument_spec()
     assert "uid" in spec
-    assert "region" in spec
-    assert "api_token" in spec
+    assert "profile" in spec
+    assert "config_path" in spec

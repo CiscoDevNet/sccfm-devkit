@@ -67,13 +67,19 @@ class FtdOnboardCommand(BaseCommand):
                 ["--performance-tier"],
                 default=None,
                 type=click.Choice(FTDV_PERFORMANCE_TIERS, case_sensitive=True),
-                help="Performance tier of the FTDv (required when --virtual is set, e.g., FTDv5, FTDv10, FTDv20).",
+                help=(
+                    "Performance tier of the FTDv (required when --virtual is set, "
+                    "e.g., FTDv5, FTDv10, FTDv20)."
+                ),
             ),
             click.Option(
                 ["--grouped-labels"],
                 type=str,
                 default=None,
-                help='Grouped labels in JSON format, e.g., \'{"environment": ["prod", "us-west"]}\'.',
+                help=(
+                    "Grouped labels in JSON format, e.g., "
+                    '\'{"environment": ["prod", "us-west"]}\'.'
+                ),
             ),
             click.Option(
                 ["--ungrouped-labels"],

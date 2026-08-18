@@ -34,11 +34,13 @@ OPTIONS (= indicates it is required):
                    Required if a password has not already been set on
                    the device.
         default: null
+        no_log: true
         type: str
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - device_group_uid  UUID of the device group the device will join
                      after registration.
@@ -58,14 +60,14 @@ OPTIONS (= indicates it is required):
 = name    Human-readable name for the FTD device.
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = serial_number  Serial number of the physical FTD device.
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Onboard a physical FTD via ZTP
@@ -75,9 +77,8 @@ EXAMPLES:
     serial_number: "FTD1234567890"
     licenses:
       - BASE
-    fmc_access_policy_uid: "your-access-policy-uid"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
+    profile: default
 
 # Example 2: Onboard with initial password and device group
 - name: Onboard FTD via ZTP with password
@@ -87,9 +88,9 @@ EXAMPLES:
     licenses:
       - BASE
       - CARRIER
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     admin_password: "{{ ftd_admin_password }}"
-    device_group_uid: "your-device-group-uid"
+    device_group_uid: "abcd1234-0000-0000-0000-000000000001"
 
 # Example 3: Using module_defaults (recommended)
 - name: Onboard cdFMC-managed FTD with ZTP
@@ -97,8 +98,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Onboard branch FTD through ZTP
       cisco.sccfm.onboard_cdfmc_ftd_ztp:
@@ -106,7 +106,7 @@ EXAMPLES:
         serial_number: "FTD1234567890"
         licenses:
           - BASE
-        fmc_access_policy_uid: "your-access-policy-uid"
+        fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
 
 RETURN VALUES:
 

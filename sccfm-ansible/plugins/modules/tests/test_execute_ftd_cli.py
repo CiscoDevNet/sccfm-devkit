@@ -62,8 +62,7 @@ def base_module_params_with_query() -> dict[str, Any]:
         "commands": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -76,8 +75,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
         "commands": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -268,40 +266,6 @@ def test_should_fail_on_api_exception(
         execute_ftd_cli.run_module()
 
     mock_module_instance_query.fail_json.assert_called_once()
-
-
-@patch("plugins.modules.execute_ftd_cli.AnsibleModule")
-def test_should_fail_if_region_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance_query: MagicMock,
-) -> None:
-    del mock_module_instance_query.params["region"]
-    mock_ansible_module_class.return_value = mock_module_instance_query
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            execute_ftd_cli.run_module()
-
-    mock_module_instance_query.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
-    assert "region is required" in call_kwargs["msg"]
-
-
-@patch("plugins.modules.execute_ftd_cli.AnsibleModule")
-def test_should_fail_if_api_token_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance_query: MagicMock,
-) -> None:
-    del mock_module_instance_query.params["api_token"]
-    mock_ansible_module_class.return_value = mock_module_instance_query
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            execute_ftd_cli.run_module()
-
-    mock_module_instance_query.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
-    assert "api_token is required" in call_kwargs["msg"]
 
 
 @patch("plugins.modules.execute_ftd_cli.Config")

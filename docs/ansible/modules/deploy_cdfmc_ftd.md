@@ -20,9 +20,10 @@ $ ansible-doc -t module cisco.sccfm.deploy_cdfmc_ftd
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - deployment_notes  Notes for the deployment.
         default: null
@@ -47,14 +48,14 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to select cdFMC-managed FTD devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with
            `deviceType:CDFMC_MANAGED_FTD'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -74,7 +75,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Deploy changes to specific FTD devices
@@ -82,8 +83,7 @@ EXAMPLES:
   cisco.sccfm.deploy_cdfmc_ftd:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Deploy with notes
 - name: Deploy FTD changes with deployment notes
@@ -107,8 +107,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Deploy branch FTD changes
       cisco.sccfm.deploy_cdfmc_ftd:

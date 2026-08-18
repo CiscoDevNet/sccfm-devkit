@@ -26,9 +26,10 @@ $ ansible-doc -t module cisco.sccfm.list_asa_disk_files
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
@@ -40,13 +41,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -56,15 +57,14 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: List files on all production ASAs matching a query
 - name: List disk files on production ASAs
   cisco.sccfm.list_asa_disk_files:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: disk_files
 
 # Example 2: List files on specific devices by UID
@@ -81,8 +81,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: List files on branch ASAs
       cisco.sccfm.list_asa_disk_files:
@@ -91,7 +90,10 @@ EXAMPLES:
 
     - name: Show only AnyConnect packages
       ansible.builtin.debug:
-        msg: "{{ disk_files.results | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE') | list }}"
+        msg: >-
+          {{ disk_files.results
+          | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE')
+          | list }}
 
 RETURN VALUES:
 

@@ -1,10 +1,34 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Optional
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import (
+        ApiException,
+        Device,
+        DevicePage,
+        EntityType,
+        FtdCreateOrUpdateInput,
+        Labels,
+    )
+
+    from cisco_sccfm_core import InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import FtdOnboardService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -54,18 +78,17 @@ options:
     required: false
     type: list
     elements: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -73,17 +96,16 @@ EXAMPLES = r"""
 - name: Onboard FTD device
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My FTD"
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Onboard a virtual FTD with multiple licenses
 - name: Onboard virtual FTD
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My vFTD"
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
       - CARRIER
@@ -94,7 +116,7 @@ EXAMPLES = r"""
 - name: Onboard FTD with labels
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "Branch FTD"
-    fmc_access_policy_uid: "your-access-policy-uid"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
     ungrouped_labels:
@@ -109,13 +131,12 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:
         name: "Branch FTD"
-        fmc_access_policy_uid: "your-access-policy-uid"
+        fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
         licenses:
           - BASE
 """
@@ -135,30 +156,6 @@ device:
 """
 
 
-from typing import Optional
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import (
-        ApiException,
-        Device,
-        DevicePage,
-        EntityType,
-        FtdCreateOrUpdateInput,
-        Labels,
-    )
-
-    from cisco_sccfm_core import InventoryService, SccApiError
-    from cisco_sccfm_core.services.inventory import FtdOnboardService
-    from cisco_sccfm_core.types import ConfigLike
-except ImportError as exc:
-    record_import_error(exc)
-
-
 _VALID_LICENSES = ["BASE", "CARRIER", "THREAT", "MALWARE", "URLFilter"]
 _VALID_PERFORMANCE_TIERS = ["FTDv5", "FTDv10", "FTDv20", "FTDv30", "FTDv50", "FTDv100", "FTDv"]
 
@@ -167,12 +164,7 @@ def build_argument_spec() -> dict:
     return {
         "name": {"type": "str", "required": True},
         "fmc_access_policy_uid": {"type": "str", "required": True},
-        "licenses": {
-            "type": "list",
-            "elements": "str",
-            "required": True,
-            "choices": _VALID_LICENSES,
-        },
+        "licenses": {"type": "list", "elements": "str", "required": True},
         "virtual": {"type": "bool", "required": False, "default": False},
         "performance_tier": {"type": "str", "required": False, "choices": _VALID_PERFORMANCE_TIERS},
         "grouped_labels": {"type": "dict", "required": False},

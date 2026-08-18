@@ -5,7 +5,8 @@
 # Generates JUnit XML for Jenkins test result reporting.
 #
 # Prerequisites:
-#   - Run cisco_sccfm_scripts/setup_tokens.py first (creates vault.yml and .vault_pass)
+#   - Configure the selected profile with sccfm-cli configure
+#   - Create vault.yml and .vault_pass for Ansible-specific device secrets
 #   - Virtualenv active (source cisco_sccfm_scripts/activate.sh)
 #
 # Usage:
@@ -27,12 +28,12 @@ fi
 
 # ── Preflight checks ──────────────────────────────────────────────
 if [[ ! -f "${VAULT_PASS}" ]]; then
-  echo "ERROR: ${VAULT_PASS} not found. Run cisco_sccfm_scripts/setup_tokens.py first." >&2
+  echo "ERROR: ${VAULT_PASS} not found. Create it for Ansible device secrets first." >&2
   exit 1
 fi
 
 if [[ ! -f "${EXAMPLES_DIR}/group_vars/all/vault.yml" ]]; then
-  echo "ERROR: group_vars/all/vault.yml not found. Run cisco_sccfm_scripts/setup_tokens.py first." >&2
+  echo "ERROR: group_vars/all/vault.yml not found. Create it for device secrets first." >&2
   exit 1
 fi
 

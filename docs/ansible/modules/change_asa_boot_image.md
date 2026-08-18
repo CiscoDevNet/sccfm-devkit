@@ -25,9 +25,10 @@ $ ansible-doc -t module cisco.sccfm.change_asa_boot_image
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 = image_path  Full ASA image path already present on the device, such
                as `disk0:/asa9xxx.bin' or `boot:/asa9xxx.bin'.
@@ -43,13 +44,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -59,7 +60,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Change boot image using a query
@@ -67,8 +68,7 @@ EXAMPLES:
   cisco.sccfm.change_asa_boot_image:
     query: "name:branch-*"
     image_path: "disk0:/asa9-18-4-smp-k8.bin"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Change boot image on specific devices
 - name: Change boot image on specific ASA devices
@@ -93,8 +93,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Set boot image on branch ASAs
       cisco.sccfm.change_asa_boot_image:

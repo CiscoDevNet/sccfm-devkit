@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 from cisco_sccfm_core.services.health_service import HealthService, HealthStatus
 from cisco_sccfm_core.services.inventory import (
     AsaBootImageService,
@@ -34,6 +36,7 @@ from cisco_sccfm_core.services.policy import (
     AccessRuleResponse,
     AccessRuleService,
 )
+from cisco_sccfm_core.services.profile_service import ProfileService
 
 __all__ = [
     "AsaBootImageService",
@@ -62,5 +65,6 @@ __all__ = [
     "NetworkObjectListResponse",
     "NetworkObjectResponse",
     "NetworkObjectService",
+    "ProfileService",
     "ShunEntrySpec",
 ]

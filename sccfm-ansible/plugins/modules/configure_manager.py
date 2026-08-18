@@ -1,10 +1,25 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule, env_fallback
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from cisco_sccfm_core.services.inventory import (
+        FtdConfigureManagerError,
+        FtdConfigureManagerService,
+        parse_jump_host,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
 
 DOCUMENTATION = r"""
 ---
@@ -41,6 +56,8 @@ options:
       - Can also be supplied via the C(SCCFM_FTD_PASSWORD) environment variable.
     required: false
     type: str
+    env:
+      - name: SCCFM_FTD_PASSWORD
   cli_key:
     description:
       - The full C(configure manager add ...) string returned by C(onboard_cdfmc_ftd).
@@ -61,15 +78,15 @@ options:
       - Leave unset to use SSH key/agent authentication for the jump host.
     required: false
     type: str
+    env:
+      - name: SCCFM_JUMP_PASSWORD
   ssh_timeout:
     description: SSH connect and read timeout in seconds.
     required: false
     type: int
     default: 30
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -107,8 +124,7 @@ EXAMPLES = r"""
     fmc_access_policy_uid: "{{ fmc_access_policy_uid }}"
     licenses:
       - BASE
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: onboard_result
 
 - name: Complete registration over SSH
@@ -139,22 +155,6 @@ msg:
 """
 
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule, env_fallback
-
-from ..module_utils.dependencies import ensure_required_dependencies, record_import_error
-
-try:
-    from cisco_sccfm_core.services.inventory import (
-        FtdConfigureManagerError,
-        FtdConfigureManagerService,
-        parse_jump_host,
-    )
-except ImportError as exc:
-    record_import_error(exc)
-
-
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "ftd_host": {"type": "str", "required": True},
@@ -183,7 +183,6 @@ def run_module() -> None:
         argument_spec=build_argument_spec(),
         supports_check_mode=True,
     )
-    ensure_required_dependencies(module)
 
     host: str = module.params["ftd_host"]
     port: int = module.params["ftd_port"]

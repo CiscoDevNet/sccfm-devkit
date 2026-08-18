@@ -1,10 +1,26 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.policy import AccessRuleService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -17,18 +33,17 @@ options:
     description: Unique identifier (UID) of the access rule to retrieve.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -36,8 +51,7 @@ EXAMPLES = r"""
 - name: Get access rule
   cisco.sccfm.get_access_rule:
     uid: "ac981dcd-9860-401e-a51d-c615c946b72f"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: result
 
 - name: Show rule
@@ -50,8 +64,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Get access rule details
       cisco.sccfm.get_access_rule:
@@ -94,22 +107,6 @@ access_rule:
       description: Destination network details.
       type: dict
 """
-
-
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException
-
-    from cisco_sccfm_core.errors import SccApiError
-    from cisco_sccfm_core.services.policy import AccessRuleService
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

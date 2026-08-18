@@ -1,10 +1,28 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, DevicePage, FtdVersion
+
+    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
+    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -56,18 +74,17 @@ options:
     required: false
     type: bool
     default: false
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -76,8 +93,7 @@ EXAMPLES = r"""
   cisco.sccfm.list_ftd_compatible_versions:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: compat_versions
 
 - name: Show compatible versions
@@ -116,8 +132,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Get compatible versions for branch FTDs
       cisco.sccfm.list_ftd_compatible_versions:
@@ -153,28 +168,6 @@ skipped:
   returned: success (check mode or when devices are skipped)
   type: dict
 """
-
-
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import (
-        ApiException,
-        DevicePage,
-        FtdVersion,
-    )
-
-    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
-    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
-    from cisco_sccfm_core.types import ConfigLike
-except ImportError as exc:
-    record_import_error(exc)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

@@ -50,7 +50,7 @@ _MINIMUM_FILES = {
     "changelogs/changelog.yaml": b"---\nancestor: null\nreleases: {}\n",
     "changelogs/config.yaml": b"---\ntitle: Cisco SCCFM Collection\n",
     "examples/.vault_pass.example": b"replace-me\n",
-    "examples/group_vars/all/vault.yml.example": (b"---\nvault_sccfm_api_token: placeholder\n"),
+    "examples/group_vars/all/vault.yml.example": (b"---\nvault_device_password: placeholder\n"),
     "examples/show_devices.yml": b"---\n- name: Synthetic example\n  hosts: localhost\n",
     "meta/execution-environment.yml": b"---\ndependencies:\n  python: requirements.txt\n",
     "meta/runtime.yml": b"requires_ansible: '>=2.20.0,<2.22.0'\n",
@@ -369,7 +369,7 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
         assert sentinel.relative_to(collection_copy).as_posix() not in member_names
     assert "examples/.vault_pass.example" in member_names
     assert "examples/group_vars/all/vault.yml.example" in member_names
-    assert "vault_sccfm_api_token" in packaged_vault_template
+    assert "vault_asa_branch_office_01_password" in packaged_vault_template
     assert "sccfm_api_token" not in packaged_vault_template
 
     verify_collection_artifact(artifact, expected_version=_COLLECTION_VERSION)
@@ -398,7 +398,7 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
             encoding="utf-8"
         )
     )
-    assert "vault_sccfm_api_token" in installed_vault_template
+    assert "vault_asa_branch_office_01_password" in installed_vault_template
     assert "sccfm_api_token" not in installed_vault_template
 
     discovery_environment = {
@@ -432,10 +432,7 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
     module_documentation = json.loads(documentation.stdout)
     assert set(module_documentation) == expected_modules
 
-    expected_auth_examples = (
-        "region: \"{{ lookup('env', 'SCCFM_REGION') }}\"",
-        "api_token: \"{{ lookup('env', 'SCCFM_API_TOKEN') }}\"",
-    )
+    expected_auth_examples = ("profile: default",)
     undocumented_auth = {
         module_name: [
             expected
@@ -447,7 +444,12 @@ def test_real_build_excludes_sentinels_and_remains_installable(tmp_path: Path) -
     }
     assert undocumented_auth == {}
 
-    legacy_auth_variables = ("{{ sccfm_region }}", "{{ sccfm_api_token }}")
+    legacy_auth_variables = (
+        "{{ sccfm_region }}",
+        "{{ sccfm_api_token }}",
+        "lookup('env', 'SCCFM_REGION')",
+        "lookup('env', 'SCCFM_API_TOKEN')",
+    )
     legacy_auth_examples = {
         module_name: [
             legacy for legacy in legacy_auth_variables if legacy in details.get("examples", "")

@@ -20,8 +20,7 @@ def base_module_params_with_uid() -> dict[str, Any]:
     return {
         "uid": "net-grp-uid-123",
         "name": None,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -31,8 +30,7 @@ def base_module_params_with_name() -> dict[str, Any]:
     return {
         "uid": None,
         "name": "test-network-group",
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -221,42 +219,6 @@ def test_should_return_structured_api_error(
     assert call_kwargs["status_code"] == 403
 
 
-@patch("plugins.modules.delete_network_group.AnsibleModule")
-def test_should_fail_if_region_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """run_module should fail when region is not provided."""
-    del mock_module_instance.params["region"]
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            delete_network_group.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance.fail_json.call_args[1]
-    assert "region is required" in call_kwargs["msg"]
-
-
-@patch("plugins.modules.delete_network_group.AnsibleModule")
-def test_should_fail_if_api_token_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """run_module should fail when api_token is not provided."""
-    del mock_module_instance.params["api_token"]
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            delete_network_group.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance.fail_json.call_args[1]
-    assert "api_token is required" in call_kwargs["msg"]
-
-
 @patch("plugins.modules.delete_network_group.Config")
 @patch("plugins.modules.delete_network_group.NetworkGroupService")
 @patch("plugins.modules.delete_network_group.AnsibleModule")
@@ -296,12 +258,11 @@ def test_build_argument_spec() -> None:
     assert spec["name"]["required"] is False
     assert spec["name"]["type"] == "str"
 
-    assert "region" in spec
-    assert spec["region"]["required"] is False
+    assert "profile" in spec
+    assert spec["profile"]["default"] == "default"
 
-    assert "api_token" in spec
-    assert spec["api_token"]["required"] is False
-    assert spec["api_token"]["no_log"] is True
+    assert "config_path" in spec
+    assert spec["config_path"]["required"] is False
 
 
 @patch("plugins.modules.delete_network_group.Config")

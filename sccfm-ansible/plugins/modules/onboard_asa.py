@@ -1,10 +1,34 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+from typing import Optional
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import (
+        ApiException,
+        AsaCreateOrUpdateInput,
+        ConnectorType,
+        Device,
+        DevicePage,
+        Labels,
+    )
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import AsaOnboardService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -29,6 +53,7 @@ options:
     description: Password used to authenticate with the device.
     required: true
     type: str
+    no_log: true
   connector_type:
     description: Connector type used to communicate with the device.
     required: true
@@ -53,18 +78,17 @@ options:
     required: false
     type: list
     elements: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -73,8 +97,7 @@ EXAMPLES = r"""
   hosts: all
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Onboard branch-asa-1
       cisco.sccfm.onboard_asa:
@@ -100,10 +123,9 @@ EXAMPLES = r"""
     password: "{{ vault_asa_password }}"
     connector_type: SDC
     connector_name: branch-sdc-1
-    region: us
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Onboard branch-asa-1
   cisco.sccfm.onboard_asa:
     name: branch-asa-1
@@ -122,30 +144,6 @@ device:
 """
 
 
-from typing import Optional
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import (
-        ApiException,
-        AsaCreateOrUpdateInput,
-        ConnectorType,
-        Device,
-        DevicePage,
-        Labels,
-    )
-
-    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.services.inventory import AsaOnboardService
-    from cisco_sccfm_core.types import ConfigLike
-except ImportError as exc:
-    record_import_error(exc)
-
-
 def build_argument_spec() -> dict[str, dict[str, str | bool | list[str]]]:
     return {
         "name": {"type": "str", "required": True},
@@ -155,7 +153,7 @@ def build_argument_spec() -> dict[str, dict[str, str | bool | list[str]]]:
         "connector_type": {
             "type": "str",
             "required": True,
-            "choices": ["CDG", "SDC"],
+            "choices": [ConnectorType.CDG, ConnectorType.SDC],
         },
         "connector_name": {"type": "str", "required": False},
         "ignore_certificate": {"type": "bool", "required": False, "default": False},

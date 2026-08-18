@@ -25,9 +25,10 @@ $ ansible-doc -t module cisco.sccfm.add_object_override
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 = override_value  The literal value for the override. For network
                    objects this can be an IP address (e.g.,
@@ -36,8 +37,8 @@ OPTIONS (= indicates it is required):
                    URL string.
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = target_id  UID of the target device for which the override applies.
@@ -47,7 +48,7 @@ OPTIONS (= indicates it is required):
            to.
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Add an override for a specific device
@@ -56,8 +57,7 @@ EXAMPLES:
     uid: "abc-123-def"
     target_id: "70bde3c9-328c-4a4b-bdc9-a4d4042bf09a"
     override_value: "10.10.10.10"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Using module_defaults to avoid repeating credentials
 - name: Add object overrides
@@ -65,8 +65,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Override web server IP for branch device
       cisco.sccfm.add_object_override:

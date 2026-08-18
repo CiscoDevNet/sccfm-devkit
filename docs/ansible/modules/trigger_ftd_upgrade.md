@@ -25,9 +25,10 @@ $ ansible-doc -t module cisco.sccfm.trigger_ftd_upgrade
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - ignore_maintenance_window  Allow upgrade outside the device
                               maintenance window.
@@ -44,14 +45,14 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to select FTD devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with FTD device type
            filters.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -89,7 +90,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Upgrade specific FTD devices
@@ -98,8 +99,7 @@ EXAMPLES:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
     software_version: "7.4.1"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Stage-only upgrade using a query
 - name: Stage FTD upgrade for branch devices
@@ -123,8 +123,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Stage FTD upgrade for branch devices
       cisco.sccfm.trigger_ftd_upgrade:

@@ -20,16 +20,17 @@ $ ansible-doc -t module cisco.sccfm.delete_network_group
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - name    Name of the network group to delete.
         default: null
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - uid     Unique identifier (UID) of the network group to delete.
@@ -38,28 +39,26 @@ OPTIONS (= indicates it is required):
 
 NOTES:
       * Either `uid' or `name' must be provided, but not both.
-      * When using `name', the module will search for the group
-        and resolve it to a UID before deletion.
+      * When using `name', the module searches for the group and
+        resolves it to a UID before deletion.
       * Network groups are filtered by objectType to avoid
         accidentally matching network objects with the same
         name.
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Delete a network group by UID
 - name: Delete network group by UID
   cisco.sccfm.delete_network_group:
     uid: "abc-123-def-456"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Delete a network group by name
 - name: Delete network group by name
   cisco.sccfm.delete_network_group:
     name: "web-server-group"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 3: Delete multiple groups using module_defaults
 - name: Delete network groups
@@ -67,8 +66,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Delete obsolete network groups
       cisco.sccfm.delete_network_group:
@@ -77,7 +75,7 @@ EXAMPLES:
         - web-server-group-01
         - web-subnet-group
 
-# Example 4: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 4: Using the default configured profile
 - name: Delete a network group
   cisco.sccfm.delete_network_group:
     name: "temporary-group"

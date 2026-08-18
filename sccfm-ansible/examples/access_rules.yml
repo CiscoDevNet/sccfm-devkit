@@ -11,8 +11,7 @@
 #   ansible-playbook examples/access_rules.yml
 #
 # PREREQUISITES:
-#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
-#   - SCCFM_REGION set and vault_sccfm_api_token in encrypted group_vars/all/vault.yml
+#   - Configure the default profile with `sccfm-cli configure`
 #   - A valid device UID and access group UID
 #   - Existing source and destination network objects referenced by the rule
 
@@ -23,11 +22,9 @@
   # Use module_defaults to avoid repeating region and api_token
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ sccfm_api_token_effective }}"
+      profile: default
 
   vars:
-    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
     device_uid: "YOUR_DEVICE_UID"
     access_group_uid: "YOUR_ACCESS_GROUP_UID"
 

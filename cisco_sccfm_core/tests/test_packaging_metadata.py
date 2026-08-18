@@ -59,6 +59,40 @@ def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
     assert "scc-firewall-manager-sdk==1.17.27" in _project_config()["dependencies"]
 
 
+def test_interactive_entrypoint_is_completely_renamed() -> None:
+    with (PROJECT_ROOT / "devtools" / "pyproject.toml").open("rb") as pyproject_file:
+        scripts = tomllib.load(pyproject_file)["project"]["scripts"]
+
+    assert scripts["sccfm-cli-interactive"] == "cisco_sccfm_scripts.interactive_cli:main"
+    assert "devkit" not in scripts
+    assert "change-tokens" not in scripts
+
+
+def test_user_guidance_only_references_canonical_profile_configuration() -> None:
+    guidance_paths = [
+        PROJECT_ROOT / "README.md",
+        PROJECT_ROOT / "INSTALL.md",
+        PROJECT_ROOT / "CONTRIBUTING.md",
+        PROJECT_ROOT / "sccfm-ansible" / "README.md",
+        PROJECT_ROOT / "skills" / "sccfm-cli" / "SKILL.md",
+        PROJECT_ROOT / "skills" / "sccfm-ansible" / "SKILL.md",
+    ]
+
+    for path in guidance_paths:
+        guidance = path.read_text(encoding="utf-8")
+        assert "change-tokens" not in guidance, path
+        assert "`devkit`" not in guidance, path
+        if path != PROJECT_ROOT / "README.md":
+            assert "SCCFM_API_TOKEN" not in guidance, path
+        assert "SCCFM_REGION" not in guidance, path
+        assert ".env.example" not in guidance, path
+
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    assert readme.count("SCCFM_API_TOKEN") == 1
+    assert "interactive hidden prompt" in readme
+    assert "can expose the token in shell history and process listings" in readme
+
+
 def test_pyinstaller_spec_uses_repository_relative_entrypoint() -> None:
     spec = (PROJECT_ROOT / "sccfm-cli.spec").read_text(encoding="utf-8")
 

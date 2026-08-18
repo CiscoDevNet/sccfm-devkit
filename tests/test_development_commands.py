@@ -16,14 +16,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEVTOOLS_PYPROJECT = PROJECT_ROOT / "devtools" / "pyproject.toml"
 COMMAND_MODULES = {
     "build-ansible-collection": "cisco_sccfm_scripts.build_ansible_collection:main",
-    "change-tokens": "cisco_sccfm_scripts.setup_tokens:main",
     "check-doc-artifacts": "cisco_sccfm_scripts.check_doc_artifacts:main",
     "check-doc-links": "cisco_sccfm_scripts.check_doc_links:main",
-    "devkit": "cisco_sccfm_scripts.devkit_cli:main",
     "generate-ansible-docs": "cisco_sccfm_scripts.generate_ansible_docs:main",
     "generate-cli-docs": "cisco_sccfm_scripts.generate_cli_docs:main",
     "generate-cli-man-docs": "cisco_sccfm_scripts.generate_cli_man_docs:main",
     "install-cli-man-docs": "cisco_sccfm_scripts.install_cli_man_docs:main",
+    "sccfm-cli-interactive": "cisco_sccfm_scripts.interactive_cli:main",
     "sync-docs-readme": "cisco_sccfm_scripts.sync_docs_readme:main",
 }
 DOCUMENTATION_COMMANDS = (

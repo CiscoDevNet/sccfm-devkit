@@ -57,8 +57,7 @@ def base_module_params_with_query() -> dict[str, Any]:
         "new_password": "NewSecurePass123",
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -72,8 +71,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
         "new_password": "NewSecurePass123",
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -259,39 +257,3 @@ def test_should_return_structured_error_on_api_exception(
     call_kwargs = mock_module_instance_query.fail_json.call_args[1]
     assert call_kwargs["msg"] == "Access denied"
     assert call_kwargs["error_code"] == "FORBIDDEN"
-
-
-@patch("plugins.modules.change_asa_local_password.AnsibleModule")
-def test_should_fail_if_region_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance_query: MagicMock,
-) -> None:
-    """run_module should fail when region is not provided."""
-    del mock_module_instance_query.params["region"]
-    mock_ansible_module_class.return_value = mock_module_instance_query
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            change_asa_local_password.run_module()
-
-    mock_module_instance_query.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
-    assert "region is required" in call_kwargs["msg"]
-
-
-@patch("plugins.modules.change_asa_local_password.AnsibleModule")
-def test_should_fail_if_api_token_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance_query: MagicMock,
-) -> None:
-    """run_module should fail when api_token is not provided."""
-    del mock_module_instance_query.params["api_token"]
-    mock_ansible_module_class.return_value = mock_module_instance_query
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            change_asa_local_password.run_module()
-
-    mock_module_instance_query.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
-    assert "api_token is required" in call_kwargs["msg"]

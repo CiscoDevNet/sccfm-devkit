@@ -9,7 +9,7 @@ from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk import CdoTransaction, Device, DevicePage
+from scc_firewall_manager_sdk import Device, DevicePage
 
 from cisco_sccfm_cli.cli import cli
 from cisco_sccfm_cli.models import Config

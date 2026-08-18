@@ -8,9 +8,6 @@ import json
 from typing import Any
 from unittest.mock import Mock
 
-import pytest
-from _pytest.monkeypatch import MonkeyPatch
-
 from cisco_sccfm_core.services.policy.access_group_service import (
     AccessGroupListResponse,
     AccessGroupResponse,

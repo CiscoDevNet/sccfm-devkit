@@ -180,7 +180,7 @@ jobs:
           pipx install poetry
 
       - name: Install dependencies
-        run: poetry install --no-interaction --with dev,build
+        run: poetry install --no-interaction --with dev
 
       - name: Infer and synchronize release version
         id: version

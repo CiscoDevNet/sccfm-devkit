@@ -46,8 +46,7 @@ def base_params() -> dict[str, Any]:
         "ignore_warnings": False,
         "wait": False,
         "timeout": 3600,
-        "region": "us",
-        "api_token": "test-token",
+        "profile": "default",
     }
 
 

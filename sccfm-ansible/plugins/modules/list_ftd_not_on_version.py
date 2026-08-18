@@ -1,10 +1,27 @@
 # Copyright 2026 Cisco Systems, Inc. and its affiliates
 #
 # SPDX-License-Identifier: Apache-2.0
-# flake8: noqa: E402
-# isort: skip_file
 
 from __future__ import annotations
+
+import re
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device, DevicePage
+
+    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = NotFoundError = FtdConfigureManagerError = RuntimeError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 DOCUMENTATION = r"""
 ---
@@ -67,18 +84,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
+    type: path
 author:
-  - huides00 (@huides00)
-  - Scoombe (@Scoombe)
-  - afercal (@afercal)
+  - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
@@ -86,8 +102,7 @@ EXAMPLES = r"""
 - name: Find FTDs not on 7.4.1
   cisco.sccfm.list_ftd_not_on_version:
     version: "7.4.1"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: result
 
 - name: Show devices that need upgrading
@@ -103,7 +118,9 @@ EXAMPLES = r"""
 
 - name: Show non-compliant devices
   ansible.builtin.debug:
-    msg: "{{ item.name }} is on {{ item.software_version }}, recommended: {{ item.recommended_version }}"
+    msg: >-
+      {{ item.name }} is on {{ item.software_version }},
+      recommended: {{ item.recommended_version }}
   loop: "{{ result.devices }}"
 
 # Example 3: Filter by name pattern
@@ -119,8 +136,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Find FTDs not on target version
       cisco.sccfm.list_ftd_not_on_version:
@@ -176,24 +192,6 @@ mode:
   type: str
 """
 
-
-import re
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-from ..module_utils.dependencies import record_import_error
-
-try:
-    from scc_firewall_manager_sdk import ApiException, Device, DevicePage
-
-    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
-except ImportError as exc:
-    record_import_error(exc)
-
-
 _VERSION_RE = re.compile(r"^\d+\.\d+")
 
 
@@ -225,7 +223,8 @@ def _validate_mode(module: AnsibleModule) -> None:
         )
 
 
-def _fetch_devices(module: AnsibleModule, config: Config) -> list[Device]:
+def _fetch_devices(module: AnsibleModule) -> list[Device]:
+    config = create_config(module)
     inventory_service = InventoryService(config=config)
 
     uids: list[str] | None = module.params.get("uids")
@@ -269,9 +268,9 @@ def _serialize_device(device: Device, *, recommended_version: str | None = None)
 
 def _check_recommended(
     module: AnsibleModule,
-    config: Config,
     devices: list[Device],
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    config = create_config(module)
     device_uids = [d.uid for d in devices]
     if not device_uids:
         return [], {}
@@ -313,14 +312,13 @@ def run_module() -> None:
     version: str | None = module.params.get("version")
     recommended: bool = module.params.get("recommended", False)
     mode = "recommended" if recommended else "specified"
-    config = create_config(module)
 
     try:
-        all_devices = _fetch_devices(module, config)
+        all_devices = _fetch_devices(module)
         matched_device_count = len(all_devices)
 
         if recommended:
-            serialized, skipped = _check_recommended(module, config, all_devices)
+            serialized, skipped = _check_recommended(module, all_devices)
             evaluated_count = matched_device_count - len(skipped)
         else:
             devices_not_on_version = [d for d in all_devices if d.software_version != version]

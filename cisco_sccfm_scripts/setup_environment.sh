@@ -48,7 +48,7 @@ function create_venv() {
   if ! command -v poetry >/dev/null 2>&1; then
     pip install poetry
   fi
-  POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --with dev,build
+  POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --with dev
   if [[ ! -x "${VENV_DIR}/bin/cz" ]]; then
     echo "Commitizen did not install correctly." >&2
     exit 1

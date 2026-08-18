@@ -12,8 +12,7 @@
 
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ vault_sccfm_api_token }}"
+      profile: default
 
   tasks:
     - name: Remove one shun entry by source IP

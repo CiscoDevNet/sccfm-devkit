@@ -21,12 +21,13 @@ $ ansible-doc -t module cisco.sccfm.update_object_default
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 = uid     Unique identifier (UID) of the object to update.
@@ -38,7 +39,7 @@ OPTIONS (= indicates it is required):
            should be the URL string.
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Update the default value of a network object
@@ -46,8 +47,7 @@ EXAMPLES:
   cisco.sccfm.update_object_default:
     uid: "abc-123-def"
     value: "10.10.10.10"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Using module_defaults to avoid repeating credentials
 - name: Update object default values
@@ -55,8 +55,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Update default value
       cisco.sccfm.update_object_default:
@@ -74,8 +73,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Update shared default value
       cisco.sccfm.update_object_default:

@@ -5,20 +5,16 @@
 #   ansible-playbook examples/list_network_objects.yml
 #
 # PREREQUISITES:
-#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
-#   - SCCFM_REGION set and vault_sccfm_api_token in encrypted group_vars/all/vault.yml
+#   - Configure the default profile with `sccfm-cli configure`
 
 - name: List network objects in SCC Firewall Manager
   hosts: localhost
   gather_facts: false
-  vars:
-    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
 
   # Use module_defaults to avoid repeating region and api_token
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ sccfm_api_token_effective }}"
+      profile: default
 
   tasks:
     # ============================================================

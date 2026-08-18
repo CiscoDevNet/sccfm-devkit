@@ -1,7 +1,7 @@
 ---
 name: sccfm-ansible
 description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules and inventory plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use for cisco.sccfm Ansible modules, inventory, vault, and playbook workflows. Do NOT use for sccfm-cli commands; use the sccfm-cli skill instead. Do not use for Jira/Confluence work, architecture design, or non-Ansible tasks.
-allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(devkit *) Bash(jq *) Read Grep Glob Write Edit"
+allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
 ---
 
 # SCC Firewall Manager Ansible Collection
@@ -32,8 +32,9 @@ respective operations.
 3. Never improvise module names, parameters, defaults, target lists, inventory
    files, vault paths, or output paths.
 4. Never ask the user to paste secrets into chat.
-5. Use Ansible Vault, environment variables, or existing local variable files
-   for secrets; never put API tokens or device passwords directly in playbooks.
+5. Use the canonical SCCFM profile store for API tokens and Ansible Vault for
+   playbook-specific secrets such as device passwords. Never put secrets directly
+   in playbooks.
 6. Treat any task as mutating unless `ansible-doc`, examples, and source context
    prove it is read-only.
 7. Use fully qualified collection names, such as `cisco.sccfm.<module>`, in
@@ -199,27 +200,26 @@ parameter, example, and return-value knowledge must come from the discovered
 
 ### Step C: Verify Credentials Without Exposing Secrets
 
-Use the matched docs to identify credential options. Most modules support
-`region` and `api_token`; inventory docs expose their own auth options.
+Use the matched docs to identify profile options. SCCFM modules and inventory
+use the canonical named profile store shared with `sccfm-cli`.
 
 Rules:
 
-1. Prefer `module_defaults: group/cisco.sccfm.all:` for module auth.
-2. Prefer Ansible Vault for API tokens and device passwords.
-3. Environment variables are acceptable when `ansible-doc` documents them, such
-   as `SCCFM_REGION` and `SCCFM_API_TOKEN`.
+1. Prefer `module_defaults: group/cisco.sccfm.all:` when selecting a non-default profile.
+2. Configure SCCFM profiles with `sccfm-cli --profile <name> configure`.
+3. Use Ansible Vault for device passwords and other playbook-specific secrets,
+   never for the SCCFM API token.
 4. Never ask for token or password contents in chat.
 5. Never print decrypted vault contents.
 6. Never write real secrets to tracked files.
-7. If credentials are missing, generate the playbook with placeholders or tell
-   the user which local setup command to run.
+7. If credentials are missing, tell the user which local profile configuration
+   command to run without asking them to paste the token into chat.
 8. Use Write/Edit only for non-secret playbook, inventory, vars template, or
    documentation artifacts.
 
-Use `change-tokens` for local credential setup only when the user explicitly asks for it. It
-configures `.env`, CLI profile state, Ansible vars, and encrypted vault files. Its default Ansible
-path is `sccfm-ansible/examples`; generated credential files there are Git-ignored and excluded
-from collection artifacts. Use `--path` only when the user supplies a different examples directory.
+Use `sccfm-cli configure` or the `configure-profile` option in
+`sccfm-cli-interactive` for local SCCFM credential setup only when the user
+explicitly asks for it.
 
 ## Step 1: Match User Intent Conservatively
 
@@ -281,17 +281,16 @@ only through documented Ansible options and discovered inventory variables.
 
 ### Auth Pattern
 
-For SCCFM modules, prefer this shape when `region` and `api_token` are supported:
+For SCCFM modules, prefer this shape when selecting a non-default profile:
 
 ```yaml
 module_defaults:
   group/cisco.sccfm.all:
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: production
 ```
 
-Do not repeat `region` or `api_token` inside each task unless the user asks for a
-self-contained snippet or the docs require task-local values.
+Omit `profile` when using the configured `default` profile. Do not place a region
+or SCCFM API token in a task, variable file, environment lookup, or vault.
 
 ### Play Targets
 
@@ -350,11 +349,8 @@ When credentials are available and the user requested inventory behavior:
 
 ```bash
 ansible-inventory -i <inventory.yml> --graph --playbook-dir <playbook_dir>
+ansible-inventory -i <inventory.yml> --list --playbook-dir <playbook_dir>
 ```
-
-Use `--list`, `--yaml`, or `--graph --vars` only after confirming that the inventory and all
-adjacent `group_vars`/`host_vars` are secret-free. These formats can print variables loaded by
-Ansible even though the SCCFM inventory plugin itself never exports its authentication token.
 
 If credentials are missing, validate only the file shape and mark it as not
 validated against live SCCFM.
@@ -479,7 +475,7 @@ When modifying or adding Ansible modules in this repository:
 
 1. Read the matched module source and its tests.
 2. Keep all module functions typed.
-3. Use `base_argument_spec()` for shared `region` and `api_token` auth.
+3. Use `base_argument_spec()` for shared `profile` and `config_path` options.
 4. Set `supports_check_mode=True` on every module.
 5. Implement a meaningful `module.check_mode` path for mutating modules.
 6. Keep secrets marked `no_log=True`.
@@ -500,7 +496,8 @@ When modifying or adding Ansible modules in this repository:
 1. Never hardcode modules. All module knowledge comes from `ansible-doc`.
 2. Never fabricate options. Only use parameters listed in the matched docs.
 3. Always use FQCNs.
-4. Always protect secrets with Vault, environment lookups, or placeholders.
+4. Always protect playbook-specific secrets with Vault or placeholders; keep
+   SCCFM API tokens in the canonical profile store.
 5. Never guess between ambiguous modules, targets, or regions.
 6. Never rely on default local output paths for customer data.
 7. Never execute mutating automation without the confirmation workflow.

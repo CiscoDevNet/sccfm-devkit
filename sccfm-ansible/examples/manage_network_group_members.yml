@@ -8,8 +8,7 @@
 #   ansible-playbook examples/manage_network_group_members.yml
 #
 # PREREQUISITES:
-#   - SCCFM_REGION and SCCFM_API_TOKEN environment variables set, OR
-#   - SCCFM_REGION set and vault_sccfm_api_token in encrypted group_vars/all/vault.yml
+#   - Configure the default profile with `sccfm-cli configure`
 #   - The network group and referenced network objects must already exist.
 #     Run create_network_objects.yml and create_network_groups.yml first.
 
@@ -19,11 +18,9 @@
 
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ sccfm_api_token_effective }}"
+      profile: default
 
   vars:
-    sccfm_api_token_effective: "{{ vault_sccfm_api_token | default(lookup('env', 'SCCFM_API_TOKEN'), true) }}"
     group_name: web-servers
     members_to_add:
       - web-server-01

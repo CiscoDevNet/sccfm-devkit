@@ -25,9 +25,10 @@ $ ansible-doc -t module cisco.sccfm.update_network_group
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - description  New description for the network group.
         default: null
@@ -47,6 +48,10 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - referenced_objects  List of existing network object names or UIDs
                        to include in the group. Names are resolved to
                        UIDs automatically. Replaces all existing
@@ -54,10 +59,6 @@ OPTIONS (= indicates it is required):
         default: null
         elements: str
         type: list
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        default: null
-        type: str
 
 - tags    New mapping of tag keys to lists of tag values. For
            example, `{"environment": ["production", "staging"]}'.
@@ -68,7 +69,7 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Update referenced objects by name
@@ -78,8 +79,7 @@ EXAMPLES:
     referenced_objects:
       - web-server-01
       - web-server-02
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Rename a group and update description using module_defaults
 - name: Update network groups
@@ -87,8 +87,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Rename and update group
       cisco.sccfm.update_network_group:

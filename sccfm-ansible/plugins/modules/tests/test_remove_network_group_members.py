@@ -49,8 +49,7 @@ def mock_module_instance() -> MagicMock:
         "uid": "net-grp-uid-456",
         "name": None,
         "referenced_objects": ["ref-uid-001"],
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
     mock_module.check_mode = False
     mock_module.exit_json.side_effect = SystemExit(0)

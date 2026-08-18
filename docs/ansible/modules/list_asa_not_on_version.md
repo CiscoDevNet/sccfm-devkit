@@ -24,9 +24,10 @@ $ ansible-doc -t module cisco.sccfm.list_asa_not_on_version
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - limit   Maximum number of devices to fetch when using `query' or no
            filter.
@@ -39,14 +40,14 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to narrow the set of ASA devices to check.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
            If omitted, all ASA devices are checked.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -63,15 +64,14 @@ OPTIONS (= indicates it is required):
             Devices NOT running this exact version will be returned.
         type: str
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: List all ASAs not on a specific version
 - name: Find ASAs not on 9.20(3)13
   cisco.sccfm.list_asa_not_on_version:
     version: "9.20(3)13"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
   register: result
 
 - name: Show devices that need upgrading
@@ -101,8 +101,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Find ASAs not on target version
       cisco.sccfm.list_asa_not_on_version:

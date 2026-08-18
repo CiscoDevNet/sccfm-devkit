@@ -17,16 +17,13 @@ $ ansible-doc -t inventory cisco.sccfm.sccfm
   enumerate devices using the REST APIs.
   Each device becomes an inventory host with SCCFM metadata attached
   as host variables.
-  Authentication values are consumed only while refreshing inventory
-  and are never attached to groups or hosts.
 
 OPTIONS (= indicates it is required):
 
-= api_token  API token for the SCCFM region.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
-        type: str
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
+        default: null
+        type: path
 
 - group   Group to place all discovered SCCFM devices into.
         default: sccfm
@@ -41,27 +38,24 @@ OPTIONS (= indicates it is required):
         default: 100
         type: int
 
-= plugin  Token that ensures this is a source file for the
-           `cisco.sccfm.sccfm' plugin.
+= plugin  Ensure this plugin gets loaded.
         choices: [cisco.sccfm.sccfm]
+
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
 
 - query   Optional text filter applied to device names.
         default: null
         type: str
 
-= region  SCCFM region to target (int, us, eu, apj, au, uae, in, or
-           ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        type: str
+NAME: cisco.sccfm.sccfm
 
-NAME: sccfm
+PLUGIN_TYPE: inventory
 
 EXAMPLES:
 plugin: cisco.sccfm.sccfm
-region: us
-api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+profile: default
 limit: 100
 query: "asa"
 group: sccfm

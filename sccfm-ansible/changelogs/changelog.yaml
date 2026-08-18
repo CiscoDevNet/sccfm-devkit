@@ -2,11 +2,14 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.38.0
 releases:
-  0.38.0:
+  0.39.0:
     changes:
-      release_summary: Initial development release of the cisco.sccfm collection,
-        with dynamic inventory and modules for automating Cisco Security Cloud Control
-        Firewall Manager.
+      release_summary: >-
+        Initial development release of the cisco.sccfm collection, with dynamic
+        inventory and modules for automating Cisco Security Cloud Control Firewall
+        Manager. This release unifies CLI and Ansible authentication around canonical
+        SCCFM profiles and prepares the paired Python and Galaxy artifacts for secure
+        publication.
     fragments:
-      - 0.38.0.yml
-    release_date: '2026-07-27'
+      - 0.39.0.yml
+    release_date: '2026-08-18'

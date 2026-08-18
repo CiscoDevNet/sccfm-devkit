@@ -240,14 +240,14 @@
 ### 9.2 Ansible `Config`
 - **Canonical:** [sccfm-ansible/plugins/module_utils/config.py](sccfm-ansible/plugins/module_utils/config.py).
 - **Invariants:**
-  - Frozen dataclass with `__post_init__` env fallback (`SCCFM_REGION`, `SCCFM_API_TOKEN`).
+  - Frozen dataclass validates values resolved from the canonical profile store.
   - Allowed regions: `int, us, eu, apj, au, uae, in, ci` (`aus` is a legacy alias normalized to `au`).
-  - `base_argument_spec()` returns `region` + `api_token` (token has `no_log: True`).
+  - `base_argument_spec()` returns `profile` + `config_path`.
   - `create_config(module)` wraps validation in try/except → `module.fail_json(msg=...)`.
 
-### 9.3 Environment variable names
-- **Canonical set:** `SCCFM_REGION`, `SCCFM_API_TOKEN`, `SCCFM_CONFIG` (CLI only).
-- **Invariants:** any new authenticated entry point reuses these — do not invent new variants.
+### 9.3 Configuration path override
+- **Canonical override:** `SCCFM_CONFIG`.
+- **Invariants:** SCCFM region and token values come only from named profiles.
 
 ---
 
@@ -338,7 +338,7 @@
 ### 14.1 Module skeleton
 - **Canonical:** [sccfm-ansible/plugins/modules/execute_asa_cli.py](sccfm-ansible/plugins/modules/execute_asa_cli.py), [sccfm-ansible/plugins/modules/trigger_ftd_upgrade.py](sccfm-ansible/plugins/modules/trigger_ftd_upgrade.py), and the rest of `plugins/modules/`.
 - **Invariants:**
-  - `DOCUMENTATION` lists every option with `description`, `type`, `required`, `default`; `region`/`api_token` declare `env: [{name: SCCFM_REGION/...}]`.
+  - `DOCUMENTATION` lists every option with `description`, `type`, `required`, and default; shared auth options are `profile` and `config_path`.
   - `EXAMPLES` includes a direct call **and** a `module_defaults` (`group/cisco.sccfm.all`) example.
   - `RETURN` documents `changed`, `result`, and (on failure) `msg`/`error_code`/`error_details`/`status_code`.
   - `author: Cisco SCCFM Team`.
@@ -400,8 +400,8 @@
 ### 16.1 Poetry / `pyproject.toml`
 - **Invariants:**
   - Dependencies added via `poetry add`; dev deps in `[tool.poetry.group.dev.dependencies]`.
-  - Public entry point: `sccfm-cli`; maintainer entry points come from the local `devtools/`
-    package in the development dependency group.
+  - Public entry point: `sccfm-cli`; `sccfm-cli-interactive` and other maintainer entry points
+    come from the local `devtools/` package in the development dependency group.
   - Tool configs (black, isort, mypy, pytest, coverage) all live in `pyproject.toml`.
 
 ### 16.2 Pre-commit
@@ -417,15 +417,15 @@
   - `cz` drives version bumps and `CHANGELOG.md` updates; do not edit version strings by hand.
 
 ### 16.5 Helper scripts
-- **Canonical:** `cisco_sccfm_scripts/` (`devkit_cli.py`, `setup_environment.sh`, `setup_ci_environment.sh`, `setup_tokens.py`, `token_store.py`, `build_ansible_collection.py`, `cz.sh`) plus the entry-point declarations in `devtools/pyproject.toml`.
-- **Invariants:** new repo-wide automation remains source-only; public CLI features belong under
-  `sccfm-cli`.
+- **Canonical:** `cisco_sccfm_scripts/` (`interactive_cli.py`, `setup_environment.sh`, `setup_ci_environment.sh`, `import_legacy_vault.py`, `build_ansible_collection.py`, `cz.sh`).
+- **Invariants:** new repo-wide automation remains source-only and is exposed through
+  `devtools/pyproject.toml`; public CLI features belong under `cisco_sccfm_cli`.
 
 ---
 
 ## 17. Questionary Prompts
 
-- **Canonical:** [cisco_sccfm_scripts/setup_tokens.py](cisco_sccfm_scripts/setup_tokens.py), `cisco_sccfm_cli/commands/configure.py`.
+- **Canonical:** `cisco_sccfm_core/services/profile_service.py` and `cisco_sccfm_cli/commands/configure.py`.
 - **Invariants:**
   - Use `.unsafe_ask()` (sync API) — never the async variant.
   - `confirm()` for yes/no with explicit `default`.
@@ -486,11 +486,11 @@
 
 ---
 
-## 22. Environment / Local Dev Files
+## 22. Local Development Files
 
 - **Invariants:**
-  - `.env.example` committed; `.env` git-ignored.
-  - Variable names match the canonical set in §9.3.
+  - SCCFM credentials are not configured through project `.env` files.
+  - Profile files are owner-only and never committed.
   - `dev-commands.local.txt` is a developer scratchpad; don't reference it from production code.
 
 ---
@@ -516,7 +516,7 @@
 - [ ] **Pagination:** `--limit` 1–200 (default 50), `--offset` ≥0 (default 0); response shape `count/items/limit/offset`.
 - [ ] **Transactions:** poll via `TransactionService`; honor `--wait` / `--timeout`; print UID + URL even without `--wait`; exit `1` on failed wait.
 - [ ] **Device targets:** ASA/FTD filters mutually exclusive; `report_check_targets` JSON shape unchanged.
-- [ ] **Config / env:** uses `SCCFM_REGION`, `SCCFM_API_TOKEN`, `SCCFM_CONFIG`; new region/token paths plumb through `Config` / `ConfigService`.
+- [ ] **Profiles:** uses the shared `ProfileService`; optional path override is `SCCFM_CONFIG`.
 - [ ] **Models:** `@dataclass(frozen=True)`, full type hints, `from_dict`/`to_dict` defaults.
 - [ ] **Parsers:** module-level compiled regexes, return typed model, defensive on missing fields, accompanied by tests with real CLI fixtures.
 - [ ] **Ansible module:** `base_argument_spec()` merged, `supports_check_mode=True`, `module_defaults` example present, action group `cisco.sccfm.all`, full `RETURN` docs.

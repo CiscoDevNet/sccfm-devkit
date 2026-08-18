@@ -21,15 +21,16 @@ $ ansible-doc -t module cisco.sccfm.remove_asa_shun
   `source_ip' and `source_ips' are mutually exclusive.
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/.
   for API documentation.
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
@@ -41,13 +42,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
         default: null
         type: str
 
@@ -70,7 +71,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: huides00 (@huides00), Scoombe (@Scoombe), afercal (@afercal)
+AUTHOR: Cisco SCCFM Team
 
 EXAMPLES:
 # Example 1: Remove a single shun on devices matching a query
@@ -78,8 +79,7 @@ EXAMPLES:
   cisco.sccfm.remove_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
     source_ip: "10.99.99.99"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 2: Remove multiple shuns in a single transaction
 - name: Remove multiple attacker IPs in one call
@@ -89,8 +89,7 @@ EXAMPLES:
       - "203.0.113.40"
       - "203.0.113.50"
       - "203.0.113.60"
-    region: "{{ lookup('env', 'SCCFM_REGION') }}"
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
 # Example 3: Remove a shun on specific devices by UID
 - name: Remove shun on specific ASA
@@ -105,8 +104,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ lookup('env', 'SCCFM_REGION') }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Remove shun for attacker
       cisco.sccfm.remove_asa_shun:

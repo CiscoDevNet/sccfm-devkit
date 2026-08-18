@@ -20,7 +20,7 @@ from cisco_sccfm_scripts.verify_ansible_collection import verify_collection_arti
 from cisco_sccfm_scripts.verify_python_artifacts import verify_python_wheel
 
 _ANSIBLE_CORE = "ansible-core>=2.20,<2.22"
-_TOKEN_ERROR = "api_token is required."
+_PROFILE_ERROR = "SCCFM profile 'default' not found"
 _EXPECTED_MODULES = 49
 _EXPECTED_INVENTORY_PLUGINS = 1
 
@@ -200,7 +200,7 @@ def _verify_missing_devkit_dependency(
             or any(message in rendered for message in forbidden)
         ):
             raise CleanControllerVerificationError(
-                f"{module_name} did not report the missing paired runtime cleanly"
+                f"{module_name} did not report the missing paired runtime cleanly: {rendered}"
             )
 
 
@@ -255,8 +255,8 @@ def _offline_checks(controller: _Controller, probe: str) -> None:
         ],
         check=False,
     )
-    if result.returncode == 0 or _TOKEN_ERROR not in f"{result.stdout}\n{result.stderr}":
-        raise CleanControllerVerificationError("module did not reach missing-token validation")
+    if result.returncode == 0 or _PROFILE_ERROR not in f"{result.stdout}\n{result.stderr}":
+        raise CleanControllerVerificationError("module did not reach missing-profile validation")
     playbook = controller.work / "syntax-check.yml"
     playbook.write_text(
         "---\n- hosts: localhost\n  gather_facts: false\n  tasks:\n" f"    - {probe}: {{}}\n",
