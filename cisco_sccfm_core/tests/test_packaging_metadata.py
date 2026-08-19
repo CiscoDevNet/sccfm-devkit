@@ -38,7 +38,10 @@ def test_published_package_contract_is_cli_and_core_only() -> None:
         "cisco_sccfm_cli",
         "cisco_sccfm_core",
     }
-    assert _project_config()["scripts"] == {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+    assert _project_config()["scripts"] == {
+        "sccfm-cli": "cisco_sccfm_cli.cli:cli",
+        "sccfm-cli-interactive": "cisco_sccfm_cli.interactive:main",
+    }
 
 
 def test_published_packages_exclude_repository_only_code() -> None:
@@ -59,13 +62,17 @@ def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
     assert "scc-firewall-manager-sdk==1.17.27" in _project_config()["dependencies"]
 
 
-def test_interactive_entrypoint_is_completely_renamed() -> None:
-    with (PROJECT_ROOT / "devtools" / "pyproject.toml").open("rb") as pyproject_file:
-        scripts = tomllib.load(pyproject_file)["project"]["scripts"]
+def test_interactive_entrypoint_is_published_from_the_cli_package() -> None:
+    scripts = _project_config()["scripts"]
 
-    assert scripts["sccfm-cli-interactive"] == "cisco_sccfm_scripts.interactive_cli:main"
-    assert "devkit" not in scripts
-    assert "change-tokens" not in scripts
+    assert scripts["sccfm-cli-interactive"] == "cisco_sccfm_cli.interactive:main"
+
+
+def test_interactive_prompt_dependency_is_installed_for_users() -> None:
+    pyproject = _pyproject()
+
+    assert "questionary>=2.1.1,<3" in _project_config()["dependencies"]
+    assert "questionary" not in pyproject["tool"]["poetry"]["group"]["dev"]["dependencies"]
 
 
 def test_user_guidance_only_references_canonical_profile_configuration() -> None:

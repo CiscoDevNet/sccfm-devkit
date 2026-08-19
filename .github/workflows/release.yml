@@ -271,6 +271,7 @@ jobs:
             "cisco-sccfm-devkit==${RELEASE_VERSION}"
           "${INSTALL_ROOT}/venv/bin/python" -I -m pip check
           "${INSTALL_ROOT}/venv/bin/sccfm-cli" --help >/dev/null
+          "${INSTALL_ROOT}/venv/bin/sccfm-cli-interactive" --help >/dev/null
           "${INSTALL_ROOT}/venv/bin/sccfm-cli" schema export --format json \
             | "${INSTALL_ROOT}/venv/bin/python" -I -c \
               'from importlib.metadata import version; import json, sys; payload=json.load(sys.stdin); assert payload.get("version") == version("cisco-sccfm-devkit"); assert len(payload.get("commands", [])) == 57'

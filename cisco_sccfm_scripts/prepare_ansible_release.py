@@ -29,6 +29,7 @@ _INITIAL_SEED = re.compile(
     r"(?P<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))$"
 )
 _IMMUTABLE_INITIAL_SEED_VERSION = "0.39.0"
+_MIN_RST_RELEASE_UNDERLINE = 8
 _MAINTAINER_GUIDANCE = "prepare the Ansible changelog in source before releasing"
 
 
@@ -275,8 +276,9 @@ def _rst_headings(lines: list[str]) -> dict[str, int]:
         if match is None:
             continue
         version = match.group("version")
-        expected = len(f"v{version}")
-        if index + 1 >= len(lines) or lines[index + 1].rstrip("\n") != "=" * expected:
+        expected_length = len(f"v{version}")
+        underline = lines[index + 1].rstrip("\n") if index + 1 < len(lines) else ""
+        if len(underline) < expected_length or set(underline) != {"="}:
             raise AnsibleReleaseError(f"invalid RST release heading; {_MAINTAINER_GUIDANCE}")
         if version in headings:
             raise AnsibleReleaseError(f"duplicate RST release heading; {_MAINTAINER_GUIDANCE}")
@@ -290,7 +292,8 @@ def _retarget_rst_heading(lines: list[str], index: int, release_version: str) ->
     underline_newline = "\n" if lines[index + 1].endswith("\n") else ""
     heading = f"v{release_version}"
     lines[index] = f"{heading}{heading_newline}"
-    lines[index + 1] = f"{'=' * len(heading)}{underline_newline}"
+    underline_length = max(len(heading), _MIN_RST_RELEASE_UNDERLINE)
+    lines[index + 1] = f"{'=' * underline_length}{underline_newline}"
 
 
 def _write_changed(path: Path, content: str, original: str) -> bool:

@@ -48,7 +48,10 @@ _REQUIRED_SDIST_DOCUMENTS = frozenset(
         "SECURITY.md",
     }
 )
-_EXPECTED_SCRIPTS = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+_EXPECTED_SCRIPTS = {
+    "sccfm-cli": "cisco_sccfm_cli.cli:cli",
+    "sccfm-cli-interactive": "cisco_sccfm_cli.interactive:main",
+}
 _EXPECTED_LICENSE_FILES = ("LICENSE", "LICENSES/Apache-2.0.txt")
 _APACHE_2_LICENSE_SHA256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 _MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(\s*(?:<(?P<angle>[^>]+)>|(?P<plain>[^\s)]+))")
@@ -227,10 +230,12 @@ def _entry_points(raw: bytes) -> dict[tuple[str, str], str]:
 
 
 def _verify_entry_points(raw: bytes) -> None:
-    """Require the sole supported public console entry point."""
+    """Require exactly the supported public console entry points."""
     expected = {("console_scripts", name): target for name, target in _EXPECTED_SCRIPTS.items()}
     if _entry_points(raw) != expected:
-        raise PythonArtifactVerificationError("wheel does not expose exactly the sccfm-cli command")
+        raise PythonArtifactVerificationError(
+            "wheel does not expose exactly the supported public commands"
+        )
 
 
 def _verify_markdown_links(text: str, source: str) -> None:
@@ -303,7 +308,9 @@ def _verify_sdist_pyproject(raw: bytes) -> None:
 
     scripts = project.get("scripts")
     if scripts != _EXPECTED_SCRIPTS:
-        raise PythonArtifactVerificationError("sdist does not expose exactly the sccfm-cli command")
+        raise PythonArtifactVerificationError(
+            "sdist does not expose exactly the supported public commands"
+        )
 
 
 def _verify_wheel(path: Path, version: str) -> int:

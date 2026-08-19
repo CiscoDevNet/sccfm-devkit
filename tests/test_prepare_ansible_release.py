@@ -101,7 +101,7 @@ def test_retargets_only_the_initial_release_metadata(tmp_path: Path) -> None:
     assert release["fragments"] == ["1.0.0.yml"]
     assert release["changes"] == {"release_summary": _SUMMARY}
     rst = (root / "CHANGELOG.rst").read_text(encoding="utf-8")
-    assert "v1.0.0\n======" in rst
+    assert "v1.0.0\n========" in rst
     assert "v0.39.0" not in rst
     assert _SUMMARY in rst
 
@@ -364,6 +364,20 @@ def test_rejects_malformed_rst_release_heading(tmp_path: Path) -> None:
 
     with pytest.raises(AnsibleReleaseError, match="invalid RST release heading.*prepare"):
         prepare_ansible_release(root, _INITIAL_VERSION, _RELEASE_VERSION, _RELEASE_DATE)
+
+
+def test_accepts_rst_release_underline_longer_than_heading(tmp_path: Path) -> None:
+    rst_content = _rst_release().replace("v0.39.0\n=======\n", "v0.39.0\n========\n")
+    root = _collection(tmp_path, rst_content=rst_content)
+
+    result = prepare_ansible_release(
+        root,
+        _INITIAL_VERSION,
+        _RELEASE_VERSION,
+        _RELEASE_DATE,
+    )
+
+    assert result.changed
 
 
 def test_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:

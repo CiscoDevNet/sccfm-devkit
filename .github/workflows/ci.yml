@@ -428,6 +428,7 @@ jobs:
             python -m venv "${smoke_root}/venv"
             local smoke_python="${smoke_root}/venv/bin/python"
             local smoke_cli="${smoke_root}/venv/bin/sccfm-cli"
+            local smoke_interactive="${smoke_root}/venv/bin/sccfm-cli-interactive"
 
             cd "${smoke_root}"
             "${smoke_python}" -I -m pip install --no-cache-dir "${artifact_path}"
@@ -469,11 +470,15 @@ jobs:
               for entry in distribution("cisco-sccfm-devkit").entry_points
               if entry.group == "console_scripts"
           }
-          expected = {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+          expected = {
+              "sccfm-cli": "cisco_sccfm_cli.cli:cli",
+              "sccfm-cli-interactive": "cisco_sccfm_cli.interactive:main",
+          }
           if console_scripts != expected:
               raise SystemExit(f"unexpected public console scripts: {console_scripts}")
           PY
             "${smoke_cli}" --help >/dev/null
+            "${smoke_interactive}" --help >/dev/null
             "${smoke_cli}" schema export --format json | "${smoke_python}" -I -c \
               'from importlib.metadata import version; import json, sys; payload = json.load(sys.stdin); commands = payload.get("commands"); assert payload.get("version") == version("cisco-sccfm-devkit"); assert isinstance(commands, list) and len(commands) == 57'
           }

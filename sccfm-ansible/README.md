@@ -55,9 +55,11 @@ See instructions in the [INSTALL.md](INSTALL.md) file.
 
 ### Local Development
 
+Run these commands from an activated repository checkout.
+
 **Build and install (recommended):**
 ```bash
-sccfm-cli-interactive
+sccfm-devkit
 # then select "build-collection" from the menu
 ```
 
@@ -94,13 +96,15 @@ Windows, the store inherits the user's profile-directory ACLs. Ansible modules
 and inventory load the selected profile directly; do not duplicate its API token in
 environment variables or Ansible Vault.
 
-If you used a release that stored SCCFM tokens in Ansible Vault, import them without
-modifying the source vault:
+When developing from a source checkout, profiles from the former Ansible Vault token store can
+be imported without modifying the source vault:
 
 ```bash
-sccfm-cli-interactive
+sccfm-devkit
 # select "import-legacy-vault"
 ```
+
+This migration helper is development-only and is not included in the public Python package.
 
 <details>
 <summary><strong>Set up Ansible-specific device secrets</strong></summary>
@@ -184,7 +188,7 @@ Each device gets the following variables:
 
 ## Modules
 
-Generated module and inventory reference docs can be previewed locally. Generate them with:
+From an activated repository checkout, generate module and inventory reference docs with:
 
 ```bash
 generate-ansible-docs

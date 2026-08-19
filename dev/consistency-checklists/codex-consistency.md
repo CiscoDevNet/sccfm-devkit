@@ -431,14 +431,14 @@ Main test locations:
 
 ## 22. Interactive CLI and discoverability
 
-- [ ] New CLI commands remain discoverable through Click introspection, which
-  powers the `sccfm-cli-interactive` runner.
-- [ ] New example playbooks remain runnable through the interactive example runner.
+- [ ] New CLI commands remain discoverable through Click introspection, which powers the public
+  `sccfm-cli-interactive` customer menu and the development-only `sccfm-devkit` menu.
+- [ ] New example playbooks remain runnable through the `sccfm-devkit` example runner.
 - [ ] Setup/lint/test/build workflows stay aligned between scripts and docs.
 
 Primary locations:
+- `cisco_sccfm_cli/interactive.py`
 - `cisco_sccfm_scripts/interactive_cli.py`
-- `cisco_sccfm_scripts/cli_commands.py`
 - `cisco_sccfm_scripts/setup_environment.sh`
 - `README.md`
 - `CONTRIBUTING.md`

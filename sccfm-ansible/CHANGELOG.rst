@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.39.2
+========
+
+Bugfixes
+--------
+
+- Added the documented ``sccfm-cli-interactive`` command to the paired Python package while keeping repository maintenance tasks out of public artifacts.
+
 v0.39.1
 =======
 

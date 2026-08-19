@@ -2,6 +2,13 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.39.2:
+    changes:
+      bugfixes:
+        - Added the documented ``sccfm-cli-interactive`` command to the paired Python
+          package while keeping repository maintenance tasks out of public artifacts.
+    fragments: []
+    release_date: '2026-08-19'
   0.39.1:
     changes:
       release_summary: >-

@@ -1,9 +1,9 @@
 # Cisco Security Cloud Control Firewall Manager (SCCFM) DevKit ![CI](https://github.com/CiscoDevNet/sccfm-devkit/actions/workflows/ci.yml/badge.svg)
 
 Toolkit for interacting with Security Cloud Control Firewall Manager (SCCFM): a Python
-package with the `sccfm-cli` command, a reusable `cisco_sccfm_core` automation library,
-and an Ansible collection. Shared business logic lives in `cisco_sccfm_core` so the CLI,
-Python scripts, and collection can reuse the same SDK integrations.
+package with the `sccfm-cli` and `sccfm-cli-interactive` commands, a reusable
+`cisco_sccfm_core` automation library, and an Ansible collection. Shared business logic lives in
+`cisco_sccfm_core` so the CLI, Python scripts, and collection can reuse the same SDK integrations.
 
 **Documentation:** [Generated CLI and Ansible reference](https://ciscodevnet.github.io/sccfm-devkit/)
 
@@ -29,7 +29,8 @@ Python scripts, and collection can reuse the same SDK integrations.
 cisco_sccfm_scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps
 source cisco_sccfm_scripts/activate.sh     # activates the project virtualenv
 sccfm-cli --help               # the main SCCFM CLI
-sccfm-cli-interactive          # interactive CLI and developer workflow menu
+sccfm-cli-interactive          # customer-facing interactive CLI menu
+sccfm-devkit                   # repository development workflow menu
 ```
 
 `setup_environment.sh` keeps everything local to the repository: pyenv provides Python 3.12.4, `.venv/` hosts the runtime, and Poetry installs the project plus dev dependencies.
@@ -45,6 +46,10 @@ sccfm-cli-interactive          # interactive CLI and developer workflow menu
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
 Every command lives in `cisco_sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
 
+`sccfm-cli-interactive` provides customer-facing shortcuts to configure or manage profiles and
+to discover and run `sccfm-cli` commands. Repository maintenance tasks are kept separate in the
+development-only `sccfm-devkit` menu.
+
 By default, configuration is stored in `~/.sccfm-cli/config.json`. On POSIX systems the CLI
 requires mode `0700` on `~/.sccfm-cli` and `0600` on the configuration file. Read-only commands
 fail without changing metadata when those modes are unsafe; `sccfm-cli configure` repairs them
@@ -52,7 +57,7 @@ while updating a profile. Custom configuration files must also use mode `0600`, 
 not change an existing custom parent directory. On Windows, keep the configuration in your user
 profile and rely on the filesystem's per-user access controls.
 
-Generated CLI reference docs can be previewed locally:
+From an activated source checkout, generated CLI reference docs can be previewed locally:
 
 ```bash
 generate-cli-docs
@@ -93,7 +98,8 @@ The package root exports the supported public service classes and response model
 ## Ansible collection
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
-- Build and install the collection locally: `build-ansible-collection`.
+- From an activated source checkout, build and install the collection with
+  `build-ansible-collection`.
 - Configure profiles interactively: run `sccfm-cli-interactive` and select **configure-profile**.
 - For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
 - Ansible modules and inventory select the same named SCCFM profile; they do not duplicate its region or API token in environment variables, playbooks, or Ansible Vault.
@@ -103,15 +109,18 @@ The package root exports the supported public service classes and response model
   or group variable. Do not use inventory output modes that render vars when your own
   `group_vars` or `host_vars` contain secrets.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
-- Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/docs/README.md) for details.
+- From an activated source checkout, generate Ansible reference docs with
+  `generate-ansible-docs`; see
+  [docs/README.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/docs/README.md)
+  for details.
 
 ## Development
 
-All common development tasks are available through the interactive CLI menu:
+All common development tasks are available through the repository-only interactive menu:
 
 ```bash
 source cisco_sccfm_scripts/activate.sh
-sccfm-cli-interactive
+sccfm-devkit
 ```
 
 This presents an interactive selector with the following tasks:
@@ -120,8 +129,8 @@ This presents an interactive selector with the following tasks:
 |------|-------------|
 | **configure-profile** | Create or replace a canonical SCCFM profile |
 | **manage-profiles** | Update or remove SCCFM profiles |
-| **import-legacy-vault** | Copy profiles from the former vault token store without modifying it |
 | **run-cli** | Discover and run an `sccfm-cli` command interactively |
+| **import-legacy-vault** | Copy profiles from the former vault token store without modifying it (source only) |
 | **run-ansible** | Select and run an example playbook |
 | **build-collection** | Build the cisco.sccfm Ansible collection tarball |
 | **generate-ansible-docs** | Generate Ansible reference docs from ansible-doc output |
@@ -130,7 +139,8 @@ This presents an interactive selector with the following tasks:
 | **install-cli-man-docs** | Install generated CLI man pages for local man lookup |
 | **setup-env** | Bootstrap environment (pyenv, venv, Poetry deps) |
 | **test** | Run the test suite (pytest), with optional filter & verbose |
-| **lint** | Run mypy + flake8 |
+| **run-e2e** | Run Ansible e2e tests against a real SCCFM tenant |
+| **lint** | Run black + isort + mypy |
 | **format** | Auto-format code with black + isort |
 
 After a task completes you're returned to the menu — select **Exit** when done.
@@ -151,7 +161,7 @@ See `CONTRIBUTING.md` for commit guidelines (Commitizen) and contribution expect
 For contributors, use the repository environment from [Getting started](#getting-started).
 
 For end users, install the published PyPI package with `pipx` when possible. `pipx`
-keeps the CLI isolated while exposing `sccfm-cli` on `PATH`:
+keeps the CLI isolated while exposing `sccfm-cli` and `sccfm-cli-interactive` on `PATH`:
 
 ```bash
 pipx install cisco-sccfm-devkit
