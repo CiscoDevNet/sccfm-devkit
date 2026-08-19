@@ -15,6 +15,7 @@ SETUP_SCRIPTS = (
     PROJECT_ROOT / "cisco_sccfm_scripts" / "setup_ci_environment.sh",
     PROJECT_ROOT / "cisco_sccfm_scripts" / "setup_environment.sh",
 )
+LOCAL_SETUP_SCRIPT = PROJECT_ROOT / "cisco_sccfm_scripts" / "setup_environment.sh"
 POETRY_GROUP_ARGUMENT = re.compile(
     r"\binstall --with (?P<groups>[A-Za-z0-9_-]+(?:,[A-Za-z0-9_-]+)*)"
 )
@@ -47,3 +48,31 @@ def test_setup_scripts_request_defined_poetry_groups() -> None:
                 f"{script.name} requests undefined Poetry groups: "
                 f"{sorted(requested_groups - defined_groups)}"
             )
+
+
+def test_setup_scripts_read_all_pyenv_versions_with_pipefail_enabled() -> None:
+    for script in SETUP_SCRIPTS:
+        source = script.read_text(encoding="utf-8")
+
+        assert 'grep -Fx "${PYTHON_VERSION}" >/dev/null' in source
+        assert "grep -q" not in source
+
+
+def test_setup_scripts_isolate_poetry_from_project_runtime() -> None:
+    for script in SETUP_SCRIPTS:
+        source = script.read_text(encoding="utf-8")
+        poetry_install_lines = [
+            line.strip() for line in source.splitlines() if 'pip" install poetry' in line
+        ]
+
+        assert 'poetry_venv="${VENV_DIR}/.poetry"' in source
+        assert poetry_install_lines == ['"${poetry_venv}/bin/pip" install poetry']
+        assert '"${poetry_venv}/bin/poetry" install --with dev' in source
+        assert 'ln -sfn "../.poetry/bin/poetry" "${VENV_DIR}/bin/poetry"' in source
+
+
+def test_local_setup_validates_runtime_dependencies() -> None:
+    source = LOCAL_SETUP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "python -m pip check" in source
+    assert 'importlib.metadata.version("poetry")' in source

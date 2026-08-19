@@ -33,7 +33,10 @@ sccfm-cli-interactive          # customer-facing interactive CLI menu
 sccfm-devkit                   # repository development workflow menu
 ```
 
-`setup_environment.sh` keeps everything local to the repository: pyenv provides Python 3.12.4, `.venv/` hosts the runtime, and Poetry installs the project plus dev dependencies.
+`setup_environment.sh` keeps the project runtime and Poetry dependencies isolated: pyenv provides
+Python 3.12.4, `.venv/` hosts the project runtime, and `.venv/.poetry/` hosts Poetry. If `.venv/`
+was created by an older version of the script that installed Poetry into the project runtime,
+remove `.venv/` once and rerun the setup script.
 
 ## Commands
 
@@ -98,10 +101,20 @@ The package root exports the supported public service classes and response model
 ## Ansible collection
 
 - macOS: `brew install ansible` (this includes `ansible-galaxy`; verify with `ansible-galaxy --version`).
-- From an activated source checkout, build and install the collection with
-  `build-ansible-collection`.
+- From an activated source checkout, build and verify the collection, then install the exact
+  artifact that was just built:
+
+  ```bash
+  build-ansible-collection
+  ansible-galaxy collection install \
+    "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
+  ```
+
 - Configure profiles interactively: run `sccfm-cli-interactive` and select **configure-profile**.
-- For IDEs/mypy, add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` (or mark it as a source root) so imports under `ansible_collections.cisco.sccfm` resolve without installing.
+- Ansible discovers its default collection install directory automatically. For a custom install,
+  pass `--collections-path <root>` to `ansible-galaxy` and set `ANSIBLE_COLLECTIONS_PATH` to that
+  same root. Point IDEs and `MYPYPATH` at the installed root as needed; the raw `sccfm-ansible`
+  source directory does not provide the `ansible_collections/cisco/sccfm` package layout.
 - Ansible modules and inventory select the same named SCCFM profile; they do not duplicate its region or API token in environment variables, playbooks, or Ansible Vault.
 - Keep Ansible Vault for playbook-specific secrets such as managed-device passwords.
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.

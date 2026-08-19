@@ -7,18 +7,18 @@
 #   2. Lists all ASA devices that are NOT currently running that version.
 #
 # RUN THIS PLAYBOOK (auto-detect majority version):
-#   ansible-playbook examples/list_asa_not_on_version.yml \
-#     --vault-password-file examples/.vault_pass
+#   ansible-playbook examples/list_asa_not_on_version.yml
 #
 # Narrow the check to a subset of devices (optional):
 #   ansible-playbook examples/list_asa_not_on_version.yml \
-#     --vault-password-file examples/.vault_pass \
 #     -e check_query="name:branch-*"
 #
 # Specify the target version directly (recommended):
 #   ansible-playbook examples/list_asa_not_on_version.yml \
-#     --vault-password-file examples/.vault_pass \
 #     -e target_version="9.20(3)13"
+#
+# If examples/group_vars/all/vault.yml exists, also pass:
+#   --vault-password-file examples/.vault_pass
 
 - name: List ASA devices not on the target version
   hosts: localhost

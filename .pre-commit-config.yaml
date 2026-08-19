@@ -50,4 +50,4 @@ repos:
     hooks:
       - id: doctoc
         args: ['--github', '--title', '## Table of Contents']
-        files: '(README\.md|INSTALL\.md|sccfm-ansible/README\.md)$'
+        files: '^(README\.md|INSTALL\.md|sccfm-ansible/README\.md)$'

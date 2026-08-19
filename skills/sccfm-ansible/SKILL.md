@@ -1,7 +1,7 @@
 ---
 name: sccfm-ansible
-description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules and inventory plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use for cisco.sccfm Ansible modules, inventory, vault, and playbook workflows. Do NOT use for sccfm-cli commands; use the sccfm-cli skill instead. Do not use for Jira/Confluence work, architecture design, or non-Ansible tasks.
-allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
+description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules, inventory plugins, and lookup plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use for cisco.sccfm Ansible modules, inventory, lookups, vault, and playbook workflows. Do NOT use for sccfm-cli commands; use the sccfm-cli skill instead. Do not use for Jira/Confluence work, architecture design, or non-Ansible tasks.
+allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(poetry version --short) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
 ---
 
 # SCC Firewall Manager Ansible Collection
@@ -17,15 +17,15 @@ managed devices. Optimize for customer safety first and convenience second.
 
 ## Scope: Ansible vs. CLI
 
-This skill covers only the `cisco.sccfm` Ansible collection (modules and the
-inventory plugin). For `sccfm-cli` command-line invocations, use the `sccfm-cli`
-skill. For requests spanning both surfaces, apply each skill only to its
-respective operations.
+This skill covers only the `cisco.sccfm` Ansible collection (modules, inventory
+plugins, and lookup plugins). For `sccfm-cli` command-line invocations, use the
+`sccfm-cli` skill. For requests spanning both surfaces, apply each skill only to
+its respective operations.
 
 ## Core Rules
 
 1. Run `ansible-doc` before writing, running, or answering detailed questions
-   about any `cisco.sccfm` module or inventory plugin.
+   about any `cisco.sccfm` module, inventory plugin, or lookup plugin.
 2. Prefer stopping over guessing. If module match, target identity, region,
    credentials, inventory, or safety class is ambiguous, ask the user or switch
    to Generate-Only.
@@ -133,10 +133,12 @@ Follow these checks in order:
 2. If you are inside this repository, `ansible-doc` is missing, and
    `cisco_sccfm_scripts/activate.sh` exists, run `source cisco_sccfm_scripts/activate.sh` once for the
    shell session, then resolve again. Do not use `poetry run`.
-3. Run discovery:
+3. Run collection discovery:
 
    ```bash
    ansible-doc -j -l -t module cisco.sccfm
+   ansible-doc -j -l -t inventory cisco.sccfm
+   ansible-doc -j -l -t lookup cisco.sccfm
    ```
 
 4. If discovery fails and you are inside this repository, run both commands,
@@ -144,13 +146,16 @@ Follow these checks in order:
 
    ```bash
    build-ansible-collection
-   ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
+   ansible-galaxy collection install \
+     "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
    ```
 
 5. If discovery succeeds and you are inside this repository, compare discovered
-   module FQCNs with `sccfm-ansible/plugins/modules/*.py` only to detect a stale
-   installed collection. If source modules are missing from `ansible-doc`, build
-   and install the generated tarball as above, then rerun discovery. Do not use source filenames as the module schema.
+   FQCNs with the corresponding files under `sccfm-ansible/plugins/modules/`,
+   `sccfm-ansible/plugins/inventory/`, or `sccfm-ansible/plugins/lookup/` only to
+   detect a stale installed collection. If source plugins are missing from
+   `ansible-doc`, build and install the generated tarball as above, then rerun
+   discovery. Do not use source filenames as the runtime schema.
 6. If you are outside this repository, install or modify local Ansible state only
    when the user explicitly asks for setup. Otherwise, stop and explain that the
    `cisco.sccfm` collection is not installed.
@@ -177,6 +182,13 @@ ansible-doc -j -l -t inventory cisco.sccfm
 ansible-doc -j -t inventory <inventory_plugin_fqcn>
 ```
 
+For lookup work, list lookup plugins, then fetch the matched plugin docs:
+
+```bash
+ansible-doc -j -l -t lookup cisco.sccfm
+ansible-doc -j -t lookup <lookup_plugin_fqcn>
+```
+
 Parse the JSON output. Use these fields as the schema:
 
 - module or plugin FQCN
@@ -185,7 +197,7 @@ Parse the JSON output. Use these fields as the schema:
   `elements`, `env`, and `no_log`
 - examples
 - return values
-- plugin type and inventory options
+- plugin type and inventory or lookup options
 
 Cache the discovered JSON in memory for the session. Do not use stale docs after
 building or reinstalling the collection.
@@ -194,9 +206,9 @@ If discovery fails, stop and report the error. Do not guess what the collection
 supports.
 
 The discovery commands above are the only hardcoded bootstrap commands. They are
-the Ansible equivalent of schema export: all module, inventory plugin,
-parameter, example, and return-value knowledge must come from the discovered
-`ansible-doc` JSON.
+the Ansible equivalent of schema export: all module, inventory plugin, lookup
+plugin, parameter, example, and return-value knowledge must come from the
+discovered `ansible-doc` JSON.
 
 ### Step C: Verify Credentials Without Exposing Secrets
 
@@ -216,6 +228,11 @@ Rules:
    command to run without asking them to paste the token into chat.
 8. Use Write/Edit only for non-secret playbook, inventory, vars template, or
    documentation artifacts.
+9. Treat a lookup result as a secret when `field` is omitted (it defaults to
+   `api_token`) or explicitly set to `field=api_token`. Use the result only
+   inside a task with `no_log: true`; never print, export, log, or return it in
+   chat. Only an explicitly non-secret field such as `field=region` may be
+   presented.
 
 Use `sccfm-cli configure` or the `configure-profile` option in
 `sccfm-cli-interactive` for local SCCFM credential setup only when the user
@@ -240,7 +257,8 @@ Then match modules using this algorithm:
 2. Fetch full docs for every plausible candidate.
 3. Reject candidates whose documented behavior conflicts with the user's intent.
 4. Prefer modules whose documented action and object type both match exactly.
-5. Use the inventory plugin only for inventory/discovery requests.
+5. Use inventory plugins only for inventory/discovery requests and lookup plugins
+   only for lookup requests.
 6. If exactly one candidate remains, use it.
 7. If multiple plausible candidates remain, show the candidates and ask the user
    to choose.
@@ -493,7 +511,8 @@ When modifying or adding Ansible modules in this repository:
 
 ## Important Rules
 
-1. Never hardcode modules. All module knowledge comes from `ansible-doc`.
+1. Never hardcode modules or plugins. All module and plugin knowledge comes from
+   `ansible-doc`.
 2. Never fabricate options. Only use parameters listed in the matched docs.
 3. Always use FQCNs.
 4. Always protect playbook-specific secrets with Vault or placeholders; keep

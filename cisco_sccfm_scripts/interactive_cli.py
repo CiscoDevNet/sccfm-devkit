@@ -12,11 +12,14 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import shlex
 import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator, Mapping, Sequence
 
 import click
 import questionary
@@ -50,6 +53,49 @@ def _ask(
     return answer if isinstance(answer, str) else None
 
 
+def _require_success(action: str, return_code: int) -> None:
+    """Raise a user-facing error when an in-process development task fails."""
+    if return_code:
+        raise click.ClickException(f"{action} failed with exit code {return_code}")
+
+
+def _run_checked(
+    command: Sequence[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str] | None = None,
+) -> None:
+    """Run a child command and propagate its nonzero status to the menu."""
+    return_code = subprocess.call(
+        list(command),
+        cwd=cwd,
+        env=dict(env) if env is not None else None,
+    )
+    if return_code:
+        raise click.ClickException(
+            f"Command failed with exit code {return_code}: {shlex.join(command)}"
+        )
+
+
+@contextmanager
+def _source_collection_environment(project_root: Path) -> Iterator[dict[str, str]]:
+    """Expose the source collection through a valid Ansible collection root."""
+    collection_dir = project_root / "sccfm-ansible"
+    with tempfile.TemporaryDirectory(prefix="sccfm-collection-") as temporary_directory:
+        collection_root = Path(temporary_directory)
+        namespace_dir = collection_root / "ansible_collections" / "cisco"
+        namespace_dir.mkdir(parents=True)
+        (namespace_dir / "sccfm").symlink_to(collection_dir, target_is_directory=True)
+
+        env = os.environ.copy()
+        existing_paths = env.get("ANSIBLE_COLLECTIONS_PATH")
+        paths = [str(collection_root)]
+        if existing_paths:
+            paths.append(existing_paths)
+        env["ANSIBLE_COLLECTIONS_PATH"] = os.pathsep.join(paths)
+        yield env
+
+
 # ── Task implementations ─────────────────────────────────────────
 
 
@@ -64,45 +110,35 @@ def _run_build_collection() -> None:
     """Build the cisco.sccfm Ansible collection tarball."""
     from cisco_sccfm_scripts.build_ansible_collection import main as _build
 
-    rc = _build()
-    if rc:
-        console.print(f"[red]Build failed with exit code {rc}[/red]")
+    _require_success("Collection build", _build([]))
 
 
 def _run_generate_ansible_docs() -> None:
     """Generate Ansible documentation from ansible-doc metadata."""
     from cisco_sccfm_scripts.generate_ansible_docs import main as _generate_ansible_docs
 
-    rc = _generate_ansible_docs([])
-    if rc:
-        console.print(f"[red]Ansible docs generation failed with exit code {rc}[/red]")
+    _require_success("Ansible docs generation", _generate_ansible_docs([]))
 
 
 def _run_generate_cli_docs() -> None:
     """Generate CLI documentation from Click help output."""
     from cisco_sccfm_scripts.generate_cli_docs import main as _generate_cli_docs
 
-    rc = _generate_cli_docs([])
-    if rc:
-        console.print(f"[red]CLI docs generation failed with exit code {rc}[/red]")
+    _require_success("CLI docs generation", _generate_cli_docs([]))
 
 
 def _run_generate_cli_man_docs() -> None:
     """Generate CLI manual pages from Click metadata."""
     from cisco_sccfm_scripts.generate_cli_man_docs import main as _generate_cli_man_docs
 
-    rc = _generate_cli_man_docs([])
-    if rc:
-        console.print(f"[red]CLI man page generation failed with exit code {rc}[/red]")
+    _require_success("CLI man page generation", _generate_cli_man_docs([]))
 
 
 def _run_install_cli_man_docs() -> None:
     """Install generated CLI manual pages into the user's man path."""
     from cisco_sccfm_scripts.install_cli_man_docs import main as _install_cli_man_docs
 
-    rc = _install_cli_man_docs([])
-    if rc:
-        console.print(f"[red]CLI man page installation failed with exit code {rc}[/red]")
+    _require_success("CLI man page installation", _install_cli_man_docs([]))
 
 
 def _run_setup_env() -> None:
@@ -113,33 +149,34 @@ def _run_setup_env() -> None:
         console.print(f"[red]Script not found: {script}[/red]")
         return
     console.print(f"[dim]Running {script}[/dim]")
-    subprocess.call(["bash", str(script)])
+    _run_checked(["bash", str(script)], cwd=root)
 
     activate = root / "cisco_sccfm_scripts" / "activate.sh"
     if activate.exists():
-        console.print(f"[dim]Sourcing {activate}[/dim]")
-        subprocess.call(["bash", "-c", f"source {activate}"])
-        console.print("[green]Environment activated.[/green]")
+        console.print(f"[green]Setup complete. Run 'source {activate}' in your shell.[/green]")
 
 
 def _run_lint() -> None:
-    """Run lint with fix (black, isort, mypy)."""
+    """Run read-only formatting and type checks."""
     root = _project_root()
     console.print("[bold]Running black …[/bold]")
-    subprocess.call([sys.executable, "-m", "black", "."], cwd=root)
+    _run_checked([sys.executable, "-m", "black", "--check", "."], cwd=root)
     console.print("[bold]Running isort …[/bold]")
-    subprocess.call([sys.executable, "-m", "isort", "."], cwd=root)
+    _run_checked([sys.executable, "-m", "isort", "--check-only", "."], cwd=root)
     console.print("[bold]Running mypy…[/bold]")
-    subprocess.call([sys.executable, "-m", "mypy", "cisco_sccfm_cli", "cisco_sccfm_core"], cwd=root)
+    _run_checked(
+        [sys.executable, "-m", "mypy", "cisco_sccfm_cli", "cisco_sccfm_core"],
+        cwd=root,
+    )
 
 
 def _run_format() -> None:
     """Auto-format code with black and isort."""
     root = _project_root()
     console.print("[bold]Running isort…[/bold]")
-    subprocess.call([sys.executable, "-m", "isort", "."], cwd=root)
+    _run_checked([sys.executable, "-m", "isort", "."], cwd=root)
     console.print("[bold]Running black…[/bold]")
-    subprocess.call([sys.executable, "-m", "black", "."], cwd=root)
+    _run_checked([sys.executable, "-m", "black", "."], cwd=root)
 
 
 def _run_test() -> None:
@@ -157,7 +194,7 @@ def _run_test() -> None:
     if normalized_expression:
         cmd.extend(["-k", normalized_expression])
 
-    subprocess.call(cmd, cwd=_project_root())
+    _run_checked(cmd, cwd=_project_root())
 
 
 def _run_e2e() -> None:
@@ -168,7 +205,7 @@ def _run_e2e() -> None:
         console.print(f"[red]Script not found: {script}[/red]")
         return
     console.print("[bold]Running Ansible e2e integration tests…[/bold]")
-    subprocess.call(["bash", str(script)], cwd=root)
+    _run_checked(["bash", str(script)], cwd=root)
 
 
 # ── Run Ansible examples ──────────────────────────────────────────
@@ -183,6 +220,27 @@ def _playbook_requires_vault(playbook: Path) -> bool:
     return any(
         "vault_" in line for line in content.splitlines() if not line.lstrip().startswith("#")
     )
+
+
+def _vault_password_arguments(examples_dir: Path, playbook: Path) -> list[str]:
+    """Return Vault arguments required by the selected example workspace."""
+    vault_file = examples_dir / "group_vars" / "all" / "vault.yml"
+    vault_password_file = examples_dir / ".vault_pass"
+    playbook_uses_vault = _playbook_requires_vault(playbook)
+
+    if not vault_file.exists() and not playbook_uses_vault:
+        return []
+    if not vault_file.is_file():
+        raise click.ClickException(
+            f"{playbook.name} uses Vault variables but {vault_file} was not found. "
+            "Create and encrypt it as described in sccfm-ansible/README.md."
+        )
+    if not vault_password_file.is_file():
+        raise click.ClickException(
+            f"{vault_file} is present, but {vault_password_file} was not found. "
+            "Create the password file before running Ansible examples."
+        )
+    return ["--vault-password-file", vault_password_file.name]
 
 
 def _run_ansible_examples() -> None:
@@ -213,17 +271,10 @@ def _run_ansible_examples() -> None:
         "-i",
         "inventory.sccfm.yml",
     ]
-    vault_password_file = examples_dir / ".vault_pass"
-    if _playbook_requires_vault(examples_dir / answer):
-        if not vault_password_file.exists():
-            console.print(
-                f"[yellow]{answer} uses vault variables but "
-                f"{vault_password_file} was not found — running without Vault.[/yellow]"
-            )
-        else:
-            cmd.extend(["--vault-password-file", vault_password_file.name])
+    cmd.extend(_vault_password_arguments(examples_dir, examples_dir / answer))
     console.print(f"[bold cyan]$ {shlex.join(cmd)}[/bold cyan]")
-    subprocess.call(cmd, cwd=str(examples_dir))
+    with _source_collection_environment(_project_root()) as env:
+        _run_checked(cmd, cwd=examples_dir, env=env)
 
 
 # ── Menu definition ───────────────────────────────────────────────

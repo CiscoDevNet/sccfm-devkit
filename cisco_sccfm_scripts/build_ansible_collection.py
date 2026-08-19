@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Build script for Ansible collection."""
+import argparse
 import os
 import re
 import shutil
@@ -12,6 +13,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from typing import Sequence
 
 import yaml
 
@@ -84,8 +86,16 @@ def _sync_runtime_requirement(dependencies_path: Path, version: str) -> None:
         dependencies_path.write_text(updated, encoding="utf-8")
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """Return the command-line parser without performing build work."""
+    return argparse.ArgumentParser(
+        description="Build and verify the cisco.sccfm Ansible collection tarball."
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     """Build the Ansible collection tarball."""
+    build_parser().parse_args(argv)
     project_root = Path(__file__).parent.parent
     collection_dir = project_root / "sccfm-ansible"
     dist_dir = project_root / "dist"

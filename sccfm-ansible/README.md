@@ -11,8 +11,8 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
   - [Local Development](#local-development)
 - [Trying out examples](#trying-out-examples)
   - [1. Configure an SCCFM Profile](#1-configure-an-sccfm-profile)
-  - [2. Edit playbook](#2-edit-playbook)
-  - [4. Run Examples](#4-run-examples)
+  - [2. Edit the onboarding playbook](#2-edit-the-onboarding-playbook)
+  - [3. Run Examples](#3-run-examples)
   - [Test Inventory](#test-inventory)
   - [Host Variables](#host-variables)
 - [Modules](#modules)
@@ -51,13 +51,14 @@ Ansible collection for managing Cisco Security Cloud Control Firewall Manager (S
 
 ## Installation
 
-See instructions in the [INSTALL.md](INSTALL.md) file.
+See [Installing the Ansible collection](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/INSTALL.md#installing-the-ansible-collection)
+for released and downloaded-artifact installation instructions.
 
 ### Local Development
 
 Run these commands from an activated repository checkout.
 
-**Build and install (recommended):**
+**Build and verify:**
 ```bash
 sccfm-devkit
 # then select "build-collection" from the menu
@@ -68,10 +69,13 @@ Or directly:
 build-ansible-collection
 ```
 
-This will:
-1. Initialize the poetry virtual environment (if needed)
-2. Install Python dependencies (`cisco_sccfm_core`, `cisco_sccfm_cli`, etc.)
-3. Install the Ansible collection
+This creates and verifies the collection tarball; it does not install it. Install the exact
+artifact that was just built:
+
+```bash
+ansible-galaxy collection install \
+  "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
+```
 
 ## Trying out examples
 
@@ -106,23 +110,30 @@ sccfm-devkit
 
 This migration helper is development-only and is not included in the public Python package.
 
+The example commands below assume the collection root as the current working directory. From a
+source checkout, enter it first:
+
+```bash
+cd sccfm-ansible
+```
+
 <details>
 <summary><strong>Set up Ansible-specific device secrets</strong></summary>
 
-Create a vault password file (do NOT commit this!):
+Only examples that reference managed-device passwords require Ansible Vault. Create a vault
+password file for those examples (do NOT commit this!):
 
 ```bash
-cd examples
-cp .vault_pass.example .vault_pass
-echo "YourSecureVaultPassword" > .vault_pass
-chmod 600 .vault_pass
+cp examples/.vault_pass.example examples/.vault_pass
+vim examples/.vault_pass
+chmod 600 examples/.vault_pass
 ```
 
 Copy and edit the example vault file:
 
 ```bash
-cp group_vars/all/vault.yml.example group_vars/all/vault.yml.temp
-vim group_vars/all/vault.yml.temp
+cp examples/group_vars/all/vault.yml.example examples/group_vars/all/vault.yml.temp
+vim examples/group_vars/all/vault.yml.temp
 ```
 
 Add only playbook-specific secrets:
@@ -133,20 +144,26 @@ vault_asa_branch_office_01_password: "ActualPassword1"
 
 Encrypt the vault file:
 ```bash
-ansible-vault encrypt group_vars/all/vault.yml.temp \
-  --vault-password-file .vault_pass \
-  --output group_vars/all/vault.yml
+ansible-vault encrypt examples/group_vars/all/vault.yml.temp \
+  --vault-password-file examples/.vault_pass \
+  --output examples/group_vars/all/vault.yml
 
-rm group_vars/all/vault.yml.temp
+rm examples/group_vars/all/vault.yml.temp
 ```
 
 </details>
 
-### 2. Edit playbook
+The commands below work in a fresh checkout, where `examples/group_vars/all/vault.yml` does not
+exist. After creating that encrypted file, pass
+`--vault-password-file examples/.vault_pass` to every `ansible-playbook` and `ansible-inventory`
+command that loads the `examples` directory. Ansible decrypts `group_vars` before running tasks,
+even for read-only playbooks and inventory output.
 
-Edit the `onboard_asas.yml` playbook, and change the `asas_to_onboard` list to match your devices.
+### 2. Edit the onboarding playbook
 
-### 4. Run Examples
+Edit `examples/onboard_asas.yml` and change the `asas_to_onboard` list to match your devices.
+
+### 3. Run Examples
 
 **Graph inventory:**
 ```bash
@@ -155,25 +172,46 @@ ansible-inventory -i examples/inventory.sccfm.yml \
   --playbook-dir examples
 ```
 
+With encrypted example `group_vars`:
+
+```bash
+ansible-inventory -i examples/inventory.sccfm.yml \
+  --graph \
+  --playbook-dir examples \
+  --vault-password-file examples/.vault_pass
+```
+
 **Show all devices:**
 ```bash
 ansible-playbook \
--i examples/inventory.sccfm.yml \
-examples/show_devices.yml \
---vault-password-file examples/.vault_pass
+  -i examples/inventory.sccfm.yml \
+  examples/show_devices.yml
+```
+
+With encrypted example `group_vars`:
+
+```bash
+ansible-playbook \
+  -i examples/inventory.sccfm.yml \
+  examples/show_devices.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 **Onboard ASA devices:**
 ```bash
-ansible-playbook onboard_asas.yml --vault-password-file .vault_pass
+ansible-playbook examples/onboard_asas.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 ### Test Inventory
 
 ```bash
-ansible-inventory -i inventory.sccfm.yml --list --vault-password-file .vault_pass
-ansible-inventory -i inventory.sccfm.yml --graph --vault-password-file .vault_pass
+ansible-inventory -i examples/inventory.sccfm.yml --list
+ansible-inventory -i examples/inventory.sccfm.yml --graph
 ```
+
+If encrypted example `group_vars` exists, append
+`--vault-password-file examples/.vault_pass` to either command.
 
 ### Host Variables
 
@@ -283,41 +321,47 @@ Ansible Vault encrypts playbook-specific secrets such as managed-device password
 
 **Create new encrypted file:**
 ```bash
-ansible-vault create group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault create examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 **Edit encrypted vault file (recommended):**
 ```bash
-ansible-vault edit group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault edit examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 **View encrypted vault file:**
 ```bash
-ansible-vault view group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault view examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 **Encrypt existing file:**
 ```bash
-ansible-vault encrypt group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault encrypt examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 **Decrypt vault file (temporarily):**
 ```bash
-ansible-vault decrypt group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault decrypt examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass
 # Edit the file
-ansible-vault encrypt group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault encrypt examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass
 ```
 
 **Change vault password:**
 ```bash
-ansible-vault rekey group_vars/all/vault.yml \
-  --vault-password-file .vault_pass \
-  --new-vault-password-file .vault_pass_new
+ansible-vault rekey examples/group_vars/all/vault.yml \
+  --vault-password-file examples/.vault_pass \
+  --new-vault-password-file examples/.vault_pass_new
 ```
 
 **Verify file is encrypted:**
 ```bash
-head -1 group_vars/all/vault.yml
+head -1 examples/group_vars/all/vault.yml
 # Should output: $ANSIBLE_VAULT;1.1;AES256
 ```
 

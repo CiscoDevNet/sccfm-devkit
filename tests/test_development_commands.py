@@ -14,6 +14,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEVTOOLS_PYPROJECT = PROJECT_ROOT / "devtools" / "pyproject.toml"
+DOCS_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "docs.yml"
+COLLECTION_README = PROJECT_ROOT / "sccfm-ansible" / "README.md"
 COMMAND_MODULES = {
     "build-ansible-collection": "cisco_sccfm_scripts.build_ansible_collection:main",
     "check-doc-artifacts": "cisco_sccfm_scripts.check_doc_artifacts:main",
@@ -93,3 +95,25 @@ def test_requested_poetry_run_commands_work_without_activation() -> None:
         )
 
         assert result.returncode == 0, result.stderr
+
+
+def test_docs_workflow_checks_collection_readme_links() -> None:
+    workflow = DOCS_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "poetry run check-doc-links --docs-root sccfm-ansible" in workflow
+
+
+def test_collection_docs_explain_conditional_vault_password_file() -> None:
+    readme = COLLECTION_README.read_text(encoding="utf-8")
+
+    assert "commands below work in a fresh checkout" in readme
+    assert "examples/group_vars/all/vault.yml` does not" in readme
+    assert "Ansible decrypts `group_vars` before running tasks" in readme
+    assert "--vault-password-file examples/.vault_pass" in readme
+
+    for example_name in ("list_asa_not_on_version.yml", "list_ftd_not_on_version.yml"):
+        example = (PROJECT_ROOT / "sccfm-ansible" / "examples" / example_name).read_text(
+            encoding="utf-8"
+        )
+        assert "If examples/group_vars/all/vault.yml exists" in example
+        assert "--vault-password-file examples/.vault_pass" in example
