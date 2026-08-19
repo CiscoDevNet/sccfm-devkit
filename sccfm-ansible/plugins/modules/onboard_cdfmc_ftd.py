@@ -4,24 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    Device,
-    DevicePage,
-    EntityType,
-    FtdCreateOrUpdateInput,
-    Labels,
-)
-
-from cisco_sccfm_core import InventoryService, SccApiError
-from cisco_sccfm_core.services.inventory import FtdOnboardService
-from cisco_sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: onboard_cdfmc_ftd
@@ -80,7 +62,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -88,7 +70,7 @@ EXAMPLES = r"""
 - name: Onboard FTD device
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My FTD"
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
     profile: default
@@ -97,7 +79,7 @@ EXAMPLES = r"""
 - name: Onboard virtual FTD
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "My vFTD"
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
       - CARRIER
@@ -108,7 +90,7 @@ EXAMPLES = r"""
 - name: Onboard FTD with labels
   cisco.sccfm.onboard_cdfmc_ftd:
     name: "Branch FTD"
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     licenses:
       - BASE
     ungrouped_labels:
@@ -128,7 +110,7 @@ EXAMPLES = r"""
     - name: Onboard branch FTD
       cisco.sccfm.onboard_cdfmc_ftd:
         name: "Branch FTD"
-        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+        fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
         licenses:
           - BASE
 """
@@ -148,6 +130,34 @@ device:
 """
 
 
+from typing import Optional
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import (
+        ApiException,
+        Device,
+        DevicePage,
+        EntityType,
+        FtdCreateOrUpdateInput,
+        Labels,
+    )
+
+    from cisco_sccfm_core import InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import FtdOnboardService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+
 _VALID_LICENSES = ["BASE", "CARRIER", "THREAT", "MALWARE", "URLFilter"]
 _VALID_PERFORMANCE_TIERS = ["FTDv5", "FTDv10", "FTDv20", "FTDv30", "FTDv50", "FTDv100", "FTDv"]
 
@@ -156,7 +166,12 @@ def build_argument_spec() -> dict:
     return {
         "name": {"type": "str", "required": True},
         "fmc_access_policy_uid": {"type": "str", "required": True},
-        "licenses": {"type": "list", "elements": "str", "required": True},
+        "licenses": {
+            "type": "list",
+            "elements": "str",
+            "choices": _VALID_LICENSES,
+            "required": True,
+        },
         "virtual": {"type": "bool", "required": False, "default": False},
         "performance_tier": {"type": "str", "required": False, "choices": _VALID_PERFORMANCE_TIERS},
         "grouped_labels": {"type": "dict", "required": False},

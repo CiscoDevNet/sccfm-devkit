@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import click
 
 from cisco_sccfm_cli.commands.shared_options import (
@@ -13,9 +11,20 @@ from cisco_sccfm_cli.commands.shared_options import (
     format_option,
     limit_option,
     offset_option,
-    timeout_option,
-    wait_option,
 )
+from cisco_sccfm_cli.commands.shared_options import timeout_option as timeout_option
+from cisco_sccfm_cli.commands.shared_options import wait_option as wait_option
+
+__all__ = [
+    "config_path_option",
+    "format_option",
+    "inventory_list_params",
+    "limit_option",
+    "offset_option",
+    "query_option",
+    "timeout_option",
+    "wait_option",
+]
 
 
 def query_option(help_text: str | None = None) -> click.Option:
@@ -33,7 +42,7 @@ def query_option(help_text: str | None = None) -> click.Option:
     )
 
 
-def inventory_list_params() -> List[click.Parameter]:
+def inventory_list_params() -> list[click.Parameter]:
     """Complete set of options for inventory list commands."""
     return [
         limit_option(),

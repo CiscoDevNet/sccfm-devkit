@@ -29,7 +29,10 @@ class ShowShunCommand(AsaDeviceTargetCommand):
 
     @property
     def help_text(self) -> str:
-        return "Display active shun entries on ASA devices. Use --statistics for per-interface counters."
+        return (
+            "Display active shun entries on ASA devices. "
+            "Use --statistics for per-interface counters."
+        )
 
     def build_params(self) -> Sequence[click.Parameter]:
         return [

@@ -13,32 +13,55 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _poetry_config() -> dict[str, Any]:
+def _pyproject() -> dict[str, Any]:
     with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
-        pyproject = tomllib.load(pyproject_file)
-    return dict(pyproject["tool"]["poetry"])
+        return tomllib.load(pyproject_file)
+
+
+def _project_config() -> dict[str, Any]:
+    return dict(_pyproject()["project"])
+
+
+def _poetry_config() -> dict[str, Any]:
+    return dict(_pyproject()["tool"]["poetry"])
 
 
 def test_distribution_uses_cisco_devkit_name() -> None:
-    assert _poetry_config()["name"] == "cisco-sccfm-devkit"
+    assert _project_config()["name"] == "cisco-sccfm-devkit"
 
 
-def test_published_packages_use_cisco_prefix() -> None:
+def test_published_package_contract_is_cli_and_core_only() -> None:
     poetry = _poetry_config()
     included_packages = {package["include"] for package in poetry["packages"]}
-    script_targets = set(poetry["scripts"].values())
 
     assert included_packages == {
         "cisco_sccfm_cli",
         "cisco_sccfm_core",
-        "cisco_sccfm_scripts",
     }
-    assert script_targets
-    assert all(target.startswith("cisco_sccfm_") for target in script_targets)
+    assert _project_config()["scripts"] == {"sccfm-cli": "cisco_sccfm_cli.cli:cli"}
+
+
+def test_published_packages_exclude_repository_only_code() -> None:
+    assert set(_poetry_config()["exclude"]) == {
+        "cisco_sccfm_scripts",
+        "**/tests",
+        "**/e2e",
+        "**/__pycache__",
+        "**/.pytest_cache",
+        "**/.mypy_cache",
+        "**/*.pyc",
+        "**/*.pyo",
+        "**/.DS_Store",
+    }
+
+
+def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
+    assert "scc-firewall-manager-sdk==1.17.27" in _project_config()["dependencies"]
 
 
 def test_interactive_entrypoint_is_completely_renamed() -> None:
-    scripts = _poetry_config()["scripts"]
+    with (PROJECT_ROOT / "devtools" / "pyproject.toml").open("rb") as pyproject_file:
+        scripts = tomllib.load(pyproject_file)["project"]["scripts"]
 
     assert scripts["sccfm-cli-interactive"] == "cisco_sccfm_scripts.interactive_cli:main"
     assert "devkit" not in scripts
@@ -59,9 +82,15 @@ def test_user_guidance_only_references_canonical_profile_configuration() -> None
         guidance = path.read_text(encoding="utf-8")
         assert "change-tokens" not in guidance, path
         assert "`devkit`" not in guidance, path
-        assert "SCCFM_API_TOKEN" not in guidance, path
+        if path != PROJECT_ROOT / "README.md":
+            assert "SCCFM_API_TOKEN" not in guidance, path
         assert "SCCFM_REGION" not in guidance, path
         assert ".env.example" not in guidance, path
+
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    assert readme.count("SCCFM_API_TOKEN") == 1
+    assert "interactive hidden prompt" in readme
+    assert "can expose the token in shell history and process listings" in readme
 
 
 def test_pyinstaller_spec_uses_repository_relative_entrypoint() -> None:

@@ -15,4 +15,4 @@ Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
 SCCFM region (int, us, eu, apj, au, uae, in, ci)  [required]
 .TP
 \fB\-\-api\-token\fP TEXT
-API token for the chosen region  [required]
+API token for the chosen region. Passing it directly is supported for compatibility but may expose it in process listings and shell history; prefer SCCFM_API_TOKEN or the hidden prompt.  [env var: SCCFM_API_TOKEN]

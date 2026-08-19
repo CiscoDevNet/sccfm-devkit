@@ -26,7 +26,7 @@ def config_path_option() -> click.Option:
     """Reusable --config-path option."""
     return click.Option(
         ["--config-path"],
-        type=click.Path(path_type=Path, resolve_path=True),
+        type=click.Path(path_type=Path, resolve_path=False),
         default=None,
         envvar="SCCFM_CONFIG",
         show_default=False,

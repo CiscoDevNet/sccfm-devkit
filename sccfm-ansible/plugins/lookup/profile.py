@@ -4,17 +4,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-
-from ansible.errors import AnsibleError
-from ansible.plugins.lookup import LookupBase
-
-from cisco_sccfm_core.services.profile_service import ProfileService
-
 DOCUMENTATION = r"""
 name: profile
-author: Cisco SCCFM Team
+author: Cisco SCCFM Team (@CiscoDevNet)
 version_added: "0.39.0"
 short_description: Read a value from a configured SCCFM profile
 description:
@@ -50,6 +42,20 @@ _raw:
 """
 
 
+from pathlib import Path
+from typing import Any
+
+from ansible.errors import AnsibleError
+from ansible.plugins.lookup import LookupBase
+
+try:
+    from cisco_sccfm_core.services.profile_service import ProfileService
+except ImportError as exc:
+    _DEPENDENCY_IMPORT_ERROR: ImportError | None = exc
+else:
+    _DEPENDENCY_IMPORT_ERROR = None
+
+
 class LookupModule(LookupBase):
     """Read fields from the canonical SCCFM profile store."""
 
@@ -59,6 +65,12 @@ class LookupModule(LookupBase):
         variables: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[str]:
+        if _DEPENDENCY_IMPORT_ERROR is not None:
+            raise AnsibleError(
+                "cisco-sccfm-devkit must be installed on the Ansible controller "
+                "to use the cisco.sccfm.profile lookup"
+            ) from _DEPENDENCY_IMPORT_ERROR
+
         self.set_options(var_options=variables, direct=kwargs)
         field = self.get_option("field")
         raw_path = self.get_option("config_path")

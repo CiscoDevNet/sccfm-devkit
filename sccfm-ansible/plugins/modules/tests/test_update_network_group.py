@@ -121,6 +121,7 @@ def test_should_update_when_referenced_objects_differ(
     call_kwargs = mock_module_instance.exit_json.call_args[1]
     assert call_kwargs["changed"] is True
     assert "Successfully updated" in call_kwargs["msg"]
+    mock_service.get_network_group_by_name.assert_called_once_with(name="test-network-group")
 
 
 @patch("plugins.modules.update_network_group.Config")

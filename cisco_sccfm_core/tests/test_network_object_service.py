@@ -224,7 +224,7 @@ class TestNetworkObjectTypeValidation:
             },
         }
 
-        result = service.get_network_object("abc-123")
+        result = service.get_network_object(uid="abc-123")
 
         assert result is None
 
@@ -235,7 +235,7 @@ class TestNetworkObjectTypeValidation:
         service._helper = MagicMock()
         service._helper.read_raw_response.return_value = {"items": []}
 
-        service.get_network_object_by_name("test-obj")
+        service.get_network_object_by_name(name="test-obj")
 
         call_kwargs = service._object_api.get_objects_without_preload_content.call_args.kwargs
         assert "objectType:NETWORK_OBJECT" in call_kwargs["q"]

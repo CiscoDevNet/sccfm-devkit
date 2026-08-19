@@ -4,23 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    Device,
-    DevicePage,
-    EntityType,
-    ZtpOnboardingInput,
-)
-
-from cisco_sccfm_core import InventoryService, SccApiError
-from cisco_sccfm_core.services.inventory import FtdZtpOnboardService
-from cisco_sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: onboard_cdfmc_ftd_ztp
@@ -64,7 +47,6 @@ options:
       - Required if a password has not already been set on the device.
     required: false
     type: str
-    no_log: true
   device_group_uid:
     description: UUID of the device group the device will join after registration.
     required: false
@@ -79,7 +61,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -90,7 +72,7 @@ EXAMPLES = r"""
     serial_number: "FTD1234567890"
     licenses:
       - BASE
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     profile: default
 
 # Example 2: Onboard with initial password and device group
@@ -101,7 +83,7 @@ EXAMPLES = r"""
     licenses:
       - BASE
       - CARRIER
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     admin_password: "{{ ftd_admin_password }}"
     device_group_uid: "abcd1234-0000-0000-0000-000000000001"
 
@@ -119,7 +101,7 @@ EXAMPLES = r"""
         serial_number: "FTD1234567890"
         licenses:
           - BASE
-        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+        fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
 """
 
 RETURN = r"""
@@ -131,6 +113,34 @@ device_uid:
   type: str
 """
 
+
+from typing import Optional
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import (
+        ApiException,
+        Device,
+        DevicePage,
+        EntityType,
+        ZtpOnboardingInput,
+    )
+
+    from cisco_sccfm_core import InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import FtdZtpOnboardService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+
 _VALID_LICENSES = ["BASE", "CARRIER", "THREAT", "MALWARE", "URLFilter"]
 
 
@@ -138,7 +148,12 @@ def build_argument_spec() -> dict:
     return {
         "name": {"type": "str", "required": True},
         "serial_number": {"type": "str", "required": True},
-        "licenses": {"type": "list", "elements": "str", "required": True},
+        "licenses": {
+            "type": "list",
+            "elements": "str",
+            "choices": _VALID_LICENSES,
+            "required": True,
+        },
         "fmc_access_policy_uid": {"type": "str", "required": True},
         "admin_password": {"type": "str", "required": False, "no_log": True},
         "device_group_uid": {"type": "str", "required": False},

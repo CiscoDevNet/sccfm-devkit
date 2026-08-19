@@ -1,5 +1,5 @@
 ---
-requires_ansible: ">=2.15.0"
+requires_ansible: ">=2.20.0,<2.22.0"
 
 action_groups:
   cisco.sccfm.all:
@@ -51,8 +51,3 @@ action_groups:
     - update_network_group
     - update_network_object
     - update_object_default
-
-module_defaults:
-  group/cisco.sccfm.all:
-    region: null
-    api_token: null

@@ -42,3 +42,17 @@ def test_should_read_profile_field(tmp_path: Path) -> None:
 def test_should_fail_for_missing_profile(tmp_path: Path) -> None:
     with pytest.raises(AnsibleError, match="profile 'missing' not found"):
         _lookup(tmp_path / "config.json").run(["missing"])
+
+
+def test_should_report_missing_devkit_dependency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        _MODULE,
+        "_DEPENDENCY_IMPORT_ERROR",
+        ImportError("cisco_sccfm_core is unavailable"),
+    )
+
+    with pytest.raises(AnsibleError, match="cisco-sccfm-devkit must be installed"):
+        _lookup(tmp_path / "config.json").run(["default"])

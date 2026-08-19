@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
-
-from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaShunService, InventoryService, SccApiError
-from cisco_sccfm_core.models.asa_shun_entry import AsaShunEntry, AsaShunInterfaceStats
-
-from ..module_utils.config import base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: show_asa_shun
@@ -74,7 +64,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -156,6 +146,32 @@ results:
       description: Number of received packets on this interface (statistics only).
       type: int
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaShunService,
+        InventoryService,
+        SccApiError,
+    )
+    from cisco_sccfm_core.models.asa_shun_entry import AsaShunEntry, AsaShunInterfaceStats
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

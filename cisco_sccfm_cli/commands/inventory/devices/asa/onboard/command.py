@@ -18,6 +18,7 @@ from scc_firewall_manager_sdk import (
 
 from cisco_sccfm_cli.commands.base import BaseCommand
 from cisco_sccfm_cli.commands.inventory.options import config_path_option, format_option
+from cisco_sccfm_cli.option_metadata import sensitive_option
 from cisco_sccfm_cli.utils import print_json, with_spinner
 from cisco_sccfm_core import ASA_ENTITY_TYPES, InventoryService, build_device_type_filter
 from cisco_sccfm_core.services.inventory import AsaOnboardService
@@ -55,12 +56,14 @@ class AsaOnboardCommand(BaseCommand):
                 default=None,
                 help="Username used to authenticate with the device.",
             ),
-            click.Option(
-                ["--password"],
-                required=False,
-                default=None,
-                hide_input=True,
-                help="Password used to authenticate with the device.",
+            sensitive_option(
+                click.Option(
+                    ["--password"],
+                    required=False,
+                    default=None,
+                    hide_input=True,
+                    help="Password used to authenticate with the device.",
+                ),
             ),
             click.Option(
                 ["--connector-type"],
@@ -128,7 +131,7 @@ class AsaOnboardCommand(BaseCommand):
 
         password = cast(str | None, kwargs.get("password"))
         if not password:
-            password = click.prompt("Password", hide_input=True)
+            password = self._prompt_sensitive("Password")
             kwargs = {**kwargs, "password": password}
 
         asa_input = self._build_asa_input(ctx, **kwargs)

@@ -97,8 +97,11 @@ No MCP servers are currently configured for this project. Skill files under `ski
 ### Ansible collection
 
 ```bash
-# Build and install locally
+# Build and verify the collection artifact
 build-ansible-collection
+
+# Install the built artifact locally
+ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
 
 # Configure or select profiles interactively
 sccfm-cli-interactive

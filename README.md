@@ -36,7 +36,7 @@ sccfm-cli-interactive          # interactive CLI and developer workflow menu
 
 ## Commands
 
-- `sccfm-cli configure [--region REGION] [--api-token TOKEN] [--config-path PATH]`: Captures the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) plus an API token (see the [auth guide](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/authentication/)) in the canonical profile store at `~/.sccfm-cli/config.json`. On POSIX systems, the directory is restricted to the current user (`0700`) and the file to owner read/write (`0600`). On Windows, the store inherits the user's profile-directory ACLs. Override the path with `--config-path` or `SCCFM_CONFIG`.
+- `sccfm-cli configure --region REGION [--config-path PATH]`: Stores the SCCFM region (`int`, `us`, `eu`, `apj`, `au`, `uae`, `in`, or `ci`) and API token in the canonical named-profile store. The token comes from `SCCFM_API_TOKEN` or an interactive hidden prompt. Direct `--api-token` input remains available for compatibility but can expose the token in shell history and process listings. On POSIX systems, the default directory uses mode `0700` and the file uses `0600`; on Windows, the store inherits the user's profile-directory ACLs.
 - `sccfm-cli status [--config-path PATH]`: Shows the current profile plus SCCFM connectivity health using Rich tables.
 - `sccfm-cli inventory devices list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists device inventory with pagination and optional name filtering.
 - `sccfm-cli inventory manager list [--limit N] [--offset N] [--query TEXT] [--format table|json]`: Lists manager inventory with the same filters.
@@ -44,6 +44,13 @@ sccfm-cli-interactive          # interactive CLI and developer workflow menu
 
 Set the active profile once via the global option: `sccfm-cli --profile lab status`.
 Every command lives in `cisco_sccfm_cli/commands/` as a concrete implementation of the command-pattern friendly `BaseCommand`, keeping files small and behavior isolated.
+
+By default, configuration is stored in `~/.sccfm-cli/config.json`. On POSIX systems the CLI
+requires mode `0700` on `~/.sccfm-cli` and `0600` on the configuration file. Read-only commands
+fail without changing metadata when those modes are unsafe; `sccfm-cli configure` repairs them
+while updating a profile. Custom configuration files must also use mode `0600`, but the CLI does
+not change an existing custom parent directory. On Windows, keep the configuration in your user
+profile and rely on the filesystem's per-user access controls.
 
 Generated CLI reference docs can be previewed locally:
 
@@ -61,7 +68,7 @@ To install or refresh the CLI man pages for local `man sccfm-cli` lookup:
 install-cli-man-docs
 ```
 
-See [docs/README.md](docs/README.md) for generation details.
+See [docs/README.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/docs/README.md) for generation details.
 
 ## Python library
 
@@ -92,8 +99,11 @@ The package root exports the supported public service classes and response model
 - Ansible modules and inventory select the same named SCCFM profile; they do not duplicate its region or API token in environment variables, playbooks, or Ansible Vault.
 - Keep Ansible Vault for playbook-specific secrets such as managed-device passwords.
 - Point Ansible at an inventory file that uses the plugin, e.g. `ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph`.
+- The inventory plugin consumes its API token only during refresh and never exports it as a host
+  or group variable. Do not use inventory output modes that render vars when your own
+  `group_vars` or `host_vars` contain secrets.
 - A starter playbook is in `sccfm-ansible/examples/show_devices.yml`; it runs against the SCCFM devices discovered by the inventory plugin.
-- Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](docs/README.md) for details.
+- Generated Ansible reference docs can be previewed locally with `generate-ansible-docs`; see [docs/README.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/docs/README.md) for details.
 
 ## Development
 
@@ -184,4 +194,4 @@ pytest  # Rerun tests
 
 ## License
 
-Distributed under the Apache 2.0 License. See [LICENSE](LICENSE) for more information.
+Distributed under the Apache 2.0 License. See [LICENSE](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/LICENSE) for more information.

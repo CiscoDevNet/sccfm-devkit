@@ -1,0 +1,550 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing stable version or tag to deploy (X.Y.Z or vX.Y.Z)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      source_commit: ${{ steps.bundle.outputs.source_commit }}
+      manifest_sha256: ${{ steps.bundle.outputs.manifest_sha256 }}
+      is_draft: ${{ steps.release.outputs.is_draft }}
+    steps:
+      - name: Validate selected draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_RELEASE: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REPOSITORY}" = "CiscoDevNet/sccfm-devkit"
+          test "${GITHUB_REF}" = "refs/heads/main"
+
+          RELEASE_VERSION="${REQUESTED_RELEASE#v}"
+          if [[ ! "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::release must be an existing stable X.Y.Z version or vX.Y.Z tag"
+            exit 1
+          fi
+          RELEASE_TAG="v${RELEASE_VERSION}"
+          if [[ "${REQUESTED_RELEASE}" != "${RELEASE_VERSION}" ]] \
+            && [[ "${REQUESTED_RELEASE}" != "${RELEASE_TAG}" ]]; then
+            echo "::error::release must be canonical X.Y.Z or vX.Y.Z"
+            exit 1
+          fi
+
+          RELEASE_IDENTITY="$(gh release view "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --json isDraft,isPrerelease,tagName \
+            --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring)')"
+          case "${RELEASE_IDENTITY}" in
+            "${RELEASE_TAG}"$'\ttrue\tfalse') RELEASE_IS_DRAFT=true ;;
+            "${RELEASE_TAG}"$'\tfalse\tfalse') RELEASE_IS_DRAFT=false ;;
+            *)
+              echo "::error::${RELEASE_TAG} must identify an existing stable GitHub release"
+              exit 1
+              ;;
+          esac
+
+          echo "version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "is_draft=${RELEASE_IS_DRAFT}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout selected release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Download exact draft release bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          mkdir -p "${BUNDLE_DIR}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir "${BUNDLE_DIR}"
+
+      - name: Verify selected tag, source, manifest, and artifacts
+        id: bundle
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          test ! -L "${BUNDLE_DIR}/release-manifest.json"
+          test "$(wc -c < "${BUNDLE_DIR}/release-manifest.json" | tr -d ' ')" -le 65536
+          SOURCE_COMMIT="$(jq -er '.source_commit' "${BUNDLE_DIR}/release-manifest.json")"
+          if [[ ! "${SOURCE_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::release manifest contains an invalid source commit"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"
+          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "${SOURCE_COMMIT}"
+          MANIFEST_SHA256="$(sha256sum \
+            "${BUNDLE_DIR}/release-manifest.json" | awk '{print $1}')"
+          TAG_MESSAGE="$(git for-each-ref \
+            --format='%(contents)' "refs/tags/${RELEASE_TAG}")"
+          test "${TAG_MESSAGE}" = "release-manifest-sha256: ${MANIFEST_SHA256}"
+          git fetch --no-tags origin refs/heads/main
+          git merge-base --is-ancestor "${SOURCE_COMMIT}" FETCH_HEAD
+          test "$(python -c \
+            'from pathlib import Path; import tomllib; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')" \
+            = "${RELEASE_VERSION}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+          echo "source_commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "manifest_sha256=${MANIFEST_SHA256}" >> "$GITHUB_OUTPUT"
+
+  publish-to-pypi:
+    needs: validate-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      already_published: ${{ steps.pypi.outputs.already_published }}
+    steps:
+      - name: Checkout verified release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate-release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install publication checks
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install twine==6.2.0
+
+      - name: Download exact draft release bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          mkdir -p "${BUNDLE_DIR}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir "${BUNDLE_DIR}"
+
+      - name: Verify bundle and inspect PyPI state
+        id: pypi
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.validate-release.outputs.source_commit }}
+          EXPECTED_MANIFEST_SHA256: ${{ needs.validate-release.outputs.manifest_sha256 }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"
+          test "$(sha256sum "${BUNDLE_DIR}/release-manifest.json" | awk '{print $1}')" \
+            = "${EXPECTED_MANIFEST_SHA256}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+
+          WHEEL_PATH="${BUNDLE_DIR}/cisco_sccfm_devkit-${RELEASE_VERSION}-py3-none-any.whl"
+          SDIST_PATH="${BUNDLE_DIR}/cisco_sccfm_devkit-${RELEASE_VERSION}.tar.gz"
+          python -m cisco_sccfm_scripts.verify_python_artifacts \
+            "${WHEEL_PATH}" "${SDIST_PATH}"
+          python -m twine check --strict "${WHEEL_PATH}" "${SDIST_PATH}"
+
+          set +e
+          PYPI_VERIFICATION="$(python -m cisco_sccfm_scripts.verify_pypi_release \
+            "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}")"
+          PYPI_STATUS=$?
+          set -e
+          printf '%s\n' "${PYPI_VERIFICATION}"
+
+          test ! -e dist
+          mkdir dist
+          case "${PYPI_STATUS}" in
+            0)
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              echo "already_published=true" >> "$GITHUB_OUTPUT"
+              ;;
+            2)
+              cp "${WHEEL_PATH}" "${SDIST_PATH}" dist/
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "already_published=false" >> "$GITHUB_OUTPUT"
+              ;;
+            3)
+              MISSING_FILES="${PYPI_VERIFICATION##* missing=}"
+              if [[ "${MISSING_FILES}" = "${PYPI_VERIFICATION}" ]] \
+                || [[ -z "${MISSING_FILES}" ]] \
+                || [[ "${MISSING_FILES}" = *$'\n'* ]]; then
+                echo "::error::partial PyPI verification did not identify a missing artifact"
+                exit 1
+              fi
+              IFS=',' read -r -a MISSING_ARTIFACTS <<< "${MISSING_FILES}"
+              for missing_artifact in "${MISSING_ARTIFACTS[@]}"; do
+                case "${missing_artifact}" in
+                  "$(basename "${WHEEL_PATH}")") cp "${WHEEL_PATH}" dist/ ;;
+                  "$(basename "${SDIST_PATH}")") cp "${SDIST_PATH}" dist/ ;;
+                  *)
+                    echo "::error::partial PyPI verification named an unexpected artifact"
+                    exit 1
+                    ;;
+                esac
+              done
+              test "$(find dist -mindepth 1 -maxdepth 1 -type f | wc -l | tr -d ' ')" = "1"
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "already_published=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *) exit "${PYPI_STATUS}" ;;
+          esac
+          echo "packages_dir=dist/" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact Python artifacts
+        if: steps.pypi.outputs.publish == 'true'
+        # Pin the reviewed release/v1 revision because this step receives the PyPI token.
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: ${{ steps.pypi.outputs.packages_dir }}
+
+      - name: Verify published PyPI release
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.validate-release.outputs.source_commit }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if python -m cisco_sccfm_scripts.verify_pypi_release "${BUNDLE_DIR}" \
+              --version "${RELEASE_VERSION}" \
+              --tag "${RELEASE_TAG}" \
+              --source-commit "${SOURCE_COMMIT}"; then
+              break
+            fi
+            if [[ "${attempt}" = "12" ]]; then
+              echo "::error::PyPI did not expose the verified release in time"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          INSTALL_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-pypi-install.XXXXXX")"
+          python -m venv "${INSTALL_ROOT}/venv"
+          "${INSTALL_ROOT}/venv/bin/python" -I -m pip install \
+            --no-cache-dir \
+            --index-url https://pypi.org/simple \
+            "cisco-sccfm-devkit==${RELEASE_VERSION}"
+          "${INSTALL_ROOT}/venv/bin/python" -I -m pip check
+          "${INSTALL_ROOT}/venv/bin/sccfm-cli" --help >/dev/null
+          "${INSTALL_ROOT}/venv/bin/sccfm-cli" schema export --format json \
+            | "${INSTALL_ROOT}/venv/bin/python" -I -c \
+              'from importlib.metadata import version; import json, sys; payload=json.load(sys.stdin); assert payload.get("version") == version("cisco-sccfm-devkit"); assert len(payload.get("commands", [])) == 57'
+
+  publish-to-galaxy:
+    needs:
+      - validate-release
+      - publish-to-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout verified release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate-release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ansible-core>=2.20,<2.22"
+
+      - name: Download exact draft release bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          mkdir -p "${BUNDLE_DIR}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir "${BUNDLE_DIR}"
+
+      - name: Verify bundle and inspect Galaxy state
+        id: galaxy
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.validate-release.outputs.source_commit }}
+          PYPI_WAS_ALREADY_PUBLISHED: ${{ needs.publish-to-pypi.outputs.already_published }}
+          EXPECTED_MANIFEST_SHA256: ${{ needs.validate-release.outputs.manifest_sha256 }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"
+          test "$(sha256sum "${BUNDLE_DIR}/release-manifest.json" | awk '{print $1}')" \
+            = "${EXPECTED_MANIFEST_SHA256}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+
+          COLLECTION_PATH="${BUNDLE_DIR}/cisco-sccfm-${RELEASE_VERSION}.tar.gz"
+          python -m cisco_sccfm_scripts.verify_ansible_collection \
+            "${COLLECTION_PATH}" --expected-version "${RELEASE_VERSION}"
+          LOCAL_SHA256="$(sha256sum "${COLLECTION_PATH}" | awk '{print $1}')"
+          GALAXY_RESPONSE="${RUNNER_TEMP}/galaxy-version.json"
+          GALAXY_URL="https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/index/cisco/sccfm/versions/${RELEASE_VERSION}/"
+          LOOKUP_ATTEMPTS=1
+          if [[ "${GITHUB_RUN_ATTEMPT}" -gt 1 ]] \
+            || [[ "${PYPI_WAS_ALREADY_PUBLISHED}" = "true" ]]; then
+            LOOKUP_ATTEMPTS=121
+          fi
+          for attempt in $(seq 1 "${LOOKUP_ATTEMPTS}"); do
+            HTTP_STATUS="$(curl --silent --show-error --location \
+              --retry 3 --retry-all-errors \
+              --max-filesize 1048576 \
+              --output "${GALAXY_RESPONSE}" \
+              --write-out '%{http_code}' \
+              "${GALAXY_URL}")"
+            if [[ "${HTTP_STATUS}" != "404" || "${attempt}" = "${LOOKUP_ATTEMPTS}" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          case "${HTTP_STATUS}" in
+            200)
+              test "$(jq -er '.version' "${GALAXY_RESPONSE}")" = "${RELEASE_VERSION}"
+              test "$(jq -er '.artifact.filename' "${GALAXY_RESPONSE}")" \
+                = "cisco-sccfm-${RELEASE_VERSION}.tar.gz"
+              test "$(jq -er '.artifact.sha256' "${GALAXY_RESPONSE}")" = "${LOCAL_SHA256}"
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              ;;
+            404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "::error::Galaxy version lookup failed with HTTP ${HTTP_STATUS}"
+              exit 1
+              ;;
+          esac
+          echo "collection_path=${COLLECTION_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact collection and wait for import
+        if: steps.galaxy.outputs.publish == 'true'
+        env:
+          ANSIBLE_GALAXY_SERVER_LIST: release
+          ANSIBLE_GALAXY_SERVER_RELEASE_URL: https://galaxy.ansible.com/
+          ANSIBLE_GALAXY_SERVER_RELEASE_TOKEN: ${{ secrets.GALAXY_API_KEY }}
+          ANSIBLE_LOCAL_TEMP: ${{ runner.temp }}/ansible-local
+        run: |
+          mkdir -p "${ANSIBLE_LOCAL_TEMP}"
+          ansible-galaxy collection publish \
+            "${{ steps.galaxy.outputs.collection_path }}" \
+            --server release \
+            --timeout 60 \
+            --import-timeout 600
+
+      - name: Verify published Galaxy collection
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          COLLECTION_PATH: ${{ steps.galaxy.outputs.collection_path }}
+          ANSIBLE_LOCAL_TEMP: ${{ runner.temp }}/ansible-local
+        run: |
+          set -euo pipefail
+          mkdir -p "${ANSIBLE_LOCAL_TEMP}"
+          LOCAL_SHA256="$(sha256sum "${COLLECTION_PATH}" | awk '{print $1}')"
+          GALAXY_RESPONSE="${RUNNER_TEMP}/published-galaxy-version.json"
+          GALAXY_URL="https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/index/cisco/sccfm/versions/${RELEASE_VERSION}/"
+          for attempt in {1..12}; do
+            HTTP_STATUS="$(curl --silent --show-error --location \
+              --retry 3 --retry-all-errors \
+              --max-filesize 1048576 \
+              --output "${GALAXY_RESPONSE}" \
+              --write-out '%{http_code}' \
+              "${GALAXY_URL}")"
+            if [[ "${HTTP_STATUS}" = "200" ]]; then
+              break
+            fi
+            if [[ "${attempt}" = "12" ]]; then
+              echo "::error::Galaxy did not expose the imported collection in time"
+              exit 1
+            fi
+            sleep 5
+          done
+          test "$(jq -er '.version' "${GALAXY_RESPONSE}")" = "${RELEASE_VERSION}"
+          test "$(jq -er '.artifact.filename' "${GALAXY_RESPONSE}")" \
+            = "cisco-sccfm-${RELEASE_VERSION}.tar.gz"
+          test "$(jq -er '.artifact.sha256' "${GALAXY_RESPONSE}")" = "${LOCAL_SHA256}"
+
+          DOWNLOAD_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-galaxy-download.XXXXXX")"
+          ansible-galaxy collection download \
+            "cisco.sccfm:==${RELEASE_VERSION}" \
+            --server https://galaxy.ansible.com \
+            --download-path "${DOWNLOAD_ROOT}" \
+            --no-deps
+          DOWNLOADED_COLLECTION="${DOWNLOAD_ROOT}/cisco-sccfm-${RELEASE_VERSION}.tar.gz"
+          cmp -s "${COLLECTION_PATH}" "${DOWNLOADED_COLLECTION}"
+
+          INSTALL_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-galaxy-install.XXXXXX")"
+          python -m pip install \
+            --no-cache-dir \
+            --index-url https://pypi.org/simple \
+            "cisco-sccfm-devkit==${RELEASE_VERSION}"
+          ansible-galaxy collection install \
+            "${DOWNLOADED_COLLECTION}" \
+            --collections-path "${INSTALL_ROOT}" \
+            --force
+          ANSIBLE_COLLECTIONS_PATH="${INSTALL_ROOT}" \
+            ansible-doc -j -l -t module cisco.sccfm > "${RUNNER_TEMP}/modules.json"
+          ANSIBLE_COLLECTIONS_PATH="${INSTALL_ROOT}" \
+            ansible-doc -j -l -t inventory cisco.sccfm > "${RUNNER_TEMP}/inventory.json"
+          python - "${RUNNER_TEMP}/modules.json" "${RUNNER_TEMP}/inventory.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          modules = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          inventory = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          if not isinstance(modules, dict) or len(modules) != 49:
+              raise SystemExit("published Galaxy artifact did not expose 49 modules")
+          if not isinstance(inventory, dict) or len(inventory) != 1:
+              raise SystemExit("published Galaxy artifact did not expose one inventory plugin")
+          PY
+
+  publish-github-release:
+    needs:
+      - validate-release
+      - publish-to-galaxy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout verified release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate-release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Download exact draft release bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          mkdir -p "${BUNDLE_DIR}"
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir "${BUNDLE_DIR}"
+
+      - name: Reverify assets and publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.validate-release.outputs.source_commit }}
+          EXPECTED_MANIFEST_SHA256: ${{ needs.validate-release.outputs.manifest_sha256 }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_COMMIT}"
+          test "$(sha256sum "${BUNDLE_DIR}/release-manifest.json" | awk '{print $1}')" \
+            = "${EXPECTED_MANIFEST_SHA256}"
+          python -m cisco_sccfm_scripts.release_artifacts verify "${BUNDLE_DIR}" \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --source-commit "${SOURCE_COMMIT}"
+
+          RELEASE_IDENTITY="$(gh release view "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --json isDraft,isPrerelease,tagName \
+            --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring)')"
+          case "${RELEASE_IDENTITY}" in
+            "${RELEASE_TAG}"$'\tfalse\tfalse')
+              echo "GitHub release ${RELEASE_TAG} is already public."
+              exit 0
+              ;;
+            "${RELEASE_TAG}"$'\ttrue\tfalse') ;;
+            *)
+              echo "::error::release identity changed during deployment"
+              exit 1
+              ;;
+          esac
+
+          PUBLIC_RELEASE_TAGS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')"
+          MAKE_LATEST="$(PUBLIC_RELEASE_TAGS="${PUBLIC_RELEASE_TAGS}" \
+            python - "${RELEASE_VERSION}" <<'PY'
+          import os
+          import re
+          import sys
+
+          pattern = re.compile(
+              r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$"
+          )
+          current = tuple(int(part) for part in sys.argv[1].split("."))
+          public_versions = []
+          for tag in os.environ.get("PUBLIC_RELEASE_TAGS", "").splitlines():
+              match = pattern.fullmatch(tag)
+              if match is not None:
+                  public_versions.append(tuple(int(part) for part in match.groups()))
+          print("false" if any(version > current for version in public_versions) else "true")
+          PY
+          )"
+          if [[ "${MAKE_LATEST}" = "true" ]]; then
+            gh release edit "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft=false \
+              --latest
+          else
+            gh release edit "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft=false \
+              --latest=false
+          fi

@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Sequence, cast
 
@@ -19,6 +18,7 @@ from scc_firewall_manager_sdk import (
 
 from cisco_sccfm_cli.commands.base import BaseCommand
 from cisco_sccfm_cli.commands.inventory.options import config_path_option, format_option
+from cisco_sccfm_cli.option_metadata import sensitive_option
 from cisco_sccfm_cli.utils import print_json, with_spinner
 from cisco_sccfm_core import FTD_LICENSES, InventoryService
 from cisco_sccfm_core.services.inventory import FtdZtpOnboardService
@@ -72,12 +72,17 @@ class FtdZtpOnboardCommand(BaseCommand):
                 required=True,
                 help="UUID of the FMC access policy to apply to this device.",
             ),
-            click.Option(
-                ["--admin-password"],
-                default=None,
-                help=(
-                    "Initial provisioning password for the device. "
-                    "Required for setup if a password has not already been set on the device."
+            sensitive_option(
+                click.Option(
+                    ["--admin-password"],
+                    default=None,
+                    envvar="SCCFM_FTD_ADMIN_PASSWORD",
+                    show_envvar=True,
+                    help=(
+                        "Initial provisioning password for the device. Required for setup if a "
+                        "password has not already been set on the device. For secure "
+                        "non-interactive use, set SCCFM_FTD_ADMIN_PASSWORD."
+                    ),
                 ),
             ),
             click.Option(

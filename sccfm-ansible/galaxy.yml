@@ -4,9 +4,8 @@ version: 0.39.0
 readme: README.md
 authors:
 - Cisco Security Cloud Control Firewall Manager Team
-description: Ansible inventory plugin for Cisco SCC Firewall Manager (SCCFM).
-license:
-- Apache-2.0
+description: Ansible modules and dynamic inventory for Cisco Security Cloud Control
+  Firewall Manager.
 license_file: LICENSE
 tags:
 - cisco
@@ -29,6 +28,8 @@ build_ignore:
 - ansible_collections
 - plugins/modules/tests
 - plugins/modules/tests/**
+- tests/test_profile_lookup.py
+- changelogs/.plugin-cache.yaml
 - .DS_Store
 - '**/.DS_Store'
 - .gitignore
@@ -39,3 +40,41 @@ build_ignore:
 - '**/*.pyc'
 - ci
 - e2e
+- .vault_pass
+- '**/.vault_pass'
+- .vault_pass_*
+- '**/.vault_pass_*'
+- .vault_pass-*
+- '**/.vault_pass-*'
+- vault.yml
+- '**/vault.yml'
+- vault.yaml
+- '**/vault.yaml'
+- .env
+- .env.*
+- '**/.env'
+- '**/.env.*'
+- .envrc*
+- '**/.envrc*'
+- id_rsa*
+- '**/id_rsa*'
+- id_dsa*
+- '**/id_dsa*'
+- id_ecdsa*
+- '**/id_ecdsa*'
+- id_ed25519*
+- '**/id_ed25519*'
+- '*.pem'
+- '**/*.pem'
+- '*.key'
+- '**/*.key'
+- '*.p12'
+- '**/*.p12'
+- '*.pfx'
+- '**/*.pfx'
+- '*.jks'
+- '**/*.jks'
+- '*.keystore'
+- '**/*.keystore'
+- '*.kdbx'
+- '**/*.kdbx'

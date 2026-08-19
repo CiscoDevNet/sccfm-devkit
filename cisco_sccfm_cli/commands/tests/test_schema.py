@@ -7,13 +7,64 @@ from __future__ import annotations
 import json
 import shlex
 import tomllib
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from typing import Any
 
 import click
+import pytest
 from click.testing import CliRunner
 
+from cisco_sccfm_cli import schema as schema_module
 from cisco_sccfm_cli.cli import cli
+
+
+def test_package_version_should_prefer_installed_distribution_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def installed_version(distribution_name: str) -> str:
+        assert distribution_name == "cisco-sccfm-devkit"
+        return "9.8.7"
+
+    def source_version() -> str | None:
+        return "1.2.3"
+
+    monkeypatch.setattr(schema_module, "version", installed_version)
+    monkeypatch.setattr(schema_module, "_pyproject_version", source_version)
+
+    assert schema_module._package_version() == "9.8.7"
+
+
+def test_package_version_should_fall_back_to_source_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(distribution_name: str) -> str:
+        assert distribution_name == "cisco-sccfm-devkit"
+        raise PackageNotFoundError(distribution_name)
+
+    def source_version() -> str | None:
+        return "1.2.3"
+
+    monkeypatch.setattr(schema_module, "version", missing_version)
+    monkeypatch.setattr(schema_module, "_pyproject_version", source_version)
+
+    assert schema_module._package_version() == "1.2.3"
+
+
+def test_package_version_should_report_unknown_without_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(distribution_name: str) -> str:
+        assert distribution_name == "cisco-sccfm-devkit"
+        raise PackageNotFoundError(distribution_name)
+
+    def source_version() -> str | None:
+        return None
+
+    monkeypatch.setattr(schema_module, "version", missing_version)
+    monkeypatch.setattr(schema_module, "_pyproject_version", source_version)
+
+    assert schema_module._package_version() == "unknown"
 
 
 def test_schema_export_should_emit_machine_readable_command_tree(
@@ -38,7 +89,11 @@ def test_schema_export_should_emit_machine_readable_command_tree(
     assert _option(payload["global_options"], "profile")["placement"] == "before_command_path"
 
     commands = _commands_by_name(payload)
-    assert "sccfm-cli schema export" in commands
+    schema_export = commands["sccfm-cli schema export"]
+    assert schema_export["readonly"] is True
+    assert schema_export["side_effects"] == [
+        "May write or overwrite the local file specified by --output."
+    ]
     assert "sccfm-cli inventory devices asa upgrade trigger" in commands
     assert "sccfm-cli configure" in commands
     assert any(command["kind"] == "group" for command in payload["command_tree"])
@@ -54,21 +109,29 @@ def test_schema_export_should_describe_options_and_auth_requirements(
     commands = _commands_by_name(json.loads(result.output))
     configure = commands["sccfm-cli configure"]
     region = _option(configure["options"], "region")
+    api_token = _option(configure["options"], "api_token")
 
     assert configure["readonly"] is True
     assert configure["side_effects"] == [
-        "Writes the selected profile to the local sccfm-cli configuration file."
+        "Writes the selected profile and repairs local POSIX configuration permissions."
     ]
     assert configure["auth"]["mode"] == "none"
     assert configure["auth"]["requires_profile"] is False
     assert region["type"] == "choice"
     assert "us" in region["values"]
     assert region["required"] is True
+    assert api_token["required"] is False
+    assert api_token["sensitive"] is True
+    assert api_token["envvar"] == "SCCFM_API_TOKEN"
+    assert "--api-token" not in configure["examples"][1]
+    assert "--region int" in configure["examples"][1]
 
     status = commands["sccfm-cli status"]
     assert status["auth"]["mode"] == "sccfm_profile"
     assert status["auth"]["requires_profile"] is True
     assert status["auth"]["requires_api_token"] is True
+    assert status["readonly"] is True
+    assert status["side_effects"] == []
 
 
 def test_schema_export_should_include_mutation_and_handler_constraints(
@@ -80,7 +143,9 @@ def test_schema_export_should_include_mutation_and_handler_constraints(
     commands = _commands_by_name(json.loads(result.output))
     asa_cli = commands["sccfm-cli inventory devices asa cli execute"]
     ftd_cli = commands["sccfm-cli inventory devices cdfmc-managed-ftd cli execute"]
+    configure_manager = commands["sccfm-cli inventory devices cdfmc-managed-ftd configure-manager"]
     ftd_onboard = commands["sccfm-cli inventory devices cdfmc-managed-ftd onboard"]
+    ftd_onboard_ztp = commands["sccfm-cli inventory devices cdfmc-managed-ftd onboard-ztp"]
     network_update = commands["sccfm-cli objects network update"]
     smartlicense = commands["sccfm-cli inventory devices asa smartlicense"]
 
@@ -128,11 +193,51 @@ def test_schema_export_should_include_mutation_and_handler_constraints(
         "At least one update field must be provided."
     )
     assert _constraint(smartlicense["constraints"], "required_unless")["options"] == [
-        "token",
         "feature_tier",
     ]
-    assert "--token <token>" in smartlicense["examples"][1]
+    smartlicense_token = _option(smartlicense["options"], "token")
+    smartlicense_token_file = _option(smartlicense["options"], "token_file")
+    token_source_constraint = _constraint_for_options(
+        smartlicense["constraints"],
+        "mutually_exclusive",
+        ["token", "token_file"],
+    )
+    assert smartlicense_token["sensitive"] is True
+    assert smartlicense_token["envvar"] == "SCCFM_SMART_LICENSE_TOKEN"
+    assert smartlicense_token_file["type"] == "path"
+    assert token_source_constraint["min_required"] == 0
+    assert token_source_constraint["max_allowed"] == 1
+    assert "--token" not in smartlicense["examples"][1]
+    assert "--token-file" not in smartlicense["examples"][1]
     assert "--feature-tier standard" in smartlicense["examples"][1]
+    configure_manager_credentials = {
+        name: _option(configure_manager["options"], name)
+        for name in ("ftd_password", "cli_key", "jump_password")
+    }
+    assert all(option["sensitive"] is True for option in configure_manager_credentials.values())
+    assert configure_manager_credentials["ftd_password"]["envvar"] == "SCCFM_FTD_PASSWORD"
+    assert configure_manager_credentials["jump_password"]["envvar"] == "SCCFM_JUMP_PASSWORD"
+    assert configure_manager_credentials["cli_key"]["envvar"] == "SCCFM_CLI_KEY"
+    assert configure_manager_credentials["cli_key"]["required"] is False
+    assert _constraint_for_options(
+        configure_manager["constraints"], "required_unless", ["cli_key"]
+    ) == {
+        "type": "required_unless",
+        "options": ["cli_key"],
+        "unless": "check",
+        "description": "Required unless --check is set.",
+    }
+    assert "--cli-key" not in configure_manager["examples"][1]
+    assert configure_manager["auth"]["mode"] == "none"
+    assert configure_manager["auth"]["requires_profile"] is False
+    assert configure_manager["auth"]["requires_api_token"] is False
+    assert configure_manager["readonly"] is False
+    assert configure_manager["side_effects"] == [
+        "May change state in SCC Firewall Manager or on managed devices."
+    ]
+    admin_password = _option(ftd_onboard_ztp["options"], "admin_password")
+    assert admin_password["sensitive"] is True
+    assert admin_password["envvar"] == "SCCFM_FTD_ADMIN_PASSWORD"
     ftd_virtual_dependency = _constraint(ftd_onboard["constraints"], "depends_on")
     assert ftd_virtual_dependency["option"] == "virtual"
     assert ftd_virtual_dependency["requires"] == "performance_tier"
@@ -286,6 +391,21 @@ def test_schema_examples_should_reference_declared_options(cli_runner: CliRunner
             assert set(example_flags) <= declared_aliases
 
 
+def test_schema_examples_should_omit_sensitive_argv_options(cli_runner: CliRunner) -> None:
+    result = cli_runner.invoke(cli, ["schema", "export"], prog_name="sccfm-cli")
+    assert result.exit_code == 0, result.output
+
+    for command in json.loads(result.output)["commands"]:
+        sensitive_aliases = {
+            alias
+            for option in command["options"]
+            if option["sensitive"]
+            for alias in option["aliases"]
+        }
+        for example in command["examples"]:
+            assert sensitive_aliases.isdisjoint(shlex.split(example))
+
+
 def _commands_by_name(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {command["command"]: command for command in payload["commands"]}
 
@@ -293,11 +413,9 @@ def _commands_by_name(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _project_version() -> str:
     pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    tool = data["tool"]
-    assert isinstance(tool, dict)
-    poetry = tool["poetry"]
-    assert isinstance(poetry, dict)
-    version = poetry["version"]
+    project = data["project"]
+    assert isinstance(project, dict)
+    version = project["version"]
     assert isinstance(version, str)
     return version
 
@@ -312,6 +430,18 @@ def _field(fields: list[dict[str, Any]], name: str) -> dict[str, Any]:
 
 def _constraint(constraints: list[dict[str, Any]], constraint_type: str) -> dict[str, Any]:
     return next(constraint for constraint in constraints if constraint["type"] == constraint_type)
+
+
+def _constraint_for_options(
+    constraints: list[dict[str, Any]],
+    constraint_type: str,
+    options: list[str],
+) -> dict[str, Any]:
+    return next(
+        constraint
+        for constraint in constraints
+        if constraint["type"] == constraint_type and constraint.get("options") == options
+    )
 
 
 def _option_group(option_groups: list[dict[str, Any]], name: str) -> dict[str, Any]:

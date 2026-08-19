@@ -20,6 +20,9 @@ results/
 /.vscode/
 /.env
 /.env.*
+!/.env.example
+/..env.*
+**/.vault.*.tmp
 /.tox/
 /.eggs/
 .poetry_cache/

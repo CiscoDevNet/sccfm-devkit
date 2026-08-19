@@ -1,9 +1,9 @@
 ---
 # Onboard the CI vASA to the SCCFM tenant.
 #
-# Expected environment variable:
-#   ASA_HOST      — IP or hostname of the provisioned vASA (set by Jenkins)
-#   VASA_PASSWORD — password for the vASA admin user (set by Jenkins)
+# Expected inputs:
+#   ASA_HOST           — IP or hostname of the provisioned vASA (set by Jenkins)
+#   vault_vasa_password — password for the vASA admin user (from Ansible Vault)
 
 - name: "CI: Onboard vASA to SCCFM tenant"
   hosts: localhost
@@ -23,15 +23,14 @@
       ansible.builtin.assert:
         that:
           - lookup('env', 'ASA_HOST') | length > 0
-          - lookup('env', 'VASA_PASSWORD') | length > 0
-        fail_msg: "ASA_HOST and VASA_PASSWORD environment variables must be set"
+        fail_msg: "ASA_HOST environment variable must be set"
 
     - name: Onboard vASA device
       cisco.sccfm.onboard_asa:
         name: "ci-e2e-asa-{{ lookup('env', 'ASA_HOST') | regex_replace('[^a-zA-Z0-9]', '-') }}"
         device_address: "{{ lookup('env', 'ASA_HOST') }}:443"
         username: admin
-        password: "{{ lookup('env', 'VASA_PASSWORD') }}"
+        password: "{{ vault_vasa_password }}"
         connector_type: "{{ default_connector_type }}"
         ignore_certificate: "{{ default_ignore_certificate }}"
       register: onboard_result

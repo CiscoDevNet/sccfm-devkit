@@ -4,17 +4,6 @@
 
 from __future__ import annotations
 
-import re
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device, DevicePage
-
-from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
-
-from ..module_utils.config import base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_ftd_not_on_version
@@ -86,7 +75,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -183,6 +172,28 @@ mode:
   returned: success
   type: str
 """
+
+
+import re
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device, DevicePage
+
+    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.services.inventory import FtdUpgradeVersionService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 _VERSION_RE = re.compile(r"^\d+\.\d+")
 

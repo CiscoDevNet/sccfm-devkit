@@ -1,0 +1,24 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "cisco-sccfm-devtools"
+version = "0.0.0"
+description = "Local-only console entry points for SCCFM maintainers"
+requires-python = ">=3.12,<4.0"
+
+[project.scripts]
+sccfm-cli-interactive = "cisco_sccfm_scripts.interactive_cli:main"
+build-ansible-collection = "cisco_sccfm_scripts.build_ansible_collection:main"
+generate-ansible-docs = "cisco_sccfm_scripts.generate_ansible_docs:main"
+generate-cli-docs = "cisco_sccfm_scripts.generate_cli_docs:main"
+generate-cli-man-docs = "cisco_sccfm_scripts.generate_cli_man_docs:main"
+install-cli-man-docs = "cisco_sccfm_scripts.install_cli_man_docs:main"
+sync-docs-readme = "cisco_sccfm_scripts.sync_docs_readme:main"
+check-doc-links = "cisco_sccfm_scripts.check_doc_links:main"
+check-doc-artifacts = "cisco_sccfm_scripts.check_doc_artifacts:main"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

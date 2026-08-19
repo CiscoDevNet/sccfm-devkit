@@ -16,9 +16,6 @@ from cisco_sccfm_core.services.object_management import (
     NetworkObjectResponse,
     NetworkObjectService,
 )
-from cisco_sccfm_core.services.object_management.network_group_service import (
-    NetworkGroupResponse as GroupResponse,
-)
 from cisco_sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 
 SAMPLE_GROUP = NetworkObjectResponse(
@@ -235,7 +232,7 @@ class TestNetworkGroupServiceUpdate:
         service._helper = ObjectApiHelper.__new__(ObjectApiHelper)
         service._network_object_service = _mock_network_object_service_for_uid(new_ref)
 
-        result = service.update_network_group(
+        service.update_network_group(
             uid="00000000-0000-0000-0000-000000000001",
             referenced_objects=[new_ref],
         )

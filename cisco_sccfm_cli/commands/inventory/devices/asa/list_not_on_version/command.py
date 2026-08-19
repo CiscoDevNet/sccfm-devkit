@@ -38,7 +38,10 @@ class AsaListNotOnVersionCommand(AsaDeviceTargetCommand):
             click.Option(
                 ["--version"],
                 required=True,
-                help="Software version to exclude (e.g. '9.20(3)13'). Devices NOT on this version are listed.",
+                help=(
+                    "Software version to exclude (e.g. '9.20(3)13'). "
+                    "Devices NOT on this version are listed."
+                ),
             ),
             *asa_device_filter_params(
                 include_device_name=True,
@@ -161,7 +164,8 @@ class AsaListNotOnVersionCommand(AsaDeviceTargetCommand):
 
         if not devices:
             self.console.print(
-                f"[green]\u2713[/green] All {matched_device_count} matched device(s) are on version {version}."
+                f"[green]\u2713[/green] All {matched_device_count} matched device(s) "
+                f"are on version {version}."
             )
             return
 
@@ -185,5 +189,6 @@ class AsaListNotOnVersionCommand(AsaDeviceTargetCommand):
 
         self.console.print(table)
         self.console.print(
-            f"\n[bold]{len(devices)} of {matched_device_count} matched device(s) are not on version {version}.[/bold]"
+            f"\n[bold]{len(devices)} of {matched_device_count} matched device(s) "
+            f"are not on version {version}.[/bold]"
         )

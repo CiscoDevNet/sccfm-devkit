@@ -77,7 +77,7 @@ EXAMPLES:
     serial_number: "FTD1234567890"
     licenses:
       - BASE
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     profile: default
 
 # Example 2: Onboard with initial password and device group
@@ -88,7 +88,7 @@ EXAMPLES:
     licenses:
       - BASE
       - CARRIER
-    fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+    fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
     admin_password: "{{ ftd_admin_password }}"
     device_group_uid: "abcd1234-0000-0000-0000-000000000001"
 
@@ -106,7 +106,7 @@ EXAMPLES:
         serial_number: "FTD1234567890"
         licenses:
           - BASE
-        fmc_access_policy_uid: "7131daad-e813-4b8f-8f42-be1e241e8cdb"
+        fmc_access_policy_uid: "00000000-0000-0000-0000-000000000000"
 
 RETURN VALUES:
 

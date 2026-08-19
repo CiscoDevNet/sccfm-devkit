@@ -6,14 +6,13 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from scc_firewall_manager_sdk import Device, DevicePage, EntityType
 
-from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
+from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult
 from cisco_sccfm_core.services.inventory.ftd_cli_service import (
     FtdCommandLineService,
     _build_fmc_uid_map,

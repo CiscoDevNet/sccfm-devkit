@@ -16,7 +16,10 @@ from typing import Any, cast
 import click
 from scc_firewall_manager_sdk import ConfigState, ConnectivityState, EntityType
 
+from cisco_sccfm_cli.option_metadata import is_sensitive_option
+
 SCHEMA_VERSION = "1.0"
+_DISTRIBUTION_NAME = "cisco-sccfm-devkit"
 
 _SCCFM_FREE_COMMANDS = {
     ("configure",),
@@ -24,8 +27,16 @@ _SCCFM_FREE_COMMANDS = {
     ("schema", "export"),
 }
 
+_NO_PROFILE_COMMANDS = {
+    *_SCCFM_FREE_COMMANDS,
+    ("inventory", "devices", "cdfmc-managed-ftd", "configure-manager"),
+}
+
 _LOCAL_SIDE_EFFECT_COMMANDS: dict[tuple[str, ...], str] = {
-    ("configure",): "Writes the selected profile to the local sccfm-cli configuration file.",
+    ("configure",): (
+        "Writes the selected profile and repairs local POSIX configuration permissions."
+    ),
+    ("schema", "export"): "May write or overwrite the local file specified by --output.",
 }
 
 _SCCFM_READONLY_LEAF_NAMES = {
@@ -244,14 +255,10 @@ def _is_object_query_path(path: tuple[str, ...]) -> bool:
 
 
 def _package_version() -> str:
-    project_version = _pyproject_version()
-    if project_version is not None:
-        return project_version
-
     try:
-        return version("sccfm")
+        return version(_DISTRIBUTION_NAME)
     except PackageNotFoundError:
-        return "unknown"
+        return _pyproject_version() or "unknown"
 
 
 def _pyproject_version() -> str | None:
@@ -261,15 +268,11 @@ def _pyproject_version() -> str | None:
     except (OSError, tomllib.TOMLDecodeError):
         return None
 
-    tool = pyproject.get("tool")
-    if not isinstance(tool, dict):
+    project = pyproject.get("project")
+    if not isinstance(project, dict):
         return None
 
-    poetry = tool.get("poetry")
-    if not isinstance(poetry, dict):
-        return None
-
-    project_version = poetry.get("version")
+    project_version = project.get("version")
     if not isinstance(project_version, str) or not project_version:
         return None
 
@@ -322,7 +325,7 @@ def _auth(*, path: tuple[str, ...], is_group: bool) -> dict[str, Any]:
 
 
 def _auth_requirements(*, path: tuple[str, ...], is_group: bool) -> dict[str, Any]:
-    if is_group or path in _SCCFM_FREE_COMMANDS:
+    if is_group or path in _NO_PROFILE_COMMANDS:
         return {
             "requires_profile": False,
             "requires_api_token": False,
@@ -356,6 +359,7 @@ def _option_schema(option: click.Option, *, scope: str) -> dict[str, Any]:
         "nargs": option.nargs,
         "is_flag": bool(option.is_flag),
         "is_bool_flag": bool(getattr(option, "is_bool_flag", False)),
+        "sensitive": is_sensitive_option(option),
         "envvar": _envvar(option.envvar),
         "metavar": option.metavar,
     }
@@ -386,7 +390,7 @@ def _option_type(option: click.Option) -> str:
 
 
 def _type_metadata(
-    parameter_type: click.ParamType,
+    parameter_type: click.ParamType[Any],
 ) -> tuple[list[str] | None, dict[str, Any] | None]:
     if isinstance(parameter_type, click.Choice):
         return list(parameter_type.choices), {"case_sensitive": parameter_type.case_sensitive}
@@ -568,6 +572,8 @@ def _path_specific_constraints(
                 "description": "--command must be 'show' or start with 'show '.",
             }
         )
+    if path == ("inventory", "devices", "cdfmc-managed-ftd", "configure-manager"):
+        constraints.append(_required_unless("cli_key", unless="check"))
     if path == ("inventory", "devices", "asa", "onboard"):
         constraints.append(
             _required_unless("device_address", "username", "connector_type", unless="check")
@@ -624,7 +630,21 @@ def _path_specific_constraints(
             ]
         )
     if path == ("inventory", "devices", "asa", "smartlicense"):
-        constraints.append(_required_unless("token", "feature_tier", unless="check"))
+        constraints.extend(
+            [
+                _required_unless("feature_tier", unless="check"),
+                {
+                    "type": "mutually_exclusive",
+                    "options": ["token", "token_file"],
+                    "min_required": 0,
+                    "max_allowed": 1,
+                    "description": (
+                        "Use at most one explicit Smart Licensing token source; omit both "
+                        "for the hidden interactive prompt."
+                    ),
+                },
+            ]
+        )
     if path == ("objects", "network", "create") and "value" in option_names:
         constraints.append(_required_unless("value", unless="check"))
     if path == ("objects", "network-group", "create"):
@@ -828,7 +848,7 @@ def _example_option_parts(
     parts: list[str] = []
     for option_name in option_names:
         option = option_by_name.get(option_name)
-        if option is None:
+        if option is None or is_sensitive_option(option):
             continue
         flag = _preferred_flag(option)
         if option.is_flag:

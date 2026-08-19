@@ -16,7 +16,8 @@ from cisco_sccfm_cli.commands.inventory.devices.asa.shared import (
     asa_device_filter_params,
 )
 from cisco_sccfm_cli.commands.inventory.options import config_path_option, format_option
-from cisco_sccfm_cli.utils import print_json, with_spinner
+from cisco_sccfm_cli.option_metadata import sensitive_option
+from cisco_sccfm_cli.utils import print_json, redact_data, redact_text, with_spinner
 from cisco_sccfm_core.models.asa_password_change_result import AsaPasswordChangeResult
 from cisco_sccfm_core.services.inventory.asa_user_password_service import (
     AsaUserPasswordService,
@@ -44,12 +45,14 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
                 required=True,
                 help="The local ASA username whose password will be changed.",
             ),
-            click.Option(
-                ["--new-password", "--password"],
-                required=False,
-                default=None,
-                hide_input=True,
-                help="The new password to set.",
+            sensitive_option(
+                click.Option(
+                    ["--new-password", "--password"],
+                    required=False,
+                    default=None,
+                    hide_input=True,
+                    help="The new password to set.",
+                ),
             ),
             asa_check_option(),
             format_option(),
@@ -80,7 +83,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
         username = cast(str, kwargs["username"])
         new_password = cast(str | None, kwargs.get("new_password"))
         if not new_password:
-            new_password = click.prompt("Password", hide_input=True)
+            new_password = self._prompt_sensitive("Password")
 
         password_service = AsaUserPasswordService(config=config)
         results = password_service.change_password(
@@ -115,6 +118,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
         results: dict[str, AsaPasswordChangeResult],
         uid_to_device: dict[str, Device],
     ) -> None:
+        sensitive_values = self._active_sensitive_values()
         output: list[dict[str, str]] = []
         for device_uid, result in results.items():
             device_name = uid_to_device[device_uid].name
@@ -126,7 +130,7 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
                     "message": result.message,
                 }
             )
-        print_json(output)
+        print_json(redact_data(output, sensitive_values))
 
     def _render_table(
         self,
@@ -138,14 +142,15 @@ class AsaChangePasswordCommand(AsaDeviceTargetCommand):
         table.add_column("Device UID")
         table.add_column("Status")
         table.add_column("Message")
+        sensitive_values = self._active_sensitive_values()
         for device_uid, result in results.items():
             device_name = uid_to_device[device_uid].name
             status_display = self._colorize_status(result.status)
             table.add_row(
-                device_name,
-                device_uid,
-                status_display,
-                result.message,
+                redact_text(device_name, sensitive_values),
+                redact_text(device_uid, sensitive_values),
+                redact_text(status_display, sensitive_values),
+                redact_text(result.message, sensitive_values),
             )
         self.console.print(table)
 

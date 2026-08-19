@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -13,4 +13,4 @@ class Profile:
 
     profile: str
     region: str
-    api_token: str
+    api_token: str = field(repr=False)

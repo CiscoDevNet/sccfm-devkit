@@ -16,8 +16,9 @@ from rich.live import Live
 from rich.spinner import Spinner
 from scc_firewall_manager_sdk import ApiException, CdoTransaction, ConnectivityState, Device
 
+from cisco_sccfm_cli.option_metadata import is_sensitive_option
 from cisco_sccfm_cli.services import ConfigService
-from cisco_sccfm_cli.utils import print_json
+from cisco_sccfm_cli.utils import print_json, redact_data, redact_text
 from cisco_sccfm_core import SccApiError
 from cisco_sccfm_core.constants import DEFAULT_POLLING_INTERVAL_SEC, DEFAULT_TRANSACTION_TIMEOUT_SEC
 from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
@@ -27,6 +28,8 @@ from cisco_sccfm_core.types import ConfigLike
 
 class BaseCommand(ABC):
     """Base class implementing the command pattern for CLI commands."""
+
+    _SENSITIVE_VALUES_META_KEY = "sccfm_sensitive_values"
 
     def __init__(self, console: Console) -> None:
         self._console = console
@@ -61,6 +64,7 @@ class BaseCommand(ABC):
                 f"Profile '{profile}' not found. "
                 f"Run 'sccfm-cli --profile {profile} configure' to set it up."
             )
+        self._register_sensitive_value(ctx, config.api_token)
         return cast(ConfigLike, cast(object, config))
 
     def build_params(self) -> Sequence[click.Parameter]:
@@ -68,36 +72,110 @@ class BaseCommand(ABC):
 
     def _dispatch(self, **kwargs: Any) -> None:
         ctx = click.get_current_context()
+        self._register_sensitive_parameters(ctx, kwargs)
+        exit_code: int | None = None
+        click_exception: click.ClickException | None = None
         try:
             self.handle(ctx=ctx, **kwargs)
         except ApiException as e:
+            sensitive_values = self._sensitive_values(ctx)
             output_format = cast(str | None, kwargs.get("format"))
             error = SccApiError.from_exception(e)
 
             if output_format == "json":
-                print_json(error.to_dict())
+                print_json(redact_data(error.to_dict(), sensitive_values))
             else:
                 self.console.print(
                     "[yellow]Error executing operation using the SCC Firewall Manager API. "
                     "If you think you should not be getting this error, please file a Github issue"
                     " with the details below.[/yellow]"
                 )
-                self.console.print(f"[bold]Error message:[/bold] {error.message}")
-                self.console.print(f"[bold]Error Code:[/bold] {error.error_code}")
                 self.console.print(
-                    f"[bold]Error Details:[/bold]\n{json.dumps(error.details, indent=2)}"
+                    f"[bold]Error message:[/bold] "
+                    f"{redact_text(error.message, sensitive_values)}"
                 )
-            sys.exit(-1)
-        except click.ClickException:
+                error_code = redact_text(str(error.error_code), sensitive_values)
+                self.console.print(f"[bold]Error Code:[/bold] {error_code}")
+                error_details = redact_data(error.details, sensitive_values)
+                self.console.print(
+                    f"[bold]Error Details:[/bold]\n{json.dumps(error_details, indent=2)}"
+                )
+            exit_code = -1
+        except click.ClickException as exc:
             # Preserve Click's default error handling so usage/help is shown for user errors.
-            raise
+            exc.message = redact_text(str(exc.message), self._sensitive_values(ctx))
+            exc.args = (exc.message,)
+            exc.__context__ = None
+            exc.__cause__ = None
+            exc.__suppress_context__ = True
+            exc.__traceback__ = None
+            click_exception = exc
         except (click.Abort, click.exceptions.Exit):
             raise
         except KeyboardInterrupt:
             sys.exit(130)
         except Exception as e:
-            self.console.print(f"[red]Error: {e}[/red]")
-            sys.exit(-1)
+            message = redact_text(str(e), self._sensitive_values(ctx))
+            self.console.print(f"[red]Error: {message}[/red]")
+            exit_code = -1
+
+        if click_exception is not None:
+            raise click_exception
+        if exit_code is not None:
+            sys.exit(exit_code)
+
+    def _register_sensitive_value(self, ctx: click.Context, value: str) -> None:
+        """Register a secret for command-scoped output and exception redaction."""
+        if not value:
+            return
+        values = self._sensitive_values(ctx)
+        if value not in values:
+            ctx.meta[self._SENSITIVE_VALUES_META_KEY] = (*values, value)
+
+    def _register_sensitive_parameters(self, ctx: click.Context, kwargs: dict[str, Any]) -> None:
+        """Register values from Click options explicitly marked as sensitive."""
+        for parameter in ctx.command.params:
+            if not isinstance(parameter, click.Option) or not is_sensitive_option(parameter):
+                continue
+            value = kwargs.get(parameter.name or "")
+            if isinstance(value, str):
+                self._register_sensitive_value(ctx, value)
+
+    def _sensitive_values(self, ctx: click.Context) -> tuple[str, ...]:
+        """Return secrets registered for the active Click command context."""
+        raw_values = ctx.meta.get(self._SENSITIVE_VALUES_META_KEY, ())
+        if not isinstance(raw_values, tuple):
+            return ()
+        return tuple(value for value in raw_values if isinstance(value, str) and value)
+
+    def _prompt_sensitive(
+        self,
+        text: str,
+        *,
+        default: str | None = None,
+        show_default: bool = True,
+    ) -> str:
+        """Prompt without echoing and immediately register the acquired secret."""
+        value = cast(
+            str,
+            click.prompt(
+                text,
+                default=default,
+                hide_input=True,
+                show_default=show_default,
+            ),
+        )
+        self._register_sensitive_value(click.get_current_context(), value)
+        return value
+
+    def _active_sensitive_values(
+        self, sensitive_values: Sequence[str] | None = None
+    ) -> Sequence[str]:
+        """Resolve explicit secrets or inherit the active command registry."""
+        if sensitive_values is not None:
+            return sensitive_values
+        ctx = click.get_current_context(silent=True)
+        return self._sensitive_values(ctx) if ctx is not None else ()
 
     @abstractmethod
     def handle(self, ctx: click.Context, **kwargs: Any) -> None:
@@ -208,24 +286,28 @@ class BaseCommand(ABC):
         )
 
     def print_failed_transaction_details(
-        self, cdo_transaction: CdoTransaction, format: str = "table"
+        self,
+        cdo_transaction: CdoTransaction,
+        format: str = "table",
+        *,
+        sensitive_values: Sequence[str] | None = None,
     ) -> None:
+        sensitive_values = self._active_sensitive_values(sensitive_values)
         if format == "json":
-            print_json(cdo_transaction.to_dict())
+            print_json(redact_data(cdo_transaction.to_dict(), sensitive_values))
         else:
+            transaction_uid = redact_text(str(cdo_transaction.transaction_uid), sensitive_values)
+            transaction_status = redact_text(
+                str(cdo_transaction.cdo_transaction_status), sensitive_values
+            )
+            error_message = redact_text(str(cdo_transaction.error_message), sensitive_values)
+            transaction_details = redact_data(cdo_transaction.transaction_details, sensitive_values)
             self.console.print("[yellow]The execution failed. Transaction Details:[/yellow]")
+            self.console.print("[bold]Transaction UID: [/bold]" f"{transaction_uid}")
+            self.console.print("[bold]Transaction Status: [/bold]" f"{transaction_status}")
+            self.console.print("[bold]Transaction Error Message: [/bold]" f"{error_message}")
             self.console.print(
-                "[bold]Transaction UID: [/bold]" f"{cdo_transaction.transaction_uid}"
-            )
-            self.console.print(
-                "[bold]Transaction Status: [/bold]" f"{cdo_transaction.cdo_transaction_status}"
-            )
-            self.console.print(
-                "[bold]Transaction Error Message: [/bold]" f"{cdo_transaction.error_message}"
-            )
-            self.console.print(
-                "[bold]Transaction Details: [/bold]\n"
-                f"{json.dumps(cdo_transaction.transaction_details)}"
+                "[bold]Transaction Details: [/bold]\n" f"{json.dumps(transaction_details)}"
             )
         sys.exit(-1)
 

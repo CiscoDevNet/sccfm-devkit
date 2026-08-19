@@ -8,7 +8,6 @@ from typing import Any, Sequence, cast
 
 import click
 from rich.console import Console
-from scc_firewall_manager_sdk import CdoTransaction
 
 from cisco_sccfm_cli.commands.base import BaseCommand
 from cisco_sccfm_cli.commands.shared_options import (

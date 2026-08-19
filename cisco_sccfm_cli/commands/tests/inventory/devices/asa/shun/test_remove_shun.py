@@ -6,8 +6,7 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any, List
+from typing import Any
 
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
@@ -43,8 +42,8 @@ def _patch_services(
 
     def fake_remove_shun_entries(
         self: AsaShunService,
-        device_uids: List[str],
-        source_ips: List[str],
+        device_uids: list[str],
+        source_ips: list[str],
         *,
         wait: bool = True,
     ) -> list[CdoCliResult]:

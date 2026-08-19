@@ -27,9 +27,15 @@ Options:
   --format [table|json]         Output format  [default: table]
   --config-path PATH            Path to the configuration file (defaults to
                                 ~/.sccfm-cli/config.json).
-  -t, --token TEXT              The smart license token for your virtual
-                                account, generated on
-                                https://software.cisco.com/clc
+  -t, --token TEXT              Smart Licensing token for your virtual account.
+                                Passing it directly is supported for
+                                compatibility but may expose it in process
+                                listings and shell history; prefer
+                                SCCFM_SMART_LICENSE_TOKEN, --token-file, or the
+                                hidden prompt.  [env var:
+                                SCCFM_SMART_LICENSE_TOKEN]
+  --token-file FILE             Read the Smart Licensing token from a file; use
+                                '-' to read from stdin.
   --throughput-level [100M|1G]  The throughput level of your ASA (required only
                                 for virtual ASAs)
   --feature-tier [standard]     The feature tier of your ASA

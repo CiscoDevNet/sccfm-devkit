@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 from scc_firewall_manager_sdk import Device, DevicePage, EntityType, ZtpOnboardingInput
@@ -152,6 +151,36 @@ class TestSuccessfulOnboard:
         assert result.exit_code == 0, f"Command failed: {result.output}"
         assert captured["input"].admin_password == "s3cr3t"
         assert captured["input"].device_group_uid == "group-uid-xyz"
+
+    def test_should_read_admin_password_from_environment(
+        self,
+        cli_runner: CliRunner,
+        default_config: Config,
+        mock_inventory_service: None,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """ZTP should provide a schema-approved non-argv credential source."""
+        admin_password = "environment-admin-password-sentinel"
+        monkeypatch.setattr(InventoryService, "get_devices", _empty_device_page)
+        monkeypatch.setattr(FtdZtpOnboardService, "__init__", _stub_ztp_service_init)
+        captured: dict[str, ZtpOnboardingInput] = {}
+
+        def fake_onboard(
+            self: FtdZtpOnboardService, ztp_onboarding_input: ZtpOnboardingInput
+        ) -> Device:
+            captured["input"] = ztp_onboarding_input
+            return _fake_device()
+
+        monkeypatch.setattr(FtdZtpOnboardService, "onboard_ftd_ztp", fake_onboard)
+        result = cli_runner.invoke(
+            cli,
+            _BASE_ARGS,
+            env={"SCCFM_FTD_ADMIN_PASSWORD": admin_password},
+        )
+
+        assert result.exit_code == 0, result.output
+        assert captured["input"].admin_password == admin_password
+        assert admin_password not in result.output
 
     def test_should_support_multiple_licenses(
         self,

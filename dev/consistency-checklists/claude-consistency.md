@@ -400,7 +400,8 @@
 ### 16.1 Poetry / `pyproject.toml`
 - **Invariants:**
   - Dependencies added via `poetry add`; dev deps in `[tool.poetry.group.dev.dependencies]`.
-  - Entry points: `sccfm-cli`, `sccfm-cli-interactive`, `build-ansible-collection`.
+  - Public entry point: `sccfm-cli`; `sccfm-cli-interactive` and other maintainer entry points
+    come from the local `devtools/` package in the development dependency group.
   - Tool configs (black, isort, mypy, pytest, coverage) all live in `pyproject.toml`.
 
 ### 16.2 Pre-commit
@@ -417,7 +418,8 @@
 
 ### 16.5 Helper scripts
 - **Canonical:** `cisco_sccfm_scripts/` (`interactive_cli.py`, `setup_environment.sh`, `setup_ci_environment.sh`, `import_legacy_vault.py`, `build_ansible_collection.py`, `cz.sh`).
-- **Invariants:** any new repo-wide automation lives in `cisco_sccfm_scripts/` and is exposed via `pyproject.toml` entry points where it's user-facing.
+- **Invariants:** new repo-wide automation remains source-only and is exposed through
+  `devtools/pyproject.toml`; public CLI features belong under `cisco_sccfm_cli`.
 
 ---
 

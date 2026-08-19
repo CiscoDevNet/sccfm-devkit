@@ -4,20 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-
-from cisco_sccfm_core.services.object_management import NetworkObjectService
-
-from ..module_utils.config import (
-    Config,
-    base_argument_spec,
-    create_config,
-    identifier_argument_spec,
-)
-from ..module_utils.operations import run_delete_with_idempotency
-
 DOCUMENTATION = r"""
 ---
 module: delete_network_object
@@ -48,7 +34,7 @@ notes:
   - When using C(name), the module searches for the object and resolves it to a UID
     before deletion.
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -93,6 +79,30 @@ deleted_uid:
   type: str
   sample: "abc-123-def-456"
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from cisco_sccfm_core.services.object_management import NetworkObjectService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import (
+    Config,
+    base_argument_spec,
+    create_config,
+    identifier_argument_spec,
+)
+from ..module_utils.operations import run_delete_with_idempotency
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

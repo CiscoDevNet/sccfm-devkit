@@ -311,13 +311,60 @@ def _validate_cli_key(cli_key: str) -> str:
 
 
 def _sanitize_manager_command_echo(output: str, command: str) -> str:
-    command_marker = command.casefold()
-    sanitized_lines: list[str] = []
-    for line in output.splitlines():
-        if command_marker in line.strip().casefold():
+    lines = output.splitlines()
+    echo_start = _manager_command_echo_range(lines, command)
+    if echo_start is None:
+        return output.strip()
+    start, end = echo_start
+    return "\n".join((*lines[:start], *lines[end:])).strip()
+
+
+def _manager_command_echo_range(lines: list[str], command: str) -> tuple[int, int] | None:
+    """Locate a complete or secret-bearing partial command echo."""
+    expected = _normalize_command_echo_fragment(command)
+    command_prefix = "configure manager add"
+    for start, line in enumerate(lines):
+        first_fragment = _normalize_command_echo_fragment(line)
+        candidate = _command_echo_candidate(first_fragment, command_prefix)
+        if candidate is None or not expected.startswith(candidate):
             continue
-        sanitized_lines.append(line)
-    return "\n".join(sanitized_lines).strip()
+        candidates = {candidate}
+        end = start + 1
+        partial_end = end if candidate != command_prefix else None
+        while expected not in candidates and candidates and end < len(lines):
+            fragment = _normalize_command_echo_fragment(lines[end])
+            if not fragment:
+                break
+            continued_candidates = {
+                joined
+                for candidate in candidates
+                for joined in (candidate + fragment, f"{candidate} {fragment}")
+                if expected.startswith(joined)
+            }
+            if not continued_candidates:
+                break
+            candidates = continued_candidates
+            end += 1
+            partial_end = end
+        if expected in candidates:
+            return start, end
+        if partial_end is not None:
+            return start, partial_end
+    return None
+
+
+def _command_echo_candidate(fragment: str, command_prefix: str) -> str | None:
+    marker_offset = fragment.find(command_prefix)
+    if marker_offset == 0:
+        return fragment
+    if marker_offset < 0:
+        return None
+    prompt = fragment[:marker_offset].rstrip()
+    return fragment[marker_offset:] if prompt.endswith((">", "#")) else None
+
+
+def _normalize_command_echo_fragment(value: str) -> str:
+    return " ".join(value.casefold().split())
 
 
 def _read_until_prompt(channel: paramiko.Channel, timeout: int) -> str:

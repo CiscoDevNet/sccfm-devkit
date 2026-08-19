@@ -11,7 +11,6 @@ from unittest.mock import Mock
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
-from scc_firewall_manager_sdk.exceptions import ApiException
 
 from cisco_sccfm_cli.cli import cli
 from cisco_sccfm_cli.models import Config

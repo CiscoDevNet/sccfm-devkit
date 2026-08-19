@@ -4,25 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
-
-from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
-from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
-from cisco_sccfm_core.services.inventory import (
-    AsaUpgradeService,
-    AsaUpgradeVersionService,
-    get_asdm_compatibility_info,
-    is_version_downgrade,
-)
-from cisco_sccfm_core.services.transaction_service import TransactionService
-from cisco_sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: trigger_asa_upgrade
@@ -126,7 +107,7 @@ options:
     required: false
     type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -188,6 +169,37 @@ device_count:
   returned: always
   type: int
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
+    from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
+    from cisco_sccfm_core.services.inventory import (
+        AsaUpgradeService,
+        AsaUpgradeVersionService,
+        get_asdm_compatibility_info,
+        is_version_downgrade,
+    )
+    from cisco_sccfm_core.services.transaction_service import TransactionService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+    DEFAULT_TRANSACTION_TIMEOUT_SEC = 3600
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
