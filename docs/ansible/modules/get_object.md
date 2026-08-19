@@ -31,7 +31,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the object to retrieve.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Get object details by UID

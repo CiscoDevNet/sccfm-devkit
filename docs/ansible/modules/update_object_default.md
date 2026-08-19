@@ -39,7 +39,7 @@ OPTIONS (= indicates it is required):
            should be the URL string.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Update the default value of a network object

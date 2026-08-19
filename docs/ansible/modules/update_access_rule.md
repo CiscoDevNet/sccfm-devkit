@@ -77,7 +77,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the access rule to update.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Update a rule's action

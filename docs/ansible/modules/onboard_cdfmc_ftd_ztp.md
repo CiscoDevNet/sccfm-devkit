@@ -34,7 +34,6 @@ OPTIONS (= indicates it is required):
                    Required if a password has not already been set on
                    the device.
         default: null
-        no_log: true
         type: str
 
 - config_path  Optional path to the canonical SCCFM profile
@@ -67,7 +66,7 @@ OPTIONS (= indicates it is required):
 = serial_number  Serial number of the physical FTD device.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Onboard a physical FTD via ZTP

@@ -40,7 +40,7 @@ NOTES:
       * When using `name', the module searches for the object
         and resolves it to a UID before deletion.
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Delete a network object by UID

@@ -64,7 +64,7 @@ OPTIONS (= indicates it is required):
             Devices NOT running this exact version will be returned.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: List all ASAs not on a specific version

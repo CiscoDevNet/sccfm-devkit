@@ -31,7 +31,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the access rule to delete.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Delete an access rule by UID

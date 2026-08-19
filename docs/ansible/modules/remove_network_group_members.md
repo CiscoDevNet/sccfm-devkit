@@ -47,7 +47,7 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Remove members by name

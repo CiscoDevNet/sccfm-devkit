@@ -12,4 +12,4 @@ releases:
         publication.
     fragments:
       - 0.39.1.yml
-    release_date: '2026-08-18'
+    release_date: '2026-08-19'

@@ -45,7 +45,7 @@ NOTES:
         accidentally matching network objects with the same
         name.
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Delete a network group by UID

@@ -42,7 +42,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the object to edit.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Edit an existing override for a specific device

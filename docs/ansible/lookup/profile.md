@@ -30,7 +30,7 @@ OPTIONS (= indicates it is required):
         choices: [region, api_token]
         default: api_token
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 NAME: profile
 

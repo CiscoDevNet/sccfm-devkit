@@ -4,4 +4,4 @@
 
 # Controller-side Python dependency for this cisco.sccfm release.
 # The collection build keeps this exact version aligned with galaxy.yml.
-cisco-sccfm-devkit==0.39.0
+cisco-sccfm-devkit==0.39.1

@@ -37,7 +37,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the object.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Promote a device override to become the new default

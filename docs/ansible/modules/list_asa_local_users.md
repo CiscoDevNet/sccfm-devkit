@@ -48,7 +48,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 - name: List local users on one or more devices by UID

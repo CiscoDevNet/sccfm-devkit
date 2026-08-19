@@ -75,7 +75,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Deploy changes to specific FTD devices

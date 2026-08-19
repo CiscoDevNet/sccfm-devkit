@@ -39,7 +39,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 - name: Register vFTD with cdFMC using shared authentication defaults

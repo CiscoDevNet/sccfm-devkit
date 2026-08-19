@@ -47,7 +47,6 @@ OPTIONS (= indicates it is required):
         type: str
 
 = password  Password used to authenticate with the device.
-        no_log: true
         type: str
 
 - profile  Named SCCFM profile configured by `sccfm-cli configure'.
@@ -62,7 +61,7 @@ OPTIONS (= indicates it is required):
 = username  Username used to authenticate with the device.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Using module_defaults (recommended)

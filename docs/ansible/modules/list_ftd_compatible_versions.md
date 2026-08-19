@@ -64,7 +64,7 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Get compatible versions for a single FTD (flat list output)

@@ -49,9 +49,7 @@ OPTIONS (= indicates it is required):
         default: null
         type: str
 
-NAME: cisco.sccfm.sccfm
-
-PLUGIN_TYPE: inventory
+NAME: sccfm
 
 EXAMPLES:
 plugin: cisco.sccfm.sccfm

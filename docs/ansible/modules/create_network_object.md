@@ -51,7 +51,7 @@ OPTIONS (= indicates it is required):
            an IP range (e.g., `10.0.0.1-10.0.0.10').
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Create a host network object

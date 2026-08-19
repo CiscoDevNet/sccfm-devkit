@@ -29,7 +29,7 @@ OPTIONS (= indicates it is required):
 = uid     Unique identifier (UID) of the access group to retrieve.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Get access group details by UID

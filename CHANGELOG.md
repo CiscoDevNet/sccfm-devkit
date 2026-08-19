@@ -1,3 +1,36 @@
+## v0.39.1 (2026-08-19)
+
+### Fix
+
+- **lh-102436**: honor keyword-only object lookups
+- **lh-102436**: prepare first ansible release metadata
+- **lh-102436**: vault ansible e2e device password
+- **lh-102436**: make ansible sanity checks pass
+- **lh-102436**: align network group service conventions
+- **lh-102436**: align network object service conventions
+- **lh-102436**: resolve generated documentation conflicts
+- **lh-102436**: integrate profile workflow with release
+- **lh-102436**: correct gitleaks module path
+- **lh-102436**: address release review feedback
+- **lh-102436**: proper release
+- **lh-102436**: fix doc styling
+- **lh-102436**: use repository secrets for publishing
+- **lh-102436**: close remaining release blockers
+- **lh-102436**: use current vault key in CLI E2E
+- **lh-102436**: harden release and credential workflows
+- **lh-102436**: add manual build-once release workflow
+- **lh-102436**: stabilizes the final package metadata and README
+- **lh-102436**: poetry run in venv
+- **lh-102436**: Galaxy metadata/runtime issues
+- **lh-102436**: make the Galaxy artifact independently installable and usable.
+- **lh-102436**: remove tests and e2e files from pypi wheel
+- **lh-102436**: query correct distribution name
+- **lh-102436**: unresolved runtime dependency
+- **lh-102436**: hide api-token
+- **lh-102436**: install resolves a broken SDK
+- **lh-102436**: hide smart licensing token
+- **lh-102436**: Inventory plugin remove exports of the API token
+
 ## v0.39.0 (2026-08-18)
 
 ### Feat

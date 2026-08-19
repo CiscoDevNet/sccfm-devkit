@@ -100,7 +100,7 @@ OPTIONS (= indicates it is required):
         default: false
         type: bool
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Upgrade software and ASDM on specific devices

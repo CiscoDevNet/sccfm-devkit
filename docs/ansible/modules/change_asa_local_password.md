@@ -38,7 +38,6 @@ OPTIONS (= indicates it is required):
         type: int
 
 = new_password  The new password to set for the user.
-        no_log: true
         type: str
 
 - offset  Pagination offset when using `query'.
@@ -65,7 +64,7 @@ OPTIONS (= indicates it is required):
 = username  The local ASA username whose password will be changed.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Change password on ASAs matching a query
