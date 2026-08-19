@@ -251,6 +251,19 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert 'git rev-parse "refs/tags/${RELEASE_TAG}^{commit}"' in validation
     assert "release-manifest-sha256:" in validation
     assert "release_artifacts verify" in validation
+    assert "contents: write" in validation
+    assert "actions/upload-artifact@v4" in validation
+    assert "bundle_name: ${{ steps.bundle.outputs.bundle_name }}" in validation
+    assert "name: ${{ steps.bundle.outputs.bundle_name }}" in validation
+    assert "GITHUB_RUN_ID" in validation
+    assert "GITHUB_RUN_ATTEMPT" in validation
+    assert "if-no-files-found: error" in validation
+    assert "overwrite:" not in validation
+    assert "secrets.PYPI_API_TOKEN" not in validation
+    assert "secrets.GALAXY_API_KEY" not in validation
+    assert validation.index("release_artifacts verify") < validation.index(
+        "actions/upload-artifact@v4"
+    )
 
     prohibited_deploy_commands = (
         "poetry build",
@@ -260,16 +273,30 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
         "git commit ",
         "git tag ",
         "git push ",
-        "actions/upload-artifact",
-        "actions/download-artifact",
         "SCCFM_CI_DEPLOY_KEY",
     )
     for command in prohibited_deploy_commands:
         assert command not in release
 
-    for job in (validation, pypi, galaxy, finalizer):
+    for job in (validation, finalizer):
         assert 'gh release download "${RELEASE_TAG}"' in job
         assert "release_artifacts verify" in job
+
+    for job in (pypi, galaxy):
+        assert "contents: read" in job
+        assert "contents: write" not in job
+        assert job.count("actions/download-artifact@v4") == 1
+        assert "name: ${{ needs.validate-release.outputs.bundle_name }}" in job
+        assert 'gh release download "${RELEASE_TAG}"' not in job
+        assert "GH_TOKEN:" not in job
+        assert "secrets.GITHUB_TOKEN" not in job
+        assert "release_artifacts verify" in job
+        assert "EXPECTED_MANIFEST_SHA256" in job
+        assert job.index("actions/download-artifact@v4") < job.index("release_artifacts verify")
+
+    assert "contents: write" in finalizer
+    assert release.count("actions/upload-artifact@v4") == 1
+    assert release.count("actions/download-artifact@v4") == 2
 
     assert "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33" in pypi
     assert "pypa/gh-action-pypi-publish@release/v1" not in pypi
