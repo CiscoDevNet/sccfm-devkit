@@ -1,3 +1,9 @@
+## v0.39.2 (2026-08-19)
+
+### Fix
+
+- **lh-114358**: publish the interactive customer CLI
+
 ## v0.39.1 (2026-08-19)
 
 ### Fix
