@@ -19,12 +19,15 @@ jobs:
   validate-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # Draft releases are visible only to tokens with push access. Keep that
+      # access isolated from the jobs that receive registry credentials.
+      contents: write
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
       source_commit: ${{ steps.bundle.outputs.source_commit }}
       manifest_sha256: ${{ steps.bundle.outputs.manifest_sha256 }}
+      bundle_name: ${{ steps.bundle.outputs.bundle_name }}
       is_draft: ${{ steps.release.outputs.is_draft }}
     steps:
       - name: Validate selected draft release
@@ -121,8 +124,23 @@ jobs:
             --version "${RELEASE_VERSION}" \
             --tag "${RELEASE_TAG}" \
             --source-commit "${SOURCE_COMMIT}"
+          BUNDLE_NAME="release-promotion-${RELEASE_VERSION}-${SOURCE_COMMIT}-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
           echo "source_commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
           echo "manifest_sha256=${MANIFEST_SHA256}" >> "$GITHUB_OUTPUT"
+          echo "bundle_name=${BUNDLE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve verified release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.bundle.outputs.bundle_name }}
+          path: |
+            ${{ runner.temp }}/release-bundle/cisco_sccfm_devkit-${{ steps.release.outputs.version }}-py3-none-any.whl
+            ${{ runner.temp }}/release-bundle/cisco_sccfm_devkit-${{ steps.release.outputs.version }}.tar.gz
+            ${{ runner.temp }}/release-bundle/cisco-sccfm-${{ steps.release.outputs.version }}.tar.gz
+            ${{ runner.temp }}/release-bundle/release-manifest.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
 
   publish-to-pypi:
     needs: validate-release
@@ -148,17 +166,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install twine==6.2.0
 
-      - name: Download exact draft release bundle
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
-          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
-        run: |
-          set -euo pipefail
-          mkdir -p "${BUNDLE_DIR}"
-          gh release download "${RELEASE_TAG}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --dir "${BUNDLE_DIR}"
+      - name: Download verified release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.validate-release.outputs.bundle_name }}
+          path: ${{ runner.temp }}/release-bundle
 
       - name: Verify bundle and inspect PyPI state
         id: pypi
@@ -300,17 +312,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "ansible-core>=2.20,<2.22"
 
-      - name: Download exact draft release bundle
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
-          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
-        run: |
-          set -euo pipefail
-          mkdir -p "${BUNDLE_DIR}"
-          gh release download "${RELEASE_TAG}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --dir "${BUNDLE_DIR}"
+      - name: Download verified release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.validate-release.outputs.bundle_name }}
+          path: ${{ runner.temp }}/release-bundle
 
       - name: Verify bundle and inspect Galaxy state
         id: galaxy

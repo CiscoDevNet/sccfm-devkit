@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.39.4
+========
+
+Bugfixes
+--------
+
+- Fixed manual release promotion so verified draft assets are handed off to read-only PyPI and Galaxy publication jobs.
+
 v0.39.3
 ========
 

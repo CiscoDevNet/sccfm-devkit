@@ -2,6 +2,13 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.39.4:
+    changes:
+      bugfixes:
+        - Fixed manual release promotion so verified draft assets are handed off to
+          read-only PyPI and Galaxy publication jobs.
+    fragments: []
+    release_date: '2026-08-19'
   0.39.3:
     changes:
       bugfixes:
