@@ -12,7 +12,16 @@ from cisco_sccfm_scripts.build_ansible_collection import (
     CollectionBuildError,
     _sync_paired_python_requirement,
     _sync_runtime_requirement,
+    main,
 )
+
+
+def test_help_exits_without_building(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+
+    assert exc_info.value.code == 0
+    assert "Build and verify the cisco.sccfm" in capsys.readouterr().out
 
 
 def test_sync_paired_python_requirement_writes_canonical_pair_pin(tmp_path: Path) -> None:

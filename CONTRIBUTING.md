@@ -39,7 +39,10 @@ reserve breaking changes until the next major version release.
 
 ## Development Setup
 
-1. Run `cisco_sccfm_scripts/setup_environment.sh` to install dependencies and create the virtualenv.
+1. Run `cisco_sccfm_scripts/setup_environment.sh` to install dependencies and create the
+   virtualenv. Poetry is kept in an isolated tooling environment so its dependencies do not
+   conflict with the project runtime. If an older setup reports that Poetry is installed in
+   `.venv/`, remove `.venv/` once and rerun the script.
 
 2. Install [direnv](https://direnv.net/) for automatic environment activation:
 

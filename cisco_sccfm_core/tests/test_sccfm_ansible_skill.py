@@ -45,29 +45,42 @@ def test_sccfm_skills_route_cli_and_ansible_requests_explicitly() -> None:
 
 def test_sccfm_ansible_skill_is_ansible_doc_driven() -> None:
     skill = _skill_text()
+    normalized_skill = " ".join(skill.split())
 
     assert "Do NOT use for sccfm-cli commands" in skill
     assert "ansible-doc -j -l -t module cisco.sccfm" in skill
     assert "ansible-doc -j cisco.sccfm.<module_name>" in skill
     assert "ansible-doc -j -l -t inventory cisco.sccfm" in skill
     assert "ansible-doc -j -t inventory <inventory_plugin_fqcn>" in skill
+    assert "ansible-doc -j -l -t lookup cisco.sccfm" in skill
+    assert "ansible-doc -j -t lookup <lookup_plugin_fqcn>" in skill
     assert "cisco.sccfm.sccfm" not in skill
     assert "Do not hardcode module names" in skill
-    assert "All module knowledge comes from `ansible-doc`" in skill
+    assert "All module and plugin knowledge comes from" in normalized_skill
     assert "only hardcoded bootstrap commands" in skill
-    assert "ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force" in skill
-    assert "only to detect a stale" in skill
+    assert '"dist/cisco-sccfm-$(poetry version --short).tar.gz" --force' in skill
+    assert "dist/cisco-sccfm-*.tar.gz" not in skill
+    assert "only to detect a stale" in normalized_skill
     assert "Do not use source filenames" in skill
 
 
 def test_sccfm_ansible_skill_documents_safety_and_secret_rules() -> None:
     skill = _skill_text()
+    normalized_skill = " ".join(skill.split())
 
     assert "Class A: Readonly, no local writes" in skill
     assert "Class B: Readonly, local-write/export side effects" in skill
     assert "Class C: Mutating SCCFM or managed devices" in skill
     assert "Never ask the user to paste secrets into chat" in skill
     assert "name or description indicates a token, password, key, or secret" in skill
+    assert "when `field` is omitted" in normalized_skill
+    assert "it defaults to `api_token`" in normalized_skill
+    assert "field=api_token" in skill
+    assert "only inside a task with `no_log: true`" in normalized_skill
+    assert "never print, export, log, or return it in chat" in normalized_skill
+    assert "field=region" in skill
+    assert "explicitly non-secret field" in normalized_skill
+    assert "may be presented" in normalized_skill
     assert "module_defaults: group/cisco.sccfm.all" in skill
     assert "supports_check_mode=True" in skill
     assert "EXECUTE cisco.sccfm <module-fqcn> <target-summary>" in skill

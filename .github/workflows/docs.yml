@@ -39,6 +39,7 @@ jobs:
       - name: Check docs
         run: |
           poetry run check-doc-links
+          poetry run check-doc-links --docs-root sccfm-ansible
           poetry run check-doc-artifacts
 
       - name: Build Pages site

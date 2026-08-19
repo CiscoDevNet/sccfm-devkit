@@ -13,7 +13,7 @@
   hosts: localhost
   gather_facts: false
 
-  # Use module_defaults to avoid repeating region and api_token
+  # Use module_defaults to select one named profile for all collection tasks
   module_defaults:
     group/cisco.sccfm.all:
       profile: default

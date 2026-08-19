@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for cisco_sccfm_cli.commands.base — filter_online_devices."""
+"""Tests for cisco_sccfm_cli.commands.base."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Sequence
 
 import click
@@ -18,7 +19,9 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
+from cisco_sccfm_cli.commands import base
 from cisco_sccfm_cli.commands.base import BaseCommand
+from cisco_sccfm_cli.services import ConfigService
 
 # ── Concrete stub so we can instantiate BaseCommand ──────────────
 
@@ -109,3 +112,50 @@ class TestFilterOnlineDevices:
         cmd = self._make_command()
         with pytest.raises(click.ClickException, match="No online devices found"):
             cmd.filter_online_devices([])
+
+
+class TestGetProfile:
+    def _context(self, profile: str) -> click.Context:
+        return click.Context(click.Command("stub"), obj={"profile": profile})
+
+    def test_missing_profile_uses_default_config_guidance(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        command = _StubCommand(console=Console(stderr=True))
+        monkeypatch.setattr(ConfigService, "load", lambda *_args: None)
+
+        with pytest.raises(click.ClickException) as exc_info:
+            command.get_profile(self._context("lab"), config_path=None)
+
+        assert "sccfm-cli --profile lab configure" in exc_info.value.message
+        assert "--config-path" not in exc_info.value.message
+
+    def test_missing_profile_preserves_custom_config_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        command = _StubCommand(console=Console(stderr=True))
+        config_path = tmp_path / "custom config.json"
+        monkeypatch.setattr(ConfigService, "load", lambda *_args: None)
+
+        with pytest.raises(click.ClickException) as exc_info:
+            command.get_profile(self._context("offline audit"), config_path=config_path)
+
+        assert (
+            "sccfm-cli --profile 'offline audit' configure " f"--config-path '{config_path}'"
+        ) in exc_info.value.message
+
+    def test_missing_profile_uses_windows_command_quoting(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        command = _StubCommand(console=Console(stderr=True))
+        config_path = Path("C:/Users/Example User/sccfm config.json")
+        monkeypatch.setattr(ConfigService, "load", lambda *_args: None)
+        monkeypatch.setattr(base, "_WINDOWS_SHELL", True)
+
+        with pytest.raises(click.ClickException) as exc_info:
+            command.get_profile(self._context("offline audit"), config_path=config_path)
+
+        assert (
+            'sccfm-cli --profile "offline audit" configure '
+            '--config-path "C:/Users/Example User/sccfm config.json"'
+        ) in exc_info.value.message

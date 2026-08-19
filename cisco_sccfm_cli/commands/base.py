@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import shlex
+import subprocess
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -24,6 +26,15 @@ from cisco_sccfm_core.constants import DEFAULT_POLLING_INTERVAL_SEC, DEFAULT_TRA
 from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from cisco_sccfm_core.services.transaction_service import TransactionService
 from cisco_sccfm_core.types import ConfigLike
+
+_WINDOWS_SHELL = sys.platform == "win32"
+
+
+def _join_shell_command(arguments: Sequence[str]) -> str:
+    """Render arguments for the platform's default command shell."""
+    if _WINDOWS_SHELL:
+        return subprocess.list2cmdline(arguments)
+    return shlex.join(arguments)
 
 
 class BaseCommand(ABC):
@@ -60,9 +71,12 @@ class BaseCommand(ABC):
         config_service = ConfigService(path=config_path)
         config = config_service.load(profile)
         if not config:
+            setup_arguments = ["sccfm-cli", "--profile", profile, "configure"]
+            if config_path is not None:
+                setup_arguments.extend(["--config-path", str(config_path)])
+            setup_command = _join_shell_command(setup_arguments)
             raise click.ClickException(
-                f"Profile '{profile}' not found. "
-                f"Run 'sccfm-cli --profile {profile} configure' to set it up."
+                f"Profile '{profile}' not found. Run this command to set it up:\n{setup_command}"
             )
         self._register_sensitive_value(ctx, config.api_token)
         return cast(ConfigLike, cast(object, config))

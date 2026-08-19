@@ -44,7 +44,7 @@ setup_pyenv() {
 }
 
 build_python() {
-  if pyenv versions --bare 2>/dev/null | grep -qx "${PYTHON_VERSION}"; then
+  if pyenv versions --bare 2>/dev/null | grep -Fx "${PYTHON_VERSION}" >/dev/null; then
     echo "Python ${PYTHON_VERSION} already installed."
     return
   fi

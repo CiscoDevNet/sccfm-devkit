@@ -81,7 +81,8 @@ coverage run -m pytest && coverage report
 ```
 
 - Unit tests live alongside source: `cisco_sccfm_cli/tests/`, `cisco_sccfm_core/tests/`, `sccfm-ansible/` (excluding `e2e/`).
-- Tests marked `ci` require a live SCCFM tenant and run only in CI.
+- Tests marked `ci` require a live SCCFM tenant and are excluded from the ordinary offline suite;
+  run them explicitly in CI or locally with suitable sandbox credentials.
 - **Test the CLI against a real SCCFM tenant** using a DevNet sandbox:
   Visit [https://devnetsandbox.cisco.com/DevNet](https://devnetsandbox.cisco.com/DevNet) to book a related sandbox.
 
@@ -100,8 +101,9 @@ No MCP servers are currently configured for this project. Skill files under `ski
 # Build and verify the collection artifact
 build-ansible-collection
 
-# Install the built artifact locally
-ansible-galaxy collection install dist/cisco-sccfm-*.tar.gz --force
+# Install the exact artifact that was just built
+ansible-galaxy collection install \
+  "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
 
 # Configure or select profiles interactively
 sccfm-cli-interactive
@@ -113,7 +115,10 @@ ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph
 ansible-playbook -i sccfm-ansible/examples/inventory.sccfm.yml sccfm-ansible/examples/show_devices.yml
 ```
 
-Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_collections.cisco.sccfm` imports.
+Ansible discovers its default collection install directory automatically. For a custom install,
+pass `--collections-path <root>` to `ansible-galaxy` and set `ANSIBLE_COLLECTIONS_PATH` to that
+same root. Point IDEs and `MYPYPATH` at the installed root as needed; do not use the raw
+`sccfm-ansible` source directory as a collection path.
 
 ## PR instructions
 
