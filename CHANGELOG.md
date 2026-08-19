@@ -1,3 +1,10 @@
+## v0.39.3 (2026-08-19)
+
+### Fix
+
+- **lh-114527**: prepare Ansible changelog for 0.39.3
+- **lh-114527**: repair developer setup and Ansible guidance
+
 ## v0.39.2 (2026-08-19)
 
 ### Fix
