@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.39.3
+========
+
+Bugfixes
+--------
+
+- Corrected development setup and Ansible example guidance so collection installation, Vault handling, profile lookup safety, and command failures follow the supported workflows.
+
 v0.39.2
 ========
 
