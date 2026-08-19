@@ -226,6 +226,9 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert prepare.count("verify_python_distribution \\") == 2
     assert 'steps.artifacts.outputs.wheel_path }}" wheel' in prepare
     assert 'steps.artifacts.outputs.sdist_path }}" sdist' in prepare
+    assert 'local smoke_interactive="${smoke_root}/venv/bin/sccfm-cli-interactive"' in prepare
+    assert '"sccfm-cli-interactive": "cisco_sccfm_cli.interactive:main"' in prepare
+    assert '"${smoke_interactive}" --help >/dev/null' in prepare
     assert "git push --atomic" in prepare
     assert "actions/upload-artifact" in prepare
 
@@ -271,6 +274,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33" in pypi
     assert "pypa/gh-action-pypi-publish@release/v1" not in pypi
     assert "secrets.PYPI_API_TOKEN" in pypi
+    assert '"${INSTALL_ROOT}/venv/bin/sccfm-cli-interactive" --help >/dev/null' in pypi
     assert "skip-existing:" not in pypi
     assert 'MISSING_FILES="${PYPI_VERIFICATION##* missing=}"' in pypi
     assert 'test "$(find dist -mindepth 1 -maxdepth 1 -type f' in pypi

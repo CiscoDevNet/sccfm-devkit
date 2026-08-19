@@ -400,8 +400,9 @@
 ### 16.1 Poetry / `pyproject.toml`
 - **Invariants:**
   - Dependencies added via `poetry add`; dev deps in `[tool.poetry.group.dev.dependencies]`.
-  - Public entry point: `sccfm-cli`; `sccfm-cli-interactive` and other maintainer entry points
-    come from the local `devtools/` package in the development dependency group.
+  - Public entry points: `sccfm-cli` and the customer-only `sccfm-cli-interactive` menu.
+  - `sccfm-devkit` and other maintainer entry points come from the local `devtools/` package in
+    the development dependency group.
   - Tool configs (black, isort, mypy, pytest, coverage) all live in `pyproject.toml`.
 
 ### 16.2 Pre-commit

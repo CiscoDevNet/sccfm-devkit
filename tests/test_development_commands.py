@@ -22,7 +22,7 @@ COMMAND_MODULES = {
     "generate-cli-docs": "cisco_sccfm_scripts.generate_cli_docs:main",
     "generate-cli-man-docs": "cisco_sccfm_scripts.generate_cli_man_docs:main",
     "install-cli-man-docs": "cisco_sccfm_scripts.install_cli_man_docs:main",
-    "sccfm-cli-interactive": "cisco_sccfm_scripts.interactive_cli:main",
+    "sccfm-devkit": "cisco_sccfm_scripts.interactive_cli:main",
     "sync-docs-readme": "cisco_sccfm_scripts.sync_docs_readme:main",
 }
 DOCUMENTATION_COMMANDS = (

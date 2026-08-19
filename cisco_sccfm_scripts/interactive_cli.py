@@ -4,10 +4,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Interactive entry point for SCCFM CLI and development workflows.
+"""Interactive entry point for SCCFM repository development workflows.
 
 Usage:
-    sccfm-cli-interactive
+    sccfm-devkit
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ import click
 import questionary
 from rich.console import Console
 from rich.panel import Panel
+
+from cisco_sccfm_cli.interactive import customer_tasks
 
 console = Console()
 
@@ -49,38 +51,6 @@ def _ask(
 
 
 # ── Task implementations ─────────────────────────────────────────
-
-
-def _configure_profile() -> None:
-    """Create or replace a profile in the canonical SCCFM config store."""
-    from cisco_sccfm_cli.models import Config
-    from cisco_sccfm_cli.services import ConfigService
-    from cisco_sccfm_core.constants import SCCFM_REGIONS
-
-    profile_answer = questionary.text("Profile name:", default="default").unsafe_ask()
-    profile = (profile_answer or "").strip()
-    if not profile:
-        console.print("[red]Profile name cannot be empty.[/red]")
-        return
-
-    region_answer = questionary.select(
-        "SCCFM region:",
-        choices=list(SCCFM_REGIONS),
-        default="us",
-    ).unsafe_ask()
-    region = region_answer if isinstance(region_answer, str) else ""
-    if not region:
-        console.print("[dim]Cancelled.[/dim]")
-        return
-
-    token_answer = questionary.password("SCCFM API token:").unsafe_ask()
-    api_token = (token_answer or "").strip()
-    if not api_token:
-        console.print("[red]API token cannot be empty.[/red]")
-        return
-
-    ConfigService().save(Config(profile=profile, region=region, api_token=api_token))
-    console.print(f"[green]Profile '{profile}' configured for region '{region}'.[/green]")
 
 
 def _import_legacy_vault() -> None:
@@ -201,119 +171,6 @@ def _run_e2e() -> None:
     subprocess.call(["bash", str(script)], cwd=root)
 
 
-# ── Run CLI commands ──────────────────────────────────────────────
-
-
-def _prompt_param(message: str, hide_input: bool) -> str | None:
-    """Prompt for a parameter value, masking input for secrets."""
-    prompt = questionary.password(message) if hide_input else questionary.text(message)
-    answer: object = prompt.unsafe_ask()
-    return answer if isinstance(answer, str) else None
-
-
-def _render_command(argv: list[str], secret_flags: set[str]) -> str:
-    """Render *argv* for display with secret option values replaced by ``***``."""
-    rendered = list(argv)
-    for index, token in enumerate(rendered[:-1]):
-        if token in secret_flags:
-            rendered[index + 1] = "***"
-    return shlex.join(rendered)
-
-
-def _invoke_cli(argv: list[str], secret_flags: set[str]) -> None:
-    """Invoke secret-bearing commands without exposing values through OS argv."""
-    if secret_flags.intersection(argv):
-        from cisco_sccfm_cli.cli import cli
-
-        try:
-            cli.main(args=argv[1:], prog_name=argv[0], standalone_mode=False)
-        except click.ClickException as exc:
-            exc.show()
-        return
-    subprocess.call(argv, cwd=_project_root())
-
-
-def _execute_cli_command(cmd: object) -> None:
-    """Prompt for params and run an sccfm-cli leaf command."""
-    from cisco_sccfm_scripts.cli_commands import CliCommand, CliParam
-
-    if not isinstance(cmd, CliCommand):
-        return
-    argv: list[str] = ["sccfm-cli", *cmd.args]
-    secret_flags = {p.flag for p in cmd.params if isinstance(p, CliParam) and p.hide_input}
-    for param in cmd.params:
-        if not isinstance(param, CliParam):
-            continue
-        if param.is_flag:
-            confirmed = questionary.confirm(f"{param.label}?", default=False).unsafe_ask()
-            if confirmed:
-                argv.append(param.flag)
-        elif param.multiple:
-            console.print(f"[dim]{param.label} — enter one value per line, blank to finish:[/dim]")
-            has_value = False
-            while True:
-                value: str | None = _prompt_param(f"  {param.flag}", param.hide_input)
-                normalized_value = (value or "").strip()
-                if not normalized_value:
-                    break
-                argv.extend([param.flag, normalized_value])
-                has_value = True
-            if param.required and not has_value:
-                console.print(f"[red]{param.label} is required.[/red]")
-                return
-        else:
-            prompt = f"{param.label}{'' if param.required else ' (leave blank to skip)'}"
-            single: str | None = _prompt_param(prompt, param.hide_input)
-            normalized_value = (single or "").strip()
-            if normalized_value:
-                argv.extend([param.flag, normalized_value])
-            elif param.required:
-                console.print(f"[red]{param.label} is required.[/red]")
-                return
-
-    console.print(f"[bold cyan]$ {_render_command(argv, secret_flags)}[/bold cyan]")
-    _invoke_cli(argv, secret_flags)
-
-
-def _navigate_cli(children: list[object], title: str) -> None:
-    """Recursively navigate a CliGroup/CliCommand tree."""
-    from cisco_sccfm_scripts.cli_commands import CliCommand, CliGroup
-
-    nodes: list[CliCommand | CliGroup] = [
-        c for c in children if isinstance(c, (CliCommand, CliGroup))
-    ]
-
-    while True:
-        choices: list[questionary.Choice | str] = [
-            questionary.Choice(
-                title=f"{n.name:20s} {n.description}",
-                value=n.name,
-            )
-            for n in nodes
-        ]
-        choices.append(questionary.Choice(title="back", value="back"))
-
-        answer = _ask(choices, f"{title}:")
-        if answer is None or answer == "back":
-            return
-
-        node = next((n for n in nodes if n.name == answer), None)
-        if node is None:
-            continue
-
-        if isinstance(node, CliGroup):
-            _navigate_cli(node.children, f"{title} > {node.name}")
-        elif isinstance(node, CliCommand):
-            _execute_cli_command(node)
-
-
-def _run_cli_commands() -> None:
-    """Interactively navigate and run sccfm-cli commands."""
-    from cisco_sccfm_scripts.cli_commands import build_cli_tree
-
-    _navigate_cli(build_cli_tree(), "sccfm-cli")
-
-
 # ── Run Ansible examples ──────────────────────────────────────────
 
 
@@ -369,101 +226,23 @@ def _run_ansible_examples() -> None:
     subprocess.call(cmd, cwd=str(examples_dir))
 
 
-# ── Manage tokens ─────────────────────────────────────────────────
-
-
-def _select_profile(message: str) -> object | None:
-    """Select a configured SCCFM profile, returning its config."""
-    from cisco_sccfm_cli.services import ConfigService
-
-    profiles = ConfigService().list_profiles()
-    if not profiles:
-        console.print("[yellow]No SCCFM profiles configured.[/yellow]")
-        return None
-
-    choices: list[questionary.Choice | str] = [
-        questionary.Choice(title=f"{item.profile}  ({item.region})", value=item.profile)
-        for item in profiles
-    ]
-    choices.append("back")
-    answer = _ask(choices, message)
-    if answer is None or answer == "back":
-        return None
-    return next((item for item in profiles if item.profile == answer), None)
-
-
-def _update_profile() -> None:
-    """Update the region and API token for an existing profile."""
-    from cisco_sccfm_cli.models import Config
-    from cisco_sccfm_cli.services import ConfigService
-    from cisco_sccfm_core.constants import SCCFM_REGIONS
-
-    selected = _select_profile("Select a profile to update:")
-    if not isinstance(selected, Config):
-        return
-
-    region_answer = questionary.select(
-        "SCCFM region:",
-        choices=list(SCCFM_REGIONS),
-        default=selected.region,
-    ).unsafe_ask()
-    region = region_answer if isinstance(region_answer, str) else ""
-    if not region:
-        console.print("[dim]Cancelled.[/dim]")
-        return
-
-    token_answer = questionary.password(
-        "New SCCFM API token (leave blank to keep the current token):"
-    ).unsafe_ask()
-    api_token = (token_answer or "").strip() or selected.api_token
-    ConfigService().save(Config(profile=selected.profile, region=region, api_token=api_token))
-    console.print(f"[green]Profile '{selected.profile}' updated.[/green]")
-
-
-def _remove_profile() -> None:
-    """Remove an SCCFM profile from the canonical config store."""
-    from cisco_sccfm_cli.models import Config
-    from cisco_sccfm_cli.services import ConfigService
-
-    selected = _select_profile("Select a profile to remove:")
-    if not isinstance(selected, Config):
-        return
-
-    confirmed = questionary.confirm(
-        f"Remove profile '{selected.profile}' (region={selected.region})?",
-        default=False,
-    ).unsafe_ask()
-    if not confirmed:
-        console.print("[dim]Cancelled.[/dim]")
-        return
-
-    ConfigService().remove(selected.profile)
-    console.print(f"[green]Profile '{selected.profile}' removed.[/green]")
-
-
-def _manage_profiles() -> None:
-    """Profile management sub-menu."""
-    answer = _ask(["update", "remove", "back"], "Manage profiles:")
-    if answer is None or answer == "back":
-        return
-
-    if answer == "update":
-        _update_profile()
-    elif answer == "remove":
-        _remove_profile()
-
-
 # ── Menu definition ───────────────────────────────────────────────
 
-_TASKS: list[tuple[str, str, Callable[[], None]]] = [
-    ("configure-profile", "Create or replace an SCCFM profile", _configure_profile),
-    ("manage-profiles", "Update or remove SCCFM profiles", _manage_profiles),
+Task = tuple[str, str, Callable[[], None]]
+
+
+def _customer_task_entries() -> list[Task]:
+    """Return public customer tasks in the development menu's tuple format."""
+    return [(task.name, task.description, task.action) for task in customer_tasks()]
+
+
+_TASKS: list[Task] = [
+    *_customer_task_entries(),
     (
         "import-legacy-vault",
         "Import profiles from the former Ansible Vault token store",
         _import_legacy_vault,
     ),
-    ("run-cli", "Run an sccfm-cli command interactively", _run_cli_commands),
     ("run-ansible", "Run an Ansible example playbook", _run_ansible_examples),
     ("build-collection", "Build the cisco.sccfm Ansible collection tarball", _run_build_collection),
     (
@@ -512,7 +291,7 @@ def _interactive_menu() -> None:
     """Show an interactive menu and run the selected task."""
     console.print(
         Panel(
-            "[bold]SCCFM CLI Interactive[/bold]\n" "Select a task to run.",
+            "[bold]SCCFM DevKit[/bold]\n" "Select a task to run.",
             border_style="cyan",
         )
     )
@@ -549,7 +328,7 @@ def _interactive_menu() -> None:
 # ── Entry-point ───────────────────────────────────────────────────
 
 
-@click.command(help="Open the interactive SCCFM CLI and development workflow menu.")
+@click.command(help="Open the SCCFM repository development workflow menu.")
 def main() -> None:
     try:
         _interactive_menu()

@@ -9,7 +9,7 @@ description = "Local-only console entry points for SCCFM maintainers"
 requires-python = ">=3.12,<4.0"
 
 [project.scripts]
-sccfm-cli-interactive = "cisco_sccfm_scripts.interactive_cli:main"
+sccfm-devkit = "cisco_sccfm_scripts.interactive_cli:main"
 build-ansible-collection = "cisco_sccfm_scripts.build_ansible_collection:main"
 generate-ansible-docs = "cisco_sccfm_scripts.generate_ansible_docs:main"
 generate-cli-docs = "cisco_sccfm_scripts.generate_cli_docs:main"

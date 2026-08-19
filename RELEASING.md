@@ -85,13 +85,14 @@ The successful deployment run is the authoritative publication record. Confirm t
 For an independent clean-install check:
 
 ```bash
-RELEASE_VERSION=0.39.1
+RELEASE_VERSION=X.Y.Z
 RELEASE_CHECK_ROOT="$(mktemp -d)"
 python3.12 -m venv "${RELEASE_CHECK_ROOT}/venv"
 "${RELEASE_CHECK_ROOT}/venv/bin/python" -m pip install \
   "cisco-sccfm-devkit==${RELEASE_VERSION}" \
   "ansible-core>=2.20,<2.22"
 "${RELEASE_CHECK_ROOT}/venv/bin/sccfm-cli" --help
+"${RELEASE_CHECK_ROOT}/venv/bin/sccfm-cli-interactive" --help
 "${RELEASE_CHECK_ROOT}/venv/bin/ansible-galaxy" collection install \
   "cisco.sccfm:==${RELEASE_VERSION}" \
   --collections-path "${RELEASE_CHECK_ROOT}/collections"

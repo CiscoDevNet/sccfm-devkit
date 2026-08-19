@@ -58,7 +58,7 @@ sccfm-cli status
 sccfm-cli inventory devices list --format table
 
 # Interactive developer menu (test, lint, format, build collection, etc.)
-sccfm-cli-interactive
+sccfm-devkit
 ```
 
 ## Credential configuration

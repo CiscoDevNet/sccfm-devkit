@@ -20,7 +20,11 @@ from cisco_sccfm_scripts.verify_python_artifacts import (
 
 _VERSION = "1.2.3"
 _DIST_INFO = f"cisco_sccfm_devkit-{_VERSION}.dist-info"
-_ENTRY_POINTS = b"[console_scripts]\nsccfm-cli=cisco_sccfm_cli.cli:cli\n"
+_ENTRY_POINTS = (
+    b"[console_scripts]\n"
+    b"sccfm-cli=cisco_sccfm_cli.cli:cli\n"
+    b"sccfm-cli-interactive=cisco_sccfm_cli.interactive:main\n"
+)
 _DESCRIPTION = b"# Synthetic package\n\nSee [documentation](https://example.com/docs).\n"
 _LICENSE = (Path(__file__).resolve().parents[1] / "LICENSE").read_bytes()
 _METADATA_HEADERS = (
@@ -42,6 +46,7 @@ _PYPROJECT = b"""\
 
 [project.scripts]
 sccfm-cli = "cisco_sccfm_cli.cli:cli"
+sccfm-cli-interactive = "cisco_sccfm_cli.interactive:main"
 
 [tool.poetry]
 packages = [
@@ -157,24 +162,22 @@ def test_verifier_rejects_non_public_members(tmp_path: Path, artifact: str, memb
 
 
 def test_verifier_rejects_additional_wheel_entry_point(tmp_path: Path) -> None:
-    entry_points = (
-        _ENTRY_POINTS + b"sccfm-cli-interactive=cisco_sccfm_scripts.interactive_cli:main\n"
-    )
+    entry_points = _ENTRY_POINTS + b"sccfm-maintainer=maintainer:main\n"
     wheel, sdist = _build_artifacts(tmp_path, entry_points=entry_points)
 
-    with pytest.raises(PythonArtifactVerificationError, match="exactly the sccfm-cli"):
+    with pytest.raises(PythonArtifactVerificationError, match="supported public commands"):
         verify_python_artifacts(wheel, sdist)
 
 
 def test_verifier_rejects_additional_sdist_entry_point(tmp_path: Path) -> None:
     pyproject = _PYPROJECT.replace(
-        b'sccfm-cli = "cisco_sccfm_cli.cli:cli"\n',
-        b'sccfm-cli = "cisco_sccfm_cli.cli:cli"\n'
-        b'sccfm-cli-interactive = "cisco_sccfm_scripts.interactive_cli:main"\n',
+        b'sccfm-cli-interactive = "cisco_sccfm_cli.interactive:main"\n',
+        b'sccfm-cli-interactive = "cisco_sccfm_cli.interactive:main"\n'
+        b'sccfm-maintainer = "maintainer:main"\n',
     )
     wheel, sdist = _build_artifacts(tmp_path, pyproject=pyproject)
 
-    with pytest.raises(PythonArtifactVerificationError, match="exactly the sccfm-cli"):
+    with pytest.raises(PythonArtifactVerificationError, match="supported public commands"):
         verify_python_artifacts(wheel, sdist)
 
 

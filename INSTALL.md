@@ -27,7 +27,7 @@ These are instructions to install the CLI and Python library from PyPI, plus the
 ## Installing the CLI
 
 Follow these steps to install the `cisco-sccfm-devkit` Python package, which provides the
-`sccfm-cli` command and the `cisco_sccfm_core` Python library.
+`sccfm-cli` and `sccfm-cli-interactive` commands and the `cisco_sccfm_core` Python library.
 
 ### Prerequisites
 
@@ -47,7 +47,7 @@ pyenv global 3.12
 ### Install with pipx
 
 `pipx` is the recommended install method for the CLI. It keeps the Python environment
-isolated while exposing `sccfm-cli` on your `PATH`.
+isolated while exposing `sccfm-cli` and `sccfm-cli-interactive` on your `PATH`.
 
 ```bash
 pipx install cisco-sccfm-devkit
