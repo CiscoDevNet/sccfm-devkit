@@ -20,6 +20,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from cisco_sccfm_scripts.verify_clean_controller import (
+    _PROFILE_ERROR,
     _Controller,
     _create_controller,
     _discovered_plugins,
@@ -53,6 +54,8 @@ class PublicReleaseSummary:
     inventory_count: int
     lookup_count: int
     offline_probe: str
+    inventory_probe: str
+    lookup_probe: str
 
 
 def _read_json(response: Any, expected_url: str) -> object:
@@ -191,14 +194,35 @@ assert {"sccfm-cli", "sccfm-cli-interactive"}.issubset(scripts)
         schema: object = json.loads(schema_raw)
     except json.JSONDecodeError as exc:
         raise PublicReleaseVerificationError("CLI schema is not valid JSON") from exc
+    _validate_cli_schema(schema, version)
+
+
+def _validate_cli_schema(schema: object, version: str) -> None:
+    """Require the public schema contract used by safe automation consumers."""
     commands = schema.get("commands") if isinstance(schema, dict) else None
-    if (
-        not isinstance(schema, dict)
-        or schema.get("version") != version
-        or not isinstance(commands, list)
-        or not commands
-    ):
+    if not isinstance(schema, dict) or schema.get("version") != version:
         raise PublicReleaseVerificationError("CLI schema does not describe the installed release")
+    if not isinstance(commands, list) or not commands:
+        raise PublicReleaseVerificationError("CLI schema did not expose any commands")
+    for command in commands:
+        if not isinstance(command, dict):
+            raise PublicReleaseVerificationError("CLI schema contains an invalid command")
+        path = command.get("path")
+        auth = command.get("auth")
+        if (
+            not isinstance(path, list)
+            or not path
+            or any(not isinstance(part, str) or not part for part in path)
+            or not isinstance(command.get("command"), str)
+            or not command["command"]
+            or not isinstance(command.get("readonly"), bool)
+            or not isinstance(auth, dict)
+            or not isinstance(auth.get("requires_profile"), bool)
+            or not isinstance(auth.get("requires_api_token"), bool)
+            or not isinstance(command.get("options"), list)
+            or not isinstance(command.get("constraints"), list)
+        ):
+            raise PublicReleaseVerificationError("CLI schema command metadata is incomplete")
 
 
 def _verify_collection_version(controller: _Controller, version: str) -> None:
@@ -230,17 +254,35 @@ def _discover_plugins(
     return discovered[0], discovered[1], discovered[2]
 
 
+def _plugin_documentation(
+    controller: _Controller,
+    plugin_type: str,
+    name: str,
+) -> dict[str, object]:
+    """Load and validate one discovered plugin's ansible-doc payload."""
+    raw = _run(
+        controller,
+        [controller.binaries / "ansible-doc", "-j", "-t", plugin_type, name],
+    ).stdout
+    try:
+        payload: object = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise PublicReleaseVerificationError(f"{plugin_type} documentation is invalid") from exc
+    plugin = payload.get(name) if isinstance(payload, dict) else None
+    doc = plugin.get("doc") if isinstance(plugin, dict) else None
+    if not isinstance(doc, dict):
+        raise PublicReleaseVerificationError(f"{plugin_type} documentation is missing")
+    return doc
+
+
 def _documented_probe(controller: _Controller, modules: dict[str, str]) -> str:
     """Select a documented readonly list module with no required business arguments."""
     ansible_doc = controller.binaries / "ansible-doc"
     for name, description in modules.items():
         if not description.casefold().startswith("list "):
             continue
-        raw = _run(controller, [ansible_doc, "-j", name]).stdout
-        try:
-            payload: object = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
+        raw = _run(controller, [ansible_doc, "-j", "-t", "module", name]).stdout
+        payload: object = json.loads(raw)
         module = payload.get(name) if isinstance(payload, dict) else None
         doc = module.get("doc") if isinstance(module, dict) else None
         options = doc.get("options") if isinstance(doc, dict) else None
@@ -250,6 +292,86 @@ def _documented_probe(controller: _Controller, modules: dict[str, str]) -> str:
         ):
             return name
     raise PublicReleaseVerificationError("no argument-free readonly list module was discovered")
+
+
+def _expect_missing_profile(
+    controller: _Controller,
+    command: list[str | Path],
+    surface: str,
+    *,
+    allow_zero: bool = False,
+) -> None:
+    """Require an offline runtime path to stop at profile validation."""
+    result = _run(controller, command, check=False)
+    rendered = f"{result.stdout}\n{result.stderr}"
+    if (result.returncode == 0 and not allow_zero) or _PROFILE_ERROR not in rendered:
+        raise PublicReleaseVerificationError(f"{surface} did not reach missing-profile validation")
+
+
+def _inventory_runtime_probe(controller: _Controller, inventory: dict[str, str]) -> str:
+    """Load a documented inventory plugin without contacting SCCFM."""
+    for name in inventory:
+        doc = _plugin_documentation(controller, "inventory", name)
+        options = doc.get("options")
+        plugin_option = options.get("plugin") if isinstance(options, dict) else None
+        choices = plugin_option.get("choices") if isinstance(plugin_option, dict) else None
+        if (
+            isinstance(plugin_option, dict)
+            and plugin_option.get("required") is True
+            and isinstance(choices, list)
+            and name in choices
+        ):
+            config = controller.work / "inventory.sccfm.yml"
+            config.write_text(f"plugin: {json.dumps(name)}\n", encoding="utf-8")
+            _expect_missing_profile(
+                controller,
+                [controller.binaries / "ansible-inventory", "-i", config, "--graph"],
+                "inventory plugin",
+                allow_zero=True,
+            )
+            return name
+    raise PublicReleaseVerificationError("no safe inventory runtime probe was discovered")
+
+
+def _lookup_runtime_probe(controller: _Controller, lookups: dict[str, str]) -> str:
+    """Load a documented lookup plugin using an explicitly non-secret field."""
+    for name in lookups:
+        doc = _plugin_documentation(controller, "lookup", name)
+        options = doc.get("options")
+        if not isinstance(options, dict):
+            continue
+        safe_option = None
+        for option_name, option in options.items():
+            choices = option.get("choices") if isinstance(option, dict) else None
+            if (
+                isinstance(option_name, str)
+                and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", option_name)
+                and isinstance(choices, list)
+                and "region" in choices
+            ):
+                safe_option = option_name
+                break
+        terms = options.get("_terms")
+        if safe_option is None or not isinstance(terms, dict) or terms.get("required") is not True:
+            continue
+        expression = f"{{{{ lookup('{name}', 'default', {safe_option}='region') }}}}"
+        playbook = controller.work / "lookup-probe.yml"
+        playbook.write_text(
+            "---\n"
+            "- hosts: localhost\n"
+            "  gather_facts: false\n"
+            "  tasks:\n"
+            "    - ansible.builtin.debug:\n"
+            f"        msg: {json.dumps(expression)}\n",
+            encoding="utf-8",
+        )
+        _expect_missing_profile(
+            controller,
+            [controller.binaries / "ansible-playbook", playbook],
+            "lookup plugin",
+        )
+        return name
+    raise PublicReleaseVerificationError("no safe lookup runtime probe was discovered")
 
 
 def verify_public_release(requested: str = "") -> PublicReleaseSummary:
@@ -263,12 +385,16 @@ def verify_public_release(requested: str = "") -> PublicReleaseSummary:
         modules, inventory, lookups = _discover_plugins(controller)
         probe = _documented_probe(controller, modules)
         _offline_checks(controller, probe)
+        inventory_probe = _inventory_runtime_probe(controller, inventory)
+        lookup_probe = _lookup_runtime_probe(controller, lookups)
     return PublicReleaseSummary(
         version=version,
         module_count=len(modules),
         inventory_count=len(inventory),
         lookup_count=len(lookups),
         offline_probe=probe,
+        inventory_probe=inventory_probe,
+        lookup_probe=lookup_probe,
     )
 
 
@@ -301,7 +427,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(
         f"Public release verified: version={summary.version} modules={summary.module_count} "
         f"inventory={summary.inventory_count} lookups={summary.lookup_count} "
-        f"probe={summary.offline_probe}"
+        f"module_probe={summary.offline_probe} inventory_probe={summary.inventory_probe} "
+        f"lookup_probe={summary.lookup_probe}"
     )
     return 0
 
