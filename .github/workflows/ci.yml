@@ -101,6 +101,7 @@ jobs:
             cisco_sccfm_scripts/verify_ansible_collection.py \
             cisco_sccfm_scripts/verify_clean_controller.py \
             cisco_sccfm_scripts/verify_pypi_release.py \
+            cisco_sccfm_scripts/verify_public_release.py \
             cisco_sccfm_scripts/verify_python_artifacts.py
 
       - name: Test
@@ -378,6 +379,7 @@ jobs:
             cisco_sccfm_scripts/verify_ansible_collection.py \
             cisco_sccfm_scripts/verify_clean_controller.py \
             cisco_sccfm_scripts/verify_pypi_release.py \
+            cisco_sccfm_scripts/verify_public_release.py \
             cisco_sccfm_scripts/verify_python_artifacts.py
           poetry run pytest --color=yes
           poetry run check-doc-links
