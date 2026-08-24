@@ -296,6 +296,25 @@ def test_profile_handoff_configures_offline_and_asserts_lookup(
     assert verifier._PROFILE_TOKEN not in rendered
 
 
+def test_public_install_logs_both_registry_sources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    controller = _controller(tmp_path)
+    monkeypatch.setattr(
+        verifier,
+        "_run",
+        lambda selected, command: subprocess.CompletedProcess(command, 0, "", ""),
+    )
+
+    verifier._install_public_artifacts(controller, _VERSION)
+
+    output = capsys.readouterr().out
+    assert f"Installing cisco-sccfm-devkit=={_VERSION} from public PyPI" in output
+    assert f"Installed cisco.sccfm:=={_VERSION} from Ansible Galaxy" in output
+
+
 def test_missing_profile_probe_rejects_other_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
