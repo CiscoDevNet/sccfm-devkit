@@ -8,13 +8,27 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
+from urllib.error import HTTPError
 
 import pytest
 
 import cisco_sccfm_scripts.verify_public_release as verifier
 
 _VERSION = "1.2.3"
+
+
+class _JsonResponse:
+    def __init__(self, url: str, payload: bytes) -> None:
+        self._url = url
+        self._payload = payload
+
+    def geturl(self) -> str:
+        return self._url
+
+    def read(self, limit: int) -> bytes:
+        return self._payload[:limit]
 
 
 def _controller(tmp_path: Path) -> verifier._Controller:
@@ -25,6 +39,42 @@ def _controller(tmp_path: Path) -> verifier._Controller:
     collections = tmp_path / "collections"
     collections.mkdir()
     return verifier._Controller(work, collections, binaries, {})
+
+
+def test_module_imports_without_site_packages() -> None:
+    result = subprocess.run(
+        [sys.executable, "-S", "-c", "import cisco_sccfm_scripts.verify_public_release"],
+        cwd=Path(__file__).parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_registry_json_rejects_duplicate_keys() -> None:
+    response = _JsonResponse(verifier._PYPI_LATEST_URL, b'{"version":"1","version":"2"}')
+
+    with pytest.raises(verifier.PublicReleaseVerificationError, match="duplicate JSON key"):
+        verifier._read_json(response, verifier._PYPI_LATEST_URL)
+
+
+def test_registry_http_error_identifies_service_and_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = verifier._GALAXY_VERSION_URL.format(version=_VERSION)
+
+    def fail(request: object, timeout: float) -> object:
+        raise HTTPError(url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(verifier, "urlopen", fail)
+
+    with pytest.raises(
+        verifier.PublicReleaseVerificationError,
+        match=r"Ansible Galaxy returned HTTP 404",
+    ):
+        verifier._fetch_json(url)
 
 
 def test_resolve_latest_requires_matching_registry_versions(
@@ -103,6 +153,39 @@ def test_cli_schema_requires_safety_and_auth_metadata() -> None:
         verifier._validate_cli_schema(schema, _VERSION)
 
 
+def test_plugin_count_floor_rejects_incomplete_collection() -> None:
+    modules = {f"cisco.sccfm.module_{index}": "List item" for index in range(48)}
+
+    with pytest.raises(verifier.PublicReleaseVerificationError, match="fewer plugins"):
+        verifier._validate_plugin_counts(
+            modules,
+            {"cisco.sccfm.inventory": "Inventory"},
+            {"cisco.sccfm.lookup": "Lookup"},
+        )
+
+
+def test_documented_probe_uses_first_argument_free_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _controller(tmp_path)
+    modules = {
+        "cisco.sccfm.list_required": "List required items",
+        "cisco.sccfm.list_safe": "List safe items",
+    }
+    documentation = {
+        "cisco.sccfm.list_required": {"options": {"device": {"required": True}}},
+        "cisco.sccfm.list_safe": {"options": {}},
+    }
+    monkeypatch.setattr(
+        verifier,
+        "_plugin_documentation",
+        lambda selected, plugin_type, name: documentation[name],
+    )
+
+    assert verifier._documented_probe(controller, modules) == "cisco.sccfm.list_safe"
+
+
 def test_inventory_probe_loads_documented_plugin(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -162,6 +245,7 @@ def test_lookup_probe_requests_only_documented_region_field(
 
     assert verifier._lookup_runtime_probe(controller, {plugin: "Read profile"}) == plugin
     playbook = controller.work.joinpath("lookup-probe.yml").read_text(encoding="utf-8")
+    assert 'lookup(\\"cisco.sccfm.profile\\"' in playbook
     assert "field='region'" in playbook
     assert "api_token" not in playbook
     assert commands == [

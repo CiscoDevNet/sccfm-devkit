@@ -38,6 +38,9 @@ _GALAXY_LATEST_URL = (
 _GALAXY_VERSION_URL = f"{_GALAXY_LATEST_URL}versions/{{version}}/"
 _MAX_RESPONSE_BYTES = 1024 * 1024
 _REQUEST_TIMEOUT_SECONDS = 30.0
+_MINIMUM_MODULES = 49
+_MINIMUM_INVENTORY_PLUGINS = 1
+_MINIMUM_LOOKUP_PLUGINS = 1
 _VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 
@@ -58,6 +61,16 @@ class PublicReleaseSummary:
     lookup_probe: str
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate keys instead of accepting ambiguous registry JSON."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise PublicReleaseVerificationError("registry response contains a duplicate JSON key")
+        result[key] = value
+    return result
+
+
 def _read_json(response: Any, expected_url: str) -> object:
     """Read one bounded JSON response from an official registry endpoint."""
     if response.geturl() != expected_url:
@@ -69,13 +82,23 @@ def _read_json(response: Any, expected_url: str) -> object:
     if len(raw) > _MAX_RESPONSE_BYTES:
         raise PublicReleaseVerificationError("registry response exceeds the size limit")
     try:
-        return json.loads(raw)
+        return json.loads(raw, object_pairs_hook=_unique_json_object)
     except (UnicodeDecodeError, ValueError) as exc:
         raise PublicReleaseVerificationError("registry returned invalid JSON") from exc
 
 
+def _registry_name(url: str) -> str:
+    """Return the public registry represented by one fixed endpoint."""
+    if url.startswith("https://pypi.org/"):
+        return "PyPI"
+    if url.startswith("https://galaxy.ansible.com/"):
+        return "Ansible Galaxy"
+    raise PublicReleaseVerificationError("unsupported public registry endpoint")
+
+
 def _fetch_json(url: str, timeout: float = _REQUEST_TIMEOUT_SECONDS) -> object:
     """Fetch JSON from one fixed PyPI or Galaxy endpoint."""
+    registry = _registry_name(url)
     request = Request(
         url,
         headers={
@@ -86,8 +109,12 @@ def _fetch_json(url: str, timeout: float = _REQUEST_TIMEOUT_SECONDS) -> object:
     try:
         with urlopen(request, timeout=timeout) as response:
             return _read_json(response, url)
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        raise PublicReleaseVerificationError("could not query public registry") from exc
+    except HTTPError as exc:
+        raise PublicReleaseVerificationError(
+            f"{registry} returned HTTP {exc.code} for {url}"
+        ) from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise PublicReleaseVerificationError(f"could not query {registry} at {url}") from exc
 
 
 def _nested_string(payload: object, *path: str) -> str | None:
@@ -254,6 +281,21 @@ def _discover_plugins(
     return discovered[0], discovered[1], discovered[2]
 
 
+def _validate_plugin_counts(
+    modules: dict[str, str],
+    inventory: dict[str, str],
+    lookups: dict[str, str],
+) -> None:
+    """Require the public collection to retain its established plugin surfaces."""
+    counts = (len(modules), len(inventory), len(lookups))
+    minimums = (_MINIMUM_MODULES, _MINIMUM_INVENTORY_PLUGINS, _MINIMUM_LOOKUP_PLUGINS)
+    if any(actual < minimum for actual, minimum in zip(counts, minimums, strict=True)):
+        raise PublicReleaseVerificationError(
+            "public collection exposes fewer plugins than expected: "
+            f"modules={counts[0]} inventory={counts[1]} lookups={counts[2]}"
+        )
+
+
 def _plugin_documentation(
     controller: _Controller,
     plugin_type: str,
@@ -277,14 +319,10 @@ def _plugin_documentation(
 
 def _documented_probe(controller: _Controller, modules: dict[str, str]) -> str:
     """Select a documented readonly list module with no required business arguments."""
-    ansible_doc = controller.binaries / "ansible-doc"
     for name, description in modules.items():
         if not description.casefold().startswith("list "):
             continue
-        raw = _run(controller, [ansible_doc, "-j", "-t", "module", name]).stdout
-        payload: object = json.loads(raw)
-        module = payload.get(name) if isinstance(payload, dict) else None
-        doc = module.get("doc") if isinstance(module, dict) else None
+        doc = _plugin_documentation(controller, "module", name)
         options = doc.get("options") if isinstance(doc, dict) else None
         if isinstance(options, dict) and not any(
             isinstance(option, dict) and option.get("required") is True
@@ -354,7 +392,7 @@ def _lookup_runtime_probe(controller: _Controller, lookups: dict[str, str]) -> s
         terms = options.get("_terms")
         if safe_option is None or not isinstance(terms, dict) or terms.get("required") is not True:
             continue
-        expression = f"{{{{ lookup('{name}', 'default', {safe_option}='region') }}}}"
+        expression = f"{{{{ lookup({json.dumps(name)}, 'default', {safe_option}='region') }}}}"
         playbook = controller.work / "lookup-probe.yml"
         playbook.write_text(
             "---\n"
@@ -383,6 +421,7 @@ def verify_public_release(requested: str = "") -> PublicReleaseSummary:
         _verify_cli(controller, version)
         _verify_collection_version(controller, version)
         modules, inventory, lookups = _discover_plugins(controller)
+        _validate_plugin_counts(modules, inventory, lookups)
         probe = _documented_probe(controller, modules)
         _offline_checks(controller, probe)
         inventory_probe = _inventory_runtime_probe(controller, inventory)
