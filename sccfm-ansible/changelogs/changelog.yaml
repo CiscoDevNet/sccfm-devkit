@@ -8,7 +8,7 @@ releases:
         - Fixed manual release promotion so verified draft assets are handed off to
           read-only PyPI and Galaxy publication jobs.
     fragments: []
-    release_date: '2026-08-19'
+    release_date: '2026-08-24'
   0.39.3:
     changes:
       bugfixes:

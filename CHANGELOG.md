@@ -1,3 +1,9 @@
+## v0.39.4 (2026-08-24)
+
+### Fix
+
+- **lh-114517**: harden public release verification
+
 ## v0.39.3 (2026-08-19)
 
 ### Fix

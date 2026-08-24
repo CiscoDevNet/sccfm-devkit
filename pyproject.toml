@@ -1,6 +1,6 @@
 [project]
 name = "cisco-sccfm-devkit"
-version = "0.39.3"
+version = "0.39.4"
 description = "Cisco SCC Firewall Manager CLI and Python automation library"
 authors = [{ name = "Cisco Security Cloud Control Firewall Manager Team" }]
 license = "Apache-2.0"
