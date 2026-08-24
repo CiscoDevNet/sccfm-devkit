@@ -16,9 +16,6 @@ import venv
 from dataclasses import dataclass
 from pathlib import Path
 
-from cisco_sccfm_scripts.verify_ansible_collection import verify_collection_artifact
-from cisco_sccfm_scripts.verify_python_artifacts import verify_python_wheel
-
 _ANSIBLE_CORE = "ansible-core>=2.20,<2.22"
 _PROFILE_ERROR = "SCCFM profile 'default' not found"
 _EXPECTED_MODULES = 49
@@ -271,6 +268,11 @@ def verify_clean_controller(
     expected_version: str,
 ) -> tuple[int, int, str]:
     """Verify matching artifacts using no project code inside the clean controller."""
+    # Keep the controller helpers importable by the public-release smoke harness
+    # without requiring artifact-verification dependencies such as PyYAML.
+    from cisco_sccfm_scripts.verify_ansible_collection import verify_collection_artifact
+    from cisco_sccfm_scripts.verify_python_artifacts import verify_python_wheel
+
     wheel_result = verify_python_wheel(wheel)
     if wheel_result.version != expected_version:
         raise CleanControllerVerificationError("wheel and collection versions do not match")
