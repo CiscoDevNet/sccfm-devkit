@@ -253,6 +253,49 @@ def test_lookup_probe_requests_only_documented_region_field(
     ]
 
 
+def test_profile_handoff_configures_offline_and_asserts_lookup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _controller(tmp_path)
+    plugin = "cisco.sccfm.profile"
+    calls: list[tuple[verifier._Controller, list[str | Path]]] = []
+
+    def run(
+        selected: verifier._Controller,
+        command: list[str | Path],
+        *,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append((selected, command))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(verifier, "_run", run)
+
+    verifier._verify_profile_handoff(controller, plugin)
+
+    configure_controller, configure_command = calls[0]
+    assert configure_command == [
+        controller.binaries / "sccfm-cli",
+        "configure",
+        "--region",
+        "int",
+    ]
+    assert "SCCFM_API_TOKEN" not in controller.environment
+    assert configure_controller.environment["SCCFM_API_TOKEN"] == verifier._PROFILE_TOKEN
+    assert verifier._PROFILE_TOKEN not in " ".join(str(part) for part in configure_command)
+
+    playbook = controller.work.joinpath("profile-handoff.yml")
+    assert calls[1] == (
+        controller,
+        [controller.binaries / "ansible-playbook", playbook],
+    )
+    rendered = playbook.read_text(encoding="utf-8")
+    assert 'lookup(\\"cisco.sccfm.profile\\"' in rendered
+    assert 'configured_region == "int"' in rendered
+    assert verifier._PROFILE_TOKEN not in rendered
+
+
 def test_missing_profile_probe_rejects_other_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

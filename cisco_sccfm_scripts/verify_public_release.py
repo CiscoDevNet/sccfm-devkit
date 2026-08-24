@@ -12,7 +12,7 @@ import re
 import sys
 import tempfile
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -41,6 +41,8 @@ _REQUEST_TIMEOUT_SECONDS = 30.0
 _MINIMUM_MODULES = 49
 _MINIMUM_INVENTORY_PLUGINS = 1
 _MINIMUM_LOOKUP_PLUGINS = 1
+_PROFILE_REGION = "int"
+_PROFILE_TOKEN = "sccfm-public-release-smoke-not-a-real-token"
 _VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 
@@ -412,6 +414,43 @@ def _lookup_runtime_probe(controller: _Controller, lookups: dict[str, str]) -> s
     raise PublicReleaseVerificationError("no safe lookup runtime probe was discovered")
 
 
+def _verify_profile_handoff(controller: _Controller, lookup_name: str) -> None:
+    """Configure one offline CLI profile and read its region through Ansible."""
+    configure_controller = replace(
+        controller,
+        environment={
+            **controller.environment,
+            "SCCFM_API_TOKEN": _PROFILE_TOKEN,
+        },
+    )
+    _run(
+        configure_controller,
+        [
+            controller.binaries / "sccfm-cli",
+            "configure",
+            "--region",
+            _PROFILE_REGION,
+        ],
+    )
+
+    expression = f"{{{{ lookup({json.dumps(lookup_name)}, 'default', field='region') }}}}"
+    playbook = controller.work / "profile-handoff.yml"
+    playbook.write_text(
+        "---\n"
+        "- hosts: localhost\n"
+        "  gather_facts: false\n"
+        "  tasks:\n"
+        "    - name: Verify CLI to Ansible profile handoff\n"
+        "      ansible.builtin.assert:\n"
+        "        that:\n"
+        f"          - configured_region == {json.dumps(_PROFILE_REGION)}\n"
+        "      vars:\n"
+        f"        configured_region: {json.dumps(expression)}\n",
+        encoding="utf-8",
+    )
+    _run(controller, [controller.binaries / "ansible-playbook", playbook])
+
+
 def verify_public_release(requested: str = "") -> PublicReleaseSummary:
     """Install and smoke-test one matching release from the public registries."""
     version = resolve_public_version(requested)
@@ -426,6 +465,7 @@ def verify_public_release(requested: str = "") -> PublicReleaseSummary:
         _offline_checks(controller, probe)
         inventory_probe = _inventory_runtime_probe(controller, inventory)
         lookup_probe = _lookup_runtime_probe(controller, lookups)
+        _verify_profile_handoff(controller, lookup_probe)
     return PublicReleaseSummary(
         version=version,
         module_count=len(modules),
