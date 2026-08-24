@@ -129,6 +129,11 @@ def _nested_string(payload: object, *path: str) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _log(message: str) -> None:
+    """Emit one immediately visible smoke-test progress message."""
+    print(f"[sccfm-smoke] {message}", flush=True)
+
+
 def resolve_public_version(requested: str = "") -> str:
     """Resolve one stable version that is present in both public registries."""
     requested = requested.strip()
@@ -136,12 +141,14 @@ def resolve_public_version(requested: str = "") -> str:
         raise PublicReleaseVerificationError("version must be a stable X.Y.Z value")
 
     if requested:
+        _log(f"Checking requested release {requested} on PyPI and Ansible Galaxy")
         encoded = quote(requested, safe="")
         pypi = _fetch_json(_PYPI_VERSION_URL.format(version=encoded))
         galaxy = _fetch_json(_GALAXY_VERSION_URL.format(version=encoded))
         pypi_version = _nested_string(pypi, "info", "version")
         galaxy_version = _nested_string(galaxy, "version")
     else:
+        _log("Resolving the latest stable release from PyPI and Ansible Galaxy")
         pypi = _fetch_json(_PYPI_LATEST_URL)
         galaxy = _fetch_json(_GALAXY_LATEST_URL)
         pypi_version = _nested_string(pypi, "info", "version")
@@ -159,12 +166,14 @@ def resolve_public_version(requested: str = "") -> str:
         )
     if _VERSION_PATTERN.fullmatch(pypi_version) is None:
         raise PublicReleaseVerificationError("public registries returned a non-stable version")
+    _log(f"Selected public release {pypi_version} from both registries")
     return pypi_version
 
 
 def _install_public_artifacts(controller: _Controller, version: str) -> None:
     """Install an exact matching release from PyPI and Ansible Galaxy."""
     python = controller.binaries / "python"
+    _log(f"Installing cisco-sccfm-devkit=={version} from public PyPI")
     _run(
         controller,
         [
@@ -181,6 +190,8 @@ def _install_public_artifacts(controller: _Controller, version: str) -> None:
         ],
     )
     _run(controller, [python, "-I", "-m", "pip", "check"])
+    _log(f"Installed and dependency-checked cisco-sccfm-devkit=={version} from PyPI")
+    _log(f"Installing cisco.sccfm:=={version} from public Ansible Galaxy")
     _run(
         controller,
         [
@@ -194,6 +205,7 @@ def _install_public_artifacts(controller: _Controller, version: str) -> None:
             controller.collections,
         ],
     )
+    _log(f"Installed cisco.sccfm:=={version} from Ansible Galaxy")
 
 
 def _verify_cli(controller: _Controller, version: str) -> None:
@@ -363,6 +375,7 @@ def _inventory_runtime_probe(controller: _Controller, inventory: dict[str, str])
         ):
             config = controller.work / "inventory.sccfm.yml"
             config.write_text(f"plugin: {json.dumps(name)}\n", encoding="utf-8")
+            _log(f"Running offline missing-profile inventory probe: {name}")
             _expect_missing_profile(
                 controller,
                 [controller.binaries / "ansible-inventory", "-i", config, "--graph"],
@@ -405,6 +418,7 @@ def _lookup_runtime_probe(controller: _Controller, lookups: dict[str, str]) -> s
             f"        msg: {json.dumps(expression)}\n",
             encoding="utf-8",
         )
+        _log(f"Running offline missing-profile lookup probe: {name}")
         _expect_missing_profile(
             controller,
             [controller.binaries / "ansible-playbook", playbook],
@@ -416,6 +430,10 @@ def _lookup_runtime_probe(controller: _Controller, lookups: dict[str, str]) -> s
 
 def _verify_profile_handoff(controller: _Controller, lookup_name: str) -> None:
     """Configure one offline CLI profile and read its region through Ansible."""
+    _log(
+        f"Running positive CLI-to-Ansible profile handoff with {lookup_name} "
+        f"and region {_PROFILE_REGION}"
+    )
     configure_controller = replace(
         controller,
         environment={
@@ -455,13 +473,24 @@ def verify_public_release(requested: str = "") -> PublicReleaseSummary:
     """Install and smoke-test one matching release from the public registries."""
     version = resolve_public_version(requested)
     with tempfile.TemporaryDirectory(prefix="sccfm-public-release-") as temporary:
+        _log("Creating an isolated controller with a clean home and collection path")
         controller = _create_controller(Path(temporary))
         _install_public_artifacts(controller, version)
+        _log("Verifying CLI imports, entry points, help output, and exported schema")
         _verify_cli(controller, version)
+        _log(f"Verified installed PyPI package version {version}")
+        _log("Verifying the installed Ansible collection version")
         _verify_collection_version(controller, version)
+        _log(f"Verified installed Ansible Galaxy collection version {version}")
+        _log("Discovering public module, inventory, and lookup plugin surfaces")
         modules, inventory, lookups = _discover_plugins(controller)
         _validate_plugin_counts(modules, inventory, lookups)
+        _log(
+            f"Discovered modules={len(modules)} inventory={len(inventory)} "
+            f"lookups={len(lookups)}"
+        )
         probe = _documented_probe(controller, modules)
+        _log(f"Running offline missing-profile module and syntax probes: {probe}")
         _offline_checks(controller, probe)
         inventory_probe = _inventory_runtime_probe(controller, inventory)
         lookup_probe = _lookup_runtime_probe(controller, lookups)

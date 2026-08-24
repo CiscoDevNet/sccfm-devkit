@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.39.5
+========
+
+Minor Changes
+-------------
+
+- Added public-release smoke progress logging for registry resolution, artifact installation, plugin discovery, offline probes, and profile handoff validation.
+
 v0.39.4
 ========
 

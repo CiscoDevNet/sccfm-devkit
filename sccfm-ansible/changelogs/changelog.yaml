@@ -2,6 +2,14 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.39.5:
+    changes:
+      minor_changes:
+        - Added public-release smoke progress logging for registry resolution,
+          artifact installation, plugin discovery, offline probes, and profile
+          handoff validation.
+    fragments: []
+    release_date: '2026-08-24'
   0.39.4:
     changes:
       bugfixes:
