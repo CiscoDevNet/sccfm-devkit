@@ -61,7 +61,9 @@ The managed installation uses `pipx` for the Python package, injects
 `ansible-core` into the same isolated environment, and installs the identical
 `cisco.sccfm` Galaxy collection version. Keeping Ansible and
 `cisco_sccfm_core` in the same Python environment prevents module import
-failures.
+failures. The collection is installed at the standard per-user Galaxy path and
+the helper stores an ownership record for that exact directory. It refuses to
+overwrite a pre-existing collection that it cannot prove it owns.
 
 ### Authentication guidance
 
@@ -233,19 +235,21 @@ The setup skill resolves its plugin root and runs the plan-only helper:
 python3 scripts/setup_runtime.py uninstall-plan
 ```
 
-The plan lists only `cisco.sccfm` directories positively reported by
-`ansible-galaxy`, validates their `ansible_collections/cisco/sccfm` layout, and
-verifies that the CLI belongs to the managed pipx environment. It preserves
-`~/.sccfm-cli/config.json` by default. After the user sends the exact
+The plan validates the `cisco.sccfm` directories positively reported by
+`ansible-galaxy`, then selects for removal only the path matching the helper's
+ownership record at `~/.sccfm-agent-plugin/runtime.json`. It verifies that the
+CLI belongs to the managed pipx environment and preserves every unowned Galaxy
+copy plus `~/.sccfm-cli/config.json` by default. After the user sends the exact
 confirmation `UNINSTALL SCCFM`, the agent runs:
 
 ```bash
 python3 scripts/setup_runtime.py uninstall --yes
 ```
 
-Removal order matters: the helper removes the Galaxy collection while
-`ansible-galaxy` is still available, then uninstalls `cisco-sccfm-devkit` with
-pipx. It refuses to guess an installation path or remove an unmanaged CLI.
+Removal order matters: the helper removes its recorded Galaxy collection while
+`ansible-galaxy` is still available, deletes the ownership record, then
+uninstalls `cisco-sccfm-devkit` with pipx. It refuses to guess an installation
+path, remove another reported collection copy, or remove an unmanaged CLI.
 
 To also delete named profiles and their API tokens, the user must request that
 separately. The agent shows:

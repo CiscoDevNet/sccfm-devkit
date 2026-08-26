@@ -107,6 +107,11 @@ def test_codex_and_claude_hook_manifests_enforce_the_same_events() -> None:
     assert "${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py" in claude_commands
     assert "--record-plan" in claude_commands
     assert "--host" not in claude_commands
+    for manifest in (codex_hooks, claude_hooks):
+        for event_groups in manifest["hooks"].values():
+            for event_group in event_groups:
+                for handler in event_group["hooks"]:
+                    assert handler["commandWindows"].startswith("py -3 ")
     assert "aligned" in codex_hooks["description"]
     assert "aligned" in claude_hooks["description"]
 
@@ -119,10 +124,11 @@ def test_distributed_skills_match_canonical_sources(skill_name: str) -> None:
     assert distributed.read_bytes() == canonical.read_bytes()
 
 
-def test_install_plan_uses_one_pipx_environment_and_matching_versions() -> None:
+def test_install_plan_uses_one_pipx_environment_and_matching_versions(tmp_path: Path) -> None:
     setup_runtime = load_setup_runtime()
+    collection_base = tmp_path / "collections"
 
-    assert setup_runtime.install_commands("0.39.3", "python3.12") == [
+    assert setup_runtime.install_commands("0.39.3", "python3.12", collection_base) == [
         [
             "pipx",
             "install",
@@ -145,6 +151,8 @@ def test_install_plan_uses_one_pipx_environment_and_matching_versions() -> None:
             "install",
             "cisco.sccfm:==0.39.3",
             "--force",
+            "--collections-path",
+            str(collection_base),
         ],
     ]
 
@@ -195,6 +203,33 @@ def test_collection_installations_reject_symlinked_root(tmp_path: Path) -> None:
         )
 
 
+def test_collection_metadata_prefers_the_recorded_copy_when_two_roots_exist(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    managed_path = setup_runtime.expected_collection_path()
+    managed_root = managed_path.parents[1]
+    unmanaged_root = tmp_path / "vendor" / "ansible_collections"
+    (unmanaged_root / "cisco" / "sccfm").mkdir(parents=True)
+    managed_path.mkdir(parents=True)
+    setup_runtime.write_install_state(managed_path, "0.39.5")
+    monkeypatch.setattr(
+        setup_runtime,
+        "collection_listing",
+        lambda environment: {
+            str(unmanaged_root): {"cisco.sccfm": {"version": "0.39.0"}},
+            str(managed_root): {"cisco.sccfm": {"version": "0.39.5"}},
+        },
+    )
+
+    metadata = setup_runtime.collection_metadata({})
+
+    assert metadata["version"] == "0.39.5"
+    assert metadata["selected_path"] == str(managed_path)
+    assert metadata["managed"] is True
+
+
 def test_pipx_package_discovery_normalizes_package_names(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -224,8 +259,10 @@ def test_uninstall_plan_preserves_profiles_by_default(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     setup_runtime = load_setup_runtime()
-    collection_path = tmp_path / "ansible_collections" / "cisco" / "sccfm"
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_path = setup_runtime.expected_collection_path()
     collection_path.mkdir(parents=True)
+    setup_runtime.write_install_state(collection_path, "0.39.5")
     monkeypatch.setattr(setup_runtime, "discover_collection_paths", lambda: [collection_path])
     monkeypatch.setattr(
         setup_runtime,
@@ -233,11 +270,11 @@ def test_uninstall_plan_preserves_profiles_by_default(
         lambda name: f"/bin/{name}" if name in {"pipx", "sccfm-cli"} else None,
     )
     monkeypatch.setattr(setup_runtime, "pipx_package_installed", lambda: True)
-    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
 
     plan = setup_runtime.uninstall_plan(remove_profiles=False)
 
     assert plan["collection_paths"] == [str(collection_path)]
+    assert plan["preserved_collection_paths"] == []
     assert plan["pipx_command"] == ["pipx", "uninstall", "cisco-sccfm-devkit"]
     assert plan["profile"] == {
         "action": "preserve",
@@ -254,6 +291,34 @@ def test_uninstall_plan_refuses_an_unmanaged_cli(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(RuntimeError, match="not owned by the managed pipx environment"):
         setup_runtime.uninstall_plan(remove_profiles=False)
+
+
+def test_uninstall_plan_removes_only_the_recorded_collection_when_two_roots_exist(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    managed_path = setup_runtime.expected_collection_path()
+    unmanaged_path = tmp_path / "vendor" / "ansible_collections" / "cisco" / "sccfm"
+    managed_path.mkdir(parents=True)
+    unmanaged_path.mkdir(parents=True)
+    setup_runtime.write_install_state(managed_path, "0.39.5")
+    monkeypatch.setattr(
+        setup_runtime,
+        "discover_collection_paths",
+        lambda: [managed_path, unmanaged_path],
+    )
+    monkeypatch.setattr(
+        setup_runtime,
+        "command_path",
+        lambda name: f"/bin/{name}" if name in {"pipx", "sccfm-cli"} else None,
+    )
+    monkeypatch.setattr(setup_runtime, "pipx_package_installed", lambda: True)
+
+    plan = setup_runtime.uninstall_plan(remove_profiles=False)
+
+    assert plan["collection_paths"] == [str(managed_path)]
+    assert plan["preserved_collection_paths"] == [str(unmanaged_path)]
 
 
 def test_uninstall_requires_confirmation() -> None:
@@ -277,6 +342,7 @@ def test_uninstall_removes_collection_before_pipx_and_preserves_profile(
         "uninstall_plan",
         lambda remove_profiles: {
             "collection_paths": [str(collection_path)],
+            "preserved_collection_paths": [],
             "pipx_command": ["pipx", "uninstall", "cisco-sccfm-devkit"],
             "profile": {"action": "preserve", "path": str(profile_path), "exists": True},
         },
@@ -314,6 +380,7 @@ def test_uninstall_deletes_profiles_only_with_explicit_option(
         "uninstall_plan",
         lambda remove_profiles: {
             "collection_paths": [],
+            "preserved_collection_paths": [],
             "pipx_command": None,
             "profile": {"action": "delete", "path": str(profile_path), "exists": True},
         },
@@ -376,6 +443,10 @@ def test_guard_allows_schema_proven_readonly_commands(command: str) -> None:
         "sccfm-cli schema export --output schema.json",
         "sccfm-cli status | tee status.txt",
         "env DEBUG=1 sccfm-cli status",
+        "SCCFM_CONFIG=/tmp/test sccfm-cli inventory devices delete --uid example",
+        "DEBUG=1 ansible-playbook change.yml",
+        "nohup sccfm-cli inventory devices delete --uid example",
+        "nice ansible-playbook change.yml",
         "ansible-playbook change.yml",
         "ansible-galaxy collection install cisco.sccfm",
     ],
@@ -413,6 +484,10 @@ def test_guard_ignores_unrelated_commands(command: str) -> None:
         "sccfm-cli inventory devices delete --uid `cat target.txt`",
         "sccfm-cli inventory devices delete --uid example && echo changed",
         "env DEBUG=1 sccfm-cli inventory devices delete --uid example",
+        "SCCFM_CONFIG=/tmp/test sccfm-cli inventory devices delete --uid example",
+        "DEBUG=1 ansible-playbook change.yml",
+        "nohup sccfm-cli inventory devices delete --uid example",
+        "nice ansible-playbook change.yml",
         "sccfm-cli inventory devices unknown --uid example",
         "sccfm-cli inventory devices delete --uid example --api-token secret",
     ],

@@ -35,7 +35,9 @@ prompt. Tokens are never requested in chat.
 
 The recommended runtime keeps `sccfm-cli`, `ansible-core`, and
 `cisco_sccfm_core` in the same pipx environment, then installs the identical
-`cisco.sccfm` collection version from Ansible Galaxy.
+`cisco.sccfm` collection version from Ansible Galaxy. The helper uses the
+standard per-user Galaxy path and records the exact collection directory it
+owns; it refuses to overwrite an existing unowned copy.
 
 ## Uninstall and teardown
 
@@ -48,8 +50,9 @@ Uninstall the SCCFM runtime installed by this plugin.
 
 The setup skill first shows a validated removal plan. After the exact
 confirmation `UNINSTALL SCCFM`, it removes the discovered `cisco.sccfm`
-collection and then runs `pipx uninstall cisco-sccfm-devkit`. The profile store
-at `~/.sccfm-cli/config.json` is preserved by default.
+collection only when it matches the helper's ownership record, then runs `pipx
+uninstall cisco-sccfm-devkit`. Other reported Galaxy copies and the profile
+store at `~/.sccfm-cli/config.json` are preserved by default.
 
 Profile deletion is separate. Request it explicitly and confirm with
 `UNINSTALL SCCFM AND DELETE PROFILES`; the setup helper then removes the profile

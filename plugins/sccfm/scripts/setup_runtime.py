@@ -27,6 +27,7 @@ COLLECTION_PACKAGE = "sccfm"
 ANSIBLE_CORE_SPEC = "ansible-core>=2.20,<2.22"
 VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 PACKAGE_NORMALIZATION_PATTERN = re.compile(r"[-_.]+")
+INSTALL_STATE_SCHEMA_VERSION = 1
 
 
 def command_path(name: str) -> str | None:
@@ -74,6 +75,90 @@ def profile_metadata() -> dict[str, Any]:
 
 def profile_store_path() -> Path:
     return Path.home() / ".sccfm-cli" / "config.json"
+
+
+def collection_install_base_path() -> Path:
+    return (Path.home() / ".ansible" / "collections").resolve(strict=False)
+
+
+def expected_collection_path() -> Path:
+    return (
+        collection_install_base_path()
+        / "ansible_collections"
+        / COLLECTION_NAMESPACE
+        / COLLECTION_PACKAGE
+    )
+
+
+def install_state_path() -> Path:
+    return Path.home() / ".sccfm-agent-plugin" / "runtime.json"
+
+
+def load_install_state() -> dict[str, Any] | None:
+    state_path = install_state_path()
+    if not state_path.exists() and not state_path.is_symlink():
+        return None
+    if state_path.is_symlink() or not state_path.is_file():
+        raise RuntimeError(f"runtime ownership state is not a regular file: {state_path}")
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as error:
+        raise RuntimeError(f"runtime ownership state is invalid: {state_path}: {error}") from error
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != INSTALL_STATE_SCHEMA_VERSION
+    ):
+        raise RuntimeError(f"runtime ownership state has an unsupported format: {state_path}")
+    collection_path = payload.get("collection_path")
+    version = payload.get("version")
+    if not isinstance(collection_path, str) or not isinstance(version, str):
+        raise RuntimeError(f"runtime ownership state is incomplete: {state_path}")
+    recorded_path = Path(collection_path).expanduser()
+    if not recorded_path.is_absolute() or recorded_path != expected_collection_path():
+        raise RuntimeError(
+            f"runtime ownership state points outside the managed collection path: {recorded_path}"
+        )
+    if not VERSION_PATTERN.fullmatch(version):
+        raise RuntimeError(f"runtime ownership state contains an invalid version: {version}")
+    return payload
+
+
+def write_install_state(collection_path: Path, version: str) -> None:
+    if collection_path != expected_collection_path():
+        raise RuntimeError(f"refusing to own an unexpected collection path: {collection_path}")
+    state_path = install_state_path()
+    state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if os.name != "nt":
+        state_path.parent.chmod(0o700)
+    temporary_path = state_path.with_suffix(".tmp")
+    temporary_path.write_text(
+        json.dumps(
+            {
+                "schema_version": INSTALL_STATE_SCHEMA_VERSION,
+                "collection_path": str(collection_path),
+                "version": version,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if os.name != "nt":
+        temporary_path.chmod(0o600)
+    temporary_path.replace(state_path)
+
+
+def remove_install_state() -> None:
+    state_path = install_state_path()
+    try:
+        state_path.unlink()
+    except FileNotFoundError:
+        return
+    try:
+        state_path.parent.rmdir()
+    except OSError:
+        pass
 
 
 def schema_metadata() -> dict[str, Any]:
@@ -159,6 +244,7 @@ def collection_installations(payload: dict[str, Any]) -> list[dict[str, str]]:
 def collection_metadata(environment: dict[str, str]) -> dict[str, Any]:
     try:
         installations = collection_installations(collection_listing(environment))
+        install_state = load_install_state()
     except (RuntimeError, ValueError) as error:
         return {"ok": False, "error": str(error)}
 
@@ -169,10 +255,33 @@ def collection_metadata(environment: dict[str, str]) -> dict[str, Any]:
             "installations": 0,
             "paths": [],
         }
+    selected_installation = installations[0]
+    managed = False
+    if install_state is not None:
+        managed_path = str(install_state["collection_path"])
+        selected_installation = next(
+            (
+                installation
+                for installation in installations
+                if installation["path"] == managed_path
+            ),
+            {},
+        )
+        if not selected_installation:
+            return {
+                "ok": False,
+                "error": (
+                    "the recorded managed collection is not reported by ansible-galaxy: "
+                    f"{managed_path}"
+                ),
+            }
+        managed = True
     return {
         "ok": True,
         "installed": True,
-        "version": installations[0]["version"],
+        "version": selected_installation["version"],
+        "managed": managed,
+        "selected_path": selected_installation["path"],
         "installations": len(installations),
         "paths": [installation["path"] for installation in installations],
     }
@@ -220,7 +329,9 @@ def doctor_report() -> dict[str, Any]:
     return report
 
 
-def install_commands(version: str, python_command: str) -> list[list[str]]:
+def install_commands(
+    version: str, python_command: str, collection_base: Path | None = None
+) -> list[list[str]]:
     if not VERSION_PATTERN.fullmatch(version):
         raise ValueError("version must be a stable X.Y.Z release")
     return [
@@ -246,6 +357,8 @@ def install_commands(version: str, python_command: str) -> list[list[str]]:
             "install",
             f"{COLLECTION_NAME}:=={version}",
             "--force",
+            "--collections-path",
+            str(collection_base or collection_install_base_path()),
         ],
     ]
 
@@ -262,9 +375,32 @@ def install(version: str, python_command: str, confirmed: bool) -> None:
         raise SystemExit("pipx is required; install pipx before continuing")
     if command_path(python_command) is None:
         raise SystemExit(f"Python runtime is not on PATH: {python_command}")
+    target_path = expected_collection_path()
+    install_state = load_install_state()
+    if target_path.exists() or target_path.is_symlink():
+        if target_path.is_symlink() or not target_path.is_dir():
+            raise SystemExit(f"Managed collection target is unsafe: {target_path}")
+        if install_state is None:
+            raise SystemExit(
+                "Refusing to overwrite an existing collection that is not owned by this helper: "
+                f"{target_path}"
+            )
+    elif install_state is not None:
+        raise SystemExit(
+            "Runtime ownership state exists but its collection is missing; "
+            f"remove or repair {install_state_path()} before reinstalling"
+        )
     for command in install_commands(version, python_command):
         print(f"Running: {shlex.join(command)}")
         subprocess.run(command, check=True)
+    installed_path = validated_collection_path(
+        str(collection_install_base_path() / "ansible_collections")
+    )
+    if installed_path != target_path:
+        raise RuntimeError(
+            f"collection was installed outside the expected managed path: {installed_path}"
+        )
+    write_install_state(installed_path, version)
 
 
 def discover_collection_paths() -> list[Path]:
@@ -275,6 +411,18 @@ def discover_collection_paths() -> list[Path]:
             Path(installation["path"])
             for installation in collection_installations(collection_listing(ansible_environment))
         ]
+
+
+def partition_collection_paths(collection_paths: Sequence[Path]) -> tuple[list[Path], list[Path]]:
+    install_state = load_install_state()
+    if install_state is None:
+        return [], list(collection_paths)
+    managed_path = Path(str(install_state["collection_path"]))
+    if managed_path not in collection_paths:
+        raise RuntimeError(
+            "the recorded managed collection is not reported by ansible-galaxy: " f"{managed_path}"
+        )
+    return [managed_path], [path for path in collection_paths if path != managed_path]
 
 
 def pipx_package_installed() -> bool:
@@ -310,7 +458,9 @@ def pipx_package_installed() -> bool:
 
 
 def uninstall_plan(remove_profiles: bool) -> dict[str, Any]:
-    collection_paths = discover_collection_paths()
+    collection_paths, preserved_collection_paths = partition_collection_paths(
+        discover_collection_paths()
+    )
     pipx_path = command_path("pipx")
     cli_path = command_path("sccfm-cli")
     if pipx_path is None and cli_path is not None:
@@ -324,6 +474,12 @@ def uninstall_plan(remove_profiles: bool) -> dict[str, Any]:
         )
     return {
         "collection_paths": [str(path) for path in collection_paths],
+        "preserved_collection_paths": [str(path) for path in preserved_collection_paths],
+        "install_state": {
+            "action": "delete" if collection_paths else "absent",
+            "path": str(install_state_path()),
+            "exists": install_state_path().exists(),
+        },
         "pipx_command": (
             ["pipx", "uninstall", PACKAGE_NAME] if managed_environment_installed else None
         ),
@@ -346,7 +502,12 @@ def print_uninstall_plan(remove_profiles: bool, as_json: bool) -> None:
         for path in collection_paths:
             print(f"Remove Ansible collection: {path}")
     else:
-        print(f"Ansible collection is not installed: {COLLECTION_NAME}")
+        print(f"No helper-managed Ansible collection is installed: {COLLECTION_NAME}")
+    for path in plan["preserved_collection_paths"]:
+        print(f"Preserve unmanaged Ansible collection: {path}")
+    install_state = plan["install_state"]
+    if install_state["action"] == "delete":
+        print(f"Remove runtime ownership state: {install_state['path']}")
     pipx_command = plan["pipx_command"]
     if pipx_command:
         print(f"Run: {shlex.join(pipx_command)}")
@@ -377,6 +538,8 @@ def uninstall(remove_profiles: bool, confirmed: bool) -> None:
         path = Path(collection_path)
         print(f"Removing Ansible collection: {path}")
         shutil.rmtree(path)
+    if plan["collection_paths"]:
+        remove_install_state()
     pipx_command = plan["pipx_command"]
     if pipx_command:
         print(f"Running: {shlex.join(pipx_command)}")

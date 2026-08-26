@@ -24,7 +24,18 @@ SCCFM_EXECUTABLE = "sccfm-cli"
 ANSIBLE_REVIEW_COMMANDS = {"ansible-galaxy", "ansible-playbook"}
 SHELL_CONTROL_CHARACTERS = frozenset(";&|<>")
 SHELL_SUBSTITUTION_MARKERS = ("$", "`")
-SHELL_WRAPPER_EXECUTABLES = {"bash", "command", "env", "sh", "sudo", "xargs", "zsh"}
+SHELL_WRAPPER_EXECUTABLES = {
+    "bash",
+    "command",
+    "env",
+    "nohup",
+    "nice",
+    "sh",
+    "sudo",
+    "time",
+    "xargs",
+    "zsh",
+}
 APPROVAL_PREFIX = "EXECUTE "
 PLANNED_COMMAND_PREFIX = "SCCFM_APPROVAL_COMMAND: "
 APPROVAL_TTL_SECONDS = 600
@@ -51,6 +62,16 @@ def executable_name(token: str) -> str:
     return Path(token).name
 
 
+def is_assignment_word(token: str) -> bool:
+    name, separator, _value = token.partition("=")
+    return bool(
+        separator
+        and name
+        and (name[0].isalpha() or name[0] == "_")
+        and all(character.isalnum() or character == "_" for character in name[1:])
+    )
+
+
 def contains_guarded_executable(command: str) -> bool:
     try:
         lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
@@ -63,7 +84,13 @@ def contains_guarded_executable(command: str) -> bool:
             for executable in (SCCFM_EXECUTABLE, *sorted(ANSIBLE_REVIEW_COMMANDS))
         )
     guarded_executables = {SCCFM_EXECUTABLE, *ANSIBLE_REVIEW_COMMANDS}
-    if tokens and executable_name(tokens[0]) in guarded_executables:
+    execution_index = 0
+    while execution_index < len(tokens) and is_assignment_word(tokens[execution_index]):
+        execution_index += 1
+    if (
+        execution_index < len(tokens)
+        and executable_name(tokens[execution_index]) in guarded_executables
+    ):
         return True
     for index, token in enumerate(tokens[1:], start=1):
         if executable_name(token) not in guarded_executables:
@@ -71,7 +98,9 @@ def contains_guarded_executable(command: str) -> bool:
         previous = tokens[index - 1]
         if set(previous) <= SHELL_CONTROL_CHARACTERS or previous in {"-exec", "-execdir"}:
             return True
-    first_executable = executable_name(tokens[0]) if tokens else ""
+    first_executable = (
+        executable_name(tokens[execution_index]) if execution_index < len(tokens) else ""
+    )
     if first_executable in SHELL_WRAPPER_EXECUTABLES:
         return any(
             executable_name(token) in guarded_executables
@@ -79,7 +108,7 @@ def contains_guarded_executable(command: str) -> bool:
                 first_executable in {"bash", "sh", "zsh"}
                 and any(executable in token for executable in guarded_executables)
             )
-            for token in tokens[1:]
+            for token in tokens[execution_index + 1 :]
         )
     return False
 

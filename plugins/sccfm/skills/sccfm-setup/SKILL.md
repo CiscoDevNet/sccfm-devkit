@@ -49,7 +49,12 @@ python3 scripts/setup_runtime.py plan --version X.Y.Z --python python3.12
 
 Explain that the plan installs the Python package with `pipx`, injects Ansible
 into that same environment so modules can import `cisco_sccfm_core`, and installs
-the collection at the identical version.
+the collection at the identical version. The helper installs the collection at
+the standard per-user path
+`~/.ansible/collections/ansible_collections/cisco/sccfm` and records that exact
+owned path in `~/.sccfm-agent-plugin/runtime.json`. If the target collection
+already exists without that ownership record, stop and ask the user to resolve
+the pre-existing installation; never overwrite or adopt it automatically.
 
 Require the exact confirmation `INSTALL SCCFM X.Y.Z`. Only then run:
 
@@ -110,17 +115,20 @@ python3 scripts/setup_runtime.py uninstall-plan
 ```
 
 The helper discovers `cisco.sccfm` through `ansible-galaxy`, validates each
-reported collection path, confirms that `sccfm-cli` belongs to the managed pipx
-environment, and preserves `~/.sccfm-cli/config.json` by default. Show the full
-plan and require the exact confirmation `UNINSTALL SCCFM`. Only then run:
+reported collection path, selects only the path matching its runtime ownership
+record, confirms that `sccfm-cli` belongs to the managed pipx environment, and
+preserves unowned collection copies. The helper preserves `~/.sccfm-cli/config.json` by default.
+Show the full plan and require the exact confirmation `UNINSTALL SCCFM`. Only
+then run:
 
 ```bash
 python3 scripts/setup_runtime.py uninstall --yes
 ```
 
-The helper removes the discovered Galaxy collection before uninstalling the
+The helper removes only its recorded Galaxy collection before uninstalling the
 pipx environment. If discovery or ownership validation fails, stop; never guess
-a collection directory or construct a broad recursive-delete command.
+a collection directory, delete another reported copy, or construct a broad
+recursive-delete command.
 
 Deleting named profiles and their API tokens is a separate destructive choice.
 Only when the user explicitly asks to delete them, generate the expanded plan:

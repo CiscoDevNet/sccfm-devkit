@@ -7,6 +7,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py\" --record-plan",
+            "commandWindows": "py -3 \"%CLAUDE_PLUGIN_ROOT%\\hooks\\sccfm_guard.py\" --record-plan",
             "timeout": 30
           }
         ]
@@ -18,6 +19,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py\" --record-approval",
+            "commandWindows": "py -3 \"%CLAUDE_PLUGIN_ROOT%\\hooks\\sccfm_guard.py\" --record-approval",
             "timeout": 30
           }
         ]
@@ -30,6 +32,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py\"",
+            "commandWindows": "py -3 \"%CLAUDE_PLUGIN_ROOT%\\hooks\\sccfm_guard.py\"",
             "timeout": 30
           }
         ]
