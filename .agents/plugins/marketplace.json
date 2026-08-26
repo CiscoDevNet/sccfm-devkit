@@ -1,0 +1,20 @@
+{
+  "name": "sccfm-devkit",
+  "interface": {
+    "displayName": "Cisco SCC Firewall Manager"
+  },
+  "plugins": [
+    {
+      "name": "sccfm",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sccfm"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Security"
+    }
+  ]
+}

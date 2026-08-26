@@ -83,7 +83,8 @@ def test_sccfm_ansible_skill_documents_safety_and_secret_rules() -> None:
     assert "may be presented" in normalized_skill
     assert "module_defaults: group/cisco.sccfm.all" in skill
     assert "supports_check_mode=True" in skill
-    assert "EXECUTE cisco.sccfm <module-fqcn> <target-summary>" in skill
+    assert "EXECUTE <exact ansible-playbook shell command>" in skill
+    assert "SCCFM_APPROVAL_COMMAND: <exact ansible-playbook shell command>" in skill
 
 
 def test_sccfm_ansible_skill_only_documents_canonical_profile_auth() -> None:
