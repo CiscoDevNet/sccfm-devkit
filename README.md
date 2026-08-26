@@ -69,9 +69,10 @@ The operational skills can execute schema-proven read-only commands. Mutating
 commands require a typed `EXECUTE <exact shell command>` confirmation; broad or
 bulk changes require two confirmations. Claude Code and Codex load a shared
 pre-command hook backed by the same one-use approval guard. See
-[`plugins/sccfm/README.md`](plugins/sccfm/README.md)
+[`plugins/sccfm/README.md`](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/plugins/sccfm/README.md)
 for installation and local validation, and
-[`docs/agent-plugin.md`](docs/agent-plugin.md) for the complete capability and
+[`docs/agent-plugin.md`](https://ciscodevnet.github.io/sccfm-devkit/agent-plugin.html)
+for the complete capability and
 end-user workflow.
 
 ## Commands
