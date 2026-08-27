@@ -1,0 +1,24 @@
+{
+  "name": "sccfm-devkit",
+  "description": "Cisco SCC Firewall Manager plugins for AI coding agents",
+  "owner": {
+    "name": "Cisco DevNet",
+    "url": "https://developer.cisco.com"
+  },
+  "plugins": [
+    {
+      "name": "sccfm",
+      "source": "./plugins/sccfm",
+      "displayName": "SCC Firewall Manager",
+      "description": "Install, configure, and safely operate sccfm-cli and the cisco.sccfm Ansible collection.",
+      "category": "security",
+      "tags": [
+        "cisco",
+        "sccfm",
+        "firewall-manager",
+        "security",
+        "ansible"
+      ]
+    }
+  ]
+}

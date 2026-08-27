@@ -2,6 +2,14 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.40.0:
+    changes:
+      minor_changes:
+        - Added an installable agent plugin for Claude Code and Codex with guided
+          SCCFM runtime setup, synchronized CLI and Ansible skills, and exact-command
+          approval guardrails for mutating operations.
+    fragments: []
+    release_date: '2026-08-26'
   0.39.5:
     changes:
       minor_changes:

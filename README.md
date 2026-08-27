@@ -12,6 +12,7 @@ package with the `sccfm-cli` and `sccfm-cli-interactive` commands, a reusable
 ## Table of Contents
 
 - [Getting started](#getting-started)
+- [Claude Code and Codex plugin](#claude-code-and-codex-plugin)
 - [Commands](#commands)
 - [Python library](#python-library)
 - [Ansible collection](#ansible-collection)
@@ -37,6 +38,42 @@ sccfm-devkit                   # repository development workflow menu
 Python 3.12.4, `.venv/` hosts the project runtime, and `.venv/.poetry/` hosts Poetry. If `.venv/`
 was created by an older version of the script that installed Poetry into the project runtime,
 remove `.venv/` once and rerun the setup script.
+
+## Claude Code and Codex plugin
+
+The repository contains an `sccfm` agent plugin for Claude Code and Codex. It
+bundles guided installation and authentication setup with the canonical
+`sccfm-cli` and `cisco.sccfm` Ansible skills.
+
+Claude Code:
+
+```text
+/plugin marketplace add CiscoDevNet/sccfm-devkit
+/plugin install sccfm@sccfm-devkit
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add CiscoDevNet/sccfm-devkit
+codex plugin add sccfm@sccfm-devkit
+```
+
+After installation, ask the agent to `Set up SCC Firewall Manager for this
+machine.` The setup checks Python and `pipx`, proposes a version-matched CLI and
+Ansible installation plan, waits for the exact `INSTALL SCCFM X.Y.Z`
+confirmation, and directs token entry to the CLI's hidden local prompt rather
+than chat.
+
+The operational skills can execute schema-proven read-only commands. Mutating
+commands require a typed `EXECUTE <exact shell command>` confirmation; broad or
+bulk changes require two confirmations. Claude Code and Codex load a shared
+pre-command hook backed by the same one-use approval guard. See
+[`plugins/sccfm/README.md`](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/plugins/sccfm/README.md)
+for installation and local validation, and
+[`docs/agent-plugin.md`](https://ciscodevnet.github.io/sccfm-devkit/agent-plugin.html)
+for the complete capability and
+end-user workflow.
 
 ## Commands
 

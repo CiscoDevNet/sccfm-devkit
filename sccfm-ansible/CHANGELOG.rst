@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.40.0
+========
+
+Minor Changes
+-------------
+
+- Added an installable agent plugin for Claude Code and Codex with guided SCCFM runtime setup, synchronized CLI and Ansible skills, and exact-command approval guardrails for mutating operations.
+
 v0.39.5
 ========
 
