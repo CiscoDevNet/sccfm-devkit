@@ -1,3 +1,15 @@
+## v0.40.0 (2026-08-27)
+
+### Feat
+
+- **lh-114214**: add SCCFM agent plugin
+
+### Fix
+
+- **lh-114214**: address plugin review findings
+- **lh-114214**: prepare Ansible changelog for 0.40.0
+- **lh-114214**: use absolute plugin documentation links
+
 ## v0.39.5 (2026-08-24)
 
 ### Fix
