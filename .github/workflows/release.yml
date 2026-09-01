@@ -130,7 +130,7 @@ jobs:
           echo "bundle_name=${BUNDLE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Preserve verified release bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.bundle.outputs.bundle_name }}
           path: |
@@ -167,7 +167,7 @@ jobs:
           python -m pip install twine==6.2.0
 
       - name: Download verified release bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ needs.validate-release.outputs.bundle_name }}
           path: ${{ runner.temp }}/release-bundle
@@ -277,10 +277,21 @@ jobs:
 
           INSTALL_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-pypi-install.XXXXXX")"
           python -m venv "${INSTALL_ROOT}/venv"
-          "${INSTALL_ROOT}/venv/bin/python" -I -m pip install \
-            --no-cache-dir \
-            --index-url https://pypi.org/simple \
-            "cisco-sccfm-devkit==${RELEASE_VERSION}"
+          for attempt in $(seq 1 60); do
+            if "${INSTALL_ROOT}/venv/bin/python" -I -m pip install \
+              --no-cache-dir \
+              --index-url https://pypi.org/simple \
+              "cisco-sccfm-devkit==${RELEASE_VERSION}"; then
+              break
+            fi
+            if [[ "${attempt}" = "60" ]]; then
+              echo "::error::PyPI Simple API did not expose ${RELEASE_VERSION} in time"
+              exit 1
+            fi
+            echo "PyPI Simple API has not exposed ${RELEASE_VERSION} yet" \
+              "(attempt ${attempt}); waiting 5s..."
+            sleep 5
+          done
           "${INSTALL_ROOT}/venv/bin/python" -I -m pip check
           "${INSTALL_ROOT}/venv/bin/sccfm-cli" --help >/dev/null
           "${INSTALL_ROOT}/venv/bin/sccfm-cli-interactive" --help >/dev/null
@@ -313,7 +324,7 @@ jobs:
           python -m pip install "ansible-core>=2.20,<2.22"
 
       - name: Download verified release bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ needs.validate-release.outputs.bundle_name }}
           path: ${{ runner.temp }}/release-bundle
@@ -433,10 +444,21 @@ jobs:
           cmp -s "${COLLECTION_PATH}" "${DOWNLOADED_COLLECTION}"
 
           INSTALL_ROOT="$(mktemp -d "${RUNNER_TEMP}/sccfm-galaxy-install.XXXXXX")"
-          python -m pip install \
-            --no-cache-dir \
-            --index-url https://pypi.org/simple \
-            "cisco-sccfm-devkit==${RELEASE_VERSION}"
+          for attempt in $(seq 1 60); do
+            if python -m pip install \
+              --no-cache-dir \
+              --index-url https://pypi.org/simple \
+              "cisco-sccfm-devkit==${RELEASE_VERSION}"; then
+              break
+            fi
+            if [[ "${attempt}" = "60" ]]; then
+              echo "::error::PyPI Simple API did not expose ${RELEASE_VERSION} in time"
+              exit 1
+            fi
+            echo "PyPI Simple API has not exposed ${RELEASE_VERSION} yet" \
+              "(attempt ${attempt}); waiting 5s..."
+            sleep 5
+          done
           ansible-galaxy collection install \
             "${DOWNLOADED_COLLECTION}" \
             --collections-path "${INSTALL_ROOT}" \
