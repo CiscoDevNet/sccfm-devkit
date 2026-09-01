@@ -1,3 +1,9 @@
+## v0.40.1 (2026-09-01)
+
+### Fix
+
+- pass release context to Homebrew workflow
+
 ## v0.40.0 (2026-08-27)
 
 ### Feat
