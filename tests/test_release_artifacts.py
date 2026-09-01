@@ -300,7 +300,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert release.count("actions/download-artifact@v7") == 2
 
     assert homebrew.count("type: boolean") == 2
-    assert "description: \"Validate the bump without opening a tap PR.\"" in homebrew
+    assert 'description: "Validate the bump without opening a tap PR."' in homebrew
     assert "HOMEBREW_NO_INSTALL_FROM_API" not in homebrew
     assert "if: ${{ !inputs.dry_run }}" in homebrew
     assert "brew update-python-resources" in homebrew
