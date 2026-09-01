@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.40.2
+========
+
+Bugfixes
+--------
+
+- Corrected Homebrew release automation to resolve Core dependencies through the Formula API, support dry-run validation, and enable protected automatic merging of successful tap updates.
+
 v0.40.1
 ========
 

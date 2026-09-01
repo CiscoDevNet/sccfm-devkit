@@ -12,6 +12,11 @@ on:
         description: "Version to bump to."
         required: true
         type: string
+      dry_run:
+        description: "Validate the bump without opening a tap PR."
+        required: false
+        default: false
+        type: boolean
     secrets:
       TAP_BOT_APP_ID:
         required: true
@@ -24,6 +29,11 @@ on:
         description: "Version to bump to (e.g. 0.40.0). Defaults to latest on PyPI."
         required: false
         type: string
+      dry_run:
+        description: "Validate the bump without opening a tap PR."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -119,7 +129,6 @@ jobs:
 
       - name: Update url + sha256 and regenerate resources
         env:
-          HOMEBREW_NO_INSTALL_FROM_API: "1"
           HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
           SDIST_URL: ${{ steps.sdist.outputs.url }}
           SDIST_SHA: ${{ steps.sdist.outputs.sha256 }}
@@ -174,7 +183,6 @@ jobs:
 
       - name: Validate the formula
         env:
-          HOMEBREW_NO_INSTALL_FROM_API: "1"
           HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
         run: |
           set -euo pipefail
@@ -182,6 +190,7 @@ jobs:
           brew audit --formula "${FORMULA}"
 
       - name: Open the bump PR
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ steps.ver.outputs.version }}
@@ -191,7 +200,8 @@ jobs:
           BRANCH="bump-sccfm-cli-${VERSION}"
 
           create_pr() {
-            gh pr create \
+            local pr_url
+            pr_url="$(gh pr create \
               --repo "${TAP_REPO}" \
               --base main \
               --head "$BRANCH" \
@@ -201,7 +211,9 @@ jobs:
             - url + sha256 updated from PyPI (\`${PYPI_NAME}\` ${VERSION})
             - resource blocks regenerated with \`brew update-python-resources\`
 
-            Opened by the release workflow in \`${GITHUB_REPOSITORY}\`."
+            Opened by the release workflow in \`${GITHUB_REPOSITORY}\`.")"
+            echo "Opened ${pr_url}"
+            gh pr merge --auto --squash --delete-branch "${pr_url}"
           }
 
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
@@ -213,6 +225,7 @@ jobs:
               --jq '.[0].url // empty')"
             if [ -n "${EXISTING_PR}" ]; then
               echo "Branch ${BRANCH} already has an open PR: ${EXISTING_PR}"
+              gh pr merge --auto --squash --delete-branch "${EXISTING_PR}"
               exit 0
             fi
             echo "Branch ${BRANCH} exists without an open PR; creating one."

@@ -2,6 +2,14 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.40.2:
+    changes:
+      bugfixes:
+        - Corrected Homebrew release automation to resolve Core dependencies through
+          the Formula API, support dry-run validation, and enable protected automatic
+          merging of successful tap updates.
+    fragments: []
+    release_date: '2026-09-01'
   0.40.1:
     changes:
       minor_changes:

@@ -191,6 +191,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     repository = Path(__file__).resolve().parents[1]
     ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    homebrew = (repository / ".github/workflows/bump-homebrew.yml").read_text(encoding="utf-8")
 
     prepare = _workflow_job(ci, "prepare-release")
     draft = _workflow_job(ci, "create-draft-release")
@@ -297,6 +298,13 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert "contents: write" in finalizer
     assert release.count("actions/upload-artifact@v7") == 1
     assert release.count("actions/download-artifact@v7") == 2
+
+    assert homebrew.count("type: boolean") == 2
+    assert 'description: "Validate the bump without opening a tap PR."' in homebrew
+    assert "HOMEBREW_NO_INSTALL_FROM_API" not in homebrew
+    assert "if: ${{ !inputs.dry_run }}" in homebrew
+    assert "brew update-python-resources" in homebrew
+    assert homebrew.count("gh pr merge --auto --squash --delete-branch") == 2
 
     assert "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33" in pypi
     assert "pypa/gh-action-pypi-publish@release/v1" not in pypi
