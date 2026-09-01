@@ -191,6 +191,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     repository = Path(__file__).resolve().parents[1]
     ci = (repository / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     release = (repository / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    homebrew = (repository / ".github/workflows/bump-homebrew.yml").read_text(encoding="utf-8")
 
     prepare = _workflow_job(ci, "prepare-release")
     draft = _workflow_job(ci, "create-draft-release")
@@ -252,7 +253,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert "release-manifest-sha256:" in validation
     assert "release_artifacts verify" in validation
     assert "contents: write" in validation
-    assert "actions/upload-artifact@v4" in validation
+    assert "actions/upload-artifact@v7" in validation
     assert "bundle_name: ${{ steps.bundle.outputs.bundle_name }}" in validation
     assert "name: ${{ steps.bundle.outputs.bundle_name }}" in validation
     assert "GITHUB_RUN_ID" in validation
@@ -262,7 +263,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert "secrets.PYPI_API_TOKEN" not in validation
     assert "secrets.GALAXY_API_KEY" not in validation
     assert validation.index("release_artifacts verify") < validation.index(
-        "actions/upload-artifact@v4"
+        "actions/upload-artifact@v7"
     )
 
     prohibited_deploy_commands = (
@@ -285,18 +286,25 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     for job in (pypi, galaxy):
         assert "contents: read" in job
         assert "contents: write" not in job
-        assert job.count("actions/download-artifact@v4") == 1
+        assert job.count("actions/download-artifact@v7") == 1
         assert "name: ${{ needs.validate-release.outputs.bundle_name }}" in job
         assert 'gh release download "${RELEASE_TAG}"' not in job
         assert "GH_TOKEN:" not in job
         assert "secrets.GITHUB_TOKEN" not in job
         assert "release_artifacts verify" in job
         assert "EXPECTED_MANIFEST_SHA256" in job
-        assert job.index("actions/download-artifact@v4") < job.index("release_artifacts verify")
+        assert job.index("actions/download-artifact@v7") < job.index("release_artifacts verify")
 
     assert "contents: write" in finalizer
-    assert release.count("actions/upload-artifact@v4") == 1
-    assert release.count("actions/download-artifact@v4") == 2
+    assert release.count("actions/upload-artifact@v7") == 1
+    assert release.count("actions/download-artifact@v7") == 2
+
+    assert homebrew.count("type: boolean") == 2
+    assert 'description: "Validate the bump without opening a tap PR."' in homebrew
+    assert "HOMEBREW_NO_INSTALL_FROM_API" not in homebrew
+    assert "if: ${{ !inputs.dry_run }}" in homebrew
+    assert "brew update-python-resources" in homebrew
+    assert homebrew.count("gh pr merge --auto --squash --delete-branch") == 2
 
     assert "pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33" in pypi
     assert "pypa/gh-action-pypi-publish@release/v1" not in pypi

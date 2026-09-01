@@ -12,6 +12,11 @@ on:
         description: "Version to bump to."
         required: true
         type: string
+      dry_run:
+        description: "Validate the bump without opening a tap PR."
+        required: false
+        default: false
+        type: boolean
     secrets:
       TAP_BOT_APP_ID:
         required: true
@@ -24,6 +29,11 @@ on:
         description: "Version to bump to (e.g. 0.40.0). Defaults to latest on PyPI."
         required: false
         type: string
+      dry_run:
+        description: "Validate the bump without opening a tap PR."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -53,6 +63,7 @@ jobs:
           else
             VERSION="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/json" | jq -r '.info.version')"
           fi
+          # Accept only a sane semver-ish string; reject anything unexpected.
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([._-][A-Za-z0-9]+)*$ ]]; then
             echo "::error::Refusing to proceed with suspicious version '${VERSION}'"; exit 1
           fi
@@ -66,6 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           URL=""; SHA=""
+          # PyPI may lag behind the GitHub release; retry for up to ~5 minutes.
           for i in $(seq 1 30); do
             DATA="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/${VERSION}/json" || true)"
             if [ -n "$DATA" ]; then
@@ -90,7 +102,7 @@ jobs:
 
       - name: Generate a token scoped to the tap
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         with:
           client-id: ${{ secrets.TAP_BOT_APP_ID }}
           private-key: ${{ secrets.TAP_BOT_APP_KEY }}
@@ -98,7 +110,7 @@ jobs:
           repositories: homebrew-tap
 
       - name: Check out the tap
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: ${{ env.TAP_REPO }}
           token: ${{ steps.app-token.outputs.token }}
@@ -106,7 +118,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607
+        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607  # master @ 2026-09-01
 
       - name: Register the checked-out tap
         run: |
@@ -117,7 +129,6 @@ jobs:
 
       - name: Update url + sha256 and regenerate resources
         env:
-          HOMEBREW_NO_INSTALL_FROM_API: "1"
           HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
           SDIST_URL: ${{ steps.sdist.outputs.url }}
           SDIST_SHA: ${{ steps.sdist.outputs.sha256 }}
@@ -172,7 +183,6 @@ jobs:
 
       - name: Validate the formula
         env:
-          HOMEBREW_NO_INSTALL_FROM_API: "1"
           HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
         run: |
           set -euo pipefail
@@ -180,6 +190,7 @@ jobs:
           brew audit --formula "${FORMULA}"
 
       - name: Open the bump PR
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ steps.ver.outputs.version }}
