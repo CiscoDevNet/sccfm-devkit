@@ -1,0 +1,169 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
+name: Bump Homebrew formula
+
+on:
+  release:
+    types: [published]
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to bump to (e.g. 0.40.0). Defaults to latest on PyPI."
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  PYPI_NAME: cisco-sccfm-devkit
+  TAP_REPO: CiscoDevNet/homebrew-tap
+  FORMULA: CiscoDevNet/tap/sccfm-cli
+
+jobs:
+  bump:
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target version
+        id: ver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            VERSION="${INPUT_VERSION}"
+          elif [ -n "${RELEASE_TAG:-}" ]; then
+            VERSION="${RELEASE_TAG#v}"                 # strip a leading v if present
+          else
+            VERSION="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/json" | jq -r '.info.version')"
+          fi
+          # Accept only a sane semver-ish string; reject anything unexpected.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([._-][A-Za-z0-9]+)*$'; then
+            echo "::error::Refusing to proceed with suspicious version '${VERSION}'"; exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Target version: ${VERSION}"
+
+      - name: Wait for the sdist to appear on PyPI
+        id: sdist
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          URL=""; SHA=""
+          # PyPI may lag behind the GitHub release; retry for up to ~5 minutes.
+          for i in $(seq 1 30); do
+            DATA="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/${VERSION}/json" || true)"
+            if [ -n "$DATA" ]; then
+              URL="$(echo "$DATA" | jq -r '.urls[] | select(.packagetype=="sdist") | .url')"
+              SHA="$(echo "$DATA" | jq -r '.urls[] | select(.packagetype=="sdist") | .digests.sha256')"
+            fi
+            if [ -n "$URL" ] && [ "$URL" != "null" ]; then break; fi
+            echo "sdist for ${VERSION} not on PyPI yet (attempt ${i}); waiting 10s..."
+            sleep 10
+          done
+
+          case "$URL" in
+            https://files.pythonhosted.org/*) : ;;
+            *) echo "::error::Unexpected sdist url '${URL}'"; exit 1 ;;
+          esac
+          if ! printf '%s' "$SHA" | grep -Eq '^[a-f0-9]{64}$'; then
+            echo "::error::Unexpected sha256 '${SHA}'"; exit 1
+          fi
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "sdist: ${URL}"
+
+      - name: Generate a token scoped to the tap
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          app-id: ${{ secrets.TAP_BOT_APP_ID }}
+          private-key: ${{ secrets.TAP_BOT_APP_KEY }}
+          owner: CiscoDevNet
+          repositories: homebrew-tap
+
+      - name: Check out the tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ env.TAP_REPO }}
+          token: ${{ steps.app-token.outputs.token }}
+          path: tap
+          fetch-depth: 0
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607  # master @ 2026-09-01
+
+      - name: Register the checked-out tap
+        run: |
+          set -euo pipefail
+          TAPS="$(brew --repository)/Library/Taps/ciscodevnet"
+          mkdir -p "$TAPS"
+          ln -sfn "$GITHUB_WORKSPACE/tap" "$TAPS/homebrew-tap"
+
+      - name: Update url + sha256 and regenerate resources
+        env:
+          HOMEBREW_NO_INSTALL_FROM_API: "1"
+          HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
+          SDIST_URL: ${{ steps.sdist.outputs.url }}
+          SDIST_SHA: ${{ steps.sdist.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+
+          brew bump-formula-pr \
+            --write-only --no-audit --no-browse \
+            --url="${SDIST_URL}" \
+            --sha256="${SDIST_SHA}" \
+            "${FORMULA}"
+
+
+      - name: Validate the formula
+        env:
+          HOMEBREW_NO_INSTALL_FROM_API: "1"
+          HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
+        run: |
+          set -euo pipefail
+          brew style "${FORMULA}"
+          brew audit --formula "${FORMULA}"
+
+      - name: Open the bump PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/tap"
+          BRANCH="bump-sccfm-cli-${VERSION}"
+
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists on the tap; nothing to do."; exit 0
+          fi
+
+          git config user.name  "sccfm-tap-bot[bot]"
+          git config user.email "sccfm-tap-bot[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add Formula/sccfm-cli.rb
+
+          if git diff --cached --quiet; then
+            echo "Formula already at ${VERSION}; no changes to commit."; exit 0
+          fi
+
+          git commit -m "sccfm-cli ${VERSION}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --repo "${TAP_REPO}" \
+            --base main \
+            --head "$BRANCH" \
+            --title "sccfm-cli ${VERSION}" \
+            --body "Automated bump of \`sccfm-cli\` to ${VERSION}.
+
+          - url + sha256 updated from PyPI (\`${PYPI_NAME}\` ${VERSION})
+          - resource blocks regenerated with \`brew update-python-resources\`
+
+          Opened by the release workflow in \`${GITHUB_REPOSITORY}\`."
