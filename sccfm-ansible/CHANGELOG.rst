@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.40.1
+========
+
+Minor Changes
+-------------
+
+- Added release automation that updates the SCCFM CLI Homebrew formula from the verified PyPI source distribution and opens a pull request in the CiscoDevNet tap.
+
 v0.40.0
 ========
 

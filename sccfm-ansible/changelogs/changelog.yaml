@@ -2,6 +2,14 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.40.1:
+    changes:
+      minor_changes:
+        - Added release automation that updates the SCCFM CLI Homebrew formula from
+          the verified PyPI source distribution and opens a pull request in the
+          CiscoDevNet tap.
+    fragments: []
+    release_date: '2026-09-01'
   0.40.0:
     changes:
       minor_changes:

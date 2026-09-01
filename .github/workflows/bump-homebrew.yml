@@ -6,17 +6,31 @@
 name: Bump Homebrew formula
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to bump to."
+        required: true
+        type: string
+    secrets:
+      TAP_BOT_APP_ID:
+        required: true
+      TAP_BOT_APP_KEY:
+        required: true
 
   workflow_dispatch:
     inputs:
       version:
         description: "Version to bump to (e.g. 0.40.0). Defaults to latest on PyPI."
         required: false
+        type: string
 
 permissions:
   contents: read
+
+concurrency:
+  group: homebrew-bump-${{ inputs.version || 'latest' }}
+  cancel-in-progress: false
 
 env:
   PYPI_NAME: cisco-sccfm-devkit
@@ -31,19 +45,16 @@ jobs:
       - name: Resolve target version
         id: ver
         env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           if [ -n "${INPUT_VERSION:-}" ]; then
             VERSION="${INPUT_VERSION}"
-          elif [ -n "${RELEASE_TAG:-}" ]; then
-            VERSION="${RELEASE_TAG#v}"                 # strip a leading v if present
           else
             VERSION="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/json" | jq -r '.info.version')"
           fi
           # Accept only a sane semver-ish string; reject anything unexpected.
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([._-][A-Za-z0-9]+)*$'; then
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([._-][A-Za-z0-9]+)*$ ]]; then
             echo "::error::Refusing to proceed with suspicious version '${VERSION}'"; exit 1
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -140,8 +151,34 @@ jobs:
           cd "$GITHUB_WORKSPACE/tap"
           BRANCH="bump-sccfm-cli-${VERSION}"
 
+          create_pr() {
+            gh pr create \
+              --repo "${TAP_REPO}" \
+              --base main \
+              --head "$BRANCH" \
+              --title "sccfm-cli ${VERSION}" \
+              --body "Automated bump of \`sccfm-cli\` to ${VERSION}.
+
+            - url + sha256 updated from PyPI (\`${PYPI_NAME}\` ${VERSION})
+            - resource blocks regenerated with \`brew update-python-resources\`
+
+            Opened by the release workflow in \`${GITHUB_REPOSITORY}\`."
+          }
+
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            echo "Branch $BRANCH already exists on the tap; nothing to do."; exit 0
+            EXISTING_PR="$(gh pr list \
+              --repo "${TAP_REPO}" \
+              --head "$BRANCH" \
+              --state open \
+              --json url \
+              --jq '.[0].url // empty')"
+            if [ -n "${EXISTING_PR}" ]; then
+              echo "Branch ${BRANCH} already has an open PR: ${EXISTING_PR}"
+              exit 0
+            fi
+            echo "Branch ${BRANCH} exists without an open PR; creating one."
+            create_pr
+            exit 0
           fi
 
           git config user.name  "sccfm-tap-bot[bot]"
@@ -155,15 +192,4 @@ jobs:
 
           git commit -m "sccfm-cli ${VERSION}"
           git push origin "$BRANCH"
-
-          gh pr create \
-            --repo "${TAP_REPO}" \
-            --base main \
-            --head "$BRANCH" \
-            --title "sccfm-cli ${VERSION}" \
-            --body "Automated bump of \`sccfm-cli\` to ${VERSION}.
-
-          - url + sha256 updated from PyPI (\`${PYPI_NAME}\` ${VERSION})
-          - resource blocks regenerated with \`brew update-python-resources\`
-
-          Opened by the release workflow in \`${GITHUB_REPOSITORY}\`."
+          create_pr
