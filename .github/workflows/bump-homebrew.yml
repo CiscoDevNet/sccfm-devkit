@@ -53,7 +53,6 @@ jobs:
           else
             VERSION="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/json" | jq -r '.info.version')"
           fi
-          # Accept only a sane semver-ish string; reject anything unexpected.
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([._-][A-Za-z0-9]+)*$ ]]; then
             echo "::error::Refusing to proceed with suspicious version '${VERSION}'"; exit 1
           fi
@@ -67,7 +66,6 @@ jobs:
         run: |
           set -euo pipefail
           URL=""; SHA=""
-          # PyPI may lag behind the GitHub release; retry for up to ~5 minutes.
           for i in $(seq 1 30); do
             DATA="$(curl -fsSL "https://pypi.org/pypi/${PYPI_NAME}/${VERSION}/json" || true)"
             if [ -n "$DATA" ]; then
@@ -92,15 +90,15 @@ jobs:
 
       - name: Generate a token scoped to the tap
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
-          app-id: ${{ secrets.TAP_BOT_APP_ID }}
+          client-id: ${{ secrets.TAP_BOT_APP_ID }}
           private-key: ${{ secrets.TAP_BOT_APP_KEY }}
           owner: CiscoDevNet
           repositories: homebrew-tap
 
       - name: Check out the tap
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ${{ env.TAP_REPO }}
           token: ${{ steps.app-token.outputs.token }}
@@ -108,7 +106,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607  # master @ 2026-09-01
+        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607
 
       - name: Register the checked-out tap
         run: |
@@ -123,13 +121,52 @@ jobs:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
           SDIST_URL: ${{ steps.sdist.outputs.url }}
           SDIST_SHA: ${{ steps.sdist.outputs.sha256 }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
 
-          brew bump-formula-pr \
-            --write-only --no-audit --no-browse \
-            --url="${SDIST_URL}" \
-            --sha256="${SDIST_SHA}" \
+          FORMULA_FILE="tap/Formula/${FORMULA##*/}.rb"
+          FORMULA_FILE="${FORMULA_FILE}" \
+            SDIST_URL="${SDIST_URL}" \
+            SDIST_SHA="${SDIST_SHA}" \
+            VERSION="${VERSION}" \
+            python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          from urllib.parse import unquote, urlparse
+
+          formula_file = Path(os.environ["FORMULA_FILE"])
+          url = os.environ["SDIST_URL"]
+          sha256 = os.environ["SDIST_SHA"]
+          version = os.environ["VERSION"]
+          expected_filename = f"cisco_sccfm_devkit-{version}.tar.gz"
+          parsed_url = urlparse(url)
+          if parsed_url.scheme != "https" or parsed_url.netloc != "files.pythonhosted.org":
+              raise SystemExit("PyPI sdist URL is not hosted by files.pythonhosted.org")
+          if Path(unquote(parsed_url.path)).name != expected_filename:
+              raise SystemExit("PyPI sdist URL does not match the release version")
+          if re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
+              raise SystemExit("PyPI sdist SHA-256 is invalid")
+
+          text = formula_file.read_text(encoding="utf-8")
+          url_match = re.search(r'(?m)^  url "([^"]+)"$', text)
+          sha_match = re.search(r'(?m)^  sha256 "([^"]+)"$', text)
+          if url_match is None or sha_match is None:
+              raise SystemExit("formula stable URL or SHA-256 is missing")
+          if not url_match.group(1).startswith("https://files.pythonhosted.org/"):
+              raise SystemExit("formula stable URL is not hosted by files.pythonhosted.org")
+
+          updated = text[:url_match.start(1)] + url + text[url_match.end(1):]
+          sha_offset = sha_match.start(1) + (len(updated) - len(text))
+          sha_end = sha_match.end(1) + (len(updated) - len(text))
+          updated = updated[:sha_offset] + sha256 + updated[sha_end:]
+          formula_file.write_text(updated, encoding="utf-8")
+          PY
+
+          brew update-python-resources \
+            --ignore-main-package-cooldown \
+            --version="${VERSION}" \
             "${FORMULA}"
 
 
@@ -152,7 +189,8 @@ jobs:
           BRANCH="bump-sccfm-cli-${VERSION}"
 
           create_pr() {
-            gh pr create \
+            local pr_url
+            pr_url="$(gh pr create \
               --repo "${TAP_REPO}" \
               --base main \
               --head "$BRANCH" \
@@ -162,7 +200,9 @@ jobs:
             - url + sha256 updated from PyPI (\`${PYPI_NAME}\` ${VERSION})
             - resource blocks regenerated with \`brew update-python-resources\`
 
-            Opened by the release workflow in \`${GITHUB_REPOSITORY}\`."
+            Opened by the release workflow in \`${GITHUB_REPOSITORY}\`.")"
+            echo "Opened ${pr_url}"
+            gh pr merge --auto --squash --delete-branch "${pr_url}"
           }
 
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
@@ -174,6 +214,7 @@ jobs:
               --jq '.[0].url // empty')"
             if [ -n "${EXISTING_PR}" ]; then
               echo "Branch ${BRANCH} already has an open PR: ${EXISTING_PR}"
+              gh pr merge --auto --squash --delete-branch "${EXISTING_PR}"
               exit 0
             fi
             echo "Branch ${BRANCH} exists without an open PR; creating one."
