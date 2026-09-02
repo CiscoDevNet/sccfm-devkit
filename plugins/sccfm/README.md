@@ -36,15 +36,16 @@ repair requests. It finishes with the exact profile configuration command so
 the API token is entered through the CLI's masked local prompt. Tokens are never
 requested in chat.
 
-The setup skill uses one canonical managed path. It keeps `sccfm-cli`,
-`ansible-core`, and `cisco_sccfm_core` in the same pipx environment, then
-installs the identical `cisco.sccfm` collection version from Ansible Galaxy. The
-helper uses the standard per-user Galaxy path and records the exact collection
-directory it owns; it refuses to overwrite an existing unowned copy.
+Without an existing Homebrew CLI, setup keeps `sccfm-cli`, `ansible-core`, and
+`cisco_sccfm_core` in one pipx environment. With the canonical Homebrew CLI, it
+preserves that installation and creates a private matching Ansible companion at
+`~/.sccfm-agent-plugin/ansible-runtime`. The companion is not added to `PATH`,
+so it cannot shadow or duplicate the user-facing Homebrew CLI.
 
-Homebrew remains available through the `sccfm-cli` skill as an explicitly
-requested CLI-only installation. The setup helper detects that formula and
-refuses a duplicate pipx installation, but it does not install Homebrew packages.
+Both paths install the identical `cisco.sccfm` collection version from Ansible
+Galaxy at the standard per-user path. The helper records every directory it
+owns and refuses to overwrite an existing unowned copy. Homebrew installation
+itself remains an explicitly requested `sccfm-cli` skill operation.
 
 ## Uninstall and teardown
 

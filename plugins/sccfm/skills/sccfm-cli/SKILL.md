@@ -147,7 +147,10 @@ whose canonical managed path uses pipx and a version-matched Galaxy collection.
    user requested a version, continue only when the formula provides that exact
    stable version.
 4. Explain that Homebrew installs the CLI and Python library only. It does not
-   install or version-align the `cisco.sccfm` Ansible collection.
+   install the `cisco.sccfm` Ansible collection by itself. If the user wants
+   Ansible too, route the follow-up to `sccfm-setup`; it keeps the Homebrew CLI
+   and adds a private version-matched Ansible companion without exposing a
+   second CLI.
 5. Install only after the tap, trust, and requested-version checks succeed.
 6. After installation, verify the canonical full formula name and version with
    Homebrew, resolve `sccfm-cli` on `PATH`, and export its schema. Stop if another

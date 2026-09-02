@@ -64,29 +64,31 @@ an exact `sccfm-cli --profile ... configure --region ...` command using the
 resolved profile and region; it never leaves profile or region placeholders for
 the user to fill in.
 
-The setup skill has one canonical installation path: a complete managed runtime
-that uses `pipx` for the Python package, injects `ansible-core` into the same
-isolated environment, and installs the identical `cisco.sccfm` Galaxy collection
-version. Keeping Ansible and
-`cisco_sccfm_core` in the same Python environment prevents module import
-failures. The collection is installed at the standard per-user Galaxy path and
-the helper stores an ownership record for that exact directory. It refuses to
-overwrite a pre-existing collection that it cannot prove it owns.
+The setup skill supports two version-aligned layouts. Without the canonical
+Homebrew CLI, it uses `pipx` for the Python package and injects `ansible-core`
+into that same isolated environment. With the Homebrew CLI, setup keeps it and
+creates a private Ansible companion at
+`~/.sccfm-agent-plugin/ansible-runtime`. The companion contains `ansible-core`
+and the exact matching `cisco-sccfm-devkit` library, but is not activated or
+added to `PATH`, so the Homebrew CLI remains authoritative.
 
-Homebrew remains an optional CLI-only distribution path documented by the
-`sccfm-cli` skill. The setup helper detects that formula for diagnostics and
-refuses to layer the managed pipx runtime over it, but `sccfm-setup` never
-installs through Homebrew.
+Both layouts install the identical `cisco.sccfm` Galaxy collection version at
+the standard per-user path. Keeping each Ansible controller with
+`cisco_sccfm_core` prevents module import failures. The helper stores an
+ownership record for the collection and any Homebrew companion, and refuses to
+overwrite paths it cannot prove it owns. Homebrew installation itself remains
+an optional CLI-only operation documented by the `sccfm-cli` skill.
 
 ### Runtime uninstall and cleanup
 
 The uninstall skill can discover the canonical `ciscodevnet/tap/sccfm-cli`
-Homebrew formula, the managed pipx environment, non-editable Python installs,
-and the standard per-user Galaxy collection. It preserves editable development
-installs and collection copies outside the standard path unless the user
-explicitly expands the reviewed plan. Each plan includes a digest; execution
-recomputes discovery and aborts when the targets have changed. Profile deletion
-is optional and the helper never reads profile contents.
+Homebrew formula, its helper-owned Ansible companion, the managed pipx
+environment, non-editable Python installs, and the standard per-user Galaxy
+collection. It preserves editable development installs and collection copies
+outside the standard path unless the user explicitly expands the reviewed
+plan. Each plan includes a digest; execution recomputes discovery and aborts
+when the targets have changed. Profile deletion is optional and the helper
+never reads profile contents.
 
 ### Authentication guidance
 

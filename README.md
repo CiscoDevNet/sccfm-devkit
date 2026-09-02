@@ -228,8 +228,10 @@ brew install CiscoDevNet/tap/sccfm-cli
 Omit `brew trust` on Homebrew releases earlier than 6.0. Formula-specific trust
 avoids trusting every current and future item in the third-party tap.
 
-It does not install the `cisco.sccfm` Ansible collection. Use the managed pipx
-setup when both surfaces are required and must remain version-aligned.
+Homebrew does not install the `cisco.sccfm` Ansible collection by itself. The
+agent plugin's setup skill can preserve the Homebrew CLI and add a private,
+version-matched Ansible companion without exposing another `sccfm-cli` on
+`PATH`.
 
 Installing into a virtual environment with `pip` is also supported:
 

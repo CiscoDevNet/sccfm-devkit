@@ -2,6 +2,15 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.41.0:
+    changes:
+      minor_changes:
+        - Improved the SCCFM agent plugin with faster version-aligned setup,
+          optional Homebrew CLI installation, a managed Ansible companion for
+          Homebrew installs, safer exact-command approvals, and digest-bound
+          runtime cleanup.
+    fragments: []
+    release_date: '2026-09-02'
   0.40.2:
     changes:
       bugfixes:

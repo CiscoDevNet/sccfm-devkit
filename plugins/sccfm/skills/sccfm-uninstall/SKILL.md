@@ -1,6 +1,6 @@
 ---
 name: sccfm-uninstall
-description: Safely discover and remove local SCC Firewall Manager runtime artifacts, including Homebrew, pipx, or legacy Python sccfm-cli installs, the standard cisco.sccfm Ansible collection, and optional named profiles. Use for uninstall, teardown, or complete SCCFM cleanup. Do not use for installation, repair, CLI operations, or Ansible automation.
+description: Safely discover and remove local SCC Firewall Manager runtime artifacts, including Homebrew, pipx, or legacy Python sccfm-cli installs, the managed Ansible companion, the standard cisco.sccfm collection, and optional named profiles. Use for uninstall, teardown, or complete SCCFM cleanup. Do not use for installation, repair, CLI operations, or Ansible automation.
 allowed-tools: "Bash(python3 *) Read"
 ---
 
@@ -22,12 +22,13 @@ profiles and their stored API tokens. The helper reports profile metadata but
 never reads or displays profile contents.
 
 The plan discovers the canonical `ciscodevnet/tap/sccfm-cli` Homebrew formula,
-the managed pipx environment, non-editable Python installs, and the positively
-identified standard Galaxy collection. It reports each installation method and
-version independently so multiple installs can be reviewed and removed
-together. Never infer Homebrew ownership from an executable path or remove a
-same-named formula from another tap. The reviewed Homebrew command disables
-automatic dependency removal so it mutates only the SCCFM formula.
+the managed pipx environment, the helper-owned Homebrew Ansible companion,
+non-editable Python installs, and the positively identified standard Galaxy
+collection. It reports each installation method and version independently so
+multiple installs can be reviewed and removed together. Never infer Homebrew
+ownership from an executable path or remove a same-named formula from another
+tap. The reviewed Homebrew command disables automatic dependency removal so it
+mutates only the SCCFM formula.
 
 The helper preserves collections outside the standard per-user path. It also
 preserves editable Python installs by default; if any are reported, explain
@@ -70,9 +71,10 @@ Include `--remove-profiles` and `--include-editable` exactly when they appeared
 in the reviewed plan. The helper recomputes discovery and refuses to proceed if
 the target set changed after review.
 
-The helper removes the standard Galaxy collection first, then reviewed pipx,
-Homebrew, and discovered Python packages, and finally the profile when
-requested. Never bypass a helper refusal with direct filesystem deletion.
+The helper removes the standard Galaxy collection and its owned Ansible
+companion first, then reviewed pipx, Homebrew, and discovered Python packages,
+and finally the profile when requested. Never bypass a helper refusal with
+direct filesystem deletion.
 
 ## 4. Verify and remove the plugin separately
 

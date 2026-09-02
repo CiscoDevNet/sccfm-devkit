@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.41.0
+========
+
+Minor Changes
+-------------
+
+- Improved the SCCFM agent plugin with faster version-aligned setup, optional Homebrew CLI installation, a managed Ansible companion for Homebrew installs, safer exact-command approvals, and digest-bound runtime cleanup.
+
 v0.40.2
 ========
 

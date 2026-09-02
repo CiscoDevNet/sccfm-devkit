@@ -67,8 +67,10 @@ there. Formula-specific trust avoids trusting every current and future item in
 the third-party tap.
 
 The Homebrew formula installs the CLI and Python library, but not the
-`cisco.sccfm` Ansible collection. Use the pipx-based managed setup when the CLI
-and collection must share a version-aligned runtime.
+`cisco.sccfm` Ansible collection by itself. The agent plugin's setup skill can
+keep this CLI and add a private, version-matched Ansible companion under
+`~/.sccfm-agent-plugin/ansible-runtime`; that directory is not added to `PATH`,
+so the Homebrew CLI remains authoritative.
 
 ### Install with pip
 

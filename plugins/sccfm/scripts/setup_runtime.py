@@ -31,9 +31,12 @@ HOMEBREW_UNINSTALL_ENVIRONMENT = {"HOMEBREW_NO_AUTOREMOVE": "1"}
 ANSIBLE_CORE_SPEC = "ansible-core>=2.20,<2.22"
 VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 PACKAGE_NORMALIZATION_PATTERN = re.compile(r"[-_.]+")
-INSTALL_STATE_SCHEMA_VERSION = 1
-CLEANUP_PLAN_SCHEMA_VERSION = 3
+INSTALL_STATE_SCHEMA_VERSION = 2
+LEGACY_INSTALL_STATE_SCHEMA_VERSION = 1
+CLEANUP_PLAN_SCHEMA_VERSION = 4
 CLEANUP_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+PIPX_RUNTIME_KIND = "pipx"
+HOMEBREW_ANSIBLE_RUNTIME_KIND = "homebrew-ansible"
 PYTHON_INSTALLATION_SCRIPT = """
 import importlib.metadata
 import json
@@ -123,8 +126,16 @@ def expected_collection_path() -> Path:
     )
 
 
+def agent_runtime_root_path() -> Path:
+    return Path.home() / ".sccfm-agent-plugin"
+
+
+def expected_ansible_runtime_path() -> Path:
+    return agent_runtime_root_path() / "ansible-runtime"
+
+
 def install_state_path() -> Path:
-    return Path.home() / ".sccfm-agent-plugin" / "runtime.json"
+    return agent_runtime_root_path() / "runtime.json"
 
 
 def load_install_state() -> dict[str, Any] | None:
@@ -137,10 +148,10 @@ def load_install_state() -> dict[str, Any] | None:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as error:
         raise RuntimeError(f"runtime ownership state is invalid: {state_path}: {error}") from error
-    if (
-        not isinstance(payload, dict)
-        or payload.get("schema_version") != INSTALL_STATE_SCHEMA_VERSION
-    ):
+    if not isinstance(payload, dict) or payload.get("schema_version") not in {
+        LEGACY_INSTALL_STATE_SCHEMA_VERSION,
+        INSTALL_STATE_SCHEMA_VERSION,
+    }:
         raise RuntimeError(f"runtime ownership state has an unsupported format: {state_path}")
     collection_path = payload.get("collection_path")
     version = payload.get("version")
@@ -153,28 +164,57 @@ def load_install_state() -> dict[str, Any] | None:
         )
     if not VERSION_PATTERN.fullmatch(version):
         raise RuntimeError(f"runtime ownership state contains an invalid version: {version}")
+    runtime_kind = payload.get("runtime_kind", PIPX_RUNTIME_KIND)
+    if runtime_kind not in {PIPX_RUNTIME_KIND, HOMEBREW_ANSIBLE_RUNTIME_KIND}:
+        raise RuntimeError(f"runtime ownership state has an invalid runtime kind: {runtime_kind}")
+    payload["runtime_kind"] = runtime_kind
+    if runtime_kind == HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        runtime_path = payload.get("ansible_runtime_path")
+        if not isinstance(runtime_path, str):
+            raise RuntimeError(f"runtime ownership state has no Ansible runtime path: {state_path}")
+        recorded_runtime = Path(runtime_path).expanduser()
+        if (
+            not recorded_runtime.is_absolute()
+            or recorded_runtime != expected_ansible_runtime_path()
+        ):
+            raise RuntimeError(
+                "runtime ownership state points outside the managed Ansible runtime: "
+                f"{recorded_runtime}"
+            )
     return payload
 
 
-def write_install_state(collection_path: Path, version: str) -> None:
+def write_install_state(
+    collection_path: Path,
+    version: str,
+    *,
+    runtime_kind: str = PIPX_RUNTIME_KIND,
+) -> None:
     if collection_path != expected_collection_path():
         raise RuntimeError(f"refusing to own an unexpected collection path: {collection_path}")
+    if runtime_kind not in {PIPX_RUNTIME_KIND, HOMEBREW_ANSIBLE_RUNTIME_KIND}:
+        raise ValueError(f"unsupported runtime kind: {runtime_kind}")
+    if not VERSION_PATTERN.fullmatch(version):
+        raise ValueError("version must be a stable X.Y.Z release")
     state_path = install_state_path()
+    if state_path.parent.is_symlink() or (
+        state_path.parent.exists() and not state_path.parent.is_dir()
+    ):
+        raise RuntimeError(f"runtime ownership directory is unsafe: {state_path.parent}")
     state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if os.name != "nt":
         state_path.parent.chmod(0o700)
     temporary_path = state_path.with_suffix(".tmp")
+    payload = {
+        "schema_version": INSTALL_STATE_SCHEMA_VERSION,
+        "collection_path": str(collection_path),
+        "runtime_kind": runtime_kind,
+        "version": version,
+    }
+    if runtime_kind == HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        payload["ansible_runtime_path"] = str(expected_ansible_runtime_path())
     temporary_path.write_text(
-        json.dumps(
-            {
-                "schema_version": INSTALL_STATE_SCHEMA_VERSION,
-                "collection_path": str(collection_path),
-                "version": version,
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     if os.name != "nt":
@@ -192,6 +232,21 @@ def remove_install_state() -> None:
         state_path.parent.rmdir()
     except OSError:
         pass
+
+
+def ansible_runtime_executable(name: str, runtime_path: Path | None = None) -> Path:
+    runtime = runtime_path or expected_ansible_runtime_path()
+    directory = "Scripts" if os.name == "nt" else "bin"
+    suffix = ".exe" if os.name == "nt" else ""
+    return runtime / directory / f"{name}{suffix}"
+
+
+def ansible_command_path(name: str) -> str | None:
+    install_state = load_install_state()
+    if install_state is not None and install_state["runtime_kind"] == HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        executable = ansible_runtime_executable(name)
+        return str(executable) if executable.is_file() else None
+    return command_path(name)
 
 
 def schema_metadata() -> dict[str, Any]:
@@ -213,11 +268,12 @@ def schema_metadata() -> dict[str, Any]:
 
 
 def collection_listing(environment: dict[str, str]) -> dict[str, Any]:
-    if command_path("ansible-galaxy") is None:
-        raise RuntimeError("ansible-galaxy is not on PATH")
+    ansible_galaxy = ansible_command_path("ansible-galaxy")
+    if ansible_galaxy is None:
+        raise RuntimeError("the selected ansible-galaxy executable is unavailable")
 
     result = run_capture(
-        ["ansible-galaxy", "collection", "list", COLLECTION_NAME, "--format", "json"],
+        [ansible_galaxy, "collection", "list", COLLECTION_NAME, "--format", "json"],
         environment=environment,
         limit=0,
     )
@@ -327,10 +383,10 @@ def doctor_report() -> dict[str, Any]:
         for name, path in python_candidates.items()
         if path is not None
     }
-    commands = {
-        name: command_path(name)
-        for name in ("brew", "pipx", "sccfm-cli", "ansible-doc", "ansible-galaxy")
-    }
+    commands = {name: command_path(name) for name in ("brew", "pipx", "sccfm-cli")}
+    commands.update(
+        {name: ansible_command_path(name) for name in ("ansible-doc", "ansible-galaxy")}
+    )
     schema = schema_metadata()
     report: dict[str, Any] = {
         "python_candidates": python_candidates,
@@ -356,7 +412,7 @@ def doctor_report() -> dict[str, Any]:
         report["collection"] = collection_metadata(ansible_environment)
         if commands["ansible-doc"]:
             report["ansible_discovery"] = run_capture(
-                ["ansible-doc", "-j", "-l", "-t", "module", COLLECTION_NAME],
+                [commands["ansible-doc"], "-j", "-l", "-t", "module", COLLECTION_NAME],
                 environment=ansible_environment,
             )
     cli_version = report["cli_version"]
@@ -407,50 +463,118 @@ def install_commands(
     ]
 
 
+def homebrew_ansible_install_commands(
+    version: str,
+    python_command: str,
+    collection_base: Path | None = None,
+) -> list[list[str]]:
+    if not VERSION_PATTERN.fullmatch(version):
+        raise ValueError("version must be a stable X.Y.Z release")
+    runtime_path = expected_ansible_runtime_path()
+    runtime_python = ansible_runtime_executable("python", runtime_path)
+    runtime_galaxy = ansible_runtime_executable("ansible-galaxy", runtime_path)
+    return [
+        [python_command, "-m", "venv", str(runtime_path)],
+        [
+            str(runtime_python),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--upgrade",
+            ANSIBLE_CORE_SPEC,
+            f"{PACKAGE_NAME}=={version}",
+        ],
+        [
+            str(runtime_galaxy),
+            "collection",
+            "install",
+            f"{COLLECTION_NAME}:=={version}",
+            "--force",
+            "--collections-path",
+            str(collection_base or collection_install_base_path()),
+        ],
+    ]
+
+
+def require_homebrew_version(installation: dict[str, Any], version: str) -> None:
+    versions = installation.get("versions", [])
+    if version not in versions:
+        installed_versions = ", ".join(str(value) for value in versions) or "unknown"
+        raise SystemExit(
+            f"Homebrew manages {HOMEBREW_FORMULA} {installed_versions}, not {version}; "
+            "use the installed CLI version for the matching Ansible runtime"
+        )
+
+
+def validate_managed_directory(path: Path, label: str, *, owned: bool) -> None:
+    if not path.exists() and not path.is_symlink():
+        return
+    if path.is_symlink() or not path.is_dir():
+        raise SystemExit(f"Managed {label} target is unsafe: {path}")
+    if not owned:
+        raise SystemExit(f"Refusing to overwrite an existing unowned {label}: {path}")
+
+
+def validate_install_targets(runtime_kind: str) -> None:
+    runtime_root = agent_runtime_root_path()
+    if runtime_root.is_symlink() or (runtime_root.exists() and not runtime_root.is_dir()):
+        raise SystemExit(f"Managed runtime root is unsafe: {runtime_root}")
+    install_state = load_install_state()
+    owned = install_state is not None
+    if install_state is not None and install_state["runtime_kind"] != runtime_kind:
+        raise SystemExit(
+            "The existing runtime ownership record uses "
+            f"{install_state['runtime_kind']}; clean it up before installing {runtime_kind}"
+        )
+    validate_managed_directory(expected_collection_path(), "collection", owned=owned)
+    if runtime_kind == HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        validate_managed_directory(
+            expected_ansible_runtime_path(),
+            "Ansible runtime",
+            owned=owned,
+        )
+
+
 def print_plan(version: str, python_command: str) -> None:
     homebrew_installation = homebrew_formula_installation()
     if homebrew_installation is not None:
-        installed_versions = ", ".join(homebrew_installation["versions"])
-        raise SystemExit(
-            f"Homebrew already manages {HOMEBREW_FORMULA} {installed_versions}; "
-            "refusing to plan a duplicate pipx installation"
-        )
-    for command in install_commands(version, python_command):
+        require_homebrew_version(homebrew_installation, version)
+        validate_install_targets(HOMEBREW_ANSIBLE_RUNTIME_KIND)
+        commands = homebrew_ansible_install_commands(version, python_command)
+    else:
+        validate_install_targets(PIPX_RUNTIME_KIND)
+        commands = install_commands(version, python_command)
+    for command in commands:
         print(shlex.join(command))
 
 
 def install(version: str, python_command: str, confirmed: bool) -> None:
     if not confirmed:
         raise SystemExit("Refusing to install without --yes after user confirmation")
-    if command_path("pipx") is None:
-        raise SystemExit("pipx is required; install pipx before continuing")
     if command_path(python_command) is None:
         raise SystemExit(f"Python runtime is not on PATH: {python_command}")
     homebrew_installation = homebrew_formula_installation()
     if homebrew_installation is not None:
-        installed_versions = ", ".join(homebrew_installation["versions"])
-        raise SystemExit(
-            f"Homebrew already manages {HOMEBREW_FORMULA} {installed_versions}; "
-            "remove it through a reviewed cleanup before installing with pipx"
+        require_homebrew_version(homebrew_installation, version)
+        validate_install_targets(HOMEBREW_ANSIBLE_RUNTIME_KIND)
+        commands = homebrew_ansible_install_commands(version, python_command)
+        write_install_state(
+            expected_collection_path(),
+            version,
+            runtime_kind=HOMEBREW_ANSIBLE_RUNTIME_KIND,
         )
-    target_path = expected_collection_path()
-    install_state = load_install_state()
-    if target_path.exists() or target_path.is_symlink():
-        if target_path.is_symlink() or not target_path.is_dir():
-            raise SystemExit(f"Managed collection target is unsafe: {target_path}")
-        if install_state is None:
-            raise SystemExit(
-                "Refusing to overwrite an existing collection that is not owned by this helper: "
-                f"{target_path}"
-            )
-    elif install_state is not None:
-        raise SystemExit(
-            "Runtime ownership state exists but its collection is missing; "
-            f"remove or repair {install_state_path()} before reinstalling"
-        )
-    for command in install_commands(version, python_command):
+        runtime_kind = HOMEBREW_ANSIBLE_RUNTIME_KIND
+    else:
+        if command_path("pipx") is None:
+            raise SystemExit("pipx is required; install pipx before continuing")
+        validate_install_targets(PIPX_RUNTIME_KIND)
+        commands = install_commands(version, python_command)
+        runtime_kind = PIPX_RUNTIME_KIND
+    for command in commands:
         print(f"Running: {shlex.join(command)}")
         subprocess.run(command, check=True)
+    target_path = expected_collection_path()
     installed_path = validated_collection_path(
         str(collection_install_base_path() / "ansible_collections")
     )
@@ -458,7 +582,12 @@ def install(version: str, python_command: str, confirmed: bool) -> None:
         raise RuntimeError(
             f"collection was installed outside the expected managed path: {installed_path}"
         )
-    write_install_state(installed_path, version)
+    if runtime_kind == HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        ansible_doc = ansible_runtime_executable("ansible-doc")
+        if not ansible_doc.is_file():
+            raise RuntimeError(f"managed Ansible runtime is incomplete: {ansible_doc}")
+    else:
+        write_install_state(installed_path, version, runtime_kind=runtime_kind)
 
 
 def discover_collection_paths() -> list[Path]:
@@ -699,7 +828,7 @@ def collection_identity_matches(collection_path: Path) -> bool:
 
 
 def discover_cleanup_collection_paths() -> list[Path]:
-    if command_path("ansible-galaxy") is not None:
+    if ansible_command_path("ansible-galaxy") is not None:
         return discover_collection_paths()
     collection_path = expected_collection_path()
     if not collection_path.exists() and not collection_path.is_symlink():
@@ -733,6 +862,20 @@ def partition_cleanup_collection_paths(
         else:
             preserved.append(path)
     return removable, preserved
+
+
+def managed_ansible_runtime_metadata() -> dict[str, Any]:
+    install_state = load_install_state()
+    runtime_path = expected_ansible_runtime_path()
+    if install_state is None or install_state["runtime_kind"] != HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        return {"action": "preserve", "path": str(runtime_path), "exists": runtime_path.exists()}
+    if runtime_path.is_symlink() or (runtime_path.exists() and not runtime_path.is_dir()):
+        raise RuntimeError(f"managed Ansible runtime is unsafe: {runtime_path}")
+    return {
+        "action": "delete" if runtime_path.exists() else "absent",
+        "path": str(runtime_path),
+        "exists": runtime_path.exists(),
+    }
 
 
 def cleanup_plan_digest(plan: dict[str, Any]) -> str:
@@ -790,6 +933,7 @@ def cleanup_plan(remove_profiles: bool, include_editable: bool) -> dict[str, Any
             "path": str(install_state_path()),
             "exists": install_state_path().exists(),
         },
+        "ansible_runtime": managed_ansible_runtime_metadata(),
         "homebrew_installation": homebrew_installation,
         "pipx_command": pipx_command,
         "python_installations": removable_python,
@@ -815,6 +959,11 @@ def print_cleanup_plan(remove_profiles: bool, include_editable: bool, as_json: b
         print(f"Preserve Ansible collection outside the standard managed path: {path}")
     if plan["pipx_command"]:
         print(f"Run: {shlex.join(plan['pipx_command'])}")
+    ansible_runtime = plan["ansible_runtime"]
+    if ansible_runtime["action"] == "delete":
+        print(f"Remove managed Ansible runtime: {ansible_runtime['path']}")
+    elif ansible_runtime["exists"]:
+        print(f"Preserve unowned Ansible runtime: {ansible_runtime['path']}")
     homebrew_installation = plan["homebrew_installation"]
     if homebrew_installation:
         versions = ", ".join(homebrew_installation["versions"])
@@ -871,6 +1020,13 @@ def cleanup(
         validate_collection_before_removal(path)
         print(f"Removing Ansible collection: {path}")
         shutil.rmtree(path)
+    ansible_runtime = plan["ansible_runtime"]
+    if ansible_runtime["action"] == "delete":
+        runtime_path = Path(str(ansible_runtime["path"]))
+        if runtime_path != expected_ansible_runtime_path() or runtime_path.is_symlink():
+            raise RuntimeError(f"managed Ansible runtime changed after planning: {runtime_path}")
+        print(f"Removing managed Ansible runtime: {runtime_path}")
+        shutil.rmtree(runtime_path)
     if plan["install_state"]["action"] == "delete":
         remove_install_state()
     pipx_command = plan["pipx_command"]

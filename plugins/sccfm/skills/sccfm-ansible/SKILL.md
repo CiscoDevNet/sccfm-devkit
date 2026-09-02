@@ -1,7 +1,7 @@
 ---
 name: sccfm-ansible
 description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules, inventory plugins, and lookup plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use for cisco.sccfm Ansible modules, inventory, lookups, vault, and playbook workflows. Do NOT use for sccfm-cli commands; use the sccfm-cli skill instead. Do not use for Jira/Confluence work, architecture design, or non-Ansible tasks.
-allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(poetry version --short) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
+allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(poetry version --short) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(~/.sccfm-agent-plugin/ansible-runtime/bin/ansible-* *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
 ---
 
 # SCC Firewall Manager Ansible Collection
@@ -129,10 +129,17 @@ before execution.
 ### Step A: Resolve Ansible and the Collection
 
 Follow these checks in order:
-1. Infer the one plugin type needed by the request: `module`, `inventory`, or
+1. On Unix, first check whether
+   `~/.sccfm-agent-plugin/ansible-runtime/bin/ansible-doc` exists. If it does,
+   it is the setup helper's companion for a Homebrew CLI. Use that absolute
+   `ansible-doc` path and the companion `ansible-playbook`, `ansible-inventory`,
+   `ansible-vault`, and `ansible-galaxy` paths for the entire request. Do not
+   activate the virtual environment or add it to `PATH`; this keeps the
+   Homebrew `sccfm-cli` authoritative. Otherwise use the ordinary command names.
+2. Infer the one plugin type needed by the request: `module`, `inventory`, or
    `lookup`. A playbook that calls SCCFM API operations needs module discovery
    only. Do not enumerate unrelated plugin types.
-2. Start with the matching collection-list command. Its success proves both
+3. Start with the matching collection-list command. Its success proves both
    that `ansible-doc` is available and that the requested collection type is
    discoverable:
 
@@ -143,16 +150,16 @@ Follow these checks in order:
    ansible-doc -j -l -t lookup cisco.sccfm
    ```
 
-3. On a sandboxed Unix host that cannot write `~/.ansible/tmp`, prefix Ansible
+4. On a sandboxed Unix host that cannot write `~/.ansible/tmp`, prefix Ansible
    discovery and validation commands with `ANSIBLE_LOCAL_TEMP=/tmp` from the
    first call. `/tmp` already exists and Ansible creates and removes its own
    private child directory, so do not create an `ansible.cfg` or probe the
    unwritable default first.
-4. If `ansible-doc` is missing and you are inside this repository,
+5. If `ansible-doc` is missing and you are inside this repository,
    `cisco_sccfm_scripts/activate.sh` exists, run
    `source cisco_sccfm_scripts/activate.sh` once for the shell session, then
    retry the selected discovery command. Do not use `poetry run`.
-5. If discovery reports that `cisco.sccfm` is missing and you are inside this
+6. If discovery reports that `cisco.sccfm` is missing and you are inside this
    repository, run both commands, then retry only the selected discovery:
 
    ```bash
@@ -161,13 +168,13 @@ Follow these checks in order:
      "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
    ```
 
-6. If discovery succeeds and you are inside this repository, compare the
+7. If discovery succeeds and you are inside this repository, compare the
    discovered FQCNs only with the source directory for the selected plugin type
    under `sccfm-ansible/plugins/`. Use this only to detect a stale installed
    collection. If source plugins are missing from `ansible-doc`, build and
    install the generated tarball as above, then rerun the selected discovery.
    Do not use source filenames as the runtime schema.
-7. If you are outside this repository, install or modify local Ansible state only
+8. If you are outside this repository, install or modify local Ansible state only
    when the user explicitly asks for setup. Otherwise, stop and explain that the
    `cisco.sccfm` collection is not installed.
 
