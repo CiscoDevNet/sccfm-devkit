@@ -1,3 +1,13 @@
+## v0.41.0 (2026-09-02)
+
+### Feat
+
+- **lh-115196**: improve SCCFM plugin setup and safety
+
+### Fix
+
+- **lh-115196**: complete ansible setup for homebrew installs
+
 ## v0.40.1 (2026-09-01)
 
 ### Fix

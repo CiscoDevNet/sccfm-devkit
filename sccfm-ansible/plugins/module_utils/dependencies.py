@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ansible.module_utils.basic import AnsibleModule
 
 _IMPORT_ERRORS: list[tuple[str, str]] = []
-_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit==0.40.1"
+_PAIRED_DEVKIT_REQUIREMENT = "cisco-sccfm-devkit==0.41.0"
 
 
 def record_import_error(error: ImportError) -> None:
