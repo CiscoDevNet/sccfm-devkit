@@ -7,12 +7,13 @@ title: SCC Firewall Manager Agent Plugin
 
 The `sccfm` plugin gives Claude Code and Codex a supported way to install,
 configure, inspect, and operate Cisco Security Cloud Control Firewall Manager
-from natural-language requests. It packages three focused skills rather than one
+from natural-language requests. It packages four focused skills rather than one
 large general-purpose instruction file:
 
 | Component | Responsibility |
 |---|---|
-| `sccfm-setup` | Diagnose prerequisites, plan a version-matched installation, guide authentication, verify the runtime, and safely remove managed setup artifacts. |
+| `sccfm-setup` | Diagnose prerequisites, plan a version-matched installation, guide authentication, and verify the runtime. |
+| `sccfm-uninstall` | Discover and safely remove managed or legacy runtime artifacts after a digest-bound plan and explicit confirmation. |
 | `sccfm-cli` | Discover the installed CLI schema and generate or execute validated CLI commands. |
 | `sccfm-ansible` | Discover the installed collection with `ansible-doc` and generate or execute validated Ansible automation. |
 | Cross-agent command guard | Require explicit authorization when a shell command is not proven read-only. |
@@ -43,8 +44,8 @@ The first release is intended to provide one installable package that:
 
 The setup skill can:
 
-- detect Python 3.12, `pipx`, `sccfm-cli`, `ansible-doc`, and
-  `ansible-galaxy`;
+- detect Python 3.12, Homebrew, `pipx`, `sccfm-cli`, `ansible-doc`, and
+  `ansible-galaxy`, including the canonical SCCFM Homebrew formula and version;
 - report whether an SCCFM profile exists without reading or displaying its
   contents;
 - export CLI schema metadata and discover the installed Ansible collection;
@@ -52,18 +53,40 @@ The setup skill can:
 - produce an exact installation plan without executing it;
 - install a selected stable version after the user types
   `INSTALL SCCFM X.Y.Z`; and
-- plan and remove the Galaxy collection and managed pipx environment after
-  explicit teardown confirmation; and
 - verify schema discovery, collection discovery, authentication readiness, and
   a harmless read-only operation.
 
-The managed installation uses `pipx` for the Python package, injects
-`ansible-core` into the same isolated environment, and installs the identical
-`cisco.sccfm` Galaxy collection version. Keeping Ansible and
+Explicit install and upgrade requests use a fast path: minimal prerequisite
+checks, one parallel PyPI/Galaxy version lookup, one reviewed helper install,
+and one local discovery verification. The full doctor is reserved for health
+checks, diagnosis, and repair. After installation, the setup response ends with
+an exact `sccfm-cli --profile ... configure --region ...` command using the
+resolved profile and region; it never leaves profile or region placeholders for
+the user to fill in.
+
+The setup skill has one canonical installation path: a complete managed runtime
+that uses `pipx` for the Python package, injects `ansible-core` into the same
+isolated environment, and installs the identical `cisco.sccfm` Galaxy collection
+version. Keeping Ansible and
 `cisco_sccfm_core` in the same Python environment prevents module import
 failures. The collection is installed at the standard per-user Galaxy path and
 the helper stores an ownership record for that exact directory. It refuses to
 overwrite a pre-existing collection that it cannot prove it owns.
+
+Homebrew remains an optional CLI-only distribution path documented by the
+`sccfm-cli` skill. The setup helper detects that formula for diagnostics and
+refuses to layer the managed pipx runtime over it, but `sccfm-setup` never
+installs through Homebrew.
+
+### Runtime uninstall and cleanup
+
+The uninstall skill can discover the canonical `ciscodevnet/tap/sccfm-cli`
+Homebrew formula, the managed pipx environment, non-editable Python installs,
+and the standard per-user Galaxy collection. It preserves editable development
+installs and collection copies outside the standard path unless the user
+explicitly expands the reviewed plan. Each plan includes a digest; execution
+recomputes discovery and aborts when the targets have changed. Profile deletion
+is optional and the helper never reads profile contents.
 
 ### Authentication guidance
 
@@ -150,18 +173,21 @@ the plan.
 
 Claude Code and Codex load the conventional shared `hooks/hooks.json` manifest,
 with a root `hooks.json` compatibility copy kept in sync. Both use the same
-host-aware guard. The agent places
-`SCCFM_APPROVAL_COMMAND: <exact shell command>` on a standalone line only after
-presenting a complete mutation plan. The `Stop` hook stores that planned
-command's SHA-256 digest, never its contents. A later standalone exact-command
+guard. After presenting a complete mutation plan, the agent shows exactly one
+standalone `EXECUTE <exact shell command>` confirmation line. The `Stop` hook
+derives the planned command from that visible line and stores its SHA-256 digest,
+never its contents. A later standalone exact-command
 confirmation creates a ten-minute, one-use execution receipt only when its
 digest matches the previously stored plan. Edited commands—including adding or
 removing `--check`—cannot authorize themselves. Mutating, locally-writing, and
-Ansible execution commands are blocked without a matching receipt. Claude
-requests interactive host approval after consuming the receipt; Codex continues
-through its native sandbox and permission flow. If the agent does not attempt the
-command in that turn, the `Stop` hook clears the unused receipt. Schema-proven
-read-only commands continue without a receipt. Compound, nested, unknown, and
+Ansible execution commands are blocked without a matching receipt. After the
+receipt is consumed, execution continues through the host's normal permission
+flow. If the agent does not attempt the command in that turn, the `Stop` hook
+clears the unused receipt. Schema-proven read-only commands and schema-declared
+preflight-only modes continue without a receipt. Local
+`ansible-playbook --syntax-check` validation also continues without a receipt,
+including when it uses only an absolute `ANSIBLE_LOCAL_TEMP` override for a
+sandbox-writable temporary directory. Compound, nested, unknown, and
 sensitive-argv commands cannot receive a receipt.
 
 ## End-user workflow
@@ -207,8 +233,8 @@ operations.
 ### 4. Make natural-language requests
 
 The user describes the desired outcome. The plugin automatically routes setup
-questions to `sccfm-setup`, CLI tasks to `sccfm-cli`, and playbook or collection
-tasks to `sccfm-ansible`.
+questions to `sccfm-setup`, teardown to `sccfm-uninstall`, CLI tasks to
+`sccfm-cli`, and playbook or collection tasks to `sccfm-ansible`.
 
 ### 5. Review changes before execution
 
@@ -220,48 +246,50 @@ approval.
 ### 6. Uninstall and teardown
 
 Plugin removal and runtime teardown are separate operations. `/plugin uninstall`
-or `codex plugin remove` removes the agent plugin but leaves its pipx environment,
-Galaxy collection, and profile store behind.
+or `codex plugin remove` removes the agent plugin but leaves Homebrew or pipx CLI
+installs, the Galaxy collection, and the profile store behind.
 
 While the plugin is still installed, ask:
 
 ```text
-Uninstall the SCCFM runtime installed by this plugin.
+Completely uninstall SCCFM from this machine.
 ```
 
-The setup skill resolves its plugin root and runs the plan-only helper:
+The uninstall skill resolves its plugin root and runs the plan-only helper:
 
 ```bash
-python3 scripts/setup_runtime.py uninstall-plan
+python3 scripts/setup_runtime.py cleanup-plan --json
 ```
 
-The plan validates the `cisco.sccfm` directories positively reported by
-`ansible-galaxy`, then selects for removal only the path matching the helper's
-ownership record at `~/.sccfm-agent-plugin/runtime.json`. It verifies that the
-CLI belongs to the managed pipx environment and preserves every unowned Galaxy
-copy plus `~/.sccfm-cli/config.json` by default. After the user sends the exact
-confirmation `UNINSTALL SCCFM`, the agent runs:
+The plan discovers the canonical SCCFM Homebrew formula, managed pipx and
+non-editable Python installs, validates the standard `cisco.sccfm` collection,
+and preserves other Galaxy copies plus editable development installs. It also
+returns a digest that binds execution to the reviewed targets. After the user
+sends `UNINSTALL SCCFM`, the agent runs:
 
 ```bash
-python3 scripts/setup_runtime.py uninstall --yes
+python3 scripts/setup_runtime.py cleanup --plan-digest <digest> --yes
 ```
 
-Removal order matters: the helper removes its recorded Galaxy collection while
-`ansible-galaxy` is still available, deletes the ownership record, then
-uninstalls `cisco-sccfm-devkit` with pipx. It refuses to guess an installation
-path, remove another reported collection copy, or remove an unmanaged CLI.
+Removal order matters: the helper removes the standard Galaxy collection while
+discovery tools are still available, deletes the ownership record, then removes
+reviewed pipx, Homebrew, and Python installs. It refuses to guess a path, remove
+a same-named formula from another tap, delete another reported collection copy,
+or execute when the plan digest has changed. Homebrew teardown sets
+`HOMEBREW_NO_AUTOREMOVE=1`, preventing automatic removal of dependencies that
+were not part of the reviewed plan.
 
 To also delete named profiles and their API tokens, the user must request that
 separately. The agent shows:
 
 ```bash
-python3 scripts/setup_runtime.py uninstall-plan --remove-profiles
+python3 scripts/setup_runtime.py cleanup-plan --remove-profiles --json
 ```
 
-and requires `UNINSTALL SCCFM AND DELETE PROFILES` before running:
+and requires `UNINSTALL SCCFM AND PROFILES` before running:
 
 ```bash
-python3 scripts/setup_runtime.py uninstall --remove-profiles --yes
+python3 scripts/setup_runtime.py cleanup --remove-profiles --plan-digest <digest> --yes
 ```
 
 The helper deletes only the canonical profile file and never reads or displays
@@ -360,9 +388,9 @@ Expected behavior:
 3. Run the schema-declared check or preflight mode.
 4. Present the profile, target, intended change, preflight result, and exact
    command.
-5. Emit `SCCFM_APPROVAL_COMMAND: ` followed by that exact command on a standalone
-   line, then ask for `EXECUTE ` followed by the same command.
-6. Execute only after that message and host approval.
+5. Show exactly one standalone `EXECUTE ` confirmation line followed by that
+   exact command.
+6. Execute only after the user sends that exact message.
 
 ### Generate an Ansible playbook
 
@@ -395,10 +423,9 @@ Expected behavior:
 2. Inspect the inventory and show the exact target count.
 3. Validate syntax and run check mode when supported.
 4. Present a plan and request the first confirmation.
-5. Emit `SCCFM_APPROVAL_COMMAND: ` followed by the exact `ansible-playbook`
-   command on a standalone line, then request a separate `EXECUTE ` message
-   containing the same command.
-6. Execute only after both confirmations and host approval.
+5. Show exactly one standalone `EXECUTE ` confirmation line followed by the
+   exact `ansible-playbook` command.
+6. Execute only after both confirmations.
 
 ## Deliberate boundaries
 
@@ -426,6 +453,6 @@ python3 plugins/sccfm/scripts/sync_skills.py
 python3 plugins/sccfm/scripts/sync_skills.py --check
 ```
 
-The plugin and all three skills must pass their validators. The setup helper,
+The plugin and all four skills must pass their validators. The runtime helper,
 command guard, manifest alignment, secret-safe diagnostics, and copied-skill
 integrity are covered by automated tests.

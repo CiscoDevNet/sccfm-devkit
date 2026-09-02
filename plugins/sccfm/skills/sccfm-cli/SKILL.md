@@ -120,18 +120,40 @@ Follow these checks in order:
 Store the invocation prefix for the rest of the session. Do not switch
 invocation modes mid-session unless the user explicitly asks.
 
-#### Installing via Homebrew
+#### Optional CLI-only Homebrew installation
 
-Only do this if the user explicitly asked for installation or setup.
+Use Homebrew only when the user explicitly asks for Homebrew or a CLI-only
+installation. Route complete CLI-plus-Ansible runtime setup to `sccfm-setup`,
+whose canonical managed path uses pipx and a version-matched Galaxy collection.
 
 1. Verify `brew` is in `PATH`. If not, stop and tell the user to install
    Homebrew.
-2. Use `brew search` or the project release docs to discover the exact
-   tap/formula.
-3. Install only the exact documented formula. Do not invent a Homebrew package
-   name.
-4. If no Homebrew formula is published for the release, say so and use the
-   documented wheel or `pipx` install path instead.
+2. Show the exact setup commands below and require the standalone confirmation
+   `INSTALL SCCFM CLI WITH HOMEBREW` before running any of them. `brew tap` and
+   `brew trust` change local Homebrew state, so do not infer confirmation from a
+   general setup request.
+
+   ```bash
+   brew tap CiscoDevNet/tap
+   brew trust --formula CiscoDevNet/tap/sccfm-cli  # required once on Homebrew 6.0+
+   brew install CiscoDevNet/tap/sccfm-cli
+   ```
+
+   On Homebrew earlier than 6.0, omit the unsupported `brew trust` command.
+   Trust only the SCCFM formula; do not trust the whole tap unless the user
+   explicitly asks to trust every current and future item it contains.
+3. After confirmation, tap and trust as applicable, then inspect the exact
+   `CiscoDevNet/tap/sccfm-cli` formula and show its available version. If the
+   user requested a version, continue only when the formula provides that exact
+   stable version.
+4. Explain that Homebrew installs the CLI and Python library only. It does not
+   install or version-align the `cisco.sccfm` Ansible collection.
+5. Install only after the tap, trust, and requested-version checks succeed.
+6. After installation, verify the canonical full formula name and version with
+   Homebrew, resolve `sccfm-cli` on `PATH`, and export its schema. Stop if another
+   installation shadows the Homebrew executable.
+7. If no Homebrew formula is published for the requested release, say so and
+   offer the managed `sccfm-setup` path instead.
 
 ### Step B: Verify Credentials
 
@@ -431,24 +453,19 @@ the reviewed plan, prefixed with `EXECUTE `. Use this format:
 EXECUTE <exact shell command>
 ```
 
-When requesting this confirmation, also emit exactly one machine-readable plan
-marker as a standalone line outside any code fence:
-
-```text
-SCCFM_APPROVAL_COMMAND: <exact shell command>
-```
-
-Replace the placeholder with the same command shown in the plan, without the
-`EXECUTE ` prefix. Emit this marker only when the plan is complete and ready for
-confirmation. Do not emit it in Generate-Only mode, for a preflight-only plan,
-or after the command has run. The plugin's Stop hook records only its digest so
-that a later user confirmation cannot authorize a different command.
+Show exactly one standalone `EXECUTE <exact shell command>` confirmation line
+outside any code fence when the plan is complete and ready for confirmation.
+Do not emit a separate machine-readable marker. The plugin's Stop hook derives
+the planned command from that visible line and records only its digest so that a
+later user confirmation cannot authorize a different command. Do not request
+confirmation in Generate-Only mode, for a schema-declared preflight-only plan,
+or after the command has run.
 
 The text after `EXECUTE ` must exactly match the command the agent will submit
 to the shell, including global options, command options, quoting, and targets.
 Require it as a standalone user message without a code fence or explanation.
 Never accept an edited, abbreviated, or compound command. The plugin command
-guard compares it with the previously recorded plan marker, creates a ten-minute
+guard compares it with the previously recorded plan command, creates a ten-minute
 receipt only for an exact match, and consumes that receipt after one matching
 execution attempt or clears it when the turn ends.
 

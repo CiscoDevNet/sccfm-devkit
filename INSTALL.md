@@ -53,6 +53,23 @@ isolated while exposing `sccfm-cli` and `sccfm-cli-interactive` on your `PATH`.
 pipx install cisco-sccfm-devkit
 ```
 
+For an explicitly requested CLI-only installation on macOS or Linux, Homebrew
+is also supported:
+
+```bash
+brew tap CiscoDevNet/tap
+brew trust --formula CiscoDevNet/tap/sccfm-cli  # required once on Homebrew 6.0+
+brew install CiscoDevNet/tap/sccfm-cli
+```
+
+Homebrew releases earlier than 6.0 do not provide `brew trust`; omit that line
+there. Formula-specific trust avoids trusting every current and future item in
+the third-party tap.
+
+The Homebrew formula installs the CLI and Python library, but not the
+`cisco.sccfm` Ansible collection. Use the pipx-based managed setup when the CLI
+and collection must share a version-aligned runtime.
+
 ### Install with pip
 
 Use `pip` when you are installing into an existing virtual environment:

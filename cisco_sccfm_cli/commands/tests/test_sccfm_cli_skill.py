@@ -52,7 +52,7 @@ def test_cisco_sccfm_cli_skill_should_cover_schema_driven_operation() -> None:
         "Class B",
         "Class C",
         "EXECUTE <exact shell command>",
-        "SCCFM_APPROVAL_COMMAND: <exact shell command>",
+        "Do not emit a separate machine-readable marker",
         "Match User Intent Conservatively",
         "schema export",
         "not validated against live state",
@@ -79,6 +79,7 @@ def test_cisco_sccfm_cli_skill_should_cover_schema_driven_operation() -> None:
 
     for fragment in expected_fragments:
         assert fragment in body
+    assert "SCCFM_APPROVAL_COMMAND:" not in body
 
     assert "sccfm-cli-interactive" in body
     assert "SCCFM_API_TOKEN" not in body

@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "sccfm",
   "displayName": "SCC Firewall Manager",
-  "description": "Guided setup and safety-aware operation for sccfm-cli and the cisco.sccfm Ansible collection.",
-  "version": "0.1.0",
+  "description": "Guided setup, teardown, and safety-aware operation for sccfm-cli and the cisco.sccfm Ansible collection.",
+  "version": "0.1.1",
   "author": {
     "name": "Cisco DevNet",
     "url": "https://developer.cisco.com"
@@ -11,11 +11,5 @@
   "homepage": "https://ciscodevnet.github.io/sccfm-devkit/",
   "repository": "https://github.com/CiscoDevNet/sccfm-devkit",
   "license": "Apache-2.0",
-  "keywords": [
-    "cisco",
-    "sccfm",
-    "firewall-manager",
-    "security",
-    "ansible"
-  ]
+  "keywords": ["cisco", "sccfm", "firewall-manager", "security", "ansible"]
 }
