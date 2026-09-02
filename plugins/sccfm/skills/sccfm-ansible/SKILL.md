@@ -1,7 +1,7 @@
 ---
 name: sccfm-ansible
 description: Use the cisco.sccfm Ansible collection for SCC Firewall Manager by discovering modules, inventory plugins, and lookup plugins with ansible-doc at runtime, validating parameters, auth, check mode, and safety before generating or running playbooks. Use for cisco.sccfm Ansible modules, inventory, lookups, vault, and playbook workflows. Do NOT use for sccfm-cli commands; use the sccfm-cli skill instead. Do not use for Jira/Confluence work, architecture design, or non-Ansible tasks.
-allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(poetry version --short) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
+allowed-tools: "Bash(command -v *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(poetry version --short) Bash(ansible-doc *) Bash(ansible-playbook *) Bash(ansible-inventory *) Bash(ansible-vault *) Bash(ansible-galaxy *) Bash(~/.sccfm-agent-plugin/ansible-runtime/bin/ansible-* *) Bash(build-ansible-collection) Bash(sccfm-cli *) Bash(sccfm-cli-interactive *) Bash(jq *) Read Grep Glob Write Edit"
 ---
 
 # SCC Firewall Manager Ansible Collection
@@ -129,20 +129,38 @@ before execution.
 ### Step A: Resolve Ansible and the Collection
 
 Follow these checks in order:
-1. Run `command -v ansible-doc`.
-2. If you are inside this repository, `ansible-doc` is missing, and
-   `cisco_sccfm_scripts/activate.sh` exists, run `source cisco_sccfm_scripts/activate.sh` once for the
-   shell session, then resolve again. Do not use `poetry run`.
-3. Run collection discovery:
+1. On Unix, first check whether
+   `~/.sccfm-agent-plugin/ansible-runtime/bin/ansible-doc` exists. If it does,
+   it is the setup helper's companion for a Homebrew CLI. Use that absolute
+   `ansible-doc` path and the companion `ansible-playbook`, `ansible-inventory`,
+   `ansible-vault`, and `ansible-galaxy` paths for the entire request. Do not
+   activate the virtual environment or add it to `PATH`; this keeps the
+   Homebrew `sccfm-cli` authoritative. Otherwise use the ordinary command names.
+2. Infer the one plugin type needed by the request: `module`, `inventory`, or
+   `lookup`. A playbook that calls SCCFM API operations needs module discovery
+   only. Do not enumerate unrelated plugin types.
+3. Start with the matching collection-list command. Its success proves both
+   that `ansible-doc` is available and that the requested collection type is
+   discoverable:
 
    ```bash
+   # Run only the line matching the requested plugin type.
    ansible-doc -j -l -t module cisco.sccfm
    ansible-doc -j -l -t inventory cisco.sccfm
    ansible-doc -j -l -t lookup cisco.sccfm
    ```
 
-4. If discovery fails and you are inside this repository, run both commands,
-   then rerun discovery:
+4. On a sandboxed Unix host that cannot write `~/.ansible/tmp`, prefix Ansible
+   discovery and validation commands with `ANSIBLE_LOCAL_TEMP=/tmp` from the
+   first call. `/tmp` already exists and Ansible creates and removes its own
+   private child directory, so do not create an `ansible.cfg` or probe the
+   unwritable default first.
+5. If `ansible-doc` is missing and you are inside this repository,
+   `cisco_sccfm_scripts/activate.sh` exists, run
+   `source cisco_sccfm_scripts/activate.sh` once for the shell session, then
+   retry the selected discovery command. Do not use `poetry run`.
+6. If discovery reports that `cisco.sccfm` is missing and you are inside this
+   repository, run both commands, then retry only the selected discovery:
 
    ```bash
    build-ansible-collection
@@ -150,13 +168,13 @@ Follow these checks in order:
      "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
    ```
 
-5. If discovery succeeds and you are inside this repository, compare discovered
-   FQCNs with the corresponding files under `sccfm-ansible/plugins/modules/`,
-   `sccfm-ansible/plugins/inventory/`, or `sccfm-ansible/plugins/lookup/` only to
-   detect a stale installed collection. If source plugins are missing from
-   `ansible-doc`, build and install the generated tarball as above, then rerun
-   discovery. Do not use source filenames as the runtime schema.
-6. If you are outside this repository, install or modify local Ansible state only
+7. If discovery succeeds and you are inside this repository, compare the
+   discovered FQCNs only with the source directory for the selected plugin type
+   under `sccfm-ansible/plugins/`. Use this only to detect a stale installed
+   collection. If source plugins are missing from `ansible-doc`, build and
+   install the generated tarball as above, then rerun the selected discovery.
+   Do not use source filenames as the runtime schema.
+8. If you are outside this repository, install or modify local Ansible state only
    when the user explicitly asks for setup. Otherwise, stop and explain that the
    `cisco.sccfm` collection is not installed.
 
@@ -164,28 +182,24 @@ Re-discover if the virtualenv, collection install, or branch changes.
 
 ### Step B: Discover Runtime Schema
 
-Export the module list once per session:
+Reuse the selected list output from Step A; do not run the list command again.
+
+Fetch full JSON docs for every plausible module candidate in one call:
 
 ```bash
-ansible-doc -j -l -t module cisco.sccfm
+ansible-doc -j cisco.sccfm.<module_name> [cisco.sccfm.<other_candidate> ...]
 ```
 
-For a matched module, fetch full JSON docs:
-
+For dynamic inventory work, reuse the inventory list from Step A, then fetch
+the matched plugin docs:
 ```bash
-ansible-doc -j cisco.sccfm.<module_name>
-```
-
-For dynamic inventory work, list inventory plugins, then fetch the matched plugin docs:
-```bash
-ansible-doc -j -l -t inventory cisco.sccfm
 ansible-doc -j -t inventory <inventory_plugin_fqcn>
 ```
 
-For lookup work, list lookup plugins, then fetch the matched plugin docs:
+For lookup work, reuse the lookup list from Step A, then fetch the matched
+plugin docs:
 
 ```bash
-ansible-doc -j -l -t lookup cisco.sccfm
 ansible-doc -j -t lookup <lookup_plugin_fqcn>
 ```
 
@@ -201,6 +215,16 @@ Parse the JSON output. Use these fields as the schema:
 
 Cache the discovered JSON in memory for the session. Do not use stale docs after
 building or reinstalling the collection.
+
+For the common Generate-Only module-playbook path, the expected fast flow is:
+
+1. One module-list call.
+2. One full-doc call containing all plausible candidates.
+3. Write the playbook once.
+4. One local syntax check.
+
+Do not run profile connectivity checks, inventory discovery, lookup discovery,
+live business operations, or check mode for a read-only Generate-Only request.
 
 If discovery fails, stop and report the error. Do not guess what the collection
 supports.
@@ -359,7 +383,16 @@ ansible-playbook --syntax-check <playbook.yml>
 ```
 
 Use `--syntax-check` on generated playbooks whenever a playbook file exists and
-the user did not forbid local validation.
+the user did not forbid local validation. It is local validation, not execution
+of the business playbook, and never requires an `EXECUTE` confirmation. On a
+sandboxed Unix host that cannot write `~/.ansible/tmp`, use the safe temporary
+directory from Step A:
+
+```bash
+ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook --syntax-check <playbook.yml>
+```
+
+Do not create or edit `ansible.cfg` solely to work around the sandbox.
 
 ### Inventory Validation
 
@@ -451,24 +484,21 @@ shell command from the reviewed plan, prefixed with `EXECUTE `:
 EXECUTE <exact ansible-playbook shell command>
 ```
 
-When requesting this confirmation, also emit exactly one machine-readable plan
-marker as a standalone line outside any code fence:
-
-```text
-SCCFM_APPROVAL_COMMAND: <exact ansible-playbook shell command>
-```
-
-Replace the placeholder with the same command shown in the plan, without the
-`EXECUTE ` prefix. Emit this marker only when the plan is complete and ready for
-confirmation. Do not emit it in Generate-Only mode, for a check-mode-only plan,
-or after the playbook has run. The plugin's Stop hook records only its digest so
-that a later user confirmation cannot authorize a different command.
+Show exactly one standalone
+`EXECUTE <exact ansible-playbook shell command>` confirmation line outside any
+code fence when the plan is complete and ready for confirmation. Keep the
+confirmation on one physical line; use the command's working directory and a
+short relative path when needed. Do not emit a separate machine-readable marker.
+The plugin's Stop hook derives the planned command from that visible line and
+records only its digest so that a later user confirmation cannot authorize a
+different command. Do not request confirmation in Generate-Only mode, for a
+check-mode-only plan, or after the playbook has run.
 
 The text after `EXECUTE ` must exactly match the command the agent will submit
 to the shell, including inventory, playbook, limit, check-mode, and other CLI
 options. Require it as a standalone user message without a code fence or
 explanation. Never accept an edited, abbreviated, or compound command. The
-plugin command guard compares it with the previously recorded plan marker,
+plugin command guard compares it with the previously recorded plan command,
 creates a ten-minute receipt only for an exact match, and consumes that receipt
 after one matching execution attempt or clears it when the turn ends. Keep the
 module FQCN and target summary in the reviewed plan even though the approval

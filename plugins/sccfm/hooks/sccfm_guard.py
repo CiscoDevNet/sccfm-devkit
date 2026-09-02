@@ -22,6 +22,7 @@ from typing import Any, Literal, Sequence, cast
 
 SCCFM_EXECUTABLE = "sccfm-cli"
 ANSIBLE_REVIEW_COMMANDS = {"ansible-galaxy", "ansible-playbook"}
+SAFE_ANSIBLE_ENVIRONMENT = {"ANSIBLE_LOCAL_TEMP"}
 SHELL_CONTROL_CHARACTERS = frozenset(";&|<>")
 SHELL_SUBSTITUTION_MARKERS = ("$", "`")
 SHELL_WRAPPER_EXECUTABLES = {
@@ -37,7 +38,6 @@ SHELL_WRAPPER_EXECUTABLES = {
     "zsh",
 }
 APPROVAL_PREFIX = "EXECUTE "
-PLANNED_COMMAND_PREFIX = "SCCFM_APPROVAL_COMMAND: "
 APPROVAL_TTL_SECONDS = 600
 PLAN_TTL_SECONDS = 3600
 Host = Literal["claude", "codex"]
@@ -122,6 +122,27 @@ def is_executable_discovery(tokens: Sequence[str]) -> bool:
     )
 
 
+def strip_safe_ansible_environment(tokens: Sequence[str]) -> list[str] | None:
+    remaining = list(tokens)
+    seen_names: set[str] = set()
+    while remaining and is_assignment_word(remaining[0]):
+        name, _separator, value = remaining.pop(0).partition("=")
+        local_path = Path(value)
+        if (
+            name not in SAFE_ANSIBLE_ENVIRONMENT
+            or name in seen_names
+            or not local_path.is_absolute()
+            or ".." in local_path.parts
+        ):
+            return None
+        seen_names.add(name)
+    if seen_names and (
+        not remaining or executable_name(remaining[0]) not in ANSIBLE_REVIEW_COMMANDS
+    ):
+        return None
+    return remaining
+
+
 def load_schema() -> dict[str, Any] | None:
     executable = shutil.which(SCCFM_EXECUTABLE)
     if executable is None:
@@ -164,6 +185,47 @@ def strip_global_options(tokens: Sequence[str], schema: dict[str, Any]) -> list[
     return remaining
 
 
+def enabled_command_flag(
+    arguments: Sequence[str], command: dict[str, Any], option_name: str
+) -> bool:
+    options_by_alias = {
+        alias: option
+        for option in command.get("options", [])
+        for alias in option.get("aliases", [])
+    }
+    argument_index = 0
+    while argument_index < len(arguments):
+        token = arguments[argument_index]
+        flag, separator, _value = token.partition("=")
+        option = options_by_alias.get(flag)
+        if option is None:
+            argument_index += 1
+            continue
+        if not separator and option.get("is_flag") is True and option.get("name") == option_name:
+            return True
+        if not separator and option.get("is_flag") is not True:
+            nargs = option.get("nargs", 1)
+            argument_index += nargs if isinstance(nargs, int) and nargs > 0 else 1
+        argument_index += 1
+    return False
+
+
+def is_schema_declared_preflight(arguments: Sequence[str], command: dict[str, Any]) -> bool:
+    for constraint in command.get("constraints", []):
+        effect = constraint.get("effect", "")
+        option_name = constraint.get("option")
+        if (
+            constraint.get("type") == "mode"
+            and isinstance(option_name, str)
+            and isinstance(effect, str)
+            and "preflight only" in effect.casefold()
+            and "do not perform" in effect.casefold()
+            and enabled_command_flag(arguments, command, option_name)
+        ):
+            return True
+    return False
+
+
 def classify_sccfm(tokens: Sequence[str], schema: dict[str, Any]) -> tuple[str, str]:
     executable_indexes = [
         index for index, token in enumerate(tokens) if executable_name(token) == SCCFM_EXECUTABLE
@@ -186,6 +248,9 @@ def classify_sccfm(tokens: Sequence[str], schema: dict[str, Any]) -> tuple[str, 
         path = command.get("path", [])
         if list(remaining[: len(path)]) != path:
             continue
+        arguments = remaining[len(path) :]
+        if is_schema_declared_preflight(arguments, command):
+            return "readonly", f"Schema-declared SCCFM preflight: {' '.join(path)}"
         if not command.get("readonly", False):
             return "review", f"Mutating SCCFM command: {' '.join(path)}"
         if path == ["schema", "export"] and not ({"--output", "-o"} & set(remaining)):
@@ -204,7 +269,12 @@ def classify_command(command: str, schema: dict[str, Any] | None = None) -> tupl
         return "unrelated", "Command is outside the SCCFM guard scope"
     if tokens is None:
         return "review", "Compound or unparseable SCCFM command requires review"
-    executable = executable_name(tokens[0]) if tokens else ""
+    execution_tokens = strip_safe_ansible_environment(tokens)
+    if execution_tokens is None:
+        return "review", "Command environment or composition could not be proven safe"
+    executable = executable_name(execution_tokens[0]) if execution_tokens else ""
+    if executable == "ansible-playbook" and "--syntax-check" in execution_tokens[1:]:
+        return "readonly", "Ansible local syntax check"
     if executable in ANSIBLE_REVIEW_COMMANDS:
         return "review", f"{executable} can change local or managed state"
     if executable != SCCFM_EXECUTABLE:
@@ -212,6 +282,8 @@ def classify_command(command: str, schema: dict[str, Any] | None = None) -> tupl
     active_schema = schema if schema is not None else load_schema()
     if active_schema is None:
         return "review", "The installed SCCFM schema was unavailable"
+    if uses_sensitive_flag(tokens, active_schema):
+        return "review", "SCCFM command includes a sensitive option"
     return classify_sccfm(tokens, active_schema)
 
 
@@ -235,9 +307,13 @@ def approval_eligible(command: str, schema: dict[str, Any] | None = None) -> boo
     tokens = shell_tokens(command)
     if not tokens:
         return False
-    executable = executable_name(tokens[0])
+    execution_tokens = strip_safe_ansible_environment(tokens)
+    if not execution_tokens:
+        return False
+    executable = executable_name(execution_tokens[0])
     if executable in ANSIBLE_REVIEW_COMMANDS:
-        return True
+        classification, _reason = classify_command(command, schema)
+        return classification == "review"
     if executable != SCCFM_EXECUTABLE:
         return False
     active_schema = schema if schema is not None else load_schema()
@@ -381,9 +457,9 @@ def exact_approval_command(prompt: str) -> str | None:
 
 def planned_command(message: str) -> str | None:
     candidates = [
-        line.removeprefix(PLANNED_COMMAND_PREFIX).strip()
+        line.removeprefix(APPROVAL_PREFIX).strip()
         for line in message.splitlines()
-        if line.startswith(PLANNED_COMMAND_PREFIX)
+        if line.startswith(APPROVAL_PREFIX)
     ]
     if len(candidates) != 1:
         return None
@@ -399,17 +475,6 @@ def deny_decision(reason: str) -> dict[str, Any]:
                 f"{reason}. The user must send the exact `EXECUTE <shell command>` "
                 "from the reviewed plan in a separate message."
             ),
-        }
-    }
-
-
-def ask_decision(reason: str) -> dict[str, Any]:
-    return {
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "ask",
-            "permissionDecisionReason": reason,
-            "additionalContext": "The exact command approval was verified and consumed.",
         }
     }
 
@@ -467,7 +532,7 @@ def process_tool_use(
     )
     if not approved:
         return deny_decision(reason)
-    return ask_decision(reason) if host == "claude" else None
+    return None
 
 
 def parse_arguments() -> argparse.Namespace:

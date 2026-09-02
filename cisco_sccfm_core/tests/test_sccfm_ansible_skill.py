@@ -58,6 +58,12 @@ def test_sccfm_ansible_skill_is_ansible_doc_driven() -> None:
     assert "Do not hardcode module names" in skill
     assert "All module and plugin knowledge comes from" in normalized_skill
     assert "only hardcoded bootstrap commands" in skill
+    assert "Do not enumerate unrelated plugin types" in normalized_skill
+    assert "One full-doc call containing all plausible candidates" in normalized_skill
+    assert "do not run the list command again" in normalized_skill
+    assert "ANSIBLE_LOCAL_TEMP=/tmp" in skill
+    assert "never requires an `EXECUTE` confirmation" in normalized_skill
+    assert "Do not create or edit `ansible.cfg`" in normalized_skill
     assert '"dist/cisco-sccfm-$(poetry version --short).tar.gz" --force' in skill
     assert "dist/cisco-sccfm-*.tar.gz" not in skill
     assert "only to detect a stale" in normalized_skill
@@ -84,7 +90,8 @@ def test_sccfm_ansible_skill_documents_safety_and_secret_rules() -> None:
     assert "module_defaults: group/cisco.sccfm.all" in skill
     assert "supports_check_mode=True" in skill
     assert "EXECUTE <exact ansible-playbook shell command>" in skill
-    assert "SCCFM_APPROVAL_COMMAND: <exact ansible-playbook shell command>" in skill
+    assert "Do not emit a separate machine-readable marker" in normalized_skill
+    assert "SCCFM_APPROVAL_COMMAND:" not in skill
 
 
 def test_sccfm_ansible_skill_only_documents_canonical_profile_auth() -> None:

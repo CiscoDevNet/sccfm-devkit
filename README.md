@@ -217,6 +217,22 @@ keeps the CLI isolated while exposing `sccfm-cli` and `sccfm-cli-interactive` on
 pipx install cisco-sccfm-devkit
 ```
 
+Homebrew remains available as an optional CLI-only install on macOS and Linux:
+
+```bash
+brew tap CiscoDevNet/tap
+brew trust --formula CiscoDevNet/tap/sccfm-cli  # required once on Homebrew 6.0+
+brew install CiscoDevNet/tap/sccfm-cli
+```
+
+Omit `brew trust` on Homebrew releases earlier than 6.0. Formula-specific trust
+avoids trusting every current and future item in the third-party tap.
+
+Homebrew does not install the `cisco.sccfm` Ansible collection by itself. The
+agent plugin's setup skill can preserve the Homebrew CLI and add a private,
+version-matched Ansible companion without exposing another `sccfm-cli` on
+`PATH`.
+
 Installing into a virtual environment with `pip` is also supported:
 
 ```bash

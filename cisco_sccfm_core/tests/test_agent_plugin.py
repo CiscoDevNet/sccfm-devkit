@@ -59,7 +59,34 @@ def sample_schema() -> dict[str, object]:
             {
                 "path": ["objects", "network", "delete"],
                 "readonly": False,
-                "options": [],
+                "options": [
+                    {
+                        "name": "uid",
+                        "aliases": ["--uid"],
+                        "is_flag": False,
+                        "nargs": 1,
+                    },
+                    {
+                        "name": "check",
+                        "aliases": ["--check"],
+                        "is_flag": True,
+                        "nargs": 1,
+                    },
+                    {
+                        "name": "api_token",
+                        "aliases": ["--api-token"],
+                        "is_flag": False,
+                        "nargs": 1,
+                        "sensitive": True,
+                    },
+                ],
+                "constraints": [
+                    {
+                        "type": "mode",
+                        "option": "check",
+                        "effect": ("Preflight only; do not perform the SCCFM-changing operation."),
+                    }
+                ],
             },
         ],
     }
@@ -157,6 +184,136 @@ def test_install_plan_uses_one_pipx_environment_and_matching_versions(tmp_path: 
     ]
 
 
+def test_homebrew_plan_uses_a_private_matching_ansible_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_base = tmp_path / ".ansible" / "collections"
+    runtime = tmp_path / ".sccfm-agent-plugin" / "ansible-runtime"
+
+    assert setup_runtime.homebrew_ansible_install_commands(
+        "0.40.0", "python3.12", collection_base
+    ) == [
+        ["python3.12", "-m", "venv", str(runtime)],
+        [
+            str(runtime / "bin" / "python"),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--upgrade",
+            "ansible-core>=2.20,<2.22",
+            "cisco-sccfm-devkit==0.40.0",
+        ],
+        [
+            str(runtime / "bin" / "ansible-galaxy"),
+            "collection",
+            "install",
+            "cisco.sccfm:==0.40.0",
+            "--force",
+            "--collections-path",
+            str(collection_base),
+        ],
+    ]
+
+
+def test_homebrew_install_state_records_the_private_ansible_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_path = setup_runtime.expected_collection_path()
+
+    setup_runtime.write_install_state(
+        collection_path,
+        "0.40.0",
+        runtime_kind=setup_runtime.HOMEBREW_ANSIBLE_RUNTIME_KIND,
+    )
+
+    assert setup_runtime.load_install_state() == {
+        "ansible_runtime_path": str(setup_runtime.expected_ansible_runtime_path()),
+        "collection_path": str(collection_path),
+        "runtime_kind": "homebrew-ansible",
+        "schema_version": 2,
+        "version": "0.40.0",
+    }
+
+
+def test_legacy_install_state_defaults_to_the_pipx_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    state_path = setup_runtime.install_state_path()
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "collection_path": str(setup_runtime.expected_collection_path()),
+                "version": "0.39.5",
+            }
+        )
+    )
+
+    assert setup_runtime.load_install_state()["runtime_kind"] == "pipx"
+
+
+def test_homebrew_install_state_selects_the_private_ansible_commands(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_path = setup_runtime.expected_collection_path()
+    ansible_doc = setup_runtime.ansible_runtime_executable("ansible-doc")
+    ansible_doc.parent.mkdir(parents=True)
+    ansible_doc.touch()
+    setup_runtime.write_install_state(
+        collection_path,
+        "0.40.0",
+        runtime_kind=setup_runtime.HOMEBREW_ANSIBLE_RUNTIME_KIND,
+    )
+
+    assert setup_runtime.ansible_command_path("ansible-doc") == str(ansible_doc)
+
+
+def test_homebrew_install_creates_only_the_private_ansible_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(
+        setup_runtime,
+        "command_path",
+        lambda name: "/usr/local/bin/python3.12" if name == "python3.12" else None,
+    )
+    monkeypatch.setattr(
+        setup_runtime,
+        "homebrew_formula_installation",
+        lambda: {"versions": ["0.40.0"]},
+    )
+    commands: list[list[str]] = []
+
+    def run_install(command: list[str], check: bool) -> None:
+        assert check is True
+        commands.append(command)
+        runtime = setup_runtime.expected_ansible_runtime_path()
+        if command[1:3] == ["-m", "venv"]:
+            (runtime / "bin").mkdir(parents=True)
+            for executable in ("python", "ansible-galaxy", "ansible-doc"):
+                (runtime / "bin" / executable).touch()
+        if "collection" in command:
+            setup_runtime.expected_collection_path().mkdir(parents=True)
+
+    monkeypatch.setattr(setup_runtime.subprocess, "run", run_install)
+
+    setup_runtime.install("0.40.0", "python3.12", confirmed=True)
+
+    assert all(command[0] != "pipx" for command in commands)
+    assert setup_runtime.load_install_state()["runtime_kind"] == "homebrew-ansible"
+
+
 @pytest.mark.parametrize("version", ["0.39", "0.39.3rc1", "latest", "0.39.3; echo unsafe"])
 def test_install_plan_rejects_non_stable_versions(version: str) -> None:
     setup_runtime = load_setup_runtime()
@@ -231,28 +388,67 @@ def test_collection_metadata_prefers_the_recorded_copy_when_two_roots_exist(
 
 
 def test_pipx_package_discovery_normalizes_package_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    pipx_home = tmp_path / "pipx"
+    metadata_path = pipx_home / "venvs" / "cisco_sccfm_devkit" / "pipx_metadata.json"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text(json.dumps({"main_package": {"package": "cisco-sccfm-devkit"}}))
+    monkeypatch.setenv("PIPX_HOME", str(pipx_home))
+
+    assert setup_runtime.pipx_package_environment() == metadata_path.parent
+    assert setup_runtime.pipx_package_installed() is True
+
+
+def test_homebrew_formula_discovery_uses_the_canonical_tap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     setup_runtime = load_setup_runtime()
-    monkeypatch.setattr(setup_runtime, "command_path", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(
+        setup_runtime,
+        "command_path",
+        lambda name: "/opt/homebrew/bin/brew" if name == "brew" else None,
+    )
+
+    def fake_run_capture(
+        command: list[str], *, environment: dict[str, str] | None = None, limit: int = 1000
+    ) -> dict[str, object]:
+        del environment, limit
+        if "--full-name" in command:
+            return {"ok": True, "exit_code": 0, "output": "ciscodevnet/tap/sccfm-cli"}
+        return {"ok": True, "exit_code": 0, "output": "sccfm-cli 0.39.3"}
+
+    monkeypatch.setattr(setup_runtime, "run_capture", fake_run_capture)
+
+    assert setup_runtime.homebrew_formula_installation() == {
+        "formula": "ciscodevnet/tap/sccfm-cli",
+        "versions": ["0.39.3"],
+        "command": [
+            "/opt/homebrew/bin/brew",
+            "uninstall",
+            "ciscodevnet/tap/sccfm-cli",
+        ],
+        "environment": {"HOMEBREW_NO_AUTOREMOVE": "1"},
+    }
+
+
+def test_homebrew_formula_discovery_ignores_a_different_tap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime, "command_path", lambda name: "/bin/brew")
     monkeypatch.setattr(
         setup_runtime,
         "run_capture",
-        lambda command, limit=1000: {
+        lambda command, limit: {
             "ok": True,
-            "output": json.dumps(
-                {
-                    "venvs": {
-                        "cisco_sccfm_devkit": {
-                            "metadata": {"main_package": {"package": "cisco-sccfm-devkit"}}
-                        }
-                    }
-                }
-            ),
+            "exit_code": 0,
+            "output": "example/tap/sccfm-cli",
         },
     )
 
-    assert setup_runtime.pipx_package_installed() is True
+    assert setup_runtime.homebrew_formula_installation() is None
 
 
 def test_uninstall_plan_preserves_profiles_by_default(
@@ -283,8 +479,11 @@ def test_uninstall_plan_preserves_profiles_by_default(
     }
 
 
-def test_uninstall_plan_refuses_an_unmanaged_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_uninstall_plan_refuses_an_unmanaged_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.setattr(setup_runtime, "discover_collection_paths", lambda: [])
     monkeypatch.setattr(setup_runtime, "command_path", lambda name: f"/bin/{name}")
     monkeypatch.setattr(setup_runtime, "pipx_package_installed", lambda: False)
@@ -392,14 +591,406 @@ def test_uninstall_deletes_profiles_only_with_explicit_option(
     assert not profile_path.exists()
 
 
-def test_setup_skill_documents_safe_teardown_contract() -> None:
+def test_setup_skill_routes_teardown_to_the_uninstall_skill() -> None:
     skill = (PLUGIN_ROOT / "skills" / "sccfm-setup" / "SKILL.md").read_text()
 
-    assert "uninstall-plan" in skill
+    assert "Route uninstall, teardown, and complete-cleanup requests" in skill
+    assert "`sccfm-uninstall` skill" in skill
+
+
+def test_setup_skill_supports_pipx_and_homebrew_companion_paths() -> None:
+    skill = (PLUGIN_ROOT / "skills" / "sccfm-setup" / "SKILL.md").read_text()
+
+    assert "pipx is the canonical installation method" in skill
+    assert "This skill never installs through Homebrew" in skill
+    assert "brew install CiscoDevNet/tap/sccfm-cli" not in skill
+    assert "Bash(brew *)" not in skill
+    assert "Homebrew CLI" in skill
+    assert "ansible-runtime" in skill
+    assert "without exposing a second `sccfm-cli`" in skill
+
+
+def test_setup_skill_uses_a_fast_install_path_and_exact_config_command() -> None:
+    skill = (PLUGIN_ROOT / "skills" / "sccfm-setup" / "SKILL.md").read_text()
+    normalized_skill = " ".join(skill.split())
+
+    assert "Do not run the full doctor before installation" in normalized_skill
+    assert "query the PyPI and Ansible Galaxy release metadata in parallel" in normalized_skill
+    assert "run exactly one helper command" in normalized_skill
+    assert "Do not run connectivity checks before the user configures a profile" in normalized_skill
+    assert "sccfm-cli --profile default configure --region us" in skill
+    assert "never return placeholders" in normalized_skill
+
+
+def test_cli_skill_keeps_homebrew_scoped_to_cli_only_installation() -> None:
+    skill = (PLUGIN_ROOT / "skills" / "sccfm-cli" / "SKILL.md").read_text()
+
+    assert "Optional CLI-only Homebrew installation" in skill
+    assert "brew tap CiscoDevNet/tap" in skill
+    assert "brew trust --formula CiscoDevNet/tap/sccfm-cli" in skill
+    assert "brew install CiscoDevNet/tap/sccfm-cli" in skill
+    assert "INSTALL SCCFM CLI WITH HOMEBREW" in skill
+    assert "Homebrew installs the CLI and Python library only" in skill
+    assert "`cisco.sccfm` Ansible collection" in skill
+
+
+def test_uninstall_skill_documents_discovered_cleanup_contract() -> None:
+    skill = (PLUGIN_ROOT / "skills" / "sccfm-uninstall" / "SKILL.md").read_text()
+
+    assert "cleanup-plan --json" in skill
+    assert "ciscodevnet/tap/sccfm-cli" in skill
+    assert "--include-editable" in skill
     assert "UNINSTALL SCCFM" in skill
-    assert "UNINSTALL SCCFM AND DELETE PROFILES" in skill
-    assert "preserves `~/.sccfm-cli/config.json` by default" in skill
+    assert "UNINSTALL SCCFM AND PROFILES" in skill
+    assert "UNINSTALL SCCFM AND DELETE PROFILES" not in skill
+    assert "--plan-digest <digest> --yes" in skill
     assert "codex plugin remove sccfm@sccfm-devkit" in skill
+
+
+def test_cleanup_collection_discovery_validates_the_standard_manifest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(setup_runtime, "command_path", lambda name: None)
+    collection_path = setup_runtime.expected_collection_path()
+    collection_path.mkdir(parents=True)
+    (collection_path / "MANIFEST.json").write_text(
+        json.dumps({"collection_info": {"namespace": "cisco", "name": "sccfm"}})
+    )
+
+    assert setup_runtime.discover_cleanup_collection_paths() == [collection_path]
+
+
+def test_cleanup_plan_preserves_editable_python_installs_by_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(setup_runtime, "discover_cleanup_collection_paths", lambda: [])
+    monkeypatch.setattr(setup_runtime, "pipx_package_environment", lambda: None)
+    monkeypatch.setattr(setup_runtime, "homebrew_formula_installation", lambda: None)
+    editable_installation = {
+        "interpreter": "/work/.venv/bin/python",
+        "version": "0.39.5",
+        "location": "/work/.venv/lib/python3.12/site-packages",
+        "environment": "/work/.venv",
+        "editable": True,
+        "source": "file:///work/sccfm-devkit",
+        "command": [
+            "/work/.venv/bin/python",
+            "-m",
+            "pip",
+            "uninstall",
+            "--yes",
+            "cisco-sccfm-devkit",
+        ],
+    }
+    monkeypatch.setattr(
+        setup_runtime,
+        "discover_python_installations",
+        lambda include_cli_candidate: [editable_installation],
+    )
+
+    plan = setup_runtime.cleanup_plan(remove_profiles=False, include_editable=False)
+
+    assert plan["python_installations"] == []
+    assert plan["preserved_python_installations"] == [editable_installation]
+    assert len(plan["plan_digest"]) == 64
+
+
+def test_cleanup_plan_includes_editable_python_installs_only_after_opt_in(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(setup_runtime, "discover_cleanup_collection_paths", lambda: [])
+    monkeypatch.setattr(setup_runtime, "pipx_package_environment", lambda: None)
+    monkeypatch.setattr(setup_runtime, "homebrew_formula_installation", lambda: None)
+    editable_installation = {
+        "interpreter": "/work/.venv/bin/python",
+        "version": "0.39.5",
+        "location": "/work/.venv/lib/python3.12/site-packages",
+        "environment": "/work/.venv",
+        "editable": True,
+        "source": "file:///work/sccfm-devkit",
+        "command": ["/work/.venv/bin/python", "-m", "pip", "uninstall"],
+    }
+    monkeypatch.setattr(
+        setup_runtime,
+        "discover_python_installations",
+        lambda include_cli_candidate: [editable_installation],
+    )
+
+    plan = setup_runtime.cleanup_plan(remove_profiles=False, include_editable=True)
+
+    assert plan["python_installations"] == [editable_installation]
+    assert plan["preserved_python_installations"] == []
+
+
+def test_cleanup_plan_includes_homebrew_and_skips_cli_python_discovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(setup_runtime, "discover_cleanup_collection_paths", lambda: [])
+    monkeypatch.setattr(setup_runtime, "pipx_package_environment", lambda: None)
+    homebrew_installation = {
+        "formula": "ciscodevnet/tap/sccfm-cli",
+        "versions": ["0.39.3"],
+        "command": ["/opt/homebrew/bin/brew", "uninstall", "ciscodevnet/tap/sccfm-cli"],
+        "environment": {"HOMEBREW_NO_AUTOREMOVE": "1"},
+    }
+    monkeypatch.setattr(
+        setup_runtime,
+        "homebrew_formula_installation",
+        lambda: homebrew_installation,
+    )
+    discovery_modes: list[bool] = []
+
+    def record_discovery_mode(include_cli_candidate: bool) -> list[dict[str, object]]:
+        discovery_modes.append(include_cli_candidate)
+        return []
+
+    monkeypatch.setattr(
+        setup_runtime,
+        "discover_python_installations",
+        record_discovery_mode,
+    )
+
+    plan = setup_runtime.cleanup_plan(remove_profiles=False, include_editable=False)
+
+    assert plan["homebrew_installation"] == homebrew_installation
+    assert discovery_modes == [False]
+
+
+def test_cleanup_plan_removes_the_owned_homebrew_ansible_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_path = setup_runtime.expected_collection_path()
+    runtime_path = setup_runtime.expected_ansible_runtime_path()
+    runtime_path.mkdir(parents=True)
+    setup_runtime.write_install_state(
+        collection_path,
+        "0.40.0",
+        runtime_kind=setup_runtime.HOMEBREW_ANSIBLE_RUNTIME_KIND,
+    )
+    monkeypatch.setattr(setup_runtime, "discover_cleanup_collection_paths", lambda: [])
+    monkeypatch.setattr(setup_runtime, "pipx_package_environment", lambda: None)
+    monkeypatch.setattr(setup_runtime, "homebrew_formula_installation", lambda: None)
+    monkeypatch.setattr(
+        setup_runtime,
+        "discover_python_installations",
+        lambda include_cli_candidate: [],
+    )
+
+    plan = setup_runtime.cleanup_plan(remove_profiles=False, include_editable=False)
+
+    assert plan["ansible_runtime"] == {
+        "action": "delete",
+        "path": str(runtime_path),
+        "exists": True,
+    }
+
+
+def test_cleanup_can_recover_an_incomplete_homebrew_ansible_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    runtime_path = setup_runtime.expected_ansible_runtime_path()
+    runtime_path.mkdir(parents=True)
+    setup_runtime.write_install_state(
+        setup_runtime.expected_collection_path(),
+        "0.40.0",
+        runtime_kind=setup_runtime.HOMEBREW_ANSIBLE_RUNTIME_KIND,
+    )
+    monkeypatch.setattr(
+        setup_runtime,
+        "command_path",
+        lambda name: "/usr/local/bin/ansible-galaxy" if name == "ansible-galaxy" else None,
+    )
+
+    assert setup_runtime.discover_cleanup_collection_paths() == []
+
+
+def test_cleanup_plan_does_not_schedule_the_pipx_environment_twice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(setup_runtime, "discover_cleanup_collection_paths", lambda: [])
+    pipx_environment = tmp_path / "pipx" / "venvs" / "cisco-sccfm-devkit"
+    monkeypatch.setattr(
+        setup_runtime,
+        "pipx_package_environment",
+        lambda: pipx_environment,
+    )
+    monkeypatch.setattr(
+        setup_runtime,
+        "command_path",
+        lambda name: "/bin/pipx" if name == "pipx" else None,
+    )
+    monkeypatch.setattr(setup_runtime, "homebrew_formula_installation", lambda: None)
+    pipx_python_installation = {
+        "environment": str(pipx_environment),
+        "editable": False,
+    }
+    monkeypatch.setattr(
+        setup_runtime,
+        "discover_python_installations",
+        lambda include_cli_candidate: [pipx_python_installation],
+    )
+
+    plan = setup_runtime.cleanup_plan(remove_profiles=False, include_editable=False)
+
+    assert plan["pipx_command"] == ["/bin/pipx", "uninstall", "cisco-sccfm-devkit"]
+    assert plan["python_installations"] == []
+
+
+def test_install_plan_completes_a_homebrew_install_without_pipx(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(
+        setup_runtime,
+        "homebrew_formula_installation",
+        lambda: {"versions": ["0.39.3"]},
+    )
+
+    setup_runtime.print_plan("0.39.3", "python3.12")
+
+    output = capsys.readouterr().out
+    assert "python3.12 -m venv" in output
+    assert "cisco-sccfm-devkit==0.39.3" in output
+    assert "cisco.sccfm:==0.39.3" in output
+    assert "pipx install" not in output
+
+
+def test_install_plan_rejects_a_version_different_from_homebrew(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(
+        setup_runtime,
+        "homebrew_formula_installation",
+        lambda: {"versions": ["0.40.0"]},
+    )
+
+    with pytest.raises(SystemExit, match="not 0.40.1"):
+        setup_runtime.print_plan("0.40.1", "python3.12")
+
+
+def test_cleanup_rejects_a_changed_plan_digest(monkeypatch: pytest.MonkeyPatch) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(
+        setup_runtime,
+        "cleanup_plan",
+        lambda remove_profiles, include_editable: {"plan_digest": "a" * 64},
+    )
+
+    with pytest.raises(RuntimeError, match="targets changed after review"):
+        setup_runtime.cleanup(
+            remove_profiles=True,
+            include_editable=False,
+            plan_digest="b" * 64,
+            confirmed=True,
+        )
+
+
+def test_cleanup_requires_confirmation() -> None:
+    setup_runtime = load_setup_runtime()
+
+    with pytest.raises(SystemExit, match="Refusing to clean up"):
+        setup_runtime.cleanup(
+            remove_profiles=True,
+            include_editable=False,
+            plan_digest="0" * 64,
+            confirmed=False,
+        )
+
+
+def test_cleanup_executes_the_reviewed_order_and_deletes_the_profile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_path = setup_runtime.expected_collection_path()
+    runtime_path = setup_runtime.expected_ansible_runtime_path()
+    profile_path = setup_runtime.profile_store_path()
+    profile_path.parent.mkdir(parents=True)
+    profile_path.write_text("secret")
+    events: list[str] = []
+    plan = {
+        "schema_version": 4,
+        "options": {"include_editable": False, "remove_profiles": True},
+        "collection_paths": [str(collection_path)],
+        "preserved_collection_paths": [],
+        "install_state": {"action": "absent", "path": "unused", "exists": False},
+        "ansible_runtime": {
+            "action": "delete",
+            "path": str(runtime_path),
+            "exists": True,
+        },
+        "homebrew_installation": {
+            "formula": "ciscodevnet/tap/sccfm-cli",
+            "versions": ["0.39.3"],
+            "command": ["brew", "uninstall", "ciscodevnet/tap/sccfm-cli"],
+            "environment": {"HOMEBREW_NO_AUTOREMOVE": "1"},
+        },
+        "pipx_command": ["pipx", "uninstall", "cisco-sccfm-devkit"],
+        "python_installations": [
+            {"command": ["/python", "-m", "pip", "uninstall", "cisco-sccfm-devkit"]}
+        ],
+        "preserved_python_installations": [],
+        "profile": {"action": "delete", "path": str(profile_path), "exists": True},
+    }
+    plan["plan_digest"] = setup_runtime.cleanup_plan_digest(plan)
+    monkeypatch.setattr(
+        setup_runtime,
+        "cleanup_plan",
+        lambda remove_profiles, include_editable: plan,
+    )
+    monkeypatch.setattr(
+        setup_runtime,
+        "validate_collection_before_removal",
+        lambda path: events.append(f"validate:{path}"),
+    )
+    monkeypatch.setattr(
+        setup_runtime.shutil,
+        "rmtree",
+        lambda path: events.append(f"collection:{path}"),
+    )
+    monkeypatch.setattr(
+        setup_runtime.subprocess,
+        "run",
+        lambda command, check, env=None: events.append(
+            f"command:{' '.join(command)}:{env.get('HOMEBREW_NO_AUTOREMOVE') if env else '-'}"
+        ),
+    )
+
+    setup_runtime.cleanup(
+        remove_profiles=True,
+        include_editable=False,
+        plan_digest=plan["plan_digest"],
+        confirmed=True,
+    )
+
+    assert events == [
+        f"validate:{collection_path}",
+        f"collection:{collection_path}",
+        f"collection:{runtime_path}",
+        "command:pipx uninstall cisco-sccfm-devkit:-",
+        "command:brew uninstall ciscodevnet/tap/sccfm-cli:1",
+        "command:/python -m pip uninstall cisco-sccfm-devkit:-",
+    ]
+    assert not profile_path.exists()
 
 
 def test_profile_diagnostics_expose_metadata_without_secret_contents(
@@ -425,10 +1016,17 @@ def test_profile_diagnostics_expose_metadata_without_secret_contents(
         "sccfm-cli status",
         "sccfm-cli --profile default --silent status --format json",
         "sccfm-cli schema export --format json",
+        "sccfm-cli objects network delete --uid example --check",
+        "ansible-playbook --syntax-check playbook.yml",
+        "ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook --syntax-check playbook.yml",
+        (
+            "/Users/example/.sccfm-agent-plugin/ansible-runtime/bin/ansible-playbook "
+            "--syntax-check playbook.yml"
+        ),
         "command -v sccfm-cli",
     ],
 )
-def test_guard_allows_schema_proven_readonly_commands(command: str) -> None:
+def test_guard_allows_proven_readonly_commands(command: str) -> None:
     guard = load_command_guard()
 
     classification, _reason = guard.classify_command(command, sample_schema())
@@ -440,20 +1038,39 @@ def test_guard_allows_schema_proven_readonly_commands(command: str) -> None:
     "command",
     [
         "sccfm-cli inventory devices delete --uid example",
+        "sccfm-cli objects network delete --uid example --check --api-token secret",
         "sccfm-cli schema export --output schema.json",
         "sccfm-cli status | tee status.txt",
         "env DEBUG=1 sccfm-cli status",
         "SCCFM_CONFIG=/tmp/test sccfm-cli inventory devices delete --uid example",
         "DEBUG=1 ansible-playbook change.yml",
+        "ANSIBLE_LOCAL_TEMP=relative ansible-playbook --syntax-check playbook.yml",
+        "ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook change.yml",
         "nohup sccfm-cli inventory devices delete --uid example",
         "nice ansible-playbook change.yml",
         "ansible-playbook change.yml",
+        "/Users/example/.sccfm-agent-plugin/ansible-runtime/bin/ansible-playbook change.yml",
         "ansible-galaxy collection install cisco.sccfm",
     ],
 )
 def test_guard_requires_review_for_mutating_local_write_or_composed_commands(
     command: str,
 ) -> None:
+    guard = load_command_guard()
+
+    classification, _reason = guard.classify_command(command, sample_schema())
+
+    assert classification == "review"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "sccfm-cli objects network delete --uid=--check",
+        "sccfm-cli objects network delete --uid --check",
+    ],
+)
+def test_guard_does_not_treat_an_option_value_named_check_as_preflight(command: str) -> None:
     guard = load_command_guard()
 
     classification, _reason = guard.classify_command(command, sample_schema())
@@ -486,6 +1103,8 @@ def test_guard_ignores_unrelated_commands(command: str) -> None:
         "env DEBUG=1 sccfm-cli inventory devices delete --uid example",
         "SCCFM_CONFIG=/tmp/test sccfm-cli inventory devices delete --uid example",
         "DEBUG=1 ansible-playbook change.yml",
+        "ansible-playbook --syntax-check playbook.yml",
+        "ANSIBLE_LOCAL_TEMP=relative ansible-playbook change.yml",
         "nohup sccfm-cli inventory devices delete --uid example",
         "nice ansible-playbook change.yml",
         "sccfm-cli inventory devices unknown --uid example",
@@ -498,6 +1117,36 @@ def test_guard_rejects_unsafe_or_unverifiable_approval_commands(command: str) ->
     assert guard.approval_eligible(command, sample_schema()) is False
 
 
+def test_guard_allows_approval_for_safe_temp_prefixed_ansible_execution() -> None:
+    guard = load_command_guard()
+
+    assert (
+        guard.approval_eligible(
+            "ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook change.yml", sample_schema()
+        )
+        is True
+    )
+
+
+def test_syntax_check_proceeds_without_an_approval_receipt(tmp_path: Path) -> None:
+    guard = load_command_guard()
+
+    decision = guard.process_tool_use(
+        {
+            "session_id": "syntax-check",
+            "tool_input": {
+                "command": ("ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook --syntax-check playbook.yml")
+            },
+        },
+        "codex",
+        tmp_path,
+        sample_schema(),
+    )
+
+    assert decision is None
+    assert not guard.approval_path(tmp_path, "syntax-check").exists()
+
+
 def test_exact_approval_command_requires_a_standalone_message() -> None:
     guard = load_command_guard()
     command = "sccfm-cli inventory devices delete --uid example"
@@ -508,20 +1157,15 @@ def test_exact_approval_command_requires_a_standalone_message() -> None:
     assert guard.exact_approval_command("EXECUTE ") is None
 
 
-def test_planned_command_requires_one_standalone_marker() -> None:
+def test_planned_command_requires_one_standalone_execute_instruction() -> None:
     guard = load_command_guard()
     command = "sccfm-cli inventory devices delete --uid example"
 
-    assert guard.planned_command(f"Plan ready.\nSCCFM_APPROVAL_COMMAND: {command}") == command
-    assert guard.planned_command(f"SCCFM_APPROVAL_COMMAND: {command}\nSummary") == command
-    assert (
-        guard.planned_command(
-            f"SCCFM_APPROVAL_COMMAND: {command}\nSCCFM_APPROVAL_COMMAND: {command} --check"
-        )
-        is None
-    )
-    assert guard.planned_command("No approval marker") is None
-    assert guard.planned_command("SCCFM_APPROVAL_COMMAND: ") is None
+    assert guard.planned_command(f"Plan ready.\nEXECUTE {command}") == command
+    assert guard.planned_command(f"EXECUTE {command}\nSummary") == command
+    assert guard.planned_command(f"EXECUTE {command}\nEXECUTE {command} --check") is None
+    assert guard.planned_command("No approval instruction") is None
+    assert guard.planned_command("EXECUTE ") is None
 
 
 def test_guard_detects_the_host_from_plugin_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -601,7 +1245,7 @@ def test_assistant_plan_records_only_one_eligible_exact_command(tmp_path: Path) 
         guard.process_assistant_plan(
             {
                 "session_id": "planned",
-                "last_assistant_message": f"Plan ready.\nSCCFM_APPROVAL_COMMAND: {command}",
+                "last_assistant_message": f"Plan ready.\nEXECUTE {command}",
             },
             tmp_path,
             sample_schema(),
@@ -613,7 +1257,7 @@ def test_assistant_plan_records_only_one_eligible_exact_command(tmp_path: Path) 
         guard.process_assistant_plan(
             {
                 "session_id": "readonly",
-                "last_assistant_message": "SCCFM_APPROVAL_COMMAND: sccfm-cli status",
+                "last_assistant_message": "EXECUTE sccfm-cli status",
             },
             tmp_path,
             sample_schema(),
@@ -623,7 +1267,9 @@ def test_assistant_plan_records_only_one_eligible_exact_command(tmp_path: Path) 
     assert not guard.plan_path(tmp_path, "readonly").exists()
 
 
-def test_latest_assistant_message_without_a_valid_marker_clears_stale_plan(tmp_path: Path) -> None:
+def test_latest_assistant_message_without_a_valid_instruction_clears_stale_plan(
+    tmp_path: Path,
+) -> None:
     guard = load_command_guard()
     command = "sccfm-cli inventory devices delete --uid example"
     guard.store_plan(tmp_path, "session", command)
@@ -725,7 +1371,7 @@ def test_codex_approved_command_proceeds_and_consumes_receipt(tmp_path: Path) ->
     assert not guard.approval_path(tmp_path, "codex-session").exists()
 
 
-def test_claude_approved_command_requests_host_confirmation(tmp_path: Path) -> None:
+def test_claude_approved_command_proceeds_and_consumes_receipt(tmp_path: Path) -> None:
     guard = load_command_guard()
     command = "ansible-playbook -i inventory.yml change.yml"
     guard.store_approval(tmp_path, "claude-session", command)
@@ -737,7 +1383,7 @@ def test_claude_approved_command_requests_host_confirmation(tmp_path: Path) -> N
         sample_schema(),
     )
 
-    assert decision["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert decision is None
     assert not guard.approval_path(tmp_path, "claude-session").exists()
 
 
