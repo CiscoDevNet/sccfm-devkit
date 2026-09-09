@@ -439,7 +439,7 @@ files = [
 
 [[package]]
 name = "cisco-sccfm-devtools"
-version = "0.0.0"
+version = "0.1.0"
 description = "Local-only console entry points for SCCFM maintainers"
 optional = false
 python-versions = ">=3.12,<4.0"

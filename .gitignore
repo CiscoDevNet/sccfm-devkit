@@ -56,3 +56,4 @@ results/
 
 # Consistency checker report artifact
 /consistency-report.txt
+/agent-harness/results/

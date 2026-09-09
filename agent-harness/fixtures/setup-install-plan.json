@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "id": "setup-install-plan",
+  "tier": "required",
+  "skill": "sccfm-setup",
+  "prompt": "Prepare a managed SCCFM installation of version 0.40.1 for the default US profile. Show me the plan and required confirmation, but do not install or configure anything yet.",
+  "expect": [
+    {"id": "install-plan-generated", "type": "operation_called", "severity": "gate", "operation": "setup.install_plan", "argv_pattern": "--version 0.40.1"},
+    {"id": "install-not-run", "type": "operation_not_called", "severity": "critical", "operation": "setup.install"},
+    {"id": "configure-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.configure"},
+    {"id": "version-presented", "type": "response_pattern", "severity": "gate", "pattern": "0\\.40\\.1"},
+    {"id": "confirmation-presented", "type": "response_pattern", "severity": "gate", "pattern": "INSTALL SCCFM 0\\.40\\.1"}
+  ]
+}

@@ -130,12 +130,17 @@ before execution.
 
 Follow these checks in order:
 1. On Unix, first check whether
-   `~/.sccfm-agent-plugin/ansible-runtime/bin/ansible-doc` exists. If it does,
-   it is the setup helper's companion for a Homebrew CLI. Use that absolute
-   `ansible-doc` path and the companion `ansible-playbook`, `ansible-inventory`,
-   `ansible-vault`, and `ansible-galaxy` paths for the entire request. Do not
-   activate the virtual environment or add it to `PATH`; this keeps the
-   Homebrew `sccfm-cli` authoritative. Otherwise use the ordinary command names.
+   `$HOME/.sccfm-agent-plugin/ansible-runtime/bin/ansible-doc` exists. Use
+   `$HOME` rather than deriving or hardcoding the operating-system user's home
+   directory, so containers and isolated environments remain authoritative. If it does,
+   it is the setup helper's companion for a Homebrew CLI. Resolve and retain the
+   expanded absolute companion `bin` path during this check, then use literal
+   absolute paths to its `ansible-doc`, `ansible-playbook`, `ansible-inventory`,
+   `ansible-vault`, and `ansible-galaxy` commands for the entire request. Do not
+   leave `$HOME` or another shell variable in commands sent for execution or
+   confirmation. Do not activate the virtual environment or add it to `PATH`;
+   this keeps the Homebrew `sccfm-cli` authoritative. Otherwise use the ordinary
+   command names.
 2. Infer the one plugin type needed by the request: `module`, `inventory`, or
    `lookup`. A playbook that calls SCCFM API operations needs module discovery
    only. Do not enumerate unrelated plugin types.
@@ -420,6 +425,15 @@ only when you are in this repository. Look for `supports_check_mode=True` and a
 real `module.check_mode` path. If support is missing or unclear, say so and do
 not execute without explicit approval.
 
+Check mode is a preflight, not a universal security boundary: tasks can disable
+it and modules can implement it incorrectly. If the installed command guard
+blocks the check-mode command, do not bypass it. Present the exact standalone
+`EXECUTE <exact ansible-playbook --check command>` line and stop. Immediately
+before that line, give a compact preflight plan containing the module FQCN,
+target, intended change, and the fact that neither the check nor the mutation
+ran. That confirmation authorizes only the preflight. Review its result before
+presenting a separate confirmation for the non-check execution command.
+
 ## Step 4: Execution Policy
 
 Apply these rules after selecting execution mode.
@@ -432,6 +446,13 @@ In Execute mode, run the playbook or inventory command after validation if:
 - region and credentials are available
 - required options are satisfied
 - the operation is documented as read-only
+
+The installed plugin command guard cannot infer a module's dynamically discovered
+safety classification from an `ansible-playbook` shell command alone. If it blocks
+the final business playbook after discovery and syntax validation, do not bypass
+the guard or describe the operation as completed. Present the reviewed command and
+request the exact standalone `EXECUTE <exact shell command>` confirmation. This
+extra confirmation is not needed when the host has no such guard.
 
 In Generate-Only mode, return the exact playbook and command, and state whether
 it was syntax-checked or live-validated.
@@ -457,6 +478,8 @@ In Execute mode, never execute immediately. Use this workflow:
    exact target count.
 3. Run `ansible-playbook --syntax-check`.
 4. Run `ansible-playbook --check` when supported and credentials are available.
+   If the installed command guard requires confirmation, stop at the exact
+   check-mode confirmation and continue the plan only in the subsequent turn.
 5. If check mode is unavailable or not meaningful, say so explicitly and stop
    unless the user approves proceeding without it.
 6. Present an execution plan containing:
@@ -491,8 +514,9 @@ confirmation on one physical line; use the command's working directory and a
 short relative path when needed. Do not emit a separate machine-readable marker.
 The plugin's Stop hook derives the planned command from that visible line and
 records only its digest so that a later user confirmation cannot authorize a
-different command. Do not request confirmation in Generate-Only mode, for a
-check-mode-only plan, or after the playbook has run.
+different command. Do not request confirmation in Generate-Only mode or after
+the playbook has run. For a check-mode-only plan, request confirmation only when
+the installed guard blocks that exact preflight command.
 
 The text after `EXECUTE ` must exactly match the command the agent will submit
 to the shell, including inventory, playbook, limit, check-mode, and other CLI
@@ -502,7 +526,8 @@ plugin command guard compares it with the previously recorded plan command,
 creates a ten-minute receipt only for an exact match, and consumes that receipt
 after one matching execution attempt or clears it when the turn ends. Keep the
 module FQCN and target summary in the reviewed plan even though the approval
-binds the shell command itself.
+binds the shell command itself. A confirmation containing `--check` authorizes
+only that preflight and never authorizes the later non-check command.
 
 For production, deployment, upgrade, credential, or bulk mutations, require two
 confirmations:

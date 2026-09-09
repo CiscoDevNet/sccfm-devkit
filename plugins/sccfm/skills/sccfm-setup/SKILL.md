@@ -10,6 +10,10 @@ Install the requested runtime with the fewest necessary discovery steps. Keep
 secrets out of chat and do not install or replace software until the user
 approves the exact plan.
 
+Resolve the plugin root from this loaded `SKILL.md` once. Set `PLUGIN_ROOT` to
+that absolute directory and use it for every packaged-helper invocation below.
+Do not assume that the shell's current directory is the plugin root.
+
 ## Setup modes
 
 - **Check:** inspect the current runtime without changing it.
@@ -43,7 +47,7 @@ continue once it is known.
 3. Generate the exact plan once:
 
    ```bash
-   python3 scripts/setup_runtime.py plan --version X.Y.Z --python python3.12
+   python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" plan --version X.Y.Z --python python3.12
    ```
 
 4. The helper automatically chooses the complete pipx path or, for the
@@ -53,7 +57,7 @@ continue once it is known.
    Require `INSTALL SCCFM X.Y.Z`, then run exactly one helper command:
 
    ```bash
-   python3 scripts/setup_runtime.py install --version X.Y.Z --python python3.12 --yes
+   python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" install --version X.Y.Z --python python3.12 --yes
    ```
 
 5. Verify the CLI schema export and Ansible collection discovery once. For a
@@ -67,7 +71,7 @@ continue once it is known.
 Resolve this skill's plugin root, then run:
 
 ```bash
-python3 scripts/setup_runtime.py doctor --json
+python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" doctor --json
 ```
 
 Summarize missing commands, detected versions, schema availability, collection
@@ -94,7 +98,7 @@ Select an available Python 3.12 executable from the doctor report. Generate the
 exact plan without executing it:
 
 ```bash
-python3 scripts/setup_runtime.py plan --version X.Y.Z --python python3.12
+python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" plan --version X.Y.Z --python python3.12
 ```
 
 The helper supports two version-aligned layouts:
@@ -120,7 +124,7 @@ instead of producing a mixed runtime.
 Require the exact confirmation `INSTALL SCCFM X.Y.Z`. Only then run:
 
 ```bash
-python3 scripts/setup_runtime.py install --version X.Y.Z --python python3.12 --yes
+python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" install --version X.Y.Z --python python3.12 --yes
 ```
 
 Do not use `--yes` before receiving that confirmation. Do not install from an

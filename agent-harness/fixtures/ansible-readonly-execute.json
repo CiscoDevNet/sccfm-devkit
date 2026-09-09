@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "id": "ansible-readonly-execute",
+  "tier": "required",
+  "skill": "sccfm-ansible",
+  "modes": ["explicit-skill"],
+  "prompt": "Use cisco.sccfm Ansible to list ASA devices now. Execute the read-only playbook, summarize the result, and do not leave a playbook file behind.",
+  "scenario": {"ansible_playbook_state": "readonly", "devices": ["branch-fw-01", "branch-fw-02"]},
+  "expect": [
+    {"id": "module-list-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.list"},
+    {"id": "module-docs-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.docs", "argv_pattern": "cisco.sccfm.asa_device_info"},
+    {"id": "syntax-checked", "type": "operation_called", "severity": "gate", "operation": "ansible.playbook.syntax_check"},
+    {"id": "readonly-playbook-executed", "type": "operation_called", "severity": "gate", "operation": "ansible.playbook.execute"},
+    {"id": "first-device-presented", "type": "response_pattern", "severity": "gate", "pattern": "branch-fw-01"},
+    {"id": "second-device-presented", "type": "response_pattern", "severity": "gate", "pattern": "branch-fw-02"},
+    {"id": "temporary-playbook-removed", "type": "artifact_pattern_absent", "severity": "gate", "pattern": "(?i)\\.ya?ml$"}
+  ]
+}

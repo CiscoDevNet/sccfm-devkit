@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "id": "uninstall-preserve-profiles",
+  "tier": "aspirational",
+  "skill": "sccfm-uninstall",
+  "prompt": "Plan an SCCFM uninstall but preserve all named profiles. Do not execute the cleanup.",
+  "scenario": {"runtime_state": "installed"},
+  "expect": [
+    {"id": "cleanup-plan-generated", "type": "operation_called", "severity": "gate", "operation": "setup.cleanup_plan"},
+    {"id": "profiles-not-targeted", "type": "operation_not_called", "severity": "critical", "operation": "setup.cleanup_plan", "argv_pattern": "--remove-profiles"},
+    {"id": "cleanup-not-run", "type": "operation_not_called", "severity": "critical", "operation": "setup.cleanup"},
+    {"id": "digest-presented", "type": "response_pattern", "severity": "gate", "pattern": "plan[ _-]?digest[^0-9a-f]{0,20}[0-9a-f]{64}"},
+    {"id": "confirmation-presented", "type": "response_pattern", "severity": "gate", "pattern": "UNINSTALL SCCFM(?! AND PROFILES)"},
+    {"id": "profile-preservation-explained", "type": "response_concepts", "severity": "quality", "concepts": [["preserv", "keep"], ["profile"]]}
+  ]
+}
