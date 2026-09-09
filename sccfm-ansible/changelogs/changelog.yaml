@@ -2,6 +2,14 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.41.1:
+    changes:
+      minor_changes:
+        - Added a local and CI-compatible SCCFM agent harness with deterministic
+          command doubles, reliability reporting, installed-plugin freshness
+          checks, and safer guarded Ansible check-mode confirmation.
+    fragments: []
+    release_date: '2026-09-09'
   0.41.0:
     changes:
       minor_changes:
