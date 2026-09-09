@@ -655,9 +655,11 @@ def test_cleanup_stub_distinguishes_profile_removal(tmp_path: Path) -> None:
     environment = isolated_environment(
         tmp_path, binary_directory, Scenario(runtime_state="installed")
     )
+    shell = shutil.which("sh")
+    assert shell is not None
 
     shell_brew = subprocess.run(
-        ["/bin/zsh", "-lc", "command -v brew"],
+        [shell, "-lc", "command -v brew"],
         check=False,
         capture_output=True,
         text=True,
