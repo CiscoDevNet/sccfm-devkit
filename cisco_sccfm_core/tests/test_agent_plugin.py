@@ -103,7 +103,11 @@ def test_plugin_manifests_and_marketplaces_are_aligned() -> None:
     )
 
     assert codex_manifest["name"] == claude_manifest["name"] == "sccfm"
-    assert codex_manifest["version"] == claude_manifest["version"]
+    codex_base_version, separator, cachebuster = codex_manifest["version"].partition("+")
+    assert codex_base_version == claude_manifest["version"]
+    if separator:
+        assert cachebuster.startswith("codex.local-")
+    assert len(codex_manifest["interface"]["defaultPrompt"]) <= 3
     assert codex_marketplace["plugins"][0]["name"] == "sccfm"
     assert codex_marketplace["plugins"][0]["source"]["path"] == "./plugins/sccfm"
     assert claude_marketplace["plugins"][0]["name"] == "sccfm"
@@ -1034,6 +1038,18 @@ def test_guard_allows_proven_readonly_commands(command: str) -> None:
     assert classification == "readonly"
 
 
+def test_guard_allows_schema_bootstrap_when_installed_schema_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    guard = load_command_guard()
+    monkeypatch.setattr(guard, "load_schema", lambda: None)
+
+    classification, reason = guard.classify_command("sccfm-cli schema export --format json")
+
+    assert classification == "readonly"
+    assert "bootstrap" in reason
+
+
 @pytest.mark.parametrize(
     "command",
     [
@@ -1046,6 +1062,8 @@ def test_guard_allows_proven_readonly_commands(command: str) -> None:
         "DEBUG=1 ansible-playbook change.yml",
         "ANSIBLE_LOCAL_TEMP=relative ansible-playbook --syntax-check playbook.yml",
         "ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook change.yml",
+        "ansible-playbook --check playbook.yml",
+        "ANSIBLE_LOCAL_TEMP=/tmp ansible-playbook playbook.yml --check",
         "nohup sccfm-cli inventory devices delete --uid example",
         "nice ansible-playbook change.yml",
         "ansible-playbook change.yml",

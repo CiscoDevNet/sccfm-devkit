@@ -1,0 +1,648 @@
+<!--
+Copyright 2026 Cisco Systems, Inc. and its affiliates
+
+SPDX-License-Identifier: Apache-2.0
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SCCFM harness results</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --page: light-dark(#f5f7fa, #0b1016);
+      --surface: light-dark(#ffffff, #131a22);
+      --surface-raised: light-dark(#f8fafc, #19222c);
+      --text: light-dark(#16202a, #edf3f8);
+      --muted: light-dark(#607080, #9dafbe);
+      --border: light-dark(#dbe3ea, #2c3946);
+      --accent: light-dark(#075985, #67c5ee);
+      --accent-soft: light-dark(#e0f2fe, #12364a);
+      --success: light-dark(#16794c, #55d79a);
+      --success-soft: light-dark(#e7f7ef, #123c2b);
+      --warning: light-dark(#9a5b00, #f2bb58);
+      --warning-soft: light-dark(#fff4d6, #3c2c0f);
+      --danger: light-dark(#b42318, #ff8a80);
+      --danger-soft: light-dark(#fdecea, #431d1d);
+      --critical: light-dark(#9f1239, #fb7185);
+      --functional: light-dark(#1d4ed8, #7aa2ff);
+      --quality: light-dark(#7e22ce, #c084fc);
+      --shadow: 0 12px 32px light-dark(rgb(27 43 58 / 8%), rgb(0 0 0 / 24%));
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--text); }
+    button, select { font: inherit; }
+    button { color: inherit; }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    code { overflow-wrap: anywhere; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+
+    .shell { max-width: 1440px; margin: 0 auto; padding: 28px; }
+    .topbar { display: flex; justify-content: space-between; gap: 24px; align-items: end; }
+    .eyebrow { color: var(--accent); font-size: .78rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    h1 { margin: 6px 0 4px; font-size: clamp(1.75rem, 4vw, 2.65rem); letter-spacing: -.04em; }
+    h2 { margin: 0; font-size: 1.25rem; }
+    h3 { margin: 0; font-size: 1rem; }
+    p { line-height: 1.55; }
+    .subtle { color: var(--muted); margin: 0; }
+    .run-meta { text-align: right; color: var(--muted); line-height: 1.55; }
+
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 24px 0 14px; }
+    .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+    .metric-label { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: .82rem; }
+    .metric-value { margin-top: 8px; font-size: 1.7rem; font-weight: 750; letter-spacing: -.03em; }
+    .metric-note { color: var(--muted); font-size: .78rem; margin-top: 3px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--success); }
+    .dot.has-failures { background: var(--danger); }
+
+    .truth-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--border); margin-bottom: 24px; }
+    .truth { background: var(--surface-raised); padding: 14px 16px; }
+    .truth strong { display: block; margin-bottom: 3px; }
+    .truth span { color: var(--muted); font-size: .84rem; line-height: 1.35; }
+
+    .workspace { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 18px; align-items: start; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); }
+    .index { position: sticky; top: 16px; overflow: hidden; }
+    .index-head { padding: 16px; border-bottom: 1px solid var(--border); }
+    .filter-label { display: block; color: var(--muted); font-size: .78rem; margin: 13px 0 5px; }
+    select { width: 100%; color: var(--text); background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+    .case-list { display: grid; max-height: calc(100vh - 250px); overflow: auto; }
+    .case-button { border: 0; border-bottom: 1px solid var(--border); background: transparent; padding: 13px 16px; text-align: left; cursor: pointer; }
+    .case-button:last-child { border-bottom: 0; }
+    .case-button:hover { background: var(--surface-raised); }
+    .case-button[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+    .case-title { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .case-name { font-weight: 650; overflow-wrap: anywhere; }
+    .case-info { color: var(--muted); font-size: .76rem; margin-top: 5px; }
+    .status { display: inline-flex; align-items: center; gap: 5px; font-size: .7rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+    .status.pass { color: var(--success); }
+    .status.warn { color: var(--warning); }
+    .status.fail { color: var(--danger); }
+    .status.invalid { color: var(--warning); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+    .detail { padding: 22px; min-width: 0; }
+    .detail-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+    .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+    .tag { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; color: var(--muted); background: var(--surface-raised); font-size: .75rem; }
+    .verdict { text-align: right; }
+    .verdict .status { font-size: .82rem; }
+    .duration { display: block; color: var(--muted); margin-top: 4px; font-size: .78rem; }
+    .section { margin-top: 26px; }
+    .section-title { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-bottom: 1px solid var(--border); padding-bottom: 9px; margin-bottom: 13px; }
+    .section-title span { color: var(--muted); font-size: .78rem; }
+
+    .prompt { padding: 14px 16px; border-left: 3px solid var(--accent); background: var(--surface-raised); border-radius: 0 10px 10px 0; line-height: 1.55; }
+    .scenario { display: flex; flex-wrap: wrap; gap: 14px 24px; margin-top: 12px; color: var(--muted); font-size: .82rem; }
+    .scenario strong { color: var(--text); font-weight: 600; }
+
+    .outcomes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .outcome { padding: 13px; border-radius: 10px; background: var(--surface-raised); border-left: 3px solid currentColor; }
+    .outcome.safety { color: var(--critical); }
+    .outcome.functional { color: var(--functional); }
+    .outcome.quality { color: var(--quality); }
+    .outcome.harness { color: var(--warning); }
+    .outcome-name { font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 750; }
+    .outcome-result { color: var(--text); font-weight: 650; margin-top: 4px; }
+    .outcome-explain { color: var(--muted); font-size: .76rem; margin-top: 3px; }
+
+    .timeline { list-style: none; margin: 0; padding: 0; counter-reset: steps; }
+    .timeline > li { counter-increment: steps; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding-bottom: 20px; position: relative; }
+    .timeline > li::before { content: counter(steps); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--accent); background: var(--accent-soft); font-weight: 750; font-size: .78rem; z-index: 1; }
+    .timeline > li:not(:last-child)::after { content: ""; position: absolute; left: 13px; top: 28px; bottom: 0; width: 1px; background: var(--border); }
+    .step-copy { min-width: 0; }
+    .step-copy > p { margin: 4px 0 0; color: var(--muted); font-size: .84rem; }
+    .trace { margin-top: 10px; display: grid; gap: 8px; min-width: 0; }
+    details { border: 1px solid var(--border); border-radius: 9px; background: var(--surface-raised); min-width: 0; max-width: 100%; }
+    summary { padding: 10px 12px; cursor: pointer; font-size: .82rem; font-weight: 600; min-width: 0; }
+    .details-body { border-top: 1px solid var(--border); padding: 12px; }
+    .command-summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; width: 100%; }
+    .command-summary code { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kind { flex: 0 0 auto; color: var(--accent); font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; }
+    .exit { flex: 0 0 auto; margin-left: auto; color: var(--success); }
+    .exit.bad { color: var(--danger); }
+    .code-label { color: var(--muted); font-size: .72rem; margin: 10px 0 5px; text-transform: uppercase; letter-spacing: .05em; }
+    .code-box { padding: 11px; border-radius: 7px; background: var(--page); font-size: .78rem; line-height: 1.5; max-height: 350px; overflow: auto; }
+    .response { padding: 15px; background: var(--surface-raised); border-radius: 10px; font-size: .84rem; line-height: 1.55; }
+
+    .assertions { display: grid; gap: 9px; }
+    .assertion { display: grid; grid-template-columns: 82px 24px minmax(0, 1fr); gap: 9px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .assertion:last-child { border-bottom: 0; }
+    .severity { font-size: .7rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+    .severity.critical { color: var(--critical); }
+    .severity.gate { color: var(--functional); }
+    .severity.quality { color: var(--quality); }
+    .severity.harness { color: var(--warning); }
+    .check { font-weight: 750; color: var(--success); }
+    .check.bad { color: var(--danger); }
+    .assertion-name { font-weight: 650; overflow-wrap: anywhere; }
+    .assertion-message { color: var(--muted); font-size: .8rem; margin-top: 3px; }
+    .evidence { margin-top: 7px; font-size: .75rem; }
+    .empty { color: var(--muted); padding: 18px 0; }
+    .diagnostics { color: var(--danger); }
+    .reliability { margin: 0 0 24px; padding: 18px; overflow-x: auto; }
+    .reliability table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .82rem; }
+    .reliability th, .reliability td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    .reliability th { color: var(--muted); font-weight: 650; }
+    .reliability td.number, .reliability th.number { text-align: right; }
+
+    @media (max-width: 900px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .workspace { grid-template-columns: 1fr; }
+      .index { position: static; }
+      .case-list { max-height: 310px; }
+    }
+
+    @media (max-width: 560px) {
+      .shell { padding: 16px; }
+      .topbar, .detail-head { display: block; }
+      .run-meta, .verdict { text-align: left; margin-top: 10px; }
+      .metrics, .truth-strip, .outcomes { grid-template-columns: 1fr; }
+      .truth-strip { gap: 1px; }
+      .detail { padding: 16px; }
+      .assertion { grid-template-columns: 72px 20px minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Agent evaluation</div>
+        <h1>SCCFM harness results</h1>
+        <p class="subtle" id="headline">Loading run…</p>
+      </div>
+      <div class="run-meta" id="run-meta"></div>
+    </header>
+
+    <section class="metrics" id="metrics" aria-label="Run summary"></section>
+
+    <section class="truth-strip" aria-label="How this evaluation works">
+      <div class="truth"><strong>Real Codex session</strong><span>The model actually read the skill, chose commands, and wrote the answer.</span></div>
+      <div class="truth"><strong>Simulated SCCFM environment</strong><span>CLI, Ansible, credentials, devices, and API responses came from deterministic test doubles.</span></div>
+      <div class="truth"><strong>Structured execution evidence</strong><span>Fake tools record actual invocations. Hook-blocked attempts are shown separately and never count as executed.</span></div>
+    </section>
+
+    <section class="panel reliability" id="reliability" aria-label="Reliability by fixture"></section>
+
+    <section class="workspace">
+      <aside class="panel index" aria-label="Test cases">
+        <div class="index-head">
+          <h2>Test cases</h2>
+          <label class="filter-label" for="result-filter">Show</label>
+          <select id="result-filter">
+            <option value="all">All results</option>
+            <option value="failed">Gate failures</option>
+            <option value="invalid">Harness-invalid samples</option>
+            <option value="warnings">Quality warnings</option>
+            <option value="passed">Clean passes</option>
+          </select>
+        </div>
+        <div class="case-list" id="case-list"></div>
+      </aside>
+
+      <article class="panel detail" id="detail" aria-live="polite"></article>
+    </section>
+  </main>
+
+  <script id="harness-data" type="application/json">__SCCFM_HARNESS_DATA__</script>
+  <script>
+    (() => {
+      "use strict";
+
+      const data = JSON.parse(document.getElementById("harness-data").textContent);
+      const results = Array.isArray(data.results) ? data.results : [];
+      const byId = new Map(results.map((result, index) => [resultKey(result, index), result]));
+      let selectedKey = results.length ? resultKey(results[0], 0) : null;
+
+      function element(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = String(text);
+        return node;
+      }
+
+      function resultKey(result, index) {
+        return `${result.fixture_id || "case"}:${result.mode || "mode"}:${result.sample || index + 1}`;
+      }
+
+      function resultStatus(result) {
+        if (result.harness_valid === false) return {label: "Harness invalid", kind: "invalid"};
+        if (!result.passed) return {label: "Failed", kind: "fail"};
+        if ((result.warnings || []).length || !result.quality_passed) {
+          return {label: "Warning", kind: "warn"};
+        }
+        return {label: "Passed", kind: "pass"};
+      }
+
+      function statusNode(result) {
+        const status = resultStatus(result);
+        const node = element("span", `status ${status.kind}`);
+        node.append(element("span", "status-dot"), document.createTextNode(status.label));
+        return node;
+      }
+
+      function summaryCategory(name) {
+        const category = (data.summary || {})[name] || {};
+        return {
+          passed: Number(category.passed || 0),
+          failed: Number(category.failed || 0),
+          total: Number(category.total || results.length),
+        };
+      }
+
+      function renderHeader() {
+        const overall = summaryCategory("overall");
+        document.getElementById("headline").textContent =
+          `${overall.passed} of ${overall.total} samples passed the configured gate`;
+        const metadata = data.metadata || {};
+        const generated = data.generated_at ? new Date(data.generated_at).toLocaleString() : "Unknown time";
+        const parts = [
+          generated,
+          metadata.mode || "unknown mode",
+          metadata.model || "configured model",
+        ];
+        if (metadata.plugin_freshness) {
+          parts.push(metadata.plugin_freshness.fresh
+            ? `plugin ${metadata.plugin_freshness.version} · source current`
+            : `plugin ${metadata.plugin_freshness.version} · stale source`);
+        }
+        document.getElementById("run-meta").replaceChildren(...parts.map((part, index) => {
+          const fragment = document.createDocumentFragment();
+          if (index) fragment.append(document.createElement("br"));
+          fragment.append(document.createTextNode(part));
+          return fragment;
+        }));
+      }
+
+      function renderMetrics() {
+        const definitions = [
+          ["overall", "Overall gate", "Safety + functional"],
+          ["harness", "Harness", "Deterministic isolation"],
+          ["safety", "Safety", "Critical protections"],
+          ["functional", "Functional", "Required behavior"],
+          ["quality", "Quality", "Answer quality"],
+        ];
+        const container = document.getElementById("metrics");
+        container.replaceChildren(...definitions.map(([key, label, note]) => {
+          const harness = key === "harness" ? ((data.summary || {}).harness || {}) : null;
+          const value = harness ? {
+            passed: Number(harness.valid || 0),
+            failed: Number(harness.invalid || 0),
+            total: Number(harness.total || results.length),
+          } : summaryCategory(key);
+          const card = element("div", "metric");
+          const heading = element("div", "metric-label");
+          heading.append(element("span", "", label));
+          heading.append(element("span", `dot${value.failed ? " has-failures" : ""}`));
+          card.append(
+            heading,
+            element("div", "metric-value", `${value.passed} / ${value.total}`),
+            element("div", "metric-note", value.failed ? `${value.failed} failed · ${note}` : `All passed · ${note}`),
+          );
+          return card;
+        }));
+      }
+
+      function matchesFilter(result, filter) {
+        if (filter === "invalid") return result.harness_valid === false;
+        if (filter === "failed") return !result.passed;
+        if (filter === "warnings") return Boolean((result.warnings || []).length || !result.quality_passed);
+        if (filter === "passed") return Boolean(result.passed && !(result.warnings || []).length && result.quality_passed);
+        return true;
+      }
+
+      function renderList() {
+        const filter = document.getElementById("result-filter").value;
+        const list = document.getElementById("case-list");
+        const visible = results.map((result, index) => ({result, key: resultKey(result, index)}))
+          .filter(({result}) => matchesFilter(result, filter));
+        if (!visible.length) {
+          list.replaceChildren(element("div", "empty", "No test cases match this filter."));
+          return;
+        }
+        if (!visible.some(({key}) => key === selectedKey)) selectedKey = visible[0].key;
+        list.replaceChildren(...visible.map(({result, key}) => {
+          const button = element("button", "case-button");
+          button.type = "button";
+          button.setAttribute("aria-current", String(key === selectedKey));
+          const title = element("div", "case-title");
+          title.append(element("span", "case-name", result.fixture_id || "Unnamed test"), statusNode(result));
+          button.append(title, element("div", "case-info", `${result.mode || "unknown mode"} · sample ${result.sample || 1} · ${formatDuration(result.duration_seconds)}`));
+          button.addEventListener("click", () => {
+            selectedKey = key;
+            renderList();
+            renderDetail(result);
+          });
+          return button;
+        }));
+      }
+
+      function formatDuration(seconds) {
+        const value = Number(seconds || 0);
+        return value >= 60 ? `${Math.floor(value / 60)}m ${Math.round(value % 60)}s` : `${value.toFixed(1)}s`;
+      }
+
+      function tag(text) {
+        return element("span", "tag", text);
+      }
+
+      function section(title, caption) {
+        const wrapper = element("section", "section");
+        const heading = element("div", "section-title");
+        heading.append(element("h2", "", title));
+        if (caption) heading.append(element("span", "", caption));
+        wrapper.append(heading);
+        return wrapper;
+      }
+
+      function renderDetail(result) {
+        const root = document.getElementById("detail");
+        const header = element("div", "detail-head");
+        const identity = element("div");
+        identity.append(element("h2", "", result.fixture_id || "Unnamed test"));
+        const tags = element("div", "tags");
+        [result.mode, result.skill, result.tier, `sample ${result.sample || 1}`].filter(Boolean)
+          .forEach((value) => tags.append(tag(value)));
+        identity.append(tags);
+        const verdict = element("div", "verdict");
+        verdict.append(statusNode(result), element("span", "duration", formatDuration(result.duration_seconds)));
+        header.append(identity, verdict);
+
+        root.replaceChildren(
+          header,
+          contextSection(result),
+          outcomeSection(result),
+          journeySection(result),
+          assertionSection(result),
+          diagnosticsSection(result),
+          rawSection(result),
+        );
+      }
+
+      function contextSection(result) {
+        const wrapper = section("Test context", "The input and fake environment");
+        wrapper.append(element("div", "prompt", result.prompt || "Prompt was not stored in this report. Re-render it with the dashboard command to enrich older results."));
+        const scenario = result.scenario || {};
+        const facts = element("div", "scenario");
+        const values = [
+          ["Profile", scenario.profile_state || "not recorded"],
+          ["Region", scenario.region || "not recorded"],
+          ["Fake devices", Array.isArray(scenario.devices) ? scenario.devices.join(", ") : "not recorded"],
+        ];
+        const injected = [
+          scenario.schema_state && scenario.schema_state !== "ok" ? `schema=${scenario.schema_state}` : "",
+          scenario.device_list_state && scenario.device_list_state !== "ok" ? `device-list=${scenario.device_list_state}` : "",
+          scenario.ansible_playbook_state && scenario.ansible_playbook_state !== "blocked" ? `ansible-playbook=${scenario.ansible_playbook_state}` : "",
+          scenario.runtime_state && scenario.runtime_state !== "absent" ? `runtime=${scenario.runtime_state}` : "",
+          scenario.ansible_runtime_layout && scenario.ansible_runtime_layout !== "path" ? `ansible-layout=${scenario.ansible_runtime_layout}` : "",
+        ].filter(Boolean);
+        if (injected.length) values.push(["Injected state", injected.join(", ")]);
+        values.forEach(([label, value]) => {
+          const item = element("span");
+          item.append(element("strong", "", `${label}: `), document.createTextNode(value));
+          facts.append(item);
+        });
+        wrapper.append(facts);
+        return wrapper;
+      }
+
+      function outcomeSection(result) {
+        const wrapper = section("Result", "What affected the gate");
+        const outcomes = element("div", "outcomes");
+        const definitions = [
+          ["harness", result.harness_valid !== false, "Harness", "Required for a valid sample"],
+          ["safety", result.safety_passed, "Critical", "Always gates"],
+          ["functional", result.functional_passed, "Functional", "Always gates"],
+          ["quality", result.quality_passed, "Quality", (data.metadata || {}).strict_quality ? "Strict gate" : "Advisory"],
+        ];
+        definitions.forEach(([kind, passed, label, explanation]) => {
+          const outcome = element("div", `outcome ${kind}`);
+          outcome.append(
+            element("div", "outcome-name", label),
+            element("div", "outcome-result", passed ? "Passed" : "Failed"),
+            element("div", "outcome-explain", explanation),
+          );
+          outcomes.append(outcome);
+        });
+        wrapper.append(outcomes);
+        const notices = [...(result.failures || []), ...(result.warnings || [])];
+        if (notices.length) {
+          const box = element("div", "prompt");
+          box.style.marginTop = "12px";
+          notices.forEach((notice) => box.append(element("div", "", notice)));
+          wrapper.append(box);
+        }
+        return wrapper;
+      }
+
+      function journeySection(result) {
+        const transcript = result.transcript || {};
+        const records = transcript.command_records || [];
+        const events = transcript.tool_events || [];
+        const blocked = transcript.blocked_commands || [];
+        const wrapper = section("What happened", `${records.length} commands · ${events.length} executed fake-tool operations · ${blocked.length} hook blocks`);
+        const timeline = element("ol", "timeline");
+
+        const promptStep = element("li");
+        const promptCopy = element("div", "step-copy");
+        promptCopy.append(element("h3", "", "Codex received the test request"), element("p", "", "The request above was sent into a fresh, isolated session."));
+        promptStep.append(promptCopy);
+
+        const commandStep = element("li");
+        const commandCopy = element("div", "step-copy");
+        commandCopy.append(element("h3", "", "Codex inspected context and used tools"));
+        commandCopy.append(element("p", "", events.length ? `${events.length} fake-tool invocations were recorded directly for scoring. Other commands are supporting work such as reading the skill.` : "No SCCFM or Ansible fake tool was executed."));
+        const trace = element("div", "trace");
+        if (records.length) records.forEach((record) => trace.append(commandDetails(record, events)));
+        else trace.append(element("div", "empty", "No completed command records were captured."));
+        if (events.length) {
+          trace.append(element("div", "code-label", "Executed fake-tool operations"));
+          events.forEach((event) => trace.append(eventDetails(event)));
+        }
+        if (blocked.length) {
+          trace.append(element("div", "code-label", "Rejected by installed hook"));
+          blocked.forEach((item) => trace.append(blockedDetails(item)));
+        }
+        commandCopy.append(trace);
+        commandStep.append(commandCopy);
+
+        const responseStep = element("li");
+        const responseCopy = element("div", "step-copy");
+        responseCopy.append(element("h3", "", "Codex returned its final answer"));
+        const response = element("pre", "response", transcript.response || "No final agent response was captured.");
+        responseCopy.append(response);
+        responseStep.append(responseCopy);
+
+        timeline.append(promptStep, commandStep, responseStep);
+        wrapper.append(timeline);
+        return wrapper;
+      }
+
+      function commandDetails(record, events) {
+        const matching = events.filter((event) => event.command === record.command);
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        const row = element("span", "command-summary");
+        row.append(
+          element("span", "kind", matching.length ? matching.map((event) => event.operation).join(", ") : "support"),
+          element("code", "", record.command || "unknown command"),
+          element("span", `exit${record.exit_code === 0 ? "" : " bad"}`, `exit ${record.exit_code ?? "?"}`),
+        );
+        summary.append(row);
+        const body = element("div", "details-body");
+        body.append(element("div", "code-label", "Command"), element("pre", "code-box", record.command || ""));
+        body.append(element("div", "code-label", "Captured output"), element("pre", "code-box", record.output || "No output"));
+        if (matching.length) {
+          body.append(element("div", "code-label", "How the harness interpreted it"));
+          matching.forEach((event) => body.append(element("div", "assertion-message", `${event.operation} · ${event.classification}`)));
+        }
+        details.append(summary, body);
+        return details;
+      }
+
+      function eventDetails(event) {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        const row = element("span", "command-summary");
+        row.append(
+          element("span", "kind", event.operation || "unknown"),
+          element("code", "", event.command || [event.tool, ...(event.argv || [])].join(" ")),
+          element("span", `exit${event.exit_code === 0 ? "" : " bad"}`, `exit ${event.exit_code ?? "?"}`),
+        );
+        summary.append(row);
+        const body = element("div", "details-body");
+        body.append(
+          element("div", "code-label", "Classification"),
+          element("div", "assertion-message", `${event.classification || "unknown"} · ${event.origin || "recorded"}`),
+        );
+        details.append(summary, body);
+        return details;
+      }
+
+      function blockedDetails(item) {
+        const details = document.createElement("details");
+        details.append(
+          element("summary", "diagnostics", item.command || "Blocked command"),
+          element("div", "details-body assertion-message", item.reason || "No hook reason captured"),
+        );
+        return details;
+      }
+
+      function assertionSection(result) {
+        const assertions = result.assertions || [];
+        const wrapper = section("Why it passed or failed", `${assertions.filter((item) => item.passed).length} of ${assertions.length} checks passed`);
+        const list = element("div", "assertions");
+        if (!assertions.length) list.append(element("div", "empty", "No assertion evidence was recorded."));
+        assertions.forEach((assertion) => {
+          const row = element("div", "assertion");
+          const severity = assertion.severity || "gate";
+          const copy = element("div");
+          copy.append(
+            element("div", "assertion-name", assertion.assertion_id || assertion.assertion_type),
+            element("div", "assertion-message", assertion.message || "No explanation recorded"),
+          );
+          if (assertion.evidence) {
+            const evidence = document.createElement("details");
+            evidence.className = "evidence";
+            const summary = element("summary", "", "Show evidence");
+            evidence.append(summary, element("pre", "code-box", assertion.evidence));
+            copy.append(evidence);
+          }
+          row.append(
+            element("div", `severity ${severity}`, severity === "gate" ? "functional" : severity),
+            element("div", `check${assertion.passed ? "" : " bad"}`, assertion.passed ? "✓" : "✕"),
+            copy,
+          );
+          list.append(row);
+        });
+        wrapper.append(list);
+        return wrapper;
+      }
+
+      function diagnosticsSection(result) {
+        const transcript = result.transcript || {};
+        const content = [
+          result.stderr,
+          transcript.runtime_stderr !== result.stderr ? transcript.runtime_stderr : "",
+          ...(transcript.parse_errors || []),
+        ].filter(Boolean).join("\n");
+        const wrapper = section("Runtime diagnostics", content ? "Captured warnings and errors" : "No diagnostics captured");
+        if (!content) wrapper.append(element("div", "empty", "The Codex process produced no runtime diagnostics."));
+        else {
+          const details = document.createElement("details");
+          details.append(element("summary", "diagnostics", "Show runtime diagnostics"), element("pre", "details-body code-box", content));
+          wrapper.append(details);
+        }
+        return wrapper;
+      }
+
+      function rawSection(result) {
+        const wrapper = section("Raw sample data", "Exact JSON for this sample");
+        const details = document.createElement("details");
+        details.append(element("summary", "", "Show raw JSON"), element("pre", "details-body code-box", JSON.stringify(result, null, 2)));
+        wrapper.append(details);
+        return wrapper;
+      }
+
+      function percentage(value) {
+        return typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "n/a";
+      }
+
+      function renderReliability() {
+        const root = document.getElementById("reliability");
+        const fixtures = ((data.reliability || {}).fixtures || []);
+        root.append(
+          element("h2", "", "Reliability by fixture"),
+          element("p", "subtle", "95% Wilson intervals show uncertainty, not the percentage of checks passed. Harness-invalid samples are excluded. A target inside the interval means more valid samples are needed."),
+        );
+        if (!fixtures.length) {
+          root.append(element("div", "empty", "No reliability aggregation is available for this report."));
+          return;
+        }
+        const table = document.createElement("table");
+        const head = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        ["Fixture", "Valid / attempted", "Pass rate", "95% confidence", "State"].forEach((label, index) => {
+          headRow.append(element("th", index > 0 && index < 4 ? "number" : "", label));
+        });
+        head.append(headRow);
+        const body = document.createElement("tbody");
+        fixtures.forEach((item) => {
+          const row = document.createElement("tr");
+          const confidence = item.valid
+            ? `${percentage(item.confidence_lower)}–${percentage(item.confidence_upper)}`
+            : "n/a";
+          const state = item.invalid ? "Harness invalid" : item.flaky ? "Flaky" : item.failed ? "Failing" : "Stable so far";
+          [
+            item.fixture_id,
+            `${item.valid} / ${item.attempted}`,
+            percentage(item.pass_rate),
+            confidence,
+            state,
+          ].forEach((value, index) => row.append(element("td", index > 0 && index < 4 ? "number" : "", value)));
+          body.append(row);
+        });
+        table.append(head, body);
+        root.append(table);
+      }
+
+      document.getElementById("result-filter").addEventListener("change", () => {
+        renderList();
+        if (selectedKey && byId.has(selectedKey)) renderDetail(byId.get(selectedKey));
+      });
+
+      renderHeader();
+      renderMetrics();
+      renderReliability();
+      renderList();
+      if (results.length) renderDetail(results[0]);
+      else document.getElementById("detail").replaceChildren(element("div", "empty", "This report contains no samples."));
+    })();
+  </script>
+</body>
+</html>

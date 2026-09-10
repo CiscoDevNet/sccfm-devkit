@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "id": "setup-missing-region",
+  "tier": "aspirational",
+  "skill": "sccfm-setup",
+  "prompt": "Set up SCCFM for me using the managed installation. I have not selected a region yet.",
+  "expect": [
+    {"id": "install-not-run", "type": "operation_not_called", "severity": "critical", "operation": "setup.install"},
+    {"id": "configure-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.configure"},
+    {"id": "region-requested", "type": "response_concepts", "severity": "gate", "concepts": [["region"]]}
+  ]
+}

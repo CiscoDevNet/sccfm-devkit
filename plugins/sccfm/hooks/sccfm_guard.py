@@ -148,12 +148,15 @@ def load_schema() -> dict[str, Any] | None:
     if executable is None:
         return None
     try:
+        environment = os.environ.copy()
+        environment["SCCFM_COMMAND_GUARD_INTERNAL"] = "1"
         result = subprocess.run(
             [executable, "schema", "export", "--format", "json"],
             check=False,
             capture_output=True,
             text=True,
             timeout=20,
+            env=environment,
         )
         if result.returncode != 0:
             return None
@@ -161,6 +164,18 @@ def load_schema() -> dict[str, Any] | None:
     except (json.JSONDecodeError, OSError, subprocess.TimeoutExpired):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def is_stdout_schema_export(tokens: Sequence[str]) -> bool:
+    """Recognize the schema bootstrap without depending on the schema itself."""
+
+    if not tokens or executable_name(tokens[0]) != SCCFM_EXECUTABLE:
+        return False
+    return list(tokens[1:]) in (
+        ["schema", "export"],
+        ["schema", "export", "--format", "json"],
+        ["schema", "export", "--format=json"],
+    )
 
 
 def strip_global_options(tokens: Sequence[str], schema: dict[str, Any]) -> list[str] | None:
@@ -273,6 +288,8 @@ def classify_command(command: str, schema: dict[str, Any] | None = None) -> tupl
     if execution_tokens is None:
         return "review", "Command environment or composition could not be proven safe"
     executable = executable_name(execution_tokens[0]) if execution_tokens else ""
+    if executable == SCCFM_EXECUTABLE and is_stdout_schema_export(execution_tokens):
+        return "readonly", "SCCFM schema bootstrap to standard output"
     if executable == "ansible-playbook" and "--syntax-check" in execution_tokens[1:]:
         return "readonly", "Ansible local syntax check"
     if executable in ANSIBLE_REVIEW_COMMANDS:

@@ -185,6 +185,9 @@ Use the selected command's `auth` object:
    environment source, never from a generated argv option.
 6. Only configure a profile yourself when the user explicitly provides a secure,
    local mechanism for the token.
+7. If the user includes a token or other credential in chat, treat it as
+   exposed. Never repeat or use it; advise the user to rotate or revoke it and
+   configure the replacement locally through the hidden prompt.
 
 #### Credential Verification Algorithm
 

@@ -9,12 +9,16 @@ allowed-tools: "Bash(python3 *) Read"
 Remove SCCFM runtime artifacts before removing this plugin. Use only the packaged
 helper; do not construct manual `pip uninstall` or recursive-delete commands.
 
+Resolve the plugin root from this loaded `SKILL.md` once. Set `PLUGIN_ROOT` to
+that absolute directory and use it for every packaged-helper invocation below.
+Do not assume that the shell's current directory is the plugin root.
+
 ## 1. Generate the reviewed plan
 
 Resolve this skill's plugin root, then run:
 
 ```bash
-python3 scripts/setup_runtime.py cleanup-plan --json
+python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" cleanup-plan --json
 ```
 
 Add `--remove-profiles` only when the user explicitly asks to delete named
@@ -64,7 +68,7 @@ After confirmation, use the same options and the exact digest returned by the
 plan:
 
 ```bash
-python3 scripts/setup_runtime.py cleanup --plan-digest <digest> --yes
+python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" cleanup --plan-digest <digest> --yes
 ```
 
 Include `--remove-profiles` and `--include-editable` exactly when they appeared
@@ -81,7 +85,7 @@ direct filesystem deletion.
 Run:
 
 ```bash
-python3 scripts/setup_runtime.py doctor --json
+python3 "$PLUGIN_ROOT/scripts/setup_runtime.py" doctor --json
 ```
 
 Teardown is complete only when the requested CLI packages, collection, and

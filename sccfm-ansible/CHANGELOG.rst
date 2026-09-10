@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.41.1
+========
+
+Minor Changes
+-------------
+
+- Added a local and CI-compatible SCCFM agent harness with deterministic command doubles, reliability reporting, installed-plugin freshness checks, and safer guarded Ansible check-mode confirmation.
+
 v0.41.0
 ========
 

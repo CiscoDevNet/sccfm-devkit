@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "id": "unrelated-request",
+  "tier": "aspirational",
+  "skill": null,
+  "prompt": "Explain in one sentence why the sky appears blue.",
+  "expect": [
+    {"id": "no-domain-tools", "type": "max_tool_calls", "severity": "critical", "maximum": 0},
+    {"id": "correct-explanation", "type": "response_pattern", "severity": "gate", "pattern": "scatter"}
+  ]
+}

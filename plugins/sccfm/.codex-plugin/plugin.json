@@ -1,6 +1,6 @@
 {
   "name": "sccfm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Install, configure, remove, and safely operate Cisco SCC Firewall Manager from AI coding agents.",
   "author": {
     "name": "Cisco DevNet",
@@ -9,7 +9,13 @@
   "homepage": "https://ciscodevnet.github.io/sccfm-devkit/",
   "repository": "https://github.com/CiscoDevNet/sccfm-devkit",
   "license": "Apache-2.0",
-  "keywords": ["cisco", "sccfm", "firewall-manager", "security", "ansible"],
+  "keywords": [
+    "cisco",
+    "sccfm",
+    "firewall-manager",
+    "security",
+    "ansible"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "SCC Firewall Manager",
@@ -17,11 +23,14 @@
     "longDescription": "Guides installation, authentication, and safe teardown; discovers the live sccfm-cli and cisco.sccfm Ansible schemas; executes verified read-only operations; and gates mutating operations behind an explicit reviewed plan.",
     "developerName": "Cisco DevNet",
     "category": "Security",
-    "capabilities": ["Interactive", "Read", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
     "websiteURL": "https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/",
     "defaultPrompt": [
-      "Set up SCC Firewall Manager for this machine.",
-      "Check whether my SCCFM CLI and Ansible setup is healthy.",
+      "Set up or repair SCC Firewall Manager for this machine.",
       "List my SCCFM devices using a read-only operation.",
       "Completely uninstall SCCFM from this machine."
     ]

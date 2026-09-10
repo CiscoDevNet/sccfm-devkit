@@ -4,7 +4,7 @@
 
 [project]
 name = "cisco-sccfm-devtools"
-version = "0.0.0"
+version = "0.1.0"
 description = "Local-only console entry points for SCCFM maintainers"
 requires-python = ">=3.12,<4.0"
 
@@ -18,6 +18,7 @@ install-cli-man-docs = "cisco_sccfm_scripts.install_cli_man_docs:main"
 sync-docs-readme = "cisco_sccfm_scripts.sync_docs_readme:main"
 check-doc-links = "cisco_sccfm_scripts.check_doc_links:main"
 check-doc-artifacts = "cisco_sccfm_scripts.check_doc_artifacts:main"
+sccfm-agent-harness = "cisco_sccfm_scripts.agent_harness.cli:main"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
