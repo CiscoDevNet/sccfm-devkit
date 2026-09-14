@@ -2,6 +2,18 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.42.0:
+    changes:
+      minor_changes:
+        - Added Claude support to the SCCFM agent harness with provider credential
+          isolation, runtime-only retries, source-aware comparison fingerprints,
+          more reliable deterministic command evidence, and clearer diagnostics.
+      bugfixes:
+        - Corrected plugin runtime ownership handling so incomplete Homebrew
+          companions cannot be silently overwritten or removed through the wrong
+          uninstall flow.
+    fragments: []
+    release_date: '2026-09-14'
   0.41.1:
     changes:
       minor_changes:
