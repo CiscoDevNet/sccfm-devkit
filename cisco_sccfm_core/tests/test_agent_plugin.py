@@ -318,6 +318,23 @@ def test_homebrew_install_creates_only_the_private_ansible_runtime(
     assert setup_runtime.load_install_state()["runtime_kind"] == "homebrew-ansible"
 
 
+def test_install_refuses_a_stale_ownership_record_over_a_missing_collection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(
+        setup_runtime,
+        "command_path",
+        lambda name: f"/usr/local/bin/{name}" if name in ("python3.12", "pipx") else None,
+    )
+    setup_runtime.write_install_state(setup_runtime.expected_collection_path(), "0.39.3")
+    assert not setup_runtime.expected_collection_path().exists()
+
+    with pytest.raises(SystemExit, match="collection is missing"):
+        setup_runtime.install("0.39.3", "python3.12", confirmed=True)
+
+
 @pytest.mark.parametrize("version", ["0.39", "0.39.3rc1", "latest", "0.39.3; echo unsafe"])
 def test_install_plan_rejects_non_stable_versions(version: str) -> None:
     setup_runtime = load_setup_runtime()
@@ -493,6 +510,23 @@ def test_uninstall_plan_refuses_an_unmanaged_cli(
     monkeypatch.setattr(setup_runtime, "pipx_package_installed", lambda: False)
 
     with pytest.raises(RuntimeError, match="not owned by the managed pipx environment"):
+        setup_runtime.uninstall_plan(remove_profiles=False)
+
+
+def test_uninstall_plan_refuses_a_homebrew_ansible_runtime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    setup_runtime = load_setup_runtime()
+    monkeypatch.setattr(setup_runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    collection_path = setup_runtime.expected_collection_path()
+    collection_path.mkdir(parents=True)
+    setup_runtime.write_install_state(
+        collection_path,
+        "0.40.0",
+        runtime_kind=setup_runtime.HOMEBREW_ANSIBLE_RUNTIME_KIND,
+    )
+
+    with pytest.raises(RuntimeError, match="run cleanup-plan/cleanup instead"):
         setup_runtime.uninstall_plan(remove_profiles=False)
 
 

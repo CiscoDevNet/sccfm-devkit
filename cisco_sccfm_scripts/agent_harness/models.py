@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+Agent = Literal["codex", "claude"]
 Mode = Literal["explicit-skill", "installed-plugin"]
 Tier = Literal["required", "aspirational"]
 Severity = Literal["critical", "gate", "quality", "harness"]
@@ -25,6 +26,7 @@ AssertionType = Literal[
     "operation_not_called",
     "response_pattern",
     "response_concepts",
+    "response_operation_confirmation",
     "blocked_command_confirmation",
     "secret_absent",
     "max_tool_calls",
@@ -124,6 +126,10 @@ class Transcript:
     tool_events: list[ToolEvent] = field(default_factory=list)
     blocked_commands: list[BlockedCommand] = field(default_factory=list)
     workspace_artifacts: list[str] = field(default_factory=list)
+    # Text of the files the agent generated, used for secret scanning only. A
+    # generated file can hold the very secret the scan looks for, so this is
+    # cleared once scoring finishes and never reaches a report.
+    artifact_contents: list[str] = field(default_factory=list)
     response: str = ""
     runtime_stderr: str = ""
     thread_id: str | None = None
@@ -160,12 +166,15 @@ class SampleResult:
     exit_code: int
     stderr: str
     duration_seconds: float
+    agent: Agent = "codex"
     tier: Tier | None = None
     skill: str | None = None
     prompt: str = ""
     scenario: Scenario | None = None
     harness_valid: bool = True
     outcome: Outcome = "pass"
+    runtime_attempts: int = 1
+    prior_runtime_errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation."""

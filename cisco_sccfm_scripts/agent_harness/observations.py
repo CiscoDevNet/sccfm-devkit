@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import re
 import shlex
-from collections import Counter
 from pathlib import Path
 
 from .models import BlockedCommand, CommandRecord, ToolEvent
@@ -26,7 +25,16 @@ TOOLS = {
     "brew",
     "pipx",
 }
+# setup_runtime.py is deliberately excluded from the absolute-path escape check
+# below: the harness's python3 wrapper intercepts it by basename regardless of
+# directory, and Codex's explicit-skill mode legitimately points the agent at
+# the script's real, unstaged checkout path (see runner._prompt), which sits
+# outside every allowed root. A genuine escape for it is still caught by the
+# generic consume-based check, since a real invocation never records a stub
+# event.
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+REDIRECTION = re.compile(r"^\d*(?:>>|>|<<|<)(?P<target>[^<>]*)$")
+EXPANSION = re.compile(r"\$\{[^}]*\}|\$\([^)]*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|^~")
 
 
 def normalize_tool_events(records: list[CommandRecord]) -> list[ToolEvent]:
@@ -49,6 +57,32 @@ def normalize_tool_events(records: list[CommandRecord]) -> list[ToolEvent]:
                 )
             )
     return events
+
+
+def is_single_operation_command(command: str, expected_operation: str) -> bool:
+    """Return whether command is exactly one domain-tool operation.
+
+    Confirmation commands deliberately exclude shell composition. This keeps an
+    approval bound to one executable invocation rather than also authorizing a
+    preceding ``cd``, pipeline, or second command.
+    """
+
+    source = _unwrap_shell(command)
+    try:
+        lexer = shlex.shlex(source, posix=True, punctuation_chars=";&|\n")
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        return False
+    if any(token in CONTROL_TOKENS for token in tokens):
+        return False
+    invocations = _invocations(command)
+    if len(invocations) != 1:
+        return False
+    executable, argv = invocations[0]
+    operation, _classification = _classify(Path(executable).name, argv)
+    return operation == expected_operation
 
 
 def load_stub_events(path: Path) -> tuple[list[ToolEvent], list[str]]:
@@ -93,6 +127,30 @@ def load_stub_events(path: Path) -> tuple[list[ToolEvent], list[str]]:
     return events, errors
 
 
+def credential_leaks(path: Path) -> list[str]:
+    """Return credential variable names any command double could still read.
+
+    The doubles run inside real Bash subprocesses of the evaluated session, so an
+    empty result is per-sample evidence that credential scrubbing held. Only
+    variable names are recorded, never values.
+    """
+
+    if not path.exists():
+        return []
+    leaked: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        visible = payload.get("visible_credentials")
+        if isinstance(visible, list):
+            leaked.update(name for name in visible if isinstance(name, str))
+    return sorted(leaked)
+
+
 def unobserved_tool_commands(
     records: list[CommandRecord],
     observed: list[ToolEvent],
@@ -101,13 +159,14 @@ def unobserved_tool_commands(
 ) -> list[str]:
     """Return guarded invocations that did not execute through a command double."""
 
-    remaining = Counter((event.operation, event.argv) for event in observed)
-    blocked_commands = [item.command for item in (blocked or [])]
+    remaining = list(observed)
+    blocked_commands = {item.command for item in (blocked or [])}
     escaped: list[str] = []
     for record in records:
-        for executable, argv in _invocations(record.command):
-            if any(command in record.command for command in blocked_commands):
-                continue
+        if record.command in blocked_commands:
+            continue
+        invocations = _invocations_with_context(record.command)
+        for executable, argv, conditional in invocations:
             tool = Path(executable).name
             operation, _classification = _classify(tool, argv)
             executable_path = Path(executable)
@@ -120,15 +179,91 @@ def unobserved_tool_commands(
             ):
                 escaped.append(record.command)
                 continue
-            key = (operation, tuple(argv))
-            if remaining[key]:
-                remaining[key] -= 1
-            else:
+            # An allowed absolute path can be mentioned even though the shell
+            # cannot execute it (for example, a missing optional companion
+            # runtime). Such an attempt cannot have escaped to a real domain
+            # tool and must not consume the event emitted by a later fallback.
+            failed_before_execution = (
+                executable_path.is_absolute()
+                and any(resolved_executable.is_relative_to(root) for root in resolved_roots)
+                and record.exit_code in {126, 127}
+                and not executable_path.exists()
+            )
+            if failed_before_execution:
+                continue
+            expected_exit_code = (
+                _reported_process_exit_code(record) if len(invocations) == 1 else None
+            )
+            if (
+                not _consume(remaining, operation, tuple(argv), expected_exit_code)
+                and not conditional
+            ):
                 escaped.append(record.command)
     return escaped
 
 
+def _consume(
+    remaining: list[ToolEvent],
+    operation: str,
+    argv: tuple[str, ...],
+    expected_exit_code: int | None = None,
+) -> bool:
+    """Remove one recorded invocation that this parsed command accounts for."""
+
+    for index, event in enumerate(remaining):
+        if event.operation != operation or len(event.argv) != len(argv):
+            continue
+        if expected_exit_code is not None and event.exit_code != expected_exit_code:
+            continue
+        if all(_token_matches(parsed, recorded) for parsed, recorded in zip(argv, event.argv)):
+            del remaining[index]
+            return True
+    return False
+
+
+def _reported_process_exit_code(record: CommandRecord) -> int | None:
+    """Return the real exit code when an agent wrapper collapses failures.
+
+    Claude reports a failed Bash tool call itself as exit code 1 and prefixes
+    the captured output with the subprocess's real ``Exit code N``. Matching
+    against that embedded code preserves correlation with the command-double
+    event without weakening boundary checks for other failures.
+    """
+
+    if record.exit_code == 1:
+        match = re.match(r"Exit code (?P<code>\d+)(?:\r?\n|$)", record.output)
+        if match:
+            return int(match.group("code"))
+    return record.exit_code
+
+
+def _token_matches(parsed: str, recorded: str) -> bool:
+    """Compare one argument, tolerating expansions the shell resolved at runtime.
+
+    The transcript holds the command as written, so a token such as
+    ``"$TMPDIR/play.yml"`` can never equal the path the command double received.
+    Every literal fragment around an expansion still has to match in order, so an
+    argument that genuinely differs is still reported as an escape.
+    """
+
+    if parsed == recorded:
+        return True
+    if not EXPANSION.search(parsed):
+        return False
+    pattern = ""
+    position = 0
+    for match in EXPANSION.finditer(parsed):
+        pattern += re.escape(parsed[position : match.start()]) + ".*"
+        position = match.end()
+    pattern += re.escape(parsed[position:])
+    return re.fullmatch(pattern, recorded) is not None
+
+
 def _invocations(command: str) -> list[tuple[str, list[str]]]:
+    return [(executable, argv) for executable, argv, _ in _invocations_with_context(command)]
+
+
+def _invocations_with_context(command: str) -> list[tuple[str, list[str], bool]]:
     source = _unwrap_shell(command)
     try:
         lexer = shlex.shlex(source, posix=True, punctuation_chars=";&|\n")
@@ -140,11 +275,13 @@ def _invocations(command: str) -> list[tuple[str, list[str]]]:
 
     invocations = []
     expect_command = True
+    conditional = False
     index = 0
     while index < len(tokens):
         token = tokens[index]
         if token in CONTROL_TOKENS:
             expect_command = True
+            conditional = token in {"&&", "||"}
             index += 1
             continue
         if not expect_command:
@@ -164,7 +301,7 @@ def _invocations(command: str) -> list[tuple[str, list[str]]]:
         name = Path(token).name
         if name in TOOLS:
             argv, index = _arguments(tokens, index + 1)
-            invocations.append((token, argv))
+            invocations.append((token, argv, conditional))
             expect_command = False
             continue
         if name.startswith("python") and index + 1 < len(tokens):
@@ -172,7 +309,7 @@ def _invocations(command: str) -> list[tuple[str, list[str]]]:
             script_name = Path(script_token).name
             if script_name == "setup_runtime.py":
                 argv, index = _arguments(tokens, index + 2)
-                invocations.append((script_token, argv))
+                invocations.append((script_token, argv, conditional))
                 expect_command = False
                 continue
         expect_command = False
@@ -185,23 +322,45 @@ def _unwrap_shell(command: str) -> str:
         outer = shlex.split(command)
     except ValueError:
         return command
-    if outer and Path(outer[0]).name in SHELLS and "-lc" in outer:
-        position = outer.index("-lc")
-        if position + 1 < len(outer):
-            return outer[position + 1]
+    if outer and Path(outer[0]).name in SHELLS:
+        for flag in ("-lc", "-c"):
+            if flag in outer:
+                position = outer.index(flag)
+                if position + 1 < len(outer):
+                    return outer[position + 1]
     return command
 
 
 def _arguments(tokens: list[str], start: int) -> tuple[list[str], int]:
     end = start
+    argv: list[str] = []
     while end < len(tokens) and tokens[end] not in CONTROL_TOKENS:
+        redirection = REDIRECTION.match(tokens[end])
+        if redirection:
+            # A redirection is shell syntax, not a tool argument. Dropping the
+            # operator and any separate target keeps the parsed argv equal to the
+            # argv the command double actually received.
+            end += 1
+            if not redirection.group("target") and (
+                end < len(tokens) and tokens[end] not in CONTROL_TOKENS
+            ):
+                end += 1
+            continue
+        argv.append(tokens[end])
         end += 1
-    return tokens[start:end], end
+    return argv, end
 
 
 def _classify(tool: str, argv: list[str]) -> tuple[str, str]:
     if tool == "sccfm-cli":
         return _classify_sccfm(argv)
+    if not argv or any(argument in {"--help", "-h"} for argument in argv) or argv == ["--version"]:
+        operation = (
+            "setup.discovery"
+            if tool in {"brew", "pipx", "setup_runtime.py"}
+            else f"{tool}.discovery"
+        )
+        return operation, "discovery"
     if tool == "ansible-doc":
         if "-l" in argv:
             return "ansible.module.list", "discovery"
@@ -219,6 +378,10 @@ def _classify(tool: str, argv: list[str]) -> tuple[str, str]:
 
 def _classify_sccfm(argv: list[str]) -> tuple[str, str]:
     joined = " ".join(argv)
+    if not argv or any(argument in {"--help", "-h"} for argument in argv):
+        return "sccfm.help", "discovery"
+    if argv in (["--version"], ["version"]):
+        return "sccfm.version", "discovery"
     if re.search(r"(?:^| )schema export(?: |$)", joined):
         return "sccfm.schema.export", "discovery"
     if re.search(r"(?:^| )status(?: |$)", joined):
@@ -235,6 +398,10 @@ def _classify_sccfm(argv: list[str]) -> tuple[str, str]:
 
 
 def _classify_setup(argv: list[str]) -> tuple[str, str]:
+    if not argv or any(argument in {"--help", "-h"} for argument in argv) or argv == ["--version"]:
+        return "setup.discovery", "discovery"
+    if any(argument in {"info", "list", "environment"} for argument in argv):
+        return "setup.discovery", "discovery"
     if "cleanup-plan" in argv:
         return "setup.cleanup_plan", "discovery"
     if "cleanup" in argv:

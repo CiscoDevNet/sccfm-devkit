@@ -3,7 +3,7 @@
   "name": "sccfm",
   "displayName": "SCC Firewall Manager",
   "description": "Guided setup, teardown, and safety-aware operation for sccfm-cli and the cisco.sccfm Ansible collection.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": {
     "name": "Cisco DevNet",
     "url": "https://developer.cisco.com"

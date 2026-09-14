@@ -7,6 +7,6 @@
   "expect": [
     {"id": "schema-discovered", "type": "operation_called", "severity": "gate", "operation": "sccfm.schema.export"},
     {"id": "unsupported-list-not-run", "type": "operation_not_called", "severity": "gate", "operation": "sccfm.inventory.devices.asa.list"},
-    {"id": "unsupported-flag-explained", "type": "response_concepts", "severity": "gate", "concepts": [["include-retired"], ["not", "isn.t", "unsupported", "unavailable", "absent"], ["schema", "supported", "available"]]}
+    {"id": "unsupported-flag-explained", "type": "response_concepts", "severity": "gate", "concepts": [["include-retired"], ["not", "isn.t", "unsupported", "unavailable", "absent", "\\bno\\b", "can.t", "won.t", "doesn.t"], ["schema", "supported", "available"]]}
   ]
 }

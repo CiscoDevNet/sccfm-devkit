@@ -187,7 +187,18 @@ Use the selected command's `auth` object:
    local mechanism for the token.
 7. If the user includes a token or other credential in chat, treat it as
    exposed. Never repeat or use it; advise the user to rotate or revoke it and
-   configure the replacement locally through the hidden prompt.
+   configure the replacement locally through the hidden prompt. Refer to it only
+   as "the token you pasted". Do not quote, mask, abbreviate, or otherwise
+   restate the value, including while explaining that it is exposed. Naming the
+   value to warn about it is still disclosure, and the warning does not need it.
+8. Do not abort before safe discovery merely because a token was exposed. Run
+   schema export and then the schema's readonly profile or connectivity check,
+   but always stop before the matched business command, even when that check
+   succeeds. You cannot prove that an existing profile does not contain the now
+   exposed credential. Resume business operations only after the user rotates or
+   revokes the exposed token and configures its replacement locally. Never
+   substitute the matched business command for the profile check, and never name
+   a command or flag you have not discovered from the schema.
 
 #### Credential Verification Algorithm
 
@@ -195,11 +206,21 @@ Before executing any command where `auth.requires_profile` is true:
 
 1. Determine the profile from the user's request, global options, or schema
    defaults.
-2. Run a readonly profile/connectivity check only if the schema exposes one and
-   the selected execution mode allows validation.
-3. If validation succeeds, proceed with command construction.
-4. If no validation command is available, proceed only if a profile is already
-   configured or the user explicitly provides the profile name to use.
+2. If the schema exposes a readonly profile or connectivity check and the
+   selected execution mode allows validation, run it. Any readonly command that
+   reports authentication, profile, or connectivity state, such as a top-level
+   status command, is that check, including when it declares
+   `requires_profile: true`. Determine profile state from that command's output,
+   never by inspecting configuration files, checking whether a config path
+   exists, or assuming a default.
+3. If validation succeeds, proceed with command construction unless the user
+   exposed a credential in the conversation; in that case stop according to
+   Secret Handling Rule 8.
+4. Treat a validation command as unavailable only when the schema exposes none.
+   In that case, proceed only if a profile is already configured or the user
+   explicitly provides the profile name to use. Never run the matched business
+   command to discover whether a profile exists; an unverified profile is a
+   reason to stop, not a reason to try.
 5. If the profile is missing or invalid, stop and tell the user to configure a
    customer SCC Firewall Manager API token locally.
 6. Do not ask for token contents, do not print token values, and do not retry
