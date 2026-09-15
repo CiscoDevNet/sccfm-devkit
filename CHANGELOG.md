@@ -1,3 +1,9 @@
+## v0.42.0 (2026-09-15)
+
+### Feat
+
+- **lh-115194**: support Claude in the agent harness
+
 ## v0.41.0 (2026-09-02)
 
 ### Feat

@@ -13,7 +13,7 @@ releases:
           companions cannot be silently overwritten or removed through the wrong
           uninstall flow.
     fragments: []
-    release_date: '2026-09-14'
+    release_date: '2026-09-15'
   0.41.1:
     changes:
       minor_changes:
