@@ -4,6 +4,19 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.42.0
+========
+
+Minor Changes
+-------------
+
+- Added Claude support to the SCCFM agent harness with provider credential isolation, runtime-only retries, source-aware comparison fingerprints, more reliable deterministic command evidence, and clearer diagnostics.
+
+Bugfixes
+--------
+
+- Corrected plugin runtime ownership handling so incomplete Homebrew companions cannot be silently overwritten or removed through the wrong uninstall flow.
+
 v0.41.1
 ========
 

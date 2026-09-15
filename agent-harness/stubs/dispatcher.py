@@ -13,6 +13,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Must match plugins/sccfm/scripts/setup_runtime.py's HOMEBREW_FORMULA.
+HOMEBREW_FORMULA = "ciscodevnet/tap/sccfm-cli"
+
 
 def main() -> int:
     """Dispatch by executable name without contacting external services."""
@@ -44,6 +47,8 @@ def _dispatch(name: str, arguments: list[str]) -> int:
         return _ansible_galaxy(arguments)
     if name == "brew":
         return _brew(arguments)
+    if name == "pipx":
+        return _pipx(arguments)
     if name == "setup_runtime.py":
         return _setup_runtime(arguments)
     print(f"HARNESS BLOCKED unsupported executable: {name}", file=sys.stderr)
@@ -59,13 +64,30 @@ def _record_event(name: str, arguments: list[str], exit_code: int) -> None:
         "argv": arguments,
         "exit_code": exit_code,
         "origin": ("guard" if os.environ.get("SCCFM_COMMAND_GUARD_INTERNAL") == "1" else "agent"),
+        "visible_credentials": _visible_credentials(),
     }
     with Path(event_log).open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
 
 
+def _visible_credentials() -> list[str]:
+    """Report which credential variables this real subprocess can still read.
+
+    Names only, never values: the event log is embedded in harness reports.
+    """
+
+    names = os.environ.get("SCCFM_HARNESS_CREDENTIAL_NAMES", "").split()
+    return [name for name in names if name in os.environ]
+
+
 def _sccfm(arguments: list[str]) -> int:
     normalized = [argument for argument in arguments if argument not in {"--silent"}]
+    if not normalized or any(argument in {"--help", "-h"} for argument in normalized):
+        print("Usage: sccfm-cli [OPTIONS] COMMAND [ARGS]...")
+        return 0
+    if normalized in (["--version"], ["version"]):
+        print("sccfm-cli, version 0.40.1-harness")
+        return 0
     if normalized[-4:] == ["schema", "export", "--format", "json"] or normalized[-2:] == [
         "schema",
         "export",
@@ -112,6 +134,12 @@ def _sccfm(arguments: list[str]) -> int:
 
 
 def _ansible_doc(arguments: list[str]) -> int:
+    if not arguments or any(argument in {"--help", "-h"} for argument in arguments):
+        print("usage: ansible-doc [options] [module ...]")
+        return 0
+    if arguments == ["--version"]:
+        print("ansible-doc [core 2.18.0-harness]")
+        return 0
     if "-l" in arguments:
         _emit(
             {
@@ -130,6 +158,12 @@ def _ansible_doc(arguments: list[str]) -> int:
 
 
 def _ansible_playbook(arguments: list[str]) -> int:
+    if not arguments or any(argument in {"--help", "-h"} for argument in arguments):
+        print("usage: ansible-playbook [options] playbook.yml")
+        return 0
+    if arguments == ["--version"]:
+        print("ansible-playbook [core 2.18.0-harness]")
+        return 0
     if "--syntax-check" in arguments or "--check" in arguments:
         print("playbook: syntax/check mode passed using deterministic harness")
         return 0
@@ -153,6 +187,12 @@ def _ansible_playbook(arguments: list[str]) -> int:
 
 
 def _ansible_galaxy(arguments: list[str]) -> int:
+    if not arguments or any(argument in {"--help", "-h"} for argument in arguments):
+        print("usage: ansible-galaxy collection [options]")
+        return 0
+    if arguments == ["--version"]:
+        print("ansible-galaxy [core 2.18.0-harness]")
+        return 0
     if arguments[:2] == ["collection", "list"] and "--format" in arguments:
         if os.environ.get("SCCFM_HARNESS_RUNTIME_STATE", "absent") == "installed":
             root = Path.home() / ".ansible" / "collections" / "ansible_collections"
@@ -168,13 +208,65 @@ def _ansible_galaxy(arguments: list[str]) -> int:
 
 
 def _brew(arguments: list[str]) -> int:
-    if arguments == ["list", "--formula", "--full-name"]:
+    if arguments and arguments[0] == "list":
+        if os.environ.get("SCCFM_HARNESS_RUNTIME_STATE", "absent") == "installed":
+            if "--versions" in arguments:
+                # Real `brew list --versions` reports the short formula name
+                # even when queried by its tap-qualified name.
+                print("sccfm-cli 0.40.1")
+            else:
+                print(HOMEBREW_FORMULA)
+        return 0
+    if arguments and arguments[0] == "info":
+        print("Error: No available formula named sccfm-cli", file=sys.stderr)
+        return 1
+    if any(argument in {"--help", "-h", "--version"} for argument in arguments):
+        print("Homebrew deterministic harness")
         return 0
     print(f"HARNESS BLOCKED unsupported brew invocation: {' '.join(arguments)}", file=sys.stderr)
     return 96
 
 
+def _pipx(arguments: list[str]) -> int:
+    if arguments and arguments[0] == "list":
+        installed = os.environ.get("SCCFM_HARNESS_RUNTIME_STATE", "absent") == "installed"
+        if "--json" in arguments:
+            _emit(
+                {
+                    "venvs": (
+                        {"cisco-sccfm-devkit": {"metadata": {"main_package": "0.40.1"}}}
+                        if installed
+                        else {}
+                    )
+                }
+            )
+        elif installed:
+            print("cisco-sccfm-devkit 0.40.1")
+        return 0
+    if arguments[:2] == ["environment", "--value"] and len(arguments) == 3:
+        values = {
+            "PIPX_BIN_DIR": str(Path.home() / ".local" / "bin"),
+            "PIPX_LOCAL_VENVS": str(Path.home() / ".local" / "pipx" / "venvs"),
+        }
+        value = values.get(arguments[2])
+        if value is not None:
+            print(value)
+            return 0
+    if any(argument in {"--help", "-h", "--version"} for argument in arguments):
+        print("pipx deterministic harness")
+        return 0
+    print(f"HARNESS BLOCKED unsupported pipx invocation: {' '.join(arguments)}", file=sys.stderr)
+    return 96
+
+
 def _setup_runtime(arguments: list[str]) -> int:
+    if (
+        not arguments
+        or any(argument in {"--help", "-h"} for argument in arguments)
+        or arguments == ["--version"]
+    ):
+        print("usage: setup_runtime.py {doctor,plan,install,cleanup-plan,cleanup}")
+        return 0
     if "cleanup-plan" in arguments:
         remove_profiles = "--remove-profiles" in arguments
         _emit(

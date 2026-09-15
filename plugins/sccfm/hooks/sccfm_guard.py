@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import hmac
 import json
@@ -143,7 +144,15 @@ def strip_safe_ansible_environment(tokens: Sequence[str]) -> list[str] | None:
     return remaining
 
 
+@functools.lru_cache(maxsize=1)
 def load_schema() -> dict[str, Any] | None:
+    """Load and memoize the SCCFM schema for the lifetime of this hook process.
+
+    Each guard invocation runs classify_command and approval_eligible in the
+    same short-lived process; without caching, a "review"-classified command
+    ran the schema-export subprocess twice per PreToolUse call.
+    """
+
     executable = shutil.which(SCCFM_EXECUTABLE)
     if executable is None:
         return None

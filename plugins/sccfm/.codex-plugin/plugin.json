@@ -1,6 +1,6 @@
 {
   "name": "sccfm",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Install, configure, remove, and safely operate Cisco SCC Firewall Manager from AI coding agents.",
   "author": {
     "name": "Cisco DevNet",

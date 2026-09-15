@@ -509,6 +509,11 @@ def require_homebrew_version(installation: dict[str, Any], version: str) -> None
 
 def validate_managed_directory(path: Path, label: str, *, owned: bool) -> None:
     if not path.exists() and not path.is_symlink():
+        if owned:
+            raise SystemExit(
+                f"Runtime ownership state exists but its {label} is missing; "
+                f"remove or repair {install_state_path()} before reinstalling"
+            )
         return
     if path.is_symlink() or not path.is_dir():
         raise SystemExit(f"Managed {label} target is unsafe: {path}")
@@ -559,11 +564,6 @@ def install(version: str, python_command: str, confirmed: bool) -> None:
         require_homebrew_version(homebrew_installation, version)
         validate_install_targets(HOMEBREW_ANSIBLE_RUNTIME_KIND)
         commands = homebrew_ansible_install_commands(version, python_command)
-        write_install_state(
-            expected_collection_path(),
-            version,
-            runtime_kind=HOMEBREW_ANSIBLE_RUNTIME_KIND,
-        )
         runtime_kind = HOMEBREW_ANSIBLE_RUNTIME_KIND
     else:
         if command_path("pipx") is None:
@@ -586,8 +586,7 @@ def install(version: str, python_command: str, confirmed: bool) -> None:
         ansible_doc = ansible_runtime_executable("ansible-doc")
         if not ansible_doc.is_file():
             raise RuntimeError(f"managed Ansible runtime is incomplete: {ansible_doc}")
-    else:
-        write_install_state(installed_path, version, runtime_kind=runtime_kind)
+    write_install_state(installed_path, version, runtime_kind=runtime_kind)
 
 
 def discover_collection_paths() -> list[Path]:
@@ -1052,6 +1051,12 @@ def cleanup(
 
 
 def uninstall_plan(remove_profiles: bool) -> dict[str, Any]:
+    install_state = load_install_state()
+    if install_state is not None and install_state["runtime_kind"] == HOMEBREW_ANSIBLE_RUNTIME_KIND:
+        raise RuntimeError(
+            "this install uses the Homebrew Ansible companion runtime, which "
+            "uninstall-plan/uninstall does not support; run cleanup-plan/cleanup instead"
+        )
     collection_paths, preserved_collection_paths = partition_collection_paths(
         discover_collection_paths()
     )
@@ -1188,9 +1193,15 @@ def main() -> None:
         else:
             print(json.dumps(report, indent=2, sort_keys=True))
     elif arguments.action == "plan":
-        print_plan(arguments.version, arguments.python)
+        try:
+            print_plan(arguments.version, arguments.python)
+        except RuntimeError as error:
+            raise SystemExit(f"Cannot safely plan install: {error}") from error
     elif arguments.action == "install":
-        install(arguments.version, arguments.python, arguments.yes)
+        try:
+            install(arguments.version, arguments.python, arguments.yes)
+        except RuntimeError as error:
+            raise SystemExit(f"Cannot safely install: {error}") from error
     elif arguments.action == "uninstall-plan":
         try:
             print_uninstall_plan(arguments.remove_profiles, arguments.json)

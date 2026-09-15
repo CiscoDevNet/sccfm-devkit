@@ -262,6 +262,16 @@ Rules:
    inside a task with `no_log: true`; never print, export, log, or return it in
    chat. Only an explicitly non-secret field such as `field=region` may be
    presented.
+10. If the user includes a token or other credential in chat, treat it as
+    exposed. Never repeat or use it; advise the user to rotate or revoke it and
+    configure the replacement locally. Refer to it only as "the token you
+    pasted". Do not quote, mask, abbreviate, or otherwise restate the value,
+    including while explaining that it is exposed.
+
+Do not invent CLI profile-discovery commands such as `profile list`,
+`list-profiles`, or `whoami`. The matched module's check-mode or execution result
+is the credential test for an Ansible workflow; if it reports an authentication
+failure, stop and provide the local configuration guidance above.
 
 Use `sccfm-cli configure` or the `configure-profile` option in
 `sccfm-cli-interactive` for local SCCFM credential setup only when the user
@@ -510,8 +520,11 @@ EXECUTE <exact ansible-playbook shell command>
 Show exactly one standalone
 `EXECUTE <exact ansible-playbook shell command>` confirmation line outside any
 code fence when the plan is complete and ready for confirmation. Keep the
-confirmation on one physical line; use the command's working directory and a
-short relative path when needed. Do not emit a separate machine-readable marker.
+confirmation on one physical line and use an absolute playbook path. The line
+must contain only optional environment assignments followed by the single
+`ansible-playbook` invocation. Never include `cd`, `&&`, `;`, a pipeline, or any
+other shell composition in the confirmation. Do not emit a separate
+machine-readable marker.
 The plugin's Stop hook derives the planned command from that visible line and
 records only its digest so that a later user confirmation cannot authorize a
 different command. Do not request confirmation in Generate-Only mode or after

@@ -182,7 +182,7 @@ SPDX-License-Identifier: Apache-2.0
     <section class="metrics" id="metrics" aria-label="Run summary"></section>
 
     <section class="truth-strip" aria-label="How this evaluation works">
-      <div class="truth"><strong>Real Codex session</strong><span>The model actually read the skill, chose commands, and wrote the answer.</span></div>
+      <div class="truth" id="truth-session"></div>
       <div class="truth"><strong>Simulated SCCFM environment</strong><span>CLI, Ansible, credentials, devices, and API responses came from deterministic test doubles.</span></div>
       <div class="truth"><strong>Structured execution evidence</strong><span>Fake tools record actual invocations. Hook-blocked attempts are shown separately and never count as executed.</span></div>
     </section>
@@ -227,7 +227,24 @@ SPDX-License-Identifier: Apache-2.0
       }
 
       function resultKey(result, index) {
-        return `${result.fixture_id || "case"}:${result.mode || "mode"}:${result.sample || index + 1}`;
+        return `${result.fixture_id || "case"}:${result.agent || "codex"}:${result.mode || "mode"}:${result.sample || index + 1}`;
+      }
+
+      function agentLabel(name) {
+        const known = {codex: "Codex", claude: "Claude"};
+        const key = String(name || "").toLowerCase();
+        if (known[key]) return known[key];
+        return key ? key.charAt(0).toUpperCase() + key.slice(1) : "Agent";
+      }
+
+      function resultAgent(result) {
+        return result.agent || (data.metadata || {}).agent || "codex";
+      }
+
+      function runAgentLabels() {
+        const names = new Set(results.map(resultAgent));
+        if (!names.size && (data.metadata || {}).agent) names.add(data.metadata.agent);
+        return [...names].map(agentLabel);
       }
 
       function resultStatus(result) {
@@ -255,6 +272,17 @@ SPDX-License-Identifier: Apache-2.0
         };
       }
 
+      function renderTruthStrip() {
+        const labels = runAgentLabels();
+        const heading = labels.length > 1
+          ? `Real ${labels.join(" and ")} sessions`
+          : `Real ${labels[0] || "agent"} session`;
+        document.getElementById("truth-session").replaceChildren(
+          element("strong", "", heading),
+          element("span", "", "The model actually read the skill, chose commands, and wrote the answer.")
+        );
+      }
+
       function renderHeader() {
         const overall = summaryCategory("overall");
         document.getElementById("headline").textContent =
@@ -263,9 +291,13 @@ SPDX-License-Identifier: Apache-2.0
         const generated = data.generated_at ? new Date(data.generated_at).toLocaleString() : "Unknown time";
         const parts = [
           generated,
+          metadata.agent || "codex",
           metadata.mode || "unknown mode",
           metadata.model || "configured model",
         ];
+        if (metadata.agent_version) parts.push(metadata.agent_version);
+        if (metadata.source_digest) parts.push(`source ${String(metadata.source_digest).slice(0, 12)}`);
+        if (metadata.fixture_digest) parts.push(`fixtures ${String(metadata.fixture_digest).slice(0, 12)}`);
         if (metadata.plugin_freshness) {
           parts.push(metadata.plugin_freshness.fresh
             ? `plugin ${metadata.plugin_freshness.version} · source current`
@@ -332,10 +364,14 @@ SPDX-License-Identifier: Apache-2.0
           button.setAttribute("aria-current", String(key === selectedKey));
           const title = element("div", "case-title");
           title.append(element("span", "case-name", result.fixture_id || "Unnamed test"), statusNode(result));
-          button.append(title, element("div", "case-info", `${result.mode || "unknown mode"} · sample ${result.sample || 1} · ${formatDuration(result.duration_seconds)}`));
+          const attempts = Number(result.runtime_attempts || 1);
+          const retry = attempts > 1 ? ` · ${attempts} runtime attempts` : "";
+          button.append(title, element("div", "case-info", `${resultAgent(result)} · ${result.mode || "unknown mode"} · sample ${result.sample || 1}${retry} · ${formatDuration(result.duration_seconds)}`));
           button.addEventListener("click", () => {
             selectedKey = key;
-            renderList();
+            list.querySelectorAll(".case-button").forEach((candidate) => {
+              candidate.setAttribute("aria-current", String(candidate === button));
+            });
             renderDetail(result);
           });
           return button;
@@ -366,7 +402,7 @@ SPDX-License-Identifier: Apache-2.0
         const identity = element("div");
         identity.append(element("h2", "", result.fixture_id || "Unnamed test"));
         const tags = element("div", "tags");
-        [result.mode, result.skill, result.tier, `sample ${result.sample || 1}`].filter(Boolean)
+        [resultAgent(result), result.mode, result.skill, result.tier, `sample ${result.sample || 1}`, Number(result.runtime_attempts || 1) > 1 ? `${result.runtime_attempts} runtime attempts` : null].filter(Boolean)
           .forEach((value) => tags.append(tag(value)));
         identity.append(tags);
         const verdict = element("div", "verdict");
@@ -450,12 +486,13 @@ SPDX-License-Identifier: Apache-2.0
 
         const promptStep = element("li");
         const promptCopy = element("div", "step-copy");
-        promptCopy.append(element("h3", "", "Codex received the test request"), element("p", "", "The request above was sent into a fresh, isolated session."));
+        const agentName = agentLabel(resultAgent(result));
+        promptCopy.append(element("h3", "", `${agentName} received the test request`), element("p", "", "The request above was sent into a fresh, isolated session."));
         promptStep.append(promptCopy);
 
         const commandStep = element("li");
         const commandCopy = element("div", "step-copy");
-        commandCopy.append(element("h3", "", "Codex inspected context and used tools"));
+        commandCopy.append(element("h3", "", `${agentName} inspected context and used tools`));
         commandCopy.append(element("p", "", events.length ? `${events.length} fake-tool invocations were recorded directly for scoring. Other commands are supporting work such as reading the skill.` : "No SCCFM or Ansible fake tool was executed."));
         const trace = element("div", "trace");
         if (records.length) records.forEach((record) => trace.append(commandDetails(record, events)));
@@ -473,7 +510,7 @@ SPDX-License-Identifier: Apache-2.0
 
         const responseStep = element("li");
         const responseCopy = element("div", "step-copy");
-        responseCopy.append(element("h3", "", "Codex returned its final answer"));
+        responseCopy.append(element("h3", "", `${agentName} returned its final answer`));
         const response = element("pre", "response", transcript.response || "No final agent response was captured.");
         responseCopy.append(response);
         responseStep.append(responseCopy);
@@ -567,12 +604,13 @@ SPDX-License-Identifier: Apache-2.0
       function diagnosticsSection(result) {
         const transcript = result.transcript || {};
         const content = [
+          ...((result.prior_runtime_errors || []).map((item, index) => `Prior runtime attempt ${index + 1}: ${item}`)),
           result.stderr,
           transcript.runtime_stderr !== result.stderr ? transcript.runtime_stderr : "",
           ...(transcript.parse_errors || []),
         ].filter(Boolean).join("\n");
         const wrapper = section("Runtime diagnostics", content ? "Captured warnings and errors" : "No diagnostics captured");
-        if (!content) wrapper.append(element("div", "empty", "The Codex process produced no runtime diagnostics."));
+        if (!content) wrapper.append(element("div", "empty", "The agent process produced no runtime diagnostics."));
         else {
           const details = document.createElement("details");
           details.append(element("summary", "diagnostics", "Show runtime diagnostics"), element("pre", "details-body code-box", content));
@@ -607,8 +645,8 @@ SPDX-License-Identifier: Apache-2.0
         const table = document.createElement("table");
         const head = document.createElement("thead");
         const headRow = document.createElement("tr");
-        ["Fixture", "Valid / attempted", "Pass rate", "95% confidence", "State"].forEach((label, index) => {
-          headRow.append(element("th", index > 0 && index < 4 ? "number" : "", label));
+        ["Fixture", "Agent", "Valid / attempted", "Pass rate", "95% confidence", "State"].forEach((label, index) => {
+          headRow.append(element("th", index > 1 && index < 5 ? "number" : "", label));
         });
         head.append(headRow);
         const body = document.createElement("tbody");
@@ -620,11 +658,12 @@ SPDX-License-Identifier: Apache-2.0
           const state = item.invalid ? "Harness invalid" : item.flaky ? "Flaky" : item.failed ? "Failing" : "Stable so far";
           [
             item.fixture_id,
+            resultAgent(item),
             `${item.valid} / ${item.attempted}`,
             percentage(item.pass_rate),
             confidence,
             state,
-          ].forEach((value, index) => row.append(element("td", index > 0 && index < 4 ? "number" : "", value)));
+          ].forEach((value, index) => row.append(element("td", index > 1 && index < 5 ? "number" : "", value)));
           body.append(row);
         });
         table.append(head, body);
@@ -636,6 +675,7 @@ SPDX-License-Identifier: Apache-2.0
         if (selectedKey && byId.has(selectedKey)) renderDetail(byId.get(selectedKey));
       });
 
+      renderTruthStrip();
       renderHeader();
       renderMetrics();
       renderReliability();

@@ -26,7 +26,7 @@ def write_report(
 
     output_directory.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema_version": 4,
+        "schema_version": 6,
         "generated_at": datetime.now(UTC).isoformat(),
         "summary": {
             "overall": _category(results, "passed"),
@@ -70,6 +70,9 @@ def compare_baseline(current: dict[str, Any], baseline_path: Path) -> list[str]:
     """Report fixture/mode gate pass-rate regressions from a prior JSON report."""
 
     baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    incompatibility = _baseline_incompatibility(current, baseline)
+    if incompatibility is not None:
+        return [incompatibility]
     before = _pass_rates(baseline)
     after = _pass_rates(current)
     regressions = []
@@ -82,6 +85,21 @@ def compare_baseline(current: dict[str, Any], baseline_path: Path) -> list[str]:
                 f"pass-rate regression for {key}: {prior_rate:.2f} -> {current_rate:.2f}"
             )
     return regressions
+
+
+def _baseline_incompatibility(current: dict[str, Any], baseline: dict[str, Any]) -> str | None:
+    current_fingerprint = current.get("metadata", {}).get("comparison_fingerprint")
+    baseline_fingerprint = baseline.get("metadata", {}).get("comparison_fingerprint")
+    if not isinstance(current_fingerprint, dict) or not isinstance(baseline_fingerprint, dict):
+        return "baseline comparison requires matching comparison fingerprints; regenerate it"
+    if current_fingerprint == baseline_fingerprint:
+        return None
+    changed = sorted(
+        key
+        for key in set(current_fingerprint) | set(baseline_fingerprint)
+        if current_fingerprint.get(key) != baseline_fingerprint.get(key)
+    )
+    return "incompatible baseline fingerprint: " + ", ".join(changed)
 
 
 def _category(
@@ -98,12 +116,12 @@ def _harness_category(results: Sequence[SampleResult]) -> dict[str, int]:
 
 
 def _reliability(results: Sequence[SampleResult]) -> list[dict[str, Any]]:
-    buckets: dict[tuple[str, str], list[SampleResult]] = {}
+    buckets: dict[tuple[str, str, str], list[SampleResult]] = {}
     for result in results:
-        buckets.setdefault((result.fixture_id, result.mode), []).append(result)
+        buckets.setdefault((result.fixture_id, result.agent, result.mode), []).append(result)
 
     reliability = []
-    for (fixture_id, mode), attempts in sorted(buckets.items()):
+    for (fixture_id, agent, mode), attempts in sorted(buckets.items()):
         valid = [result for result in attempts if result.harness_valid]
         passed = sum(result.passed for result in valid)
         failed = len(valid) - passed
@@ -111,6 +129,7 @@ def _reliability(results: Sequence[SampleResult]) -> list[dict[str, Any]]:
         reliability.append(
             {
                 "fixture_id": fixture_id,
+                "agent": agent,
                 "mode": mode,
                 "attempted": len(attempts),
                 "valid": len(valid),
@@ -146,7 +165,8 @@ def _pass_rates(payload: dict[str, Any]) -> dict[str, float]:
     for result in payload.get("results", []):
         if result.get("harness_valid", True) is False:
             continue
-        key = f"{result['fixture_id']}[{result['mode']}]"
+        agent = result.get("agent", payload.get("metadata", {}).get("agent", "codex"))
+        key = f"{result['fixture_id']}[{agent}/{result['mode']}]"
         buckets.setdefault(key, []).append(bool(result["passed"]))
     return {key: sum(values) / len(values) for key, values in buckets.items()}
 
@@ -155,6 +175,7 @@ def _with_fixture_context(payload: dict[str, Any], fixtures: Sequence[Fixture]) 
     fixture_map = {fixture.fixture_id: fixture for fixture in fixtures}
     enriched = cast(dict[str, Any], json.loads(json.dumps(payload)))
     for result in enriched.get("results", []):
+        result.setdefault("agent", enriched.get("metadata", {}).get("agent", "codex"))
         fixture = fixture_map.get(result.get("fixture_id"))
         if fixture is None:
             continue
@@ -195,8 +216,9 @@ def _markdown(payload: dict[str, Any]) -> str:
         f"- Quality: **{quality['passed']} / {quality['total']}** "
         f"({summary['quality_warnings']} warnings)",
         "",
-        "| Fixture | Mode | Sample | Outcome | Safety | Functional | Quality | Gate | Duration |",
-        "|---|---|---:|---|---|---|---|---|---:|",
+        "| Fixture | Agent | Mode | Sample | Runtime tries | Outcome | Safety "
+        "| Functional | Quality | Gate | Duration |",
+        "|---|---|---|---:|---:|---|---|---|---|---|---:|",
     ]
     freshness = payload.get("metadata", {}).get("plugin_freshness")
     if isinstance(freshness, dict):
@@ -207,12 +229,23 @@ def _markdown(payload: dict[str, Any]) -> str:
         ]
     for result in payload["results"]:
         lines.append(
-            f"| {result['fixture_id']} | {result['mode']} | {result['sample']} | "
+            f"| {result['fixture_id']} | {result.get('agent', 'codex')} | "
+            f"{result['mode']} | {result['sample']} | {result.get('runtime_attempts', 1)} | "
             f"{result.get('outcome', 'pass' if result['passed'] else 'agent-fail')} | "
             f"{_status(result['safety_passed'])} | {_status(result['functional_passed'])} | "
             f"{_status(result['quality_passed'])} | {_status(result['passed'])} | "
             f"{result['duration_seconds']:.3f}s |"
         )
+        if result.get("prior_runtime_errors"):
+            lines.extend(
+                [
+                    "",
+                    *[
+                        f"- **RECOVERED RUNTIME ERROR** `{result['fixture_id']}`: {item}"
+                        for item in result["prior_runtime_errors"]
+                    ],
+                ]
+            )
         if result["failures"]:
             lines.extend(
                 [
@@ -242,8 +275,9 @@ def _markdown(payload: dict[str, Any]) -> str:
                 "",
                 "Invalid harness samples are excluded from pass rates and confidence intervals.",
                 "",
-                "| Fixture | Valid / attempted | Pass rate | 95% confidence interval | Flaky |",
-                "|---|---:|---:|---:|---|",
+                "| Fixture | Agent | Valid / attempted | Pass rate "
+                "| 95% confidence interval | Flaky |",
+                "|---|---|---:|---:|---:|---|",
             ]
         )
         for item in reliability:
@@ -252,7 +286,8 @@ def _markdown(payload: dict[str, Any]) -> str:
             upper = _percentage(item.get("confidence_upper"))
             interval = f"{lower}–{upper}" if item.get("valid") else "n/a"
             lines.append(
-                f"| {item['fixture_id']} | {item['valid']} / {item['attempted']} | "
+                f"| {item['fixture_id']} | {item.get('agent', 'codex')} | "
+                f"{item['valid']} / {item['attempted']} | "
                 f"{rate} | {interval} | {'yes' if item['flaky'] else 'no'} |"
             )
     return "\n".join(lines) + "\n"

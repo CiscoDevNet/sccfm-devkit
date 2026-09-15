@@ -7,23 +7,35 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Sequence, cast
 
+from .credentials import (
+    SCRUB_VARIABLE,
+    install_probe,
+    isolation_settings,
+    preserved_credential_names,
+    read_probe,
+    redact,
+)
 from .fixtures import load_fixtures
-from .models import Fixture, Mode
+from .models import Agent, Fixture, Mode, Scenario
 from .plugin_state import (
     PLUGIN_ID,
     inspect_plugin_freshness,
+    plugin_tree_digest,
     refresh_local_plugin,
 )
 from .report import compare_baseline, write_dashboard, write_report
-from .runner import build_codex_command, run_sample
+from .runner import build_agent_command, run_sample
+from .stubs import isolated_environment
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURES = REPOSITORY_ROOT / "agent-harness" / "fixtures"
@@ -51,7 +63,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sccfm-agent-harness",
-        description="Evaluate SCCFM Codex skills against deterministic command doubles.",
+        description="Evaluate SCCFM agent skills against deterministic command doubles.",
     )
     subparsers = parser.add_subparsers(dest="command")
     validate = subparsers.add_parser("validate", help="validate fixtures and local assets")
@@ -71,9 +83,16 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--mode", choices=("explicit-skill", "installed-plugin"), default="explicit-skill"
     )
+    run.add_argument("--agent", choices=("codex", "claude"), default="codex")
     run.add_argument("--samples", type=int, default=1)
     run.add_argument("--model")
     run.add_argument("--timeout", type=int, default=300)
+    run.add_argument(
+        "--runtime-retries",
+        type=int,
+        default=1,
+        help="retry provider/runtime failures only; assertion failures are never retried",
+    )
     run.add_argument("--output", type=Path)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--compare-baseline", type=Path)
@@ -118,24 +137,38 @@ def _run(options: argparse.Namespace) -> int:
         raise ValueError("--samples must be at least 1")
     if options.timeout < 1:
         raise ValueError("--timeout must be at least 1")
+    if options.runtime_retries < 0:
+        raise ValueError("--runtime-retries must be non-negative")
+    if (options.compare_baseline or options.write_baseline) and not options.model:
+        raise ValueError("--model is required when reading or writing a baseline")
     mode = cast(Mode, options.mode)
+    agent = cast(Agent, options.agent)
     fixtures = _select_fixtures(
         load_fixtures(Path(options.fixtures)), options.fixture_ids, options.tier, mode
     )
     if not fixtures:
         raise ValueError("no fixtures matched the selection")
-    codex = shutil.which("codex")
-    if codex is None:
-        raise ValueError("codex executable is not on PATH")
+    executable = shutil.which(agent)
+    if executable is None:
+        raise ValueError(f"{agent} executable is not on PATH")
     if options.refresh_installed_plugin and mode != "installed-plugin":
         raise ValueError("--refresh-installed-plugin requires --mode installed-plugin")
+    if options.refresh_installed_plugin and agent != "codex":
+        raise ValueError(
+            "--refresh-installed-plugin is unnecessary for Claude; Claude loads the current "
+            "checkout directly with --plugin-dir"
+        )
+    if options.bypass_hook_trust and agent != "codex":
+        raise ValueError("--bypass-hook-trust is supported only by Codex")
+    if agent == "claude" and not options.dry_run:
+        _validate_claude_isolation(executable, options.model, options.timeout)
     plugin_freshness = None
-    if mode == "installed-plugin":
-        plugin_payload = _plugin_list_payload(codex)
+    if mode == "installed-plugin" and agent == "codex":
+        plugin_payload = _plugin_list_payload(executable)
         plugin_freshness = inspect_plugin_freshness(plugin_payload, REPOSITORY_ROOT)
         if not plugin_freshness.fresh and options.refresh_installed_plugin:
-            refresh_local_plugin(codex, REPOSITORY_ROOT, plugin_payload)
-            plugin_payload = _plugin_list_payload(codex)
+            refresh_local_plugin(executable, REPOSITORY_ROOT, plugin_payload)
+            plugin_payload = _plugin_list_payload(executable)
             plugin_freshness = inspect_plugin_freshness(plugin_payload, REPOSITORY_ROOT)
         if not plugin_freshness.fresh:
             raise ValueError(
@@ -145,14 +178,19 @@ def _run(options: argparse.Namespace) -> int:
 
     if options.dry_run:
         workspace = Path("/tmp/sccfm-agent-harness-WORKSPACE")
+        settings_path = (
+            Path("/tmp/sccfm-agent-tools-TOOLS/claude-settings.json") if agent == "claude" else None
+        )
         for fixture in fixtures:
-            command = build_codex_command(
+            command = build_agent_command(
+                agent,
                 fixture,
                 mode,
                 workspace,
                 REPOSITORY_ROOT,
                 options.model,
                 options.bypass_hook_trust,
+                settings_path,
             )
             print(f"{fixture.fixture_id}: {json.dumps(command)}")
         return 0
@@ -160,17 +198,35 @@ def _run(options: argparse.Namespace) -> int:
     results = []
     for fixture in fixtures:
         for sample in range(1, options.samples + 1):
-            print(f"running {fixture.fixture_id} [{mode}] sample {sample}/{options.samples}")
-            result = run_sample(
-                fixture,
-                mode,
-                sample,
-                REPOSITORY_ROOT,
-                options.model,
-                options.timeout,
-                options.bypass_hook_trust,
-                options.strict_quality,
+            print(
+                f"running {fixture.fixture_id} [{agent}/{mode}] "
+                f"sample {sample}/{options.samples}"
             )
+            prior_runtime_errors: list[str] = []
+            total_duration = 0.0
+            for attempt in range(1, options.runtime_retries + 2):
+                result = run_sample(
+                    fixture,
+                    mode,
+                    sample,
+                    REPOSITORY_ROOT,
+                    options.model,
+                    options.timeout,
+                    options.bypass_hook_trust,
+                    options.strict_quality,
+                    agent,
+                )
+                total_duration += result.duration_seconds
+                result.duration_seconds = round(total_duration, 3)
+                result.runtime_attempts = attempt
+                result.prior_runtime_errors = list(prior_runtime_errors)
+                if result.outcome != "runtime-error" or attempt > options.runtime_retries:
+                    break
+                prior_runtime_errors.append("; ".join(result.failures))
+                print(
+                    f"runtime failure; retrying {fixture.fixture_id} "
+                    f"({attempt}/{options.runtime_retries})"
+                )
             results.append(result)
             if result.outcome == "harness-invalid":
                 print(f"HARNESS INVALID: {'; '.join(result.failures)}")
@@ -182,18 +238,42 @@ def _run(options: argparse.Namespace) -> int:
                 print("PASS" if result.passed else f"FAIL: {'; '.join(result.failures)}")
 
     output_directory = options.output or _default_output_directory()
+    agent_version = _command_version([executable, "--version"])
+    source_digest = plugin_tree_digest(REPOSITORY_ROOT / "plugins" / "sccfm")
+    fixture_digest = _fixture_digest(fixtures)
+    model = options.model or "configured default"
+    fingerprint = {
+        "agent": agent,
+        "agent_version": agent_version,
+        "fixture_digest": fixture_digest,
+        "mode": mode,
+        "model": model,
+        "source_digest": source_digest,
+    }
     payload = write_report(
         output_directory,
         results,
         {
             "mode": mode,
-            "model": options.model or "configured default",
-            "codex_version": _command_version([codex, "--version"]),
+            "agent": agent,
+            "model": model,
+            "agent_version": agent_version,
+            "codex_version": agent_version if agent == "codex" else None,
+            "source_digest": source_digest,
+            "fixture_digest": fixture_digest,
+            "comparison_fingerprint": fingerprint,
             "plugin_id": "sccfm@sccfm-devkit" if mode == "installed-plugin" else None,
             "plugin_freshness": (
-                plugin_freshness.to_dict() if plugin_freshness is not None else None
+                plugin_freshness.to_dict()
+                if plugin_freshness is not None
+                else (
+                    _claude_source_freshness()
+                    if mode == "installed-plugin" and agent == "claude"
+                    else None
+                )
             ),
             "samples": options.samples,
+            "runtime_retries": options.runtime_retries,
             "strict_quality": options.strict_quality,
         },
     )
@@ -257,6 +337,111 @@ def _plugin_list_payload(codex: str) -> str:
             + (completed.stderr.strip() or completed.stdout.strip())
         )
     return completed.stdout
+
+
+def _claude_source_freshness() -> dict[str, object]:
+    """Describe Claude's direct, per-session checkout plugin loading."""
+
+    plugin = REPOSITORY_ROOT / "plugins" / "sccfm"
+    manifest = json.loads((plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    digest = plugin_tree_digest(plugin)
+    return {
+        "plugin_id": PLUGIN_ID,
+        "version": manifest.get("version", "unknown"),
+        "marketplace": "checkout",
+        "source_path": str(plugin),
+        "cache_path": None,
+        "source_digest": digest,
+        "installed_digest": digest,
+        "fresh": True,
+        "reason": "Claude loads a staged copy of this checkout with --plugin-dir",
+    }
+
+
+def _fixture_digest(fixtures: Sequence[Fixture]) -> str:
+    """Hash the exact selected fixture definitions used by a run."""
+
+    digest = hashlib.sha256()
+    for fixture in sorted(fixtures, key=lambda item: item.fixture_id):
+        digest.update(fixture.fixture_id.encode())
+        digest.update(b"\0")
+        digest.update(fixture.source.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _validate_claude_isolation(claude: str, model: str | None, timeout_seconds: int) -> None:
+    """Prove the parent session authenticates and its subprocesses see no credentials.
+
+    Claude keeps its provider variables so Bedrock, Vertex, Foundry, and API-key
+    logins work, and relies on ``CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`` to strip them
+    from every subprocess. This preflight refuses to run the suite unless a real
+    Claude session starts and a hook subprocess of that session confirms each
+    credential variable is absent. It records and reports variable names only.
+    """
+
+    with tempfile.TemporaryDirectory(prefix="sccfm-claude-preflight-") as temporary:
+        root = Path(temporary)
+        environment = isolated_environment(root, root / "bin", Scenario(), "claude")
+        names = preserved_credential_names()
+        settings, report = install_probe(root, names, isolation_settings(Path.home(), (root,)))
+        command = [
+            claude,
+            "Reply with the single word ready.",
+            "--print",
+            "--output-format",
+            "text",
+            "--no-session-persistence",
+            "--permission-mode",
+            "default",
+            "--restricted",
+            "--tools",
+            "Read",
+            "--allowedTools",
+            "Read",
+            "--settings",
+            str(settings),
+        ]
+        if model:
+            command.extend(["--model", model])
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=timeout_seconds,
+                env=environment,
+                cwd=root,
+            )
+        except subprocess.TimeoutExpired:
+            raise ValueError(
+                "Claude did not start a session within "
+                f"{timeout_seconds} seconds during the credential-isolation preflight"
+            ) from None
+        if completed.returncode != 0:
+            diagnostic = redact(completed.stderr.strip() or completed.stdout.strip())
+            raise ValueError(
+                "Claude could not start a session in the harness environment. Confirm the "
+                "provider login this shell uses works for a plain `claude --print` call. "
+                f"Claude reported: {diagnostic[-500:]}"
+            )
+        completed_probe, visible = read_probe(report)
+    if not completed_probe:
+        raise ValueError(
+            "the credential-isolation preflight probe did not run, so the harness cannot "
+            "confirm that evaluated subprocesses are credential free; expected the "
+            "SessionStart hook to execute"
+        )
+    if visible:
+        raise ValueError(
+            "Claude subprocesses can still read provider credentials "
+            f"({', '.join(visible)}); the harness requires "
+            f"{SCRUB_VARIABLE}=1 to remove them from Bash commands, hooks, and MCP "
+            "servers. Upgrade the Claude CLI or unset those variables and use a login "
+            "that does not rely on the environment."
+        )
 
 
 def _default_output_directory() -> Path:

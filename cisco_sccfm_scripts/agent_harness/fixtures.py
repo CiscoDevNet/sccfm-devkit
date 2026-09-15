@@ -43,6 +43,7 @@ VALID_ASSERTION_TYPES = {
     "operation_not_called",
     "response_pattern",
     "response_concepts",
+    "response_operation_confirmation",
     "blocked_command_confirmation",
     "secret_absent",
     "max_tool_calls",
@@ -173,6 +174,7 @@ def _load_assertion(raw: object, path: Path, index: int) -> Assertion:
             "operation_called",
             "operation_not_called",
             "max_operation_calls",
+            "response_operation_confirmation",
             "blocked_command_confirmation",
         }
         and operation is None
