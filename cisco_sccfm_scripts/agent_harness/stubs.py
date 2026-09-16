@@ -69,7 +69,10 @@ def install_stubs(workspace: Path, dispatcher: Path, tools_root: Path | None = N
     binary_directory.mkdir(parents=True)
     for name in STUB_NAMES:
         target = binary_directory / name
-        shutil.copy2(dispatcher, target)
+        # copy2 preserves SELinux xattrs from a Jenkins checkout. Those labels
+        # can prevent a bind-mounted script from executing in the tool container
+        # even after Docker privately relabels the mount, so copy content only.
+        shutil.copyfile(dispatcher, target)
         target.chmod(0o755)
 
     wrapper = (

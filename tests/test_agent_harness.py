@@ -22,6 +22,7 @@ from cisco_sccfm_scripts.agent_harness import (
     observations,
     plugin_state,
     runner,
+    stubs,
 )
 from cisco_sccfm_scripts.agent_harness.fixtures import load_fixtures
 from cisco_sccfm_scripts.agent_harness.models import (
@@ -524,6 +525,20 @@ def test_failed_allowed_absolute_tool_does_not_consume_successful_fallback_event
     ]
 
     assert unobserved_tool_commands(records, observed, allowed_roots=(tools_root, workspace)) == []
+
+
+def test_container_stub_path_is_an_allowed_tool_root() -> None:
+    command = "/opt/sccfm-agent-harness/bin/sccfm-cli status"
+    records = [CommandRecord(command, '{"status":"healthy"}', 0)]
+    observed = normalize_tool_events([CommandRecord("sccfm-cli status", "", 0)])
+
+    escaped = unobserved_tool_commands(
+        records,
+        observed,
+        allowed_roots=(bedrock.CONTAINER_TOOL_ROOT,),
+    )
+
+    assert escaped == []
 
 
 def test_claude_collapsed_failure_code_matches_the_stub_event() -> None:
@@ -1156,11 +1171,35 @@ def test_stub_inspection_detects_literal_and_resolved_private_paths(tmp_path: Pa
             0,
         ),
         CommandRecord("command -v sccfm-cli", f"{private_cli}\n", 0),
+        CommandRecord("head -5 /opt/sccfm-agent-harness/bin/sccfm-cli", "#!/usr/bin/env", 0),
     ]
 
-    flagged = runner._stub_inspection_commands(records, tools_root, dispatcher)
+    flagged = runner._stub_inspection_commands(
+        records,
+        tools_root,
+        dispatcher,
+        (bedrock.CONTAINER_TOOL_ROOT,),
+    )
 
-    assert flagged == [record.command for record in records[:3]]
+    assert flagged == [record.command for record in (*records[:3], records[4])]
+
+
+def test_install_stubs_does_not_preserve_dispatcher_metadata(tmp_path: Path) -> None:
+    dispatcher = tmp_path / "dispatcher.py"
+    dispatcher.write_text("#!/usr/bin/env python3\nprint('stub')\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    with mock.patch.object(
+        stubs.shutil,
+        "copy2",
+        side_effect=AssertionError("metadata-preserving copy is unsafe for container stubs"),
+    ):
+        binary_directory = install_stubs(workspace, dispatcher)
+
+    assert (binary_directory / "sccfm-cli").read_text(encoding="utf-8") == (
+        dispatcher.read_text(encoding="utf-8")
+    )
 
 
 def test_stub_inspection_does_not_associate_unrelated_grep_with_tool_execution(
