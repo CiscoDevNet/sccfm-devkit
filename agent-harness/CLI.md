@@ -148,7 +148,8 @@ poetry run sccfm-agent-harness run \
 This performs a small Bedrock preflight before the first fixture. The parent
 Python process uses the normal AWS credential chain. Model-requested shell
 commands run in a read-only, network-disabled Docker container without AWS
-credentials.
+credentials. In explicit-skill mode, the trusted skill content is supplied as
+Bedrock system guidance while the fixture remains a separate user message.
 
 ## Exit codes
 

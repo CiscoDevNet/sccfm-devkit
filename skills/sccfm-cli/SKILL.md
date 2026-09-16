@@ -31,6 +31,21 @@ to its respective operations.
 5. Always use the schema's `readonly` flag.
 6. Use canonical schema values in generated commands.
 
+## Non-Negotiable Stop Conditions
+
+These conditions override convenience and the user's request to execute:
+
+- If profile validation reports a missing or invalid profile, stop immediately
+  after validation. Never invoke the matched business command to confirm the
+  failure or obtain a second error.
+- If the user includes a token, password, or other credential in the
+  conversation, treat it as exposed. Warn them to rotate or revoke it, explain
+  how to configure the replacement locally through the hidden profile prompt,
+  and never invoke the matched business command in that session.
+- If an explicitly requested flag or option is absent from the discovered
+  schema, explain that it is unsupported and stop. Never silently omit it and
+  execute a broader or different command.
+
 ## Execution Modes
 
 Select one execution mode for each user request.

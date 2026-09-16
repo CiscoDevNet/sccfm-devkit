@@ -123,10 +123,11 @@ instance role or web-identity role can invoke Claude without installing Claude
 Code or adding an Anthropic credential. A small Converse request validates the
 selected region, model, and IAM permission before fixtures begin.
 
-Direct Bedrock currently supports `explicit-skill` only. The skill is staged in
-the disposable workspace and Claude reads it through the provided shell tool.
-Claude Code plugin discovery and hooks are runtime features and therefore remain
-covered by `--agent claude --mode installed-plugin`.
+Direct Bedrock currently supports `explicit-skill` only. The harness loads the
+trusted `SKILL.md` content into the Bedrock system instructions and sends the
+fixture request separately as the user message. Claude Code plugin discovery
+and hooks are runtime features and therefore remain covered by
+`--agent claude --mode installed-plugin`.
 
 The parent Python process is the only process that can reach Bedrock. Every
 model-requested shell command runs in a separate Docker container with no

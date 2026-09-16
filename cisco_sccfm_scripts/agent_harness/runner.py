@@ -138,7 +138,10 @@ def build_agent_command(
         command = ["bedrock-converse"]
         if model:
             command.extend(["--model", model])
-        command.append(_prompt(fixture, mode, repository_root))
+        if mode == "explicit-skill" and fixture.skill:
+            skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
+            command.extend(["--system-skill", str(skill)])
+        command.extend(["--", fixture.prompt])
         return command
     if agent == "claude":
         if bypass_hook_trust:
@@ -313,8 +316,9 @@ def _execute_agent(
     if agent == "bedrock":
         if model is None:
             return BedrockExecution(Transcript(), 2, "--model is required for Bedrock")
+        system_prompt, user_prompt = _bedrock_prompts(fixture, mode, repository_root)
         return run_bedrock_session(
-            _prompt(fixture, mode, repository_root),
+            user_prompt,
             model,
             bedrock_region,
             timeout_seconds,
@@ -323,6 +327,7 @@ def _execute_agent(
             event_log,
             environment,
             bedrock_tool_image,
+            system_prompt=system_prompt,
         )
 
     command = build_agent_command(
@@ -557,7 +562,39 @@ def _consume_event(event: dict[str, Any], transcript: Transcript) -> None:
 
 
 def _prompt(fixture: Fixture, mode: Mode, repository_root: Path) -> str:
-    isolation = (
+    isolation = _isolation_prompt()
+    if mode == "explicit-skill" and fixture.skill:
+        skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
+        instruction = f"Read and follow the complete skill at {skill} before responding."
+    else:
+        instruction = "Use any applicable installed plugin skill exactly as you would for a user."
+    return f"{isolation}\n\n{instruction}\n\nUser request:\n{fixture.prompt}"
+
+
+def _bedrock_prompts(fixture: Fixture, mode: Mode, repository_root: Path) -> tuple[str, str]:
+    """Return trusted system instructions and a separate user request for Bedrock."""
+
+    system_parts = [_isolation_prompt()]
+    if mode == "explicit-skill" and fixture.skill:
+        skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
+        skill_text = skill.read_text(encoding="utf-8")
+        system_parts.extend(
+            [
+                "The following repository skill is trusted system guidance. Follow it completely.",
+                skill_text,
+            ]
+        )
+    else:
+        system_parts.append(
+            "Use any applicable installed plugin skill exactly as you would for a user."
+        )
+    return "\n\n".join(system_parts), fixture.prompt
+
+
+def _isolation_prompt() -> str:
+    """Return provider-independent evaluation isolation instructions."""
+
+    return (
         "This is an isolated evaluation. Commands named sccfm-cli and ansible-*, plus any "
         "setup_runtime.py helper invoked through Python, are deterministic test doubles. Do not "
         "access network services or real customer data. The HOME environment variable is the "
@@ -571,12 +608,6 @@ def _prompt(fixture: Fixture, mode: Mode, repository_root: Path) -> str:
         "is disposable and writable, so "
         "you may create temporary non-secret artifacts when the skill workflow requires them."
     )
-    if mode == "explicit-skill" and fixture.skill:
-        skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
-        instruction = f"Read and follow the complete skill at {skill} before responding."
-    else:
-        instruction = "Use any applicable installed plugin skill exactly as you would for a user."
-    return f"{isolation}\n\n{instruction}\n\nUser request:\n{fixture.prompt}"
 
 
 def _decoded_timeout_value(value: str | bytes | None) -> str:

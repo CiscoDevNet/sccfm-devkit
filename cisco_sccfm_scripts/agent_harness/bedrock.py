@@ -72,6 +72,7 @@ def run_session(
     event_log: Path,
     tool_environment: dict[str, str],
     tool_image: str = DEFAULT_TOOL_IMAGE,
+    system_prompt: str | None = None,
 ) -> BedrockExecution:
     """Run a Bedrock Converse loop with one isolated POSIX-shell tool."""
 
@@ -84,11 +85,16 @@ def run_session(
     try:
         for _round in range(MAX_TOOL_ROUNDS + 1):
             client = _client(region, _remaining_seconds(deadline))
+            request: dict[str, Any] = {
+                "modelId": model,
+                "messages": messages,
+                "toolConfig": {"tools": [_bash_tool()]},
+                "inferenceConfig": {"maxTokens": 4096, "temperature": 0},
+            }
+            if system_prompt:
+                request["system"] = [{"text": system_prompt}]
             response = client.converse(
-                modelId=model,
-                messages=messages,
-                toolConfig={"tools": [_bash_tool()]},
-                inferenceConfig={"maxTokens": 4096, "temperature": 0},
+                **request,
             )
             message = _assistant_message(response)
             messages.append(message)

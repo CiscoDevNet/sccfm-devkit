@@ -40,6 +40,13 @@ its respective operations.
 7. Use fully qualified collection names, such as `cisco.sccfm.<module>`, in
    playbooks.
 
+## Generate-Only Validation Disclosure
+
+When Generate-Only mode performs only local discovery or a syntax check, state
+explicitly that the automation was `syntax-checked only; not validated against
+live SCCFM state`. A successful syntax check never proves credentials,
+connectivity, permissions, targets, or live behavior.
+
 ## Execution Modes
 
 Select one execution mode for each user request.

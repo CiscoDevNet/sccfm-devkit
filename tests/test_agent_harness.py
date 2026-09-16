@@ -313,6 +313,7 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
             tmp_path / "bin",
             event_log,
             {},
+            system_prompt="Trusted system guidance",
         )
 
     assert execution.exit_code == 0
@@ -320,6 +321,14 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
     assert execution.transcript.commands == ["sccfm-cli status"]
     assert execution.transcript.response == "The simulated service is healthy."
     run_bash.assert_called_once()
+    assert all(
+        call.kwargs["system"] == [{"text": "Trusted system guidance"}]
+        for call in client.converse.call_args_list
+    )
+    assert client.converse.call_args_list[0].kwargs["messages"][0] == {
+        "role": "user",
+        "content": [{"text": "Check status"}],
+    }
     second_messages = client.converse.call_args_list[1].kwargs["messages"]
     assert second_messages[-2]["content"][0]["toolResult"]["toolUseId"] == "tool-1"
 
@@ -880,6 +889,47 @@ def test_build_command_separates_explicit_and_installed_modes(tmp_path: Path) ->
     assert "--settings" not in claude_installed
     assert str(PROJECT_ROOT / "plugins/sccfm") in claude_installed
     assert claude_installed[-2:] == ["--model", "sonnet"]
+
+    bedrock_command = runner.build_agent_command(
+        "bedrock",
+        fixture,
+        "explicit-skill",
+        tmp_path,
+        PROJECT_ROOT,
+        "us.anthropic.test",
+        False,
+    )
+    skill_path = PROJECT_ROOT / "plugins/sccfm/skills/sccfm-cli/SKILL.md"
+    assert bedrock_command == [
+        "bedrock-converse",
+        "--model",
+        "us.anthropic.test",
+        "--system-skill",
+        str(skill_path),
+        "--",
+        "List devices",
+    ]
+
+
+def test_bedrock_prompts_keep_trusted_skill_separate_from_user_request(
+    tmp_path: Path,
+) -> None:
+    fixture = Fixture(
+        fixture_id="example",
+        tier="required",
+        skill="sccfm-cli",
+        prompt="List devices",
+        expectations=Expectations(),
+        source=tmp_path / "fixture.json",
+    )
+
+    system_prompt, user_prompt = runner._bedrock_prompts(fixture, "explicit-skill", PROJECT_ROOT)
+
+    assert user_prompt == "List devices"
+    assert "# SCC Firewall Manager CLI" in system_prompt
+    assert "Non-Negotiable Stop Conditions" in system_prompt
+    assert "User request:" not in system_prompt
+    assert "List devices" not in system_prompt
 
 
 def test_plugin_preflight_requires_enabled_installed_plugin() -> None:
