@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-Agent = Literal["codex", "claude"]
+Agent = Literal["codex", "claude", "bedrock"]
 Mode = Literal["explicit-skill", "installed-plugin"]
 Tier = Literal["required", "aspirational"]
 Severity = Literal["critical", "gate", "quality", "harness"]

@@ -1,9 +1,9 @@
 # SCCFM agent and skill harness
 
-This harness evaluates the SCCFM plugin with real Codex or Claude Code model
-sessions and deterministic fake SCCFM/Ansible data. It never needs a customer
+This harness evaluates the SCCFM plugin with real Codex, Claude Code, or direct
+Amazon Bedrock model sessions and deterministic fake SCCFM/Ansible data. It never needs a customer
 tenant, SCCFM credentials, or live managed devices. Codex remains the default;
-select Claude with `--agent claude`.
+select Claude Code with `--agent claude` or Bedrock Converse with `--agent bedrock`.
 
 The two modes answer different questions:
 
@@ -41,7 +41,8 @@ double starts does not consume a later fallback command's structured event.
 ## Prerequisites
 
 - Python 3.12 and the repository Poetry environment
-- An authenticated `codex` or `claude` CLI on `PATH`
+- An authenticated `codex` or `claude` CLI on `PATH`, or ambient AWS Bedrock
+  access plus Docker for `--agent bedrock`
 - For Codex installed-plugin mode, the local marketplace plugin installed and enabled:
 
   ```bash
@@ -115,6 +116,25 @@ and `harness-credential-isolation` fails the sample if any were visible.
 `harness-credential-paths` fails the safety channel if the agent referenced a
 host credential store by path.
 
+## Direct Bedrock provider
+
+`--agent bedrock` uses the standard boto3 credential chain, so a Jenkins node's
+instance role or web-identity role can invoke Claude without installing Claude
+Code or adding an Anthropic credential. A small Converse request validates the
+selected region, model, and IAM permission before fixtures begin.
+
+Direct Bedrock currently supports `explicit-skill` only. The skill is staged in
+the disposable workspace and Claude reads it through the provided shell tool.
+Claude Code plugin discovery and hooks are runtime features and therefore remain
+covered by `--agent claude --mode installed-plugin`.
+
+The parent Python process is the only process that can reach Bedrock. Every
+model-requested shell command runs in a separate Docker container with no
+network, no AWS variables, a read-only root filesystem, and only the disposable
+workspace plus deterministic command doubles mounted. The doubles report the
+credential names visible inside that container, preserving the harness's
+per-sample credential-isolation assertion.
+
 ## Local workflow
 
 [CLI.md](CLI.md) documents every flag and when to use it. The examples below cover
@@ -136,6 +156,15 @@ Inspect the equivalent Claude invocation:
 
 ```bash
 poetry run sccfm-agent-harness run --agent claude --dry-run
+```
+
+Inspect the direct Bedrock request without invoking a model:
+
+```bash
+poetry run sccfm-agent-harness run \
+  --agent bedrock \
+  --model us.anthropic.claude-sonnet-4-20250514-v1:0 \
+  --dry-run
 ```
 
 Run the Phase 1 required gate:

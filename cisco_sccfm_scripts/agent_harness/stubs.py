@@ -17,6 +17,7 @@ from pathlib import Path
 from .credentials import (
     CODEX_CREDENTIAL_VARIABLES,
     CREDENTIAL_NAMES_VARIABLE,
+    CREDENTIAL_VARIABLES,
     SCRUB_VARIABLE,
     preserved_credential_names,
     provider_environment,
@@ -131,6 +132,11 @@ def isolated_environment(
         environment.update(provider_environment(dict(os.environ)))
         environment[SCRUB_VARIABLE] = "1"
         environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(preserved_credential_names())
+    elif agent == "bedrock":
+        # Bedrock authentication remains in the parent Python process. Tool calls
+        # run in a separate network-disabled container and receive only this
+        # credential-name list so the doubles can prove no provider value leaked.
+        environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(CREDENTIAL_VARIABLES)
     else:
         environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(CODEX_CREDENTIAL_VARIABLES)
     real_home = Path.home()

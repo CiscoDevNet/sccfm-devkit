@@ -16,7 +16,13 @@ from unittest import mock
 
 import pytest
 
-from cisco_sccfm_scripts.agent_harness import credentials, observations, plugin_state, runner
+from cisco_sccfm_scripts.agent_harness import (
+    bedrock,
+    credentials,
+    observations,
+    plugin_state,
+    runner,
+)
 from cisco_sccfm_scripts.agent_harness.fixtures import load_fixtures
 from cisco_sccfm_scripts.agent_harness.models import (
     Assertion,
@@ -255,6 +261,114 @@ def test_parse_claude_jsonl_associates_hook_block_with_exact_command() -> None:
             ),
         )
     ]
+
+
+def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -> None:
+    responses = [
+        {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tool-1",
+                                "name": "Bash",
+                                "input": {"command": "sccfm-cli status"},
+                            }
+                        }
+                    ],
+                }
+            },
+            "stopReason": "tool_use",
+            "ResponseMetadata": {"RequestId": "request-1"},
+        },
+        {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [{"text": "The simulated service is healthy."}],
+                }
+            },
+            "stopReason": "end_turn",
+        },
+    ]
+    client = mock.Mock()
+    client.converse.side_effect = responses
+    record = CommandRecord("sccfm-cli status", '{"status":"healthy"}', 0)
+    event_log = tmp_path / "events.jsonl"
+    event_log.touch()
+
+    with (
+        mock.patch.object(bedrock, "_client", return_value=client),
+        mock.patch.object(bedrock, "_run_bash", return_value=record) as run_bash,
+    ):
+        execution = bedrock.run_session(
+            "Check status",
+            "us.anthropic.test",
+            "us-west-2",
+            30,
+            tmp_path,
+            tmp_path / "bin",
+            event_log,
+            {},
+        )
+
+    assert execution.exit_code == 0
+    assert execution.transcript.thread_id == "request-1"
+    assert execution.transcript.commands == ["sccfm-cli status"]
+    assert execution.transcript.response == "The simulated service is healthy."
+    run_bash.assert_called_once()
+    second_messages = client.converse.call_args_list[1].kwargs["messages"]
+    assert second_messages[-2]["content"][0]["toolResult"]["toolUseId"] == "tool-1"
+
+
+def test_bedrock_container_environment_excludes_provider_credentials(tmp_path: Path) -> None:
+    environment = {
+        "AWS_ACCESS_KEY_ID": "not-a-real-key",
+        "AWS_WEB_IDENTITY_TOKEN_FILE": "/tmp/token",
+        "SCCFM_HARNESS_REGION": "us",
+        "SCCFM_HARNESS_CREDENTIAL_NAMES": "AWS_ACCESS_KEY_ID",
+        "HOME": str(tmp_path / "home"),
+    }
+
+    isolated = bedrock._container_environment(environment, tmp_path / "bin")
+
+    assert "AWS_ACCESS_KEY_ID" not in isolated
+    assert "AWS_WEB_IDENTITY_TOKEN_FILE" not in isolated
+    assert isolated["SCCFM_HARNESS_REGION"] == "us"
+    assert isolated["SCCFM_HARNESS_CREDENTIAL_NAMES"] == "AWS_ACCESS_KEY_ID"
+    assert isolated["SCCFM_HARNESS_REAL_PYTHON"] == "/usr/local/bin/python3"
+
+
+def test_bedrock_bash_uses_network_disabled_read_only_container(tmp_path: Path) -> None:
+    binary_directory = tmp_path / "tools" / "bin"
+    binary_directory.mkdir(parents=True)
+    event_log = tmp_path / "tools" / "events.jsonl"
+    event_log.touch()
+
+    with mock.patch.object(
+        bedrock.subprocess,
+        "run",
+        return_value=subprocess.CompletedProcess([], 0, "healthy\n", ""),
+    ) as run:
+        result = bedrock._run_bash(
+            "sccfm-cli status",
+            tmp_path,
+            binary_directory,
+            event_log,
+            {"SCCFM_HARNESS_REGION": "us", "HOME": str(tmp_path / "home")},
+            "python:3.12-slim",
+            30,
+        )
+
+    command = run.call_args.args[0]
+    assert command[:3] == ["docker", "run", "--rm"]
+    assert command[command.index("--network") + 1] == "none"
+    assert "--read-only" in command
+    assert command[command.index("--entrypoint") + 1] == "/bin/sh"
+    assert command[-3:] == ["python:3.12-slim", "-c", "sccfm-cli status"]
+    assert result == CommandRecord("sccfm-cli status", "healthy", 0)
 
 
 def test_observation_normalizer_ignores_reads_and_handles_compound_commands() -> None:
@@ -696,6 +810,15 @@ def test_artifact_assertion_checks_final_workspace_state() -> None:
     assert [result.assertion_id for result in dirty if not result.passed] == ["no-playbook"]
 
 
+def test_artifact_scanner_does_not_follow_workspace_symlinks(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside-agent-harness-secret.txt"
+    outside.write_text("not-a-real-secret", encoding="utf-8")
+    link = tmp_path / "generated.txt"
+    link.symlink_to(outside)
+
+    assert runner._artifact_contents(tmp_path, ["generated.txt"]) == []
+
+
 def test_build_command_separates_explicit_and_installed_modes(tmp_path: Path) -> None:
     fixture = Fixture(
         fixture_id="example",
@@ -943,6 +1066,24 @@ def test_isolated_environment_keeps_claude_provider_credentials_for_the_parent(
     assert "SCCFM_API_TOKEN" not in environment
     # zsh re-reads .zshenv for every subprocess, so the disposable home overrides it.
     assert str(binary_directory) in (tmp_path / "home" / ".zshenv").read_text(encoding="utf-8")
+
+
+def test_isolated_environment_strips_bedrock_credentials_from_tools(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "not-a-real-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "not-a-real-secret")
+    monkeypatch.setenv("AWS_WEB_IDENTITY_TOKEN_FILE", "/tmp/not-a-real-token")
+    binary_directory = install_stubs(tmp_path, DISPATCHER)
+
+    environment = isolated_environment(tmp_path, binary_directory, Scenario(), "bedrock")
+
+    assert "AWS_ACCESS_KEY_ID" not in environment
+    assert "AWS_SECRET_ACCESS_KEY" not in environment
+    assert "AWS_WEB_IDENTITY_TOKEN_FILE" not in environment
+    credential_names = environment[credentials.CREDENTIAL_NAMES_VARIABLE].split()
+    assert "AWS_ACCESS_KEY_ID" in credential_names
+    assert "AWS_WEB_IDENTITY_TOKEN_FILE" in credential_names
 
 
 def test_command_doubles_record_credential_visibility_without_values(tmp_path: Path) -> None:

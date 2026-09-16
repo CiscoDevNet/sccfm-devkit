@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Sequence, cast
 
+from .bedrock import DEFAULT_TOOL_IMAGE, provider_version, validate_access
 from .credentials import (
     SCRUB_VARIABLE,
     install_probe,
@@ -83,9 +85,18 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--mode", choices=("explicit-skill", "installed-plugin"), default="explicit-skill"
     )
-    run.add_argument("--agent", choices=("codex", "claude"), default="codex")
+    run.add_argument("--agent", choices=("codex", "claude", "bedrock"), default="codex")
     run.add_argument("--samples", type=int, default=1)
     run.add_argument("--model")
+    run.add_argument(
+        "--bedrock-region",
+        default=os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-west-2")),
+    )
+    run.add_argument(
+        "--bedrock-tool-image",
+        default=os.environ.get("SCCFM_HARNESS_BEDROCK_TOOL_IMAGE", DEFAULT_TOOL_IMAGE),
+        help="network-disabled container image used for Bedrock-requested shell commands",
+    )
     run.add_argument("--timeout", type=int, default=300)
     run.add_argument(
         "--runtime-retries",
@@ -148,9 +159,14 @@ def _run(options: argparse.Namespace) -> int:
     )
     if not fixtures:
         raise ValueError("no fixtures matched the selection")
-    executable = shutil.which(agent)
+    executable = shutil.which("docker" if agent == "bedrock" else agent)
     if executable is None:
-        raise ValueError(f"{agent} executable is not on PATH")
+        required = "docker" if agent == "bedrock" else agent
+        raise ValueError(f"{required} executable is not on PATH")
+    if agent == "bedrock" and mode != "explicit-skill":
+        raise ValueError("--agent bedrock currently supports only --mode explicit-skill")
+    if agent == "bedrock" and not options.model:
+        raise ValueError("--model is required with --agent bedrock")
     if options.refresh_installed_plugin and mode != "installed-plugin":
         raise ValueError("--refresh-installed-plugin requires --mode installed-plugin")
     if options.refresh_installed_plugin and agent != "codex":
@@ -162,6 +178,8 @@ def _run(options: argparse.Namespace) -> int:
         raise ValueError("--bypass-hook-trust is supported only by Codex")
     if agent == "claude" and not options.dry_run:
         _validate_claude_isolation(executable, options.model, options.timeout)
+    if agent == "bedrock" and not options.dry_run:
+        validate_access(options.model, options.bedrock_region, options.timeout)
     plugin_freshness = None
     if mode == "installed-plugin" and agent == "codex":
         plugin_payload = _plugin_list_payload(executable)
@@ -192,6 +210,13 @@ def _run(options: argparse.Namespace) -> int:
                 options.bypass_hook_trust,
                 settings_path,
             )
+            if agent == "bedrock":
+                command[1:1] = [
+                    "--region",
+                    options.bedrock_region,
+                    "--tool-image",
+                    options.bedrock_tool_image,
+                ]
             print(f"{fixture.fixture_id}: {json.dumps(command)}")
         return 0
 
@@ -215,6 +240,8 @@ def _run(options: argparse.Namespace) -> int:
                     options.bypass_hook_trust,
                     options.strict_quality,
                     agent,
+                    options.bedrock_region,
+                    options.bedrock_tool_image,
                 )
                 total_duration += result.duration_seconds
                 result.duration_seconds = round(total_duration, 3)
@@ -238,7 +265,9 @@ def _run(options: argparse.Namespace) -> int:
                 print("PASS" if result.passed else f"FAIL: {'; '.join(result.failures)}")
 
     output_directory = options.output or _default_output_directory()
-    agent_version = _command_version([executable, "--version"])
+    agent_version = (
+        provider_version() if agent == "bedrock" else _command_version([executable, "--version"])
+    )
     source_digest = plugin_tree_digest(REPOSITORY_ROOT / "plugins" / "sccfm")
     fixture_digest = _fixture_digest(fixtures)
     model = options.model or "configured default"
