@@ -332,13 +332,16 @@ def test_bedrock_container_environment_excludes_provider_credentials(tmp_path: P
         "HOME": str(tmp_path / "home"),
     }
 
-    isolated = bedrock._container_environment(environment, tmp_path / "bin")
+    isolated = bedrock._container_environment(environment)
 
     assert "AWS_ACCESS_KEY_ID" not in isolated
     assert "AWS_WEB_IDENTITY_TOKEN_FILE" not in isolated
     assert isolated["SCCFM_HARNESS_REGION"] == "us"
     assert isolated["SCCFM_HARNESS_CREDENTIAL_NAMES"] == "AWS_ACCESS_KEY_ID"
     assert isolated["SCCFM_HARNESS_REAL_PYTHON"] == "/usr/local/bin/python3"
+    assert isolated["PATH"].startswith("/opt/sccfm-agent-harness/bin:")
+    assert isolated["SCCFM_HARNESS_DISPATCHER"] == ("/opt/sccfm-agent-harness/bin/sccfm-cli")
+    assert isolated["SCCFM_HARNESS_EVENT_LOG"] == "/opt/sccfm-agent-harness/events.jsonl"
 
 
 def test_bedrock_bash_uses_network_disabled_read_only_container(tmp_path: Path) -> None:
@@ -366,6 +369,10 @@ def test_bedrock_bash_uses_network_disabled_read_only_container(tmp_path: Path) 
     assert command[:3] == ["docker", "run", "--rm"]
     assert command[command.index("--network") + 1] == "none"
     assert "--read-only" in command
+    volumes = [command[index + 1] for index, item in enumerate(command) if item == "--volume"]
+    assert f"{tmp_path}:{tmp_path}:rw,Z" in volumes
+    assert f"{binary_directory}:/opt/sccfm-agent-harness/bin:ro,Z" in volumes
+    assert f"{event_log}:/opt/sccfm-agent-harness/events.jsonl:rw,Z" in volumes
     assert command[command.index("--entrypoint") + 1] == "/bin/sh"
     assert command[-3:] == ["python:3.12-slim", "-c", "sccfm-cli status"]
     assert result == CommandRecord("sccfm-cli status", "healthy", 0)

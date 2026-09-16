@@ -20,6 +20,9 @@ from .models import CommandRecord, Transcript
 DEFAULT_TOOL_IMAGE = "python:3.12-slim"
 MAX_TOOL_ROUNDS = 40
 MAX_TOOL_OUTPUT = 64 * 1024
+CONTAINER_TOOL_ROOT = Path("/opt/sccfm-agent-harness")
+CONTAINER_BINARY_DIRECTORY = CONTAINER_TOOL_ROOT / "bin"
+CONTAINER_EVENT_LOG = CONTAINER_TOOL_ROOT / "events.jsonl"
 
 
 @dataclass(frozen=True)
@@ -249,7 +252,7 @@ def _run_bash(
     image: str,
     timeout_seconds: int,
 ) -> CommandRecord:
-    container_environment = _container_environment(environment, binary_directory)
+    container_environment = _container_environment(environment)
     docker_command = [
         "docker",
         "run",
@@ -266,12 +269,12 @@ def _run_bash(
         f"{os.getuid()}:{os.getgid()}",
         "--workdir",
         str(workspace),
-        "--mount",
-        f"type=bind,source={workspace},target={workspace}",
-        "--mount",
-        f"type=bind,source={binary_directory},target={binary_directory},readonly",
-        "--mount",
-        f"type=bind,source={event_log},target={event_log}",
+        "--volume",
+        f"{workspace}:{workspace}:rw,Z",
+        "--volume",
+        f"{binary_directory}:{CONTAINER_BINARY_DIRECTORY}:ro,Z",
+        "--volume",
+        f"{event_log}:{CONTAINER_EVENT_LOG}:rw,Z",
         "--tmpfs",
         "/tmp:rw,nosuid,nodev,noexec,size=64m",
         "--entrypoint",
@@ -295,16 +298,17 @@ def _run_bash(
     return CommandRecord(command=command, output=output, exit_code=completed.returncode)
 
 
-def _container_environment(environment: dict[str, str], binary_directory: Path) -> dict[str, str]:
+def _container_environment(environment: dict[str, str]) -> dict[str, str]:
     allowed = {
         name: value
         for name, value in environment.items()
         if name.startswith("SCCFM_HARNESS_")
         or name in {"HOME", "ZDOTDIR", "NO_COLOR", "PYTHONDONTWRITEBYTECODE"}
     }
-    allowed["PATH"] = f"{binary_directory}:/usr/local/bin:/usr/bin:/bin"
+    allowed["PATH"] = f"{CONTAINER_BINARY_DIRECTORY}:/usr/local/bin:/usr/bin:/bin"
     allowed["SCCFM_HARNESS_REAL_PYTHON"] = "/usr/local/bin/python3"
-    allowed["SCCFM_HARNESS_DISPATCHER"] = str(binary_directory / "sccfm-cli")
+    allowed["SCCFM_HARNESS_DISPATCHER"] = str(CONTAINER_BINARY_DIRECTORY / "sccfm-cli")
+    allowed["SCCFM_HARNESS_EVENT_LOG"] = str(CONTAINER_EVENT_LOG)
     return allowed
 
 
