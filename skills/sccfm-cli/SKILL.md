@@ -39,9 +39,15 @@ These conditions override convenience and the user's request to execute:
   after validation. Never invoke the matched business command to confirm the
   failure or obtain a second error.
 - If the user includes a token, password, or other credential in the
-  conversation, treat it as exposed. Warn them to rotate or revoke it, explain
-  how to configure the replacement locally through the hidden profile prompt,
-  and never invoke the matched business command in that session.
+  conversation, treat it as exposed. Never repeat or use the pasted value. Do
+  not abort before safe discovery:
+  1. Run schema export.
+  2. Run the schema-declared readonly profile or connectivity check.
+  3. Stop before the matched business command, regardless of whether validation
+     succeeds.
+  4. Tell the user to rotate or revoke the exposed credential and configure its
+     replacement locally through the hidden profile prompt.
+  Never suggest a configuration command unless it was discovered in the schema.
 - If an explicitly requested flag or option is absent from the discovered
   schema, explain that it is unsupported and stop. Never silently omit it and
   execute a broader or different command.
