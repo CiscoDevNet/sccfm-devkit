@@ -6,12 +6,18 @@
 
 from __future__ import annotations
 
+import json
 import re
+import shlex
+from pathlib import Path
+from typing import Any
 
 from .models import Assertion, AssertionResult, CommandRecord, Expectations, Transcript
 from .observations import is_single_operation_command, normalize_tool_events
 
 FLAGS = re.IGNORECASE | re.DOTALL
+FENCED_CODE = re.compile(r"```[^\n]*\n(?P<body>.*?)```", FLAGS)
+INLINE_CODE = re.compile(r"`(?P<body>[^`\n]+)`")
 
 
 def score(expectations: Expectations, transcript: Transcript) -> list[AssertionResult]:
@@ -62,6 +68,8 @@ def _score_assertion(assertion: Assertion, transcript: Transcript) -> AssertionR
             "response omitted semantic concept groups",
             evidence,
         )
+    if assertion.assertion_type == "response_commands_supported":
+        return _score_response_commands_supported(assertion, transcript)
     if assertion.assertion_type == "response_operation_confirmation":
         return _score_response_operation_confirmation(assertion, transcript)
     if assertion.assertion_type == "secret_absent":
@@ -132,6 +140,182 @@ def _score_assertion(assertion: Assertion, transcript: Transcript) -> AssertionR
             f"operation call count {actual} exceeds limit {maximum}",
         )
     raise ValueError(f"unsupported assertion type: {assertion.assertion_type}")
+
+
+def _score_response_commands_supported(
+    assertion: Assertion, transcript: Transcript
+) -> AssertionResult:
+    """Validate every presented SCCFM command against the exported schema."""
+
+    schema = _exported_sccfm_schema(transcript)
+    if schema is None:
+        return _result(
+            assertion,
+            False,
+            "all response commands were supported by the exported schema",
+            "could not validate response commands because schema output was unavailable",
+        )
+    commands = _response_sccfm_commands(transcript.response)
+    unsupported = [command for command in commands if not _schema_supports(command, schema)]
+    return _result(
+        assertion,
+        not unsupported,
+        "all response commands were supported by the exported schema",
+        "response included commands absent from the exported schema",
+        "\n".join(unsupported) if unsupported else None,
+    )
+
+
+def _exported_sccfm_schema(transcript: Transcript) -> dict[str, Any] | None:
+    for record in transcript.command_records:
+        events = normalize_tool_events([record])
+        if not any(event.operation == "sccfm.schema.export" for event in events):
+            continue
+        payload = _json_object(record.output)
+        if payload is not None and payload.get("tool_name") == "sccfm-cli":
+            return payload
+    return None
+
+
+def _json_object(value: str) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError:
+        start = value.find("{")
+        end = value.rfind("}")
+        if start < 0 or end < start:
+            return None
+        try:
+            payload = json.loads(value[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _response_sccfm_commands(response: str) -> list[str]:
+    commands: list[str] = []
+    fenced_ranges: list[tuple[int, int]] = []
+    for match in FENCED_CODE.finditer(response):
+        fenced_ranges.append(match.span())
+        body = match.group("body").replace("\\\n", " ")
+        commands.extend(
+            command
+            for line in body.splitlines()
+            if (command := _presented_sccfm_command(line)) is not None
+        )
+
+    outside_fences = response
+    for start, end in reversed(fenced_ranges):
+        outside_fences = outside_fences[:start] + (" " * (end - start)) + outside_fences[end:]
+    commands.extend(
+        command
+        for match in INLINE_CODE.finditer(outside_fences)
+        if (command := _presented_sccfm_command(match.group("body"))) is not None
+    )
+    commands.extend(
+        command
+        for line in outside_fences.splitlines()
+        if (command := _presented_sccfm_command(line)) is not None
+    )
+    return list(dict.fromkeys(commands))
+
+
+def _presented_sccfm_command(value: str) -> str | None:
+    candidate = value.strip()
+    for prefix in ("$ ", "EXECUTE "):
+        if candidate.startswith(prefix):
+            candidate = candidate[len(prefix) :].strip()
+    if not candidate.startswith("sccfm-cli "):
+        return None
+    return candidate
+
+
+def _schema_supports(command: str, schema: dict[str, Any]) -> bool:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False
+    if not tokens or Path(tokens[0]).name != "sccfm-cli":
+        return False
+    arguments = tokens[1:]
+    global_options = _option_aliases(schema.get("global_options"))
+    command_start = _consume_options(arguments, 0, global_options, required=False)
+    if command_start is None:
+        return False
+    raw_commands = schema.get("commands")
+    if not isinstance(raw_commands, list):
+        return False
+    for raw_command in raw_commands:
+        if not isinstance(raw_command, dict):
+            continue
+        raw_path = raw_command.get("path")
+        if not isinstance(raw_path, list) or not all(isinstance(item, str) for item in raw_path):
+            continue
+        path = list(raw_path)
+        if arguments[command_start : command_start + len(path)] != path:
+            continue
+        option_start = command_start + len(path)
+        command_options = _option_aliases(raw_command.get("options"))
+        return _consume_options(arguments, option_start, command_options, required=True) == len(
+            arguments
+        )
+    return False
+
+
+def _option_aliases(raw_options: object) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    if not isinstance(raw_options, list):
+        return result
+    for raw_option in raw_options:
+        if not isinstance(raw_option, dict):
+            continue
+        aliases = raw_option.get("aliases")
+        if not isinstance(aliases, list):
+            continue
+        for alias in aliases:
+            if isinstance(alias, str):
+                result[alias] = raw_option
+    return result
+
+
+def _consume_options(
+    arguments: list[str],
+    start: int,
+    options: dict[str, dict[str, Any]],
+    *,
+    required: bool,
+) -> int | None:
+    index = start
+    seen: set[str] = set()
+    while index < len(arguments) and arguments[index].startswith("-"):
+        token = arguments[index]
+        alias, separator, inline_value = token.partition("=")
+        option = options.get(alias)
+        if option is None:
+            return None
+        name = option.get("name")
+        if isinstance(name, str):
+            seen.add(name)
+        index += 1
+        if option.get("is_flag") is True:
+            if separator:
+                return None
+            continue
+        if not separator:
+            if index >= len(arguments) or arguments[index].startswith("-"):
+                return None
+            index += 1
+        elif not inline_value:
+            return None
+    if required:
+        raw_required = {
+            option.get("name")
+            for option in options.values()
+            if option.get("required") is True and isinstance(option.get("name"), str)
+        }
+        if not raw_required.issubset(seen):
+            return None
+    return index
 
 
 def _score_response_operation_confirmation(

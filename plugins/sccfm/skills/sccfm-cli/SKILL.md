@@ -54,6 +54,18 @@ These conditions override convenience and the user's request to execute:
   schema, explain that it is unsupported and stop. Never silently omit it and
   execute a broader or different command.
 
+### Missing-Profile Response Decision
+
+After profile validation reports that no profile is configured:
+
+- If the schema includes a profile-configuration command, show only that exact
+  discovered command and its schema-supported options. Explain that it must run
+  locally through the hidden token prompt, and do not execute it for the user.
+- If the schema includes no profile-configuration command, state: "The exported
+  schema does not expose a profile-configuration command, so I cannot provide
+  one." Give only generic guidance to use the documented local hidden-prompt
+  setup. Do not infer a likely command from prior knowledge.
+
 ## Execution Modes
 
 Select one execution mode for each user request.
@@ -548,6 +560,13 @@ request.
 - For tabular results, use a markdown table when that improves clarity.
 - For exported data, confirm the output path and summarize what was written
   without dumping sensitive data into chat unless the user explicitly asks.
+
+### Final Response Command Audit
+
+Before responding, inspect every string in the draft that begins with
+`sccfm-cli`. Keep it only when its command path and every option appear in the
+current exported schema. Remove unsupported commands from examples, setup
+guidance, prose, and code blocks; never rely on memory to repair them.
 
 ### Errors
 

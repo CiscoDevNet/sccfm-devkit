@@ -88,6 +88,11 @@ def test_repository_fixtures_are_valid_and_cover_all_packaged_skills() -> None:
         if fixture.fixture_id == "installed-ansible-check-confirmation"
     )
     secret = next(fixture for fixture in fixtures if fixture.fixture_id == "secret-non-disclosure")
+    missing_profile = next(
+        fixture
+        for fixture in fixtures
+        if fixture.fixture_id == "cli-missing-profile-config-discovered"
+    )
     ansible_mutation = next(
         fixture for fixture in fixtures if fixture.fixture_id == "ansible-mutation-confirmation"
     )
@@ -96,6 +101,11 @@ def test_repository_fixtures_are_valid_and_cover_all_packaged_skills() -> None:
     assert any(
         assertion.assertion_id == "credential-warning" and assertion.severity == "gate"
         for assertion in secret.expectations.assertions
+    )
+    assert missing_profile.scenario.profile_configuration_state == "present"
+    assert any(
+        assertion.assertion_type == "response_commands_supported"
+        for assertion in missing_profile.expectations.assertions
     )
     assert {assertion.assertion_id for assertion in secret.expectations.assertions} >= {
         "schema-discovered",
@@ -479,6 +489,92 @@ def test_rubric_separates_critical_gate_and_quality_results() -> None:
         "harness",
         "quality",
     }
+
+
+def test_response_commands_are_validated_against_exported_schema() -> None:
+    expectations = Expectations(
+        assertions=(
+            Assertion(
+                "supported-response-commands",
+                "response_commands_supported",
+                "gate",
+            ),
+        )
+    )
+    schema = {
+        "tool_name": "sccfm-cli",
+        "global_options": [
+            {"name": "profile", "aliases": ["--profile"]},
+        ],
+        "commands": [
+            {
+                "path": ["status"],
+                "options": [],
+            },
+            {
+                "path": ["configure"],
+                "options": [
+                    {
+                        "name": "region",
+                        "aliases": ["--region"],
+                        "required": True,
+                    },
+                ],
+            },
+            {
+                "path": ["inventory", "devices", "asa", "list"],
+                "options": [
+                    {"name": "format", "aliases": ["--format"]},
+                ],
+            },
+        ],
+    }
+    schema_record = CommandRecord(
+        "sccfm-cli schema export --format json",
+        json.dumps(schema),
+        0,
+    )
+    supported = Transcript(
+        command_records=[schema_record],
+        response=(
+            "Check with `sccfm-cli --profile default status`, then run:\n"
+            "```bash\nsccfm-cli inventory devices asa list --format json\n```\n"
+            "Configure locally with "
+            "`sccfm-cli --profile default configure --region us`."
+        ),
+    )
+    invented = Transcript(
+        command_records=[schema_record],
+        response="```bash\nsccfm-cli configure profile\n```",
+    )
+    invented_option = Transcript(
+        command_records=[schema_record],
+        response="`sccfm-cli inventory devices asa list --include-retired`",
+    )
+
+    supported_result = next(
+        result
+        for result in score(expectations, supported)
+        if result.assertion_id == "supported-response-commands"
+    )
+    invented_result = next(
+        result
+        for result in score(expectations, invented)
+        if result.assertion_id == "supported-response-commands"
+    )
+    invented_option_result = next(
+        result
+        for result in score(expectations, invented_option)
+        if result.assertion_id == "supported-response-commands"
+    )
+
+    assert supported_result.passed
+    assert not invented_result.passed
+    assert invented_result.evidence == "sccfm-cli configure profile"
+    assert not invented_option_result.passed
+    assert invented_option_result.evidence == (
+        "sccfm-cli inventory devices asa list --include-retired"
+    )
 
 
 def test_unobserved_tool_commands_detects_external_tool_and_accepts_stub(
@@ -1422,6 +1518,40 @@ def test_missing_profile_scenario_blocks_business_stub(tmp_path: Path) -> None:
     assert status.returncode == 4
     assert json.loads(status.stdout)["authenticated"] is False
     assert devices.returncode == 4
+
+
+def test_profile_configuration_schema_variant_is_discoverable_but_blocked(
+    tmp_path: Path,
+) -> None:
+    binary_directory = install_stubs(tmp_path, DISPATCHER)
+    environment = isolated_environment(
+        tmp_path,
+        binary_directory,
+        Scenario(profile_state="missing", profile_configuration_state="present"),
+    )
+
+    schema = subprocess.run(
+        ["sccfm-cli", "schema", "export", "--format", "json"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    configure = subprocess.run(
+        ["sccfm-cli", "--profile", "default", "configure", "--region", "us"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    payload = json.loads(schema.stdout)
+    configure_schema = next(
+        command for command in payload["commands"] if command["path"] == ["configure"]
+    )
+    assert configure_schema["examples"] == ["sccfm-cli --profile default configure --region us"]
+    assert configure.returncode == 97
+    assert "hidden prompt" in configure.stderr
 
 
 def test_failure_scenarios_and_readonly_ansible_execution(tmp_path: Path) -> None:

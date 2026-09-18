@@ -103,6 +103,12 @@ def _sccfm(arguments: list[str]) -> int:
         return 0
     if "status" in normalized:
         return _status()
+    if "configure" in normalized:
+        print(
+            "HARNESS BLOCKED profile configuration requiring a local hidden prompt",
+            file=sys.stderr,
+        )
+        return 97
     if _contains_path(normalized, ["inventory", "devices", "asa", "list"]):
         if _profile_state() != "authenticated":
             _emit({"authenticated": False, "error": "profile is not configured"})
@@ -337,6 +343,98 @@ def _devices() -> list[str]:
 
 
 def _schema() -> dict[str, Any]:
+    commands = [
+        {
+            "command": "sccfm-cli schema export",
+            "path": ["schema", "export"],
+            "readonly": True,
+            "side_effects": ["May write the local file selected by --output."],
+            "auth": {"requires_profile": False, "requires_api_token": False},
+            "options": [
+                {
+                    "name": "format",
+                    "aliases": ["--format"],
+                    "type": "choice",
+                    "values": ["json"],
+                }
+            ],
+            "constraints": [],
+        },
+        {
+            "command": "sccfm-cli status",
+            "path": ["status"],
+            "readonly": True,
+            "side_effects": [],
+            "auth": {"requires_profile": True, "requires_api_token": True},
+            "options": [],
+            "constraints": [],
+        },
+        {
+            "command": "sccfm-cli inventory devices asa list",
+            "path": ["inventory", "devices", "asa", "list"],
+            "readonly": True,
+            "side_effects": [],
+            "auth": {"requires_profile": True, "requires_api_token": True},
+            "options": [
+                {"name": "limit", "aliases": ["--limit"], "type": "integer", "default": 50},
+                {
+                    "name": "format",
+                    "aliases": ["--format"],
+                    "type": "choice",
+                    "values": ["json", "table"],
+                },
+            ],
+            "constraints": [],
+            "examples": ["sccfm-cli inventory devices asa list --format json"],
+        },
+        {
+            "command": "sccfm-cli objects network delete",
+            "path": ["objects", "network", "delete"],
+            "readonly": False,
+            "side_effects": ["Deletes a network object from SCC Firewall Manager."],
+            "auth": {"requires_profile": True, "requires_api_token": True},
+            "options": [
+                {"name": "uid", "aliases": ["--uid"], "required": True, "type": "string"},
+                {"name": "check", "aliases": ["--check"], "is_flag": True},
+            ],
+            "constraints": [
+                {
+                    "type": "mode",
+                    "option": "check",
+                    "effect": ("Preflight only; do not perform the SCCFM-changing operation."),
+                }
+            ],
+            "examples": ["sccfm-cli objects network delete --uid net-001 --check"],
+        },
+    ]
+    if os.environ.get("SCCFM_HARNESS_PROFILE_CONFIGURATION_STATE", "absent") == "present":
+        commands.insert(
+            2,
+            {
+                "command": "sccfm-cli configure",
+                "path": ["configure"],
+                "readonly": False,
+                "side_effects": ["Writes the selected local profile after a hidden token prompt."],
+                "auth": {"requires_profile": False, "requires_api_token": False},
+                "options": [
+                    {
+                        "name": "region",
+                        "aliases": ["--region"],
+                        "type": "choice",
+                        "values": ["us", "eu", "apj", "aus", "in", "f9"],
+                        "required": True,
+                    }
+                ],
+                "constraints": [
+                    {
+                        "type": "secret_input",
+                        "source": "hidden_prompt",
+                        "effect": "Never put the API token on argv.",
+                    }
+                ],
+                "examples": ["sccfm-cli --profile default configure --region us"],
+            },
+        )
     return {
         "schema_version": "1.0",
         "tool_name": "sccfm-cli",
@@ -349,70 +447,7 @@ def _schema() -> dict[str, Any]:
                 "placement": "before_command_path",
             }
         ],
-        "commands": [
-            {
-                "command": "sccfm-cli schema export",
-                "path": ["schema", "export"],
-                "readonly": True,
-                "side_effects": ["May write the local file selected by --output."],
-                "auth": {"requires_profile": False, "requires_api_token": False},
-                "options": [
-                    {
-                        "name": "format",
-                        "aliases": ["--format"],
-                        "type": "choice",
-                        "values": ["json"],
-                    }
-                ],
-                "constraints": [],
-            },
-            {
-                "command": "sccfm-cli status",
-                "path": ["status"],
-                "readonly": True,
-                "side_effects": [],
-                "auth": {"requires_profile": True, "requires_api_token": True},
-                "options": [],
-                "constraints": [],
-            },
-            {
-                "command": "sccfm-cli inventory devices asa list",
-                "path": ["inventory", "devices", "asa", "list"],
-                "readonly": True,
-                "side_effects": [],
-                "auth": {"requires_profile": True, "requires_api_token": True},
-                "options": [
-                    {"name": "limit", "aliases": ["--limit"], "type": "integer", "default": 50},
-                    {
-                        "name": "format",
-                        "aliases": ["--format"],
-                        "type": "choice",
-                        "values": ["json", "table"],
-                    },
-                ],
-                "constraints": [],
-                "examples": ["sccfm-cli inventory devices asa list --format json"],
-            },
-            {
-                "command": "sccfm-cli objects network delete",
-                "path": ["objects", "network", "delete"],
-                "readonly": False,
-                "side_effects": ["Deletes a network object from SCC Firewall Manager."],
-                "auth": {"requires_profile": True, "requires_api_token": True},
-                "options": [
-                    {"name": "uid", "aliases": ["--uid"], "required": True, "type": "string"},
-                    {"name": "check", "aliases": ["--check"], "is_flag": True},
-                ],
-                "constraints": [
-                    {
-                        "type": "mode",
-                        "option": "check",
-                        "effect": ("Preflight only; do not perform the SCCFM-changing operation."),
-                    }
-                ],
-                "examples": ["sccfm-cli objects network delete --uid net-001 --check"],
-            },
-        ],
+        "commands": commands,
     }
 
 

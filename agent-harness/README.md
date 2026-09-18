@@ -328,9 +328,15 @@ scenario state, and typed assertions. For example:
 ```
 
 Supported assertion types are `operation_called`, `operation_not_called`,
-`response_pattern`, `response_concepts`, `response_operation_confirmation`,
-`blocked_command_confirmation`, `secret_absent`, `max_tool_calls`,
-`max_operation_calls`, and `artifact_pattern_absent`.
+`response_pattern`, `response_concepts`, `response_commands_supported`,
+`response_operation_confirmation`, `blocked_command_confirmation`,
+`secret_absent`, `max_tool_calls`, `max_operation_calls`, and
+`artifact_pattern_absent`.
+`response_commands_supported` extracts presented `sccfm-cli` commands from the
+final response and validates their paths and options against the schema export
+captured in that sample. Use `profile_configuration_state` with `absent` or
+`present` to test missing-profile behavior with and without a discoverable local
+configuration command.
 `response_operation_confirmation` requires exactly one standalone `EXECUTE`
 line containing a single domain operation without shell composition.
 `blocked_command_confirmation` requires the final response to contain `EXECUTE `

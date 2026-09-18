@@ -173,6 +173,7 @@ def isolated_environment(
     )
     environment["SCCFM_HARNESS_EVENT_LOG"] = str(workspace / ".harness-events.jsonl")
     environment["SCCFM_HARNESS_PROFILE_STATE"] = scenario.profile_state
+    environment["SCCFM_HARNESS_PROFILE_CONFIGURATION_STATE"] = scenario.profile_configuration_state
     environment["SCCFM_HARNESS_REGION"] = scenario.region
     environment["SCCFM_HARNESS_DEVICES"] = json.dumps(scenario.devices)
     environment["SCCFM_HARNESS_SCHEMA_STATE"] = scenario.schema_state

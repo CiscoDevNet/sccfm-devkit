@@ -20,6 +20,7 @@ from .models import (
     Expectations,
     Fixture,
     Mode,
+    ProfileConfigurationState,
     ProfileState,
     RuntimeState,
     Scenario,
@@ -33,6 +34,7 @@ VALID_TIERS = {"required", "aspirational"}
 VALID_SKILLS = {"sccfm-cli", "sccfm-ansible", "sccfm-setup", "sccfm-uninstall"}
 VALID_SEVERITIES = {"critical", "gate", "quality"}
 VALID_PROFILE_STATES = {"authenticated", "missing", "invalid"}
+VALID_PROFILE_CONFIGURATION_STATES = {"absent", "present"}
 VALID_SCHEMA_STATES = {"ok", "error", "malformed"}
 VALID_DEVICE_LIST_STATES = {"ok", "error"}
 VALID_ANSIBLE_PLAYBOOK_STATES = {"blocked", "readonly", "error"}
@@ -43,6 +45,7 @@ VALID_ASSERTION_TYPES = {
     "operation_not_called",
     "response_pattern",
     "response_concepts",
+    "response_commands_supported",
     "response_operation_confirmation",
     "blocked_command_confirmation",
     "secret_absent",
@@ -106,6 +109,9 @@ def _load_scenario(raw: object, path: Path) -> Scenario:
     profile_state = raw.get("profile_state", "authenticated")
     if profile_state not in VALID_PROFILE_STATES:
         raise ValueError(f"{path}: invalid scenario.profile_state")
+    profile_configuration_state = raw.get("profile_configuration_state", "absent")
+    if profile_configuration_state not in VALID_PROFILE_CONFIGURATION_STATES:
+        raise ValueError(f"{path}: invalid scenario.profile_configuration_state")
     region = _nonempty_string(raw.get("region", "us"), path, "scenario.region")
     devices = raw.get("devices", ["branch-fw-01", "branch-fw-02"])
     if not isinstance(devices, list) or not all(
@@ -129,6 +135,7 @@ def _load_scenario(raw: object, path: Path) -> Scenario:
         raise ValueError(f"{path}: invalid scenario.ansible_runtime_layout")
     return Scenario(
         profile_state=cast(ProfileState, profile_state),
+        profile_configuration_state=cast(ProfileConfigurationState, profile_configuration_state),
         region=region,
         devices=tuple(devices),
         schema_state=cast(SchemaState, schema_state),
