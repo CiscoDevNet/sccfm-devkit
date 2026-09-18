@@ -551,6 +551,17 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
         command_records=[schema_record],
         response="`sccfm-cli inventory devices asa list --include-retired`",
     )
+    supported_inline_reference = Transcript(
+        command_records=[schema_record],
+        response=(
+            "The `sccfm-cli configure` command is available. Run "
+            "`sccfm-cli --profile default configure --region us` locally."
+        ),
+    )
+    incomplete_runnable_command = Transcript(
+        command_records=[schema_record],
+        response="```bash\nsccfm-cli configure\n```",
+    )
 
     supported_result = next(
         result
@@ -567,6 +578,16 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
         for result in score(expectations, invented_option)
         if result.assertion_id == "supported-response-commands"
     )
+    supported_inline_reference_result = next(
+        result
+        for result in score(expectations, supported_inline_reference)
+        if result.assertion_id == "supported-response-commands"
+    )
+    incomplete_runnable_result = next(
+        result
+        for result in score(expectations, incomplete_runnable_command)
+        if result.assertion_id == "supported-response-commands"
+    )
 
     assert supported_result.passed
     assert not invented_result.passed
@@ -575,6 +596,9 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
     assert invented_option_result.evidence == (
         "sccfm-cli inventory devices asa list --include-retired"
     )
+    assert supported_inline_reference_result.passed
+    assert not incomplete_runnable_result.passed
+    assert incomplete_runnable_result.evidence == "sccfm-cli configure"
 
 
 def test_unobserved_tool_commands_detects_external_tool_and_accepts_stub(

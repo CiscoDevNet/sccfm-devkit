@@ -334,8 +334,10 @@ Supported assertion types are `operation_called`, `operation_not_called`,
 `artifact_pattern_absent`.
 `response_commands_supported` extracts presented `sccfm-cli` commands from the
 final response and validates their paths and options against the schema export
-captured in that sample. Use `profile_configuration_state` with `absent` or
-`present` to test missing-profile behavior with and without a discoverable local
+captured in that sample. Fenced and standalone commands must include required
+options, while inline command-name references only validate the path and any
+options they show. Use `profile_configuration_state` with `absent` or `present`
+to test missing-profile behavior with and without a discoverable local
 configuration command.
 `response_operation_confirmation` requires exactly one standalone `EXECUTE`
 line containing a single domain operation without shell composition.

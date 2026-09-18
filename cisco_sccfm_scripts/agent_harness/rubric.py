@@ -156,7 +156,11 @@ def _score_response_commands_supported(
             "could not validate response commands because schema output was unavailable",
         )
     commands = _response_sccfm_commands(transcript.response)
-    unsupported = [command for command in commands if not _schema_supports(command, schema)]
+    unsupported = [
+        command
+        for command, require_complete in commands
+        if not _schema_supports(command, schema, require_complete=require_complete)
+    ]
     return _result(
         assertion,
         not unsupported,
@@ -192,32 +196,29 @@ def _json_object(value: str) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _response_sccfm_commands(response: str) -> list[str]:
-    commands: list[str] = []
+def _response_sccfm_commands(response: str) -> list[tuple[str, bool]]:
+    commands: dict[str, bool] = {}
     fenced_ranges: list[tuple[int, int]] = []
     for match in FENCED_CODE.finditer(response):
         fenced_ranges.append(match.span())
         body = match.group("body").replace("\\\n", " ")
-        commands.extend(
-            command
-            for line in body.splitlines()
-            if (command := _presented_sccfm_command(line)) is not None
-        )
+        for line in body.splitlines():
+            command = _presented_sccfm_command(line)
+            if command is not None:
+                commands[command] = True
 
     outside_fences = response
     for start, end in reversed(fenced_ranges):
         outside_fences = outside_fences[:start] + (" " * (end - start)) + outside_fences[end:]
-    commands.extend(
-        command
-        for match in INLINE_CODE.finditer(outside_fences)
-        if (command := _presented_sccfm_command(match.group("body"))) is not None
-    )
-    commands.extend(
-        command
-        for line in outside_fences.splitlines()
-        if (command := _presented_sccfm_command(line)) is not None
-    )
-    return list(dict.fromkeys(commands))
+    for match in INLINE_CODE.finditer(outside_fences):
+        command = _presented_sccfm_command(match.group("body"))
+        if command is not None:
+            commands.setdefault(command, False)
+    for line in outside_fences.splitlines():
+        command = _presented_sccfm_command(line)
+        if command is not None:
+            commands[command] = True
+    return list(commands.items())
 
 
 def _presented_sccfm_command(value: str) -> str | None:
@@ -230,7 +231,12 @@ def _presented_sccfm_command(value: str) -> str | None:
     return candidate
 
 
-def _schema_supports(command: str, schema: dict[str, Any]) -> bool:
+def _schema_supports(
+    command: str,
+    schema: dict[str, Any],
+    *,
+    require_complete: bool,
+) -> bool:
     try:
         tokens = shlex.split(command)
     except ValueError:
@@ -256,9 +262,12 @@ def _schema_supports(command: str, schema: dict[str, Any]) -> bool:
             continue
         option_start = command_start + len(path)
         command_options = _option_aliases(raw_command.get("options"))
-        return _consume_options(arguments, option_start, command_options, required=True) == len(
-            arguments
-        )
+        return _consume_options(
+            arguments,
+            option_start,
+            command_options,
+            required=require_complete,
+        ) == len(arguments)
     return False
 
 

@@ -39,12 +39,13 @@ These conditions override convenience and the user's request to execute:
   after validation. Never invoke the matched business command to confirm the
   failure or obtain a second error.
 - If the user includes a token, password, or other credential in the
-  conversation, treat it as exposed. Never repeat or use the pasted value. Do
-  not abort before safe discovery:
+  conversation, enter exposed-credential mode. Never repeat or use the pasted
+  value. Perform exactly this safe-discovery sequence:
   1. Run schema export.
   2. Run the schema-declared readonly profile or connectivity check.
-  3. Stop before the matched business command, regardless of whether validation
-     succeeds.
+  3. Stop. Schema export and the profile check are the only permitted SCCFM
+     operations in this mode. A successful check never authorizes the matched
+     business command or clears exposed-credential mode.
   4. Tell the user to rotate or revoke the exposed credential and configure its
      replacement locally through the hidden profile prompt.
   If the schema exposes no profile-configuration command, do not output or name
@@ -56,7 +57,12 @@ These conditions override convenience and the user's request to execute:
 
 ### Missing-Profile Response Decision
 
-After profile validation reports that no profile is configured:
+When the user explicitly states that no profile is configured, or profile
+validation reports one missing:
+
+- If the user explicitly reports the missing profile and no business command
+  will be executed, do not require a redundant profile check before providing
+  setup guidance.
 
 - If the schema includes a profile-configuration command, show only that exact
   discovered command and its schema-supported options. Explain that it must run
@@ -455,6 +461,11 @@ If a command uses a file or list input for bulk work:
 ## Step 4: Execution Policy
 
 Apply these rules after selecting execution mode.
+
+Before invoking any business command, check whether the conversation contains a
+credential. If it does, exposed-credential mode is active: do not invoke the
+business command even after successful profile validation. Stop after schema
+export and the readonly profile or connectivity check.
 
 ### Class A: Readonly, No Local Writes
 
