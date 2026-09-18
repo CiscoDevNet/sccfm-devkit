@@ -59,7 +59,7 @@ def test_published_packages_exclude_repository_only_code() -> None:
 
 
 def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
-    assert "scc-firewall-manager-sdk==1.17.27" in _project_config()["dependencies"]
+    assert "scc-firewall-manager-sdk==1.22.1573" in _project_config()["dependencies"]
 
 
 def test_interactive_entrypoint_is_published_from_the_cli_package() -> None:

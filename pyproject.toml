@@ -26,7 +26,7 @@ dependencies = [
     "rich>=14.2.0,<15",
     "click-option-group>=0.5.9,<0.6",
     "questionary>=2.1.1,<3",
-    "scc-firewall-manager-sdk==1.17.27",
+    "scc-firewall-manager-sdk==1.22.1573",
     "paramiko>=5.0.0,<6",
     "cryptography>=50.0.0,<51",
     "pygments>=2.20.0,<3",
