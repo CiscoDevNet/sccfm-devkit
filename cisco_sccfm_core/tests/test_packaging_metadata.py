@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import tomllib
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 from typing import Any
 
@@ -58,8 +59,16 @@ def test_published_packages_exclude_repository_only_code() -> None:
     }
 
 
-def test_generated_sdk_is_pinned_to_the_verified_compatible_version() -> None:
-    assert "scc-firewall-manager-sdk==1.22.1573" in _project_config()["dependencies"]
+def test_generated_sdk_pin_matches_installed_version() -> None:
+    sdk_dependencies = [
+        dependency
+        for dependency in _project_config()["dependencies"]
+        if dependency.startswith("scc-firewall-manager-sdk==")
+    ]
+
+    assert len(sdk_dependencies) == 1
+    pinned_version = sdk_dependencies[0].split("==", maxsplit=1)[1]
+    assert distribution_version("scc-firewall-manager-sdk") == pinned_version
 
 
 def test_interactive_entrypoint_is_published_from_the_cli_package() -> None:

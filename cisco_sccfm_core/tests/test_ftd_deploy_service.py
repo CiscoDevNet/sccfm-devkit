@@ -29,7 +29,19 @@ def mock_inventory_api(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 
 @pytest.fixture
-def service(mock_inventory_api: MagicMock) -> FtdDeployService:
+def mock_device_deployments_api(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    mock_api = MagicMock()
+    monkeypatch.setattr(
+        "cisco_sccfm_core.services.inventory.ftd_deploy_service.DeviceDeploymentsApi",
+        lambda client: mock_api,
+    )
+    return mock_api
+
+
+@pytest.fixture
+def service(
+    mock_inventory_api: MagicMock, mock_device_deployments_api: MagicMock
+) -> FtdDeployService:
     config = MagicMock()
     config.region = "us"
     config.api_token = "test-token"
@@ -85,15 +97,19 @@ class TestDeploySingle:
 
 class TestDeployMultiple:
     def test_should_call_deploy_multiple_ftd_devices(
-        self, service: FtdDeployService, mock_inventory_api: MagicMock
+        self, service: FtdDeployService, mock_device_deployments_api: MagicMock
     ) -> None:
-        mock_inventory_api.deploy_changes_to_multiple_ftd_devices.return_value = SAMPLE_TRANSACTION
+        mock_device_deployments_api.deploy_changes_to_multiple_ftd_devices.return_value = (
+            SAMPLE_TRANSACTION
+        )
 
         result = service.deploy_multiple(device_uids=[UID_1, UID_2])
 
         assert result == SAMPLE_TRANSACTION
-        mock_inventory_api.deploy_changes_to_multiple_ftd_devices.assert_called_once()
-        call_kwargs = mock_inventory_api.deploy_changes_to_multiple_ftd_devices.call_args[1]
+        mock_device_deployments_api.deploy_changes_to_multiple_ftd_devices.assert_called_once()
+        call_kwargs = mock_device_deployments_api.deploy_changes_to_multiple_ftd_devices.call_args[
+            1
+        ]
         deployment_input = call_kwargs["ftd_multi_device_deployment_input"]
         assert deployment_input.device_uids == [UID_1, UID_2]
         assert deployment_input.deployment_notes is None
@@ -101,9 +117,11 @@ class TestDeployMultiple:
         assert deployment_input.ignore_warnings is False
 
     def test_should_pass_optional_params(
-        self, service: FtdDeployService, mock_inventory_api: MagicMock
+        self, service: FtdDeployService, mock_device_deployments_api: MagicMock
     ) -> None:
-        mock_inventory_api.deploy_changes_to_multiple_ftd_devices.return_value = SAMPLE_TRANSACTION
+        mock_device_deployments_api.deploy_changes_to_multiple_ftd_devices.return_value = (
+            SAMPLE_TRANSACTION
+        )
 
         result = service.deploy_multiple(
             device_uids=[UID_1, UID_2],
@@ -113,7 +131,9 @@ class TestDeployMultiple:
         )
 
         assert result == SAMPLE_TRANSACTION
-        call_kwargs = mock_inventory_api.deploy_changes_to_multiple_ftd_devices.call_args[1]
+        call_kwargs = mock_device_deployments_api.deploy_changes_to_multiple_ftd_devices.call_args[
+            1
+        ]
         deployment_input = call_kwargs["ftd_multi_device_deployment_input"]
         assert deployment_input.deployment_notes == "Bulk deploy"
         assert deployment_input.description == "Weekend maintenance"

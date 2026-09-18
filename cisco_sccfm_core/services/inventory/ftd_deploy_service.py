@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from scc_firewall_manager_sdk import (
     CdoTransaction,
+    DeviceDeploymentsApi,
     FtdDeploymentInput,
     FtdMultiDeviceDeploymentInput,
     InventoryApi,
@@ -20,7 +21,9 @@ class FtdDeployService:
     """Deploys configuration changes to cdFMC-managed FTD devices."""
 
     def __init__(self, config: ConfigLike) -> None:
-        self._inventory_api = InventoryApi(ApiClientFactory().build(config=config))
+        api_client = ApiClientFactory().build(config=config)
+        self._inventory_api = InventoryApi(api_client)
+        self._device_deployments_api = DeviceDeploymentsApi(api_client)
 
     def deploy_single(
         self,
@@ -64,6 +67,6 @@ class FtdDeployService:
             description=description,
             ignoreWarnings=ignore_warnings,
         )
-        return self._inventory_api.deploy_changes_to_multiple_ftd_devices(
+        return self._device_deployments_api.deploy_changes_to_multiple_ftd_devices(
             ftd_multi_device_deployment_input=deployment_input,
         )

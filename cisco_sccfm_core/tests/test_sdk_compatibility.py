@@ -4,6 +4,8 @@
 
 """Regression tests for compatibility with the generated SDK contract."""
 
+from __future__ import annotations
+
 from scc_firewall_manager_sdk.models.device import Device
 
 
