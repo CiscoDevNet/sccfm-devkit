@@ -2,6 +2,13 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.42.1:
+    changes:
+      bugfixes:
+        - Bumped the SCCFM SDK to 1.22.1573 to support unknown licensing
+          statuses and aligned multi-device FTD deployments with the current SDK API.
+    fragments: []
+    release_date: '2026-09-18'
   0.42.0:
     changes:
       minor_changes:

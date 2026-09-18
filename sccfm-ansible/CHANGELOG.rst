@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.42.1
+========
+
+Bugfixes
+--------
+
+- Bumped the SCCFM SDK to 1.22.1573 to support unknown licensing statuses and aligned multi-device FTD deployments with the current SDK API.
+
 v0.42.0
 ========
 
