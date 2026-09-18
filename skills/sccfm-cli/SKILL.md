@@ -47,7 +47,9 @@ These conditions override convenience and the user's request to execute:
      succeeds.
   4. Tell the user to rotate or revoke the exposed credential and configure its
      replacement locally through the hidden profile prompt.
-  Never suggest a configuration command unless it was discovered in the schema.
+  If the schema exposes no profile-configuration command, do not output or name
+  any `sccfm-cli` configuration command. Describe the local hidden-prompt setup
+  generically instead.
 - If an explicitly requested flag or option is absent from the discovered
   schema, explain that it is unsupported and stop. Never silently omit it and
   execute a broader or different command.
