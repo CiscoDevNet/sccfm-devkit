@@ -398,6 +398,32 @@ def test_bedrock_bash_uses_network_disabled_read_only_container(tmp_path: Path) 
     assert result == CommandRecord("sccfm-cli status", "healthy", 0)
 
 
+def test_bedrock_bash_removes_container_after_timeout(tmp_path: Path) -> None:
+    binary_directory = tmp_path / "tools" / "bin"
+    binary_directory.mkdir(parents=True)
+    event_log = tmp_path / "tools" / "events.jsonl"
+    event_log.touch()
+    timeout = subprocess.TimeoutExpired(["docker", "run"], 1)
+    cleanup = subprocess.CompletedProcess([], 0, "", "")
+
+    with mock.patch.object(bedrock.subprocess, "run", side_effect=[timeout, cleanup]) as run:
+        with pytest.raises(subprocess.TimeoutExpired):
+            bedrock._run_bash(
+                "sleep 999999",
+                tmp_path,
+                binary_directory,
+                event_log,
+                {"SCCFM_HARNESS_REGION": "us", "HOME": str(tmp_path / "home")},
+                "python:3.12-slim",
+                1,
+            )
+
+    run_command = run.call_args_list[0].args[0]
+    container_name = run_command[run_command.index("--name") + 1]
+    assert run_command[0:2] == ["docker", "run"]
+    assert run.call_args_list[1].args[0] == ["docker", "rm", "--force", container_name]
+
+
 def test_observation_normalizer_ignores_reads_and_handles_compound_commands() -> None:
     records = [
         CommandRecord("/bin/zsh -lc 'command -v sccfm-cli'", "", 0),
@@ -524,7 +550,12 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
             {
                 "path": ["inventory", "devices", "asa", "list"],
                 "options": [
-                    {"name": "format", "aliases": ["--format"]},
+                    {
+                        "name": "format",
+                        "aliases": ["--format"],
+                        "type": "choice",
+                        "values": ["json", "table"],
+                    },
                 ],
             },
         ],
@@ -562,6 +593,10 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
         command_records=[schema_record],
         response="```bash\nsccfm-cli configure\n```",
     )
+    invalid_option_value = Transcript(
+        command_records=[schema_record],
+        response="`sccfm-cli inventory devices asa list --format yaml`",
+    )
 
     supported_result = next(
         result
@@ -588,6 +623,11 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
         for result in score(expectations, incomplete_runnable_command)
         if result.assertion_id == "supported-response-commands"
     )
+    invalid_option_value_result = next(
+        result
+        for result in score(expectations, invalid_option_value)
+        if result.assertion_id == "supported-response-commands"
+    )
 
     assert supported_result.passed
     assert not invented_result.passed
@@ -599,6 +639,10 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
     assert supported_inline_reference_result.passed
     assert not incomplete_runnable_result.passed
     assert incomplete_runnable_result.evidence == "sccfm-cli configure"
+    assert not invalid_option_value_result.passed
+    assert invalid_option_value_result.evidence == (
+        "sccfm-cli inventory devices asa list --format yaml"
+    )
 
 
 def test_discovered_configuration_fixture_accepts_default_profile_omission() -> None:

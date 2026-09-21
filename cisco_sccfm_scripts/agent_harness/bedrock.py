@@ -10,6 +10,7 @@ import importlib.metadata
 import os
 import subprocess
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -259,10 +260,13 @@ def _run_bash(
     timeout_seconds: int,
 ) -> CommandRecord:
     container_environment = _container_environment(environment)
+    container_name = f"sccfm-agent-harness-{uuid.uuid4().hex}"
     docker_command = [
         "docker",
         "run",
         "--rm",
+        "--name",
+        container_name,
         "--network",
         "none",
         "--read-only",
@@ -289,15 +293,37 @@ def _run_bash(
     for name, value in sorted(container_environment.items()):
         docker_command.extend(["--env", f"{name}={value}"])
     docker_command.extend([image, "-c", command])
-    completed = subprocess.run(
-        docker_command,
-        check=False,
-        capture_output=True,
-        text=True,
-        stdin=subprocess.DEVNULL,
-        timeout=max(1, timeout_seconds),
-        env=_docker_environment(),
-    )
+    try:
+        completed = subprocess.run(
+            docker_command,
+            check=False,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=max(1, timeout_seconds),
+            env=_docker_environment(),
+        )
+    except subprocess.TimeoutExpired:
+        # Killing the docker CLI does not reliably stop the container it
+        # started. Force-remove the uniquely named container before allowing
+        # the harness timeout to propagate, otherwise a model can leave an
+        # unbounded command running after the sample has ended.
+        try:
+            subprocess.run(
+                ["docker", "rm", "--force", container_name],
+                check=False,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=min(10, max(1, timeout_seconds)),
+                env=_docker_environment(),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            # Preserve the original timeout as the useful harness result. The
+            # cleanup command is best effort because the daemon may already
+            # have removed a container that exited concurrently.
+            pass
+        raise
     output = "\n".join(part for part in (completed.stdout, completed.stderr) if part).rstrip()
     if completed.returncode == 125:
         raise RuntimeError(f"Docker could not start the Bedrock tool sandbox: {output[-500:]}")

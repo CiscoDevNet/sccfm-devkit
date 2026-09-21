@@ -303,6 +303,8 @@ def _consume_options(
         if option is None:
             return None
         name = option.get("name")
+        if isinstance(name, str) and name in seen and option.get("multiple") is not True:
+            return None
         if isinstance(name, str):
             seen.add(name)
         index += 1
@@ -310,11 +312,22 @@ def _consume_options(
             if separator:
                 return None
             continue
+        nargs = option.get("nargs", 1)
+        if not isinstance(nargs, int) or isinstance(nargs, bool) or nargs < 1:
+            return None
+        values: list[str]
         if not separator:
-            if index >= len(arguments) or arguments[index].startswith("-"):
+            if index + nargs > len(arguments):
                 return None
-            index += 1
-        elif not inline_value:
+            values = arguments[index : index + nargs]
+            if any(value.startswith("-") for value in values):
+                return None
+            index += nargs
+        else:
+            if not inline_value or nargs != 1:
+                return None
+            values = [inline_value]
+        if not _option_values_are_supported(values, option):
             return None
     if required:
         raw_required = {
@@ -325,6 +338,36 @@ def _consume_options(
         if not raw_required.issubset(seen):
             return None
     return index
+
+
+def _option_values_are_supported(values: list[str], option: dict[str, Any]) -> bool:
+    """Validate option values using the types and choices in the exported schema."""
+
+    allowed = option.get("values")
+    if isinstance(allowed, list) and any(value not in allowed for value in values):
+        return False
+    option_type = option.get("type")
+    if option_type == "integer":
+        return all(_is_integer(value) for value in values)
+    if option_type == "float":
+        return all(_is_float(value) for value in values)
+    return True
+
+
+def _is_integer(value: str) -> bool:
+    try:
+        int(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _is_float(value: str) -> bool:
+    try:
+        float(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _score_response_operation_confirmation(
