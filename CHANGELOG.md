@@ -1,3 +1,9 @@
+## v0.42.1 (2026-09-18)
+
+### Fix
+
+- **sdk**: adapt FTD deployments to SDK API split
+
 ## v0.42.0 (2026-09-15)
 
 ### Feat

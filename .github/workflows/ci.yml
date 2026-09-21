@@ -452,13 +452,29 @@ jobs:
               --requirement "${requirements}"
             "${smoke_python}" -I - "${artifact_kind}" <<'PY'
           import importlib
+          import re
           import sys
           from importlib.metadata import distribution, version
           from importlib.util import find_spec
 
           artifact_kind = sys.argv[1]
-          if version("scc-firewall-manager-sdk") != "1.17.27":
-              raise SystemExit("the installed SDK version is not the supported release pin")
+          sdk_requirements = [
+              requirement.split(";", 1)[0].strip()
+              for requirement in distribution("cisco-sccfm-devkit").requires or []
+              if requirement.split(";", 1)[0].strip().startswith("scc-firewall-manager-sdk")
+          ]
+          if len(sdk_requirements) != 1:
+              raise SystemExit("the distribution must declare one SDK dependency")
+          sdk_requirement = sdk_requirements[0]
+          sdk_match = re.fullmatch(
+              r"scc-firewall-manager-sdk\s*(?:\(\s*)?==\s*(?P<version>[^)\s]+)\s*\)?",
+              sdk_requirement,
+          )
+          if sdk_match is None:
+              raise SystemExit("the distribution must declare an exact SDK release pin")
+          expected_sdk_version = sdk_match.group("version")
+          if version("scc-firewall-manager-sdk") != expected_sdk_version:
+              raise SystemExit("the installed SDK version does not match the release pin")
           for package in (
               "scc_firewall_manager_sdk",
               "cisco_sccfm_cli",
