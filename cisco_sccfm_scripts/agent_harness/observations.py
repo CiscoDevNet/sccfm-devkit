@@ -192,7 +192,9 @@ def unobserved_tool_commands(
             if failed_before_execution:
                 continue
             expected_exit_code = (
-                _reported_process_exit_code(record) if len(invocations) == 1 else None
+                _reported_process_exit_code(record)
+                if len(invocations) == 1 and not _has_shell_composition(record.command)
+                else None
             )
             if (
                 not _consume(remaining, operation, tuple(argv), expected_exit_code)
@@ -235,6 +237,19 @@ def _reported_process_exit_code(record: CommandRecord) -> int | None:
         if match:
             return int(match.group("code"))
     return record.exit_code
+
+
+def _has_shell_composition(command: str) -> bool:
+    """Return whether another shell segment can determine the process exit code."""
+
+    source = _unwrap_shell(command)
+    try:
+        lexer = shlex.shlex(source, posix=True, punctuation_chars=";&|\n")
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        return any(token in CONTROL_TOKENS for token in lexer)
+    except ValueError:
+        return True
 
 
 def _token_matches(parsed: str, recorded: str) -> bool:

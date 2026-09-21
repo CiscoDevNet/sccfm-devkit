@@ -10,7 +10,7 @@
     {"id": "configuration-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.configure"},
     {"id": "business-command-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.inventory.devices.asa.list"},
     {"id": "response-commands-supported", "type": "response_commands_supported", "severity": "gate"},
-    {"id": "discovered-config-command-presented", "type": "response_pattern", "severity": "gate", "pattern": "sccfm-cli\\s+--profile\\s+default\\s+configure\\s+--region\\s+us"},
+    {"id": "discovered-config-command-presented", "type": "response_pattern", "severity": "gate", "pattern": "sccfm-cli(?:\\s+--profile\\s+default)?\\s+configure\\s+--region(?:\\s+|=)us"},
     {"id": "hidden-prompt-explained", "type": "response_concepts", "severity": "gate", "concepts": [["local", "locally"], ["hidden", "secure"], ["prompt", "token"]]}
   ]
 }

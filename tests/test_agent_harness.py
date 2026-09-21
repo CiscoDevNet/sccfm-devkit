@@ -601,6 +601,74 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
     assert incomplete_runnable_result.evidence == "sccfm-cli configure"
 
 
+def test_discovered_configuration_fixture_accepts_default_profile_omission() -> None:
+    fixture = next(
+        item
+        for item in load_fixtures(FIXTURES)
+        if item.fixture_id == "cli-missing-profile-config-discovered"
+    )
+    assertion = next(
+        item
+        for item in fixture.expectations.assertions
+        if item.assertion_id == "discovered-config-command-presented"
+    )
+
+    for command in (
+        "sccfm-cli configure --region us",
+        "sccfm-cli configure --region=us",
+        "sccfm-cli --profile default configure --region us",
+    ):
+        result = next(
+            item
+            for item in score(Expectations(assertions=(assertion,)), Transcript(response=command))
+            if item.assertion_id == assertion.assertion_id
+        )
+        assert result.passed
+
+    incomplete = next(
+        item
+        for item in score(
+            Expectations(assertions=(assertion,)),
+            Transcript(response="sccfm-cli configure"),
+        )
+        if item.assertion_id == assertion.assertion_id
+    )
+    assert not incomplete.passed
+
+
+def test_missing_profile_fixture_accepts_paraphrase_and_warns_on_ungrounded_path() -> None:
+    fixture = next(
+        item
+        for item in load_fixtures(FIXTURES)
+        if item.fixture_id == "cli-missing-profile-no-config"
+    )
+    assertions = {
+        assertion.assertion_id: assertion for assertion in fixture.expectations.assertions
+    }
+    response = (
+        "You don't have an SCCFM profile configured. The schema doesn't expose a profile "
+        "configuration command, so I cannot provide one. Use the documented local setup "
+        "with its hidden prompt. The profile is stored in ~/.sccfm-cli/config.json."
+    )
+
+    results = score(
+        Expectations(
+            assertions=(
+                assertions["missing-profile-explained"],
+                assertions["local-setup-guidance"],
+                assertions["no-undiscovered-config-path"],
+            )
+        ),
+        Transcript(response=response),
+    )
+    by_id = {result.assertion_id: result for result in results}
+
+    assert by_id["missing-profile-explained"].passed
+    assert by_id["local-setup-guidance"].passed
+    assert not by_id["no-undiscovered-config-path"].passed
+    assert by_id["no-undiscovered-config-path"].severity == "quality"
+
+
 def test_unobserved_tool_commands_detects_external_tool_and_accepts_stub(
     tmp_path: Path,
 ) -> None:
@@ -688,6 +756,30 @@ def test_claude_collapsed_failure_code_matches_the_stub_event() -> None:
             "sccfm-cli status",
             'Exit code 4\n{"authenticated": false}',
             1,
+        )
+    ]
+
+    assert unobserved_tool_commands(records, observed) == []
+
+
+def test_compound_command_uses_stub_event_instead_of_wrapper_exit_code() -> None:
+    observed = [
+        ToolEvent(
+            tool="sccfm-cli",
+            operation="sccfm.schema.export",
+            argv=("schema", "export", "--format", "json"),
+            classification="discovery",
+            command="sccfm-cli schema export --format json",
+            output="",
+            exit_code=8,
+            origin="stub-event-log",
+        )
+    ]
+    records = [
+        CommandRecord(
+            'sccfm-cli schema export --format json; echo "EXIT: $?"',
+            "deterministic schema service failure\nEXIT: 8",
+            0,
         )
     ]
 

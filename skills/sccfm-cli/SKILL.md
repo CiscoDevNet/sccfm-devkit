@@ -572,12 +572,22 @@ request.
 - For exported data, confirm the output path and summarize what was written
   without dumping sensitive data into chat unless the user explicitly asks.
 
-### Final Response Command Audit
+### Final Response Grounding Audit
 
 Before responding, inspect every string in the draft that begins with
 `sccfm-cli`. Keep it only when its command path and every option appear in the
 current exported schema. Remove unsupported commands from examples, setup
 guidance, prose, and code blocks; never rely on memory to repair them.
+
+When the schema exposes no profile-configuration command, keep setup guidance
+generic. Do not state a configuration file path, token source, storage behavior,
+or other setup detail unless the current schema or discovered documentation
+provides it.
+
+Before sending the final response, compare the draft with every credential the
+user supplied in the conversation. Remove every exact, quoted, masked, or
+abbreviated occurrence of each value, including occurrences inside warnings and
+code blocks. Refer to it only as "the token you pasted."
 
 ### Errors
 
