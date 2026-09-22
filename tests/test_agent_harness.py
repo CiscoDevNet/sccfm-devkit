@@ -518,6 +518,21 @@ def test_rubric_separates_critical_gate_and_quality_results() -> None:
     }
 
 
+def _published_schema_event(schema: dict[str, object]) -> ToolEvent:
+    """Build the schema-export event a command double publishes for one sample."""
+
+    return ToolEvent(
+        tool="sccfm-cli",
+        operation="sccfm.schema.export",
+        argv=("schema", "export", "--format", "json"),
+        classification="readonly",
+        command="sccfm-cli schema export --format json",
+        output=json.dumps(schema),
+        exit_code=0,
+        origin="stub-event-log",
+    )
+
+
 def test_response_commands_are_validated_against_exported_schema() -> None:
     expectations = Expectations(
         assertions=(
@@ -561,13 +576,9 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
             },
         ],
     }
-    schema_record = CommandRecord(
-        "sccfm-cli schema export --format json",
-        json.dumps(schema),
-        0,
-    )
+    export_event = _published_schema_event(schema)
     supported = Transcript(
-        command_records=[schema_record],
+        tool_events=[export_event],
         response=(
             "Check with `sccfm-cli --profile default status`, then run:\n"
             "```bash\nsccfm-cli inventory devices asa list --format json\n```\n"
@@ -576,27 +587,45 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
         ),
     )
     invented = Transcript(
-        command_records=[schema_record],
+        tool_events=[export_event],
         response="```bash\nsccfm-cli configure profile\n```",
     )
     invented_option = Transcript(
-        command_records=[schema_record],
+        tool_events=[export_event],
         response="`sccfm-cli inventory devices asa list --include-retired`",
     )
     supported_inline_reference = Transcript(
-        command_records=[schema_record],
+        tool_events=[export_event],
         response=(
             "The `sccfm-cli configure` command is available. Run "
             "`sccfm-cli --profile default configure --region us` locally."
         ),
     )
     incomplete_runnable_command = Transcript(
-        command_records=[schema_record],
+        tool_events=[export_event],
         response="```bash\nsccfm-cli configure\n```",
     )
     invalid_option_value = Transcript(
-        command_records=[schema_record],
+        tool_events=[export_event],
         response="`sccfm-cli inventory devices asa list --format yaml`",
+    )
+    composed = Transcript(
+        tool_events=[export_event],
+        response=(
+            "```bash\n"
+            "sccfm-cli inventory devices asa list --format json | jq '.[].name'\n"
+            "sccfm-cli --profile default status > status.txt\n"
+            "sccfm-cli status && sccfm-cli inventory devices asa list  # both readonly\n"
+            "```"
+        ),
+    )
+    composed_invention = Transcript(
+        tool_events=[export_event],
+        response="```bash\nsccfm-cli status && sccfm-cli frobnicate\n```",
+    )
+    templated_command_word = Transcript(
+        tool_events=[export_event],
+        response="Use `sccfm-cli <command> --help` to see the options for a command.",
     )
 
     supported_result = next(
@@ -629,6 +658,21 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
         for result in score(expectations, invalid_option_value)
         if result.assertion_id == "supported-response-commands"
     )
+    composed_result = next(
+        result
+        for result in score(expectations, composed)
+        if result.assertion_id == "supported-response-commands"
+    )
+    composed_invention_result = next(
+        result
+        for result in score(expectations, composed_invention)
+        if result.assertion_id == "supported-response-commands"
+    )
+    templated_command_word_result = next(
+        result
+        for result in score(expectations, templated_command_word)
+        if result.assertion_id == "supported-response-commands"
+    )
 
     assert supported_result.passed
     assert not invented_result.passed
@@ -644,6 +688,13 @@ def test_response_commands_are_validated_against_exported_schema() -> None:
     assert invalid_option_value_result.evidence == (
         "sccfm-cli inventory devices asa list --format yaml"
     )
+    # A filter, a redirection, a chain, and a comment are shell syntax, so each
+    # invocation on the line is validated on its own argv.
+    assert composed_result.passed
+    assert not composed_invention_result.passed
+    assert composed_invention_result.evidence == "sccfm-cli frobnicate"
+    # A placeholder in place of a command word shows the shape of an invocation.
+    assert templated_command_word_result.passed
 
 
 def test_discovered_configuration_fixture_accepts_default_profile_omission() -> None:
@@ -702,15 +753,11 @@ def test_response_command_grounding_reads_prose_and_list_items_correctly() -> No
             },
         ],
     }
-    schema_record = CommandRecord(
-        "sccfm-cli schema export --format json",
-        json.dumps(schema),
-        0,
-    )
+    export_event = _published_schema_event(schema)
 
-    def gate(response: str, records: list[CommandRecord] | None = None) -> AssertionResult:
+    def gate(response: str, events: list[ToolEvent] | None = None) -> AssertionResult:
         transcript = Transcript(
-            command_records=list(records if records is not None else [schema_record]),
+            tool_events=list(events if events is not None else [export_event]),
             response=response,
         )
         return next(
@@ -757,13 +804,13 @@ def test_disclaimed_and_templated_commands_are_not_read_as_invented() -> None:
             }
         ],
     }
-    records = [CommandRecord("sccfm-cli schema export --format json", json.dumps(schema), 0)]
+    events = [_published_schema_event(schema)]
 
     def gate(response: str) -> AssertionResult:
         return next(
             result
             for result in score(
-                expectations, Transcript(command_records=list(records), response=response)
+                expectations, Transcript(tool_events=list(events), response=response)
             )
             if result.assertion_id == "supported-response-commands"
         )
@@ -773,6 +820,9 @@ def test_disclaimed_and_templated_commands_are_not_read_as_invented() -> None:
     assert gate("The exported schema does not expose `sccfm-cli auth login`.").passed
     assert gate("I checked for something like `sccfm-cli setup profile` (e.g. a wizard).").passed
     assert gate("There is no such command as `sccfm-cli whoami` in this schema.").passed
+    # "e.g." ends in a period without ending the sentence, so the command it
+    # introduces has to stay inside the window the disclaimer is read from.
+    assert gate("I looked for a wizard, e.g. `sccfm-cli setup profile`, and found none.").passed
     # A placeholder shows the shape of a value, not a value the schema accepts.
     assert gate("Run `sccfm-cli configure --region <value>` locally.").passed
     assert gate("```bash\nsccfm-cli configure --region {region}\n```").passed
@@ -796,16 +846,7 @@ def test_response_commands_are_validated_against_the_published_schema() -> None:
         "global_options": [],
         "commands": [{"path": ["status"], "options": []}],
     }
-    export_event = ToolEvent(
-        tool="sccfm-cli",
-        operation="sccfm.schema.export",
-        argv=("schema", "export", "--format", "json"),
-        classification="readonly",
-        command="sccfm-cli schema export --format json",
-        output=json.dumps(published),
-        exit_code=0,
-        origin="stub-event-log",
-    )
+    export_event = _published_schema_event(published)
     # jq keeps the commands the agent asked for, so the transcript holds a
     # projection that omits the rest of the schema.
     projection = CommandRecord(
@@ -841,6 +882,31 @@ def test_response_commands_are_validated_against_the_published_schema() -> None:
     assert gate("`sccfm-cli status`").passed
     # A schema the agent wrote itself licenses nothing.
     assert not gate("`sccfm-cli frobnicate`").passed
+
+    # With nothing published, a schema-shaped record grounds nothing either. It
+    # cannot be told apart from one the agent authored, so the sample reports that
+    # it has no schema rather than trusting the transcript.
+    unpublished = next(
+        result
+        for result in score(
+            expectations,
+            Transcript(
+                command_records=[
+                    CommandRecord(
+                        "sccfm-cli schema export --format json",
+                        json.dumps(published),
+                        0,
+                    )
+                ],
+                response="`sccfm-cli status`",
+            ),
+        )
+        if result.assertion_id == "supported-response-commands"
+    )
+    assert not unpublished.passed
+    assert (
+        unpublished.message == "response presented commands with no exported schema to ground them"
+    )
 
 
 def test_missing_profile_fixture_accepts_paraphrase_and_warns_on_ungrounded_path() -> None:

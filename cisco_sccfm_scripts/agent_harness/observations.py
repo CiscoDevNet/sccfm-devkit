@@ -85,6 +85,18 @@ def is_single_operation_command(command: str, expected_operation: str) -> bool:
     return operation == expected_operation
 
 
+def shell_invocations(command: str) -> list[tuple[str, list[str]]]:
+    """Return every recognized tool invocation one written command line composes.
+
+    Reading a command a response presents requires the reading a shell would give
+    it. A pipeline, a redirection, a trailing comment, and a ``&&`` chain are
+    shell syntax rather than arguments, so treating the whole line as one argv
+    turns a correct command into an unrecognizable one.
+    """
+
+    return _invocations(command)
+
+
 def load_stub_events(path: Path) -> tuple[list[ToolEvent], list[str]]:
     """Load ground-truth command-double invocations from an isolated run."""
 

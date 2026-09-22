@@ -338,11 +338,17 @@ command double published to the event log for that sample, so filtering the
 export through `jq` or into a file does not narrow what counts as supported and
 a schema the agent wrote itself grounds nothing. Fenced and standalone commands
 must include required options, while inline command-name references only
-validate the path and any options they show. A command named in order to rule it
-out ("the schema does not expose `sccfm-cli auth login`") and a bracketed
-placeholder value (`--region <value>`) are not presented commands, so neither
-fails the check; a response presenting no command passes, and one presenting a
-command with no schema export to ground it fails. Use
+validate the path and any options they show. Each presented line is read the way
+a shell reads it, so a pipeline, redirection, `&&` chain, or trailing comment is
+not part of any command's arguments and every invocation the line composes is
+validated on its own. A command named in order to rule it out ("the schema does
+not expose `sccfm-cli auth login`"), a bracketed placeholder value
+(`--region <value>`), and a placeholder standing where a command word belongs
+(`sccfm-cli <command> --help`) are not presented commands, so none of them fails
+the check; a response presenting no command passes, and one presenting a command
+with no published schema to ground it fails. Because only the published copy
+grounds anything, a report recorded before the doubles published their schema
+cannot be rescored. Use
 `profile_configuration_state` with `absent` or `present` to test missing-profile
 behavior with and without a discoverable local configuration command.
 `response_operation_confirmation` requires exactly one standalone `EXECUTE`

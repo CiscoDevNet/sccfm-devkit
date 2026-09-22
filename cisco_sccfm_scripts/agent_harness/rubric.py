@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from .models import Assertion, AssertionResult, CommandRecord, Expectations, Transcript
-from .observations import is_single_operation_command, normalize_tool_events
+from .observations import (
+    is_single_operation_command,
+    normalize_tool_events,
+    shell_invocations,
+)
 
 FLAGS = re.IGNORECASE | re.DOTALL
 FENCED_CODE = re.compile(r"```[^\n]*\n(?P<body>.*?)```", FLAGS)
@@ -24,7 +28,10 @@ PROMPT_PREFIXES = ("$ ", "EXECUTE ")
 PLACEHOLDER = re.compile(r"<[^<>]+>|\{[^{}]+\}|\[[^\[\]]+\]")
 # A sentence ends at terminal punctuation followed by whitespace, and a list item
 # or heading ends at its own newline, so a disclaimer cannot leak across items.
-SENTENCE_BREAK = re.compile(r"(?<=[.!?:])\s+|\n")
+# "e.g." and "i.e." end in a period without ending the sentence: breaking there
+# would leave the abbreviation in the preceding window and make the alternative
+# for it in DISCLAIMED_MENTION unreachable.
+SENTENCE_BREAK = re.compile(r"(?<!\be\.g\.)(?<!\bi\.e\.)(?<=[.!?:])\s+|\n")
 # Wording that names a command in order to rule it out or to illustrate the shape
 # being searched for. A fixture can require this wording and then read the named
 # command as invented, so the two have to be reconciled here.
@@ -221,8 +228,11 @@ def _exported_sccfm_schema(transcript: Transcript) -> dict[str, Any] | None:
     author, so a JSON blob written to look like a schema cannot license the
     commands it declares.
 
-    The export record's own output is the fallback, for the transcripts of runs
-    recorded before the double published anything.
+    There is deliberately no fallback to the transcript. Reading the export
+    record's own output would restore exactly that hole, because a record whose
+    output happens to hold a schema-shaped object cannot be distinguished from one
+    the agent wrote and printed itself. A sample whose double published nothing
+    has no schema to validate against, and reports that instead.
     """
 
     for event in transcript.tool_events:
@@ -230,14 +240,6 @@ def _exported_sccfm_schema(transcript: Transcript) -> dict[str, Any] | None:
             payload = _json_object(event.output)
             if payload is not None:
                 return payload
-    for record in transcript.command_records:
-        if not any(
-            event.operation == "sccfm.schema.export" for event in normalize_tool_events([record])
-        ):
-            continue
-        payload = _json_object(record.output)
-        if payload is not None and payload.get("tool_name") == "sccfm-cli":
-            return payload
     return None
 
 
@@ -282,22 +284,24 @@ def _response_sccfm_commands(response: str) -> list[tuple[str, bool]]:
         fenced_ranges.append(match.span())
         body = match.group("body").replace("\\\n", " ")
         for line in body.splitlines():
-            presented = _presented_sccfm_command(line)
-            if presented is not None:
-                commands[presented[0]] = True
+            for command in _presented_sccfm_commands(line)[0]:
+                commands[command] = True
 
     outside_fences = response
     for start, end in reversed(fenced_ranges):
         outside_fences = outside_fences[:start] + (" " * (end - start)) + outside_fences[end:]
     for match in INLINE_CODE.finditer(outside_fences):
-        presented = _presented_sccfm_command(match.group("body"))
-        if presented is None or _is_disclaimed_mention(outside_fences, match.start()):
+        presented, _prompted = _presented_sccfm_commands(match.group("body"))
+        if not presented or _is_disclaimed_mention(outside_fences, match.start()):
             continue
-        commands.setdefault(presented[0], False)
+        for command in presented:
+            commands.setdefault(command, False)
     for line in outside_fences.splitlines():
-        presented = _presented_sccfm_command(line)
-        if presented is not None and presented[1]:
-            commands[presented[0]] = True
+        presented, prompted = _presented_sccfm_commands(line)
+        if not prompted:
+            continue
+        for command in presented:
+            commands[command] = True
     return list(commands.items())
 
 
@@ -315,8 +319,17 @@ def _is_disclaimed_mention(response: str, position: int) -> bool:
     return DISCLAIMED_MENTION.search(response[start:end]) is not None
 
 
-def _presented_sccfm_command(value: str) -> tuple[str, bool] | None:
-    """Return the command a line presents and whether a shell prompt introduced it.
+def _presented_sccfm_commands(value: str) -> tuple[list[str], bool]:
+    """Return the commands a line presents and whether a shell prompt introduced it.
+
+    One line can compose more than one invocation, and the shell syntax around an
+    invocation is not part of its argv. Reading the whole line as one command
+    makes ``sccfm-cli schema export --format json | jq '.commands'`` an argv no
+    schema declares, so a correct answer fails for the filter it piped into; the
+    same applies to a redirection, a ``&&`` chain, and a trailing comment. The
+    line is therefore read the way a shell reads it and each invocation is
+    validated on its own, which also points the evidence at the one invocation
+    that is actually unsupported.
 
     A command can be introduced by a markdown list marker, a prompt, or both, so
     both are stripped. The prompt is reported back because it is what
@@ -330,8 +343,30 @@ def _presented_sccfm_command(value: str) -> tuple[str, bool] | None:
             candidate = candidate[len(prefix) :].strip()
             prompted = True
     if not candidate.startswith("sccfm-cli "):
-        return None
-    return candidate, prompted
+        return [], prompted
+    presented = [
+        shlex.join([executable, *argv])
+        for executable, argv in shell_invocations(candidate)
+        if Path(executable).name == "sccfm-cli" and not _has_placeholder_command_word(argv)
+    ]
+    return presented, prompted
+
+
+def _has_placeholder_command_word(argv: list[str]) -> bool:
+    """Return whether a placeholder stands where a command word belongs.
+
+    ``sccfm-cli <command> --help`` shows the shape of an invocation instead of
+    presenting one, so there is no command to look up and nothing to report. A
+    placeholder that follows an option name is a value for the reader to fill in,
+    and stays validated as one so an invented option name is still caught.
+    """
+
+    previous = ""
+    for token in argv:
+        if PLACEHOLDER.fullmatch(token) and not previous.startswith("-"):
+            return True
+        previous = token
+    return False
 
 
 def _schema_supports(
@@ -365,12 +400,16 @@ def _schema_supports(
             continue
         option_start = command_start + len(path)
         command_options = _option_aliases(raw_command.get("options"))
-        return _consume_options(
+        # Every matching path is tried rather than only the first. One declared
+        # path can be the prefix of another, and stopping at the shorter one would
+        # reject a longer command the schema does declare.
+        if _consume_options(
             arguments,
             option_start,
             command_options,
             required=require_complete,
-        ) == len(arguments)
+        ) == len(arguments):
+            return True
     return False
 
 
