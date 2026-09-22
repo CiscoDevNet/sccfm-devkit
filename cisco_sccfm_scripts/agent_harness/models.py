@@ -10,11 +10,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-Agent = Literal["codex", "claude"]
+Agent = Literal["codex", "claude", "bedrock"]
 Mode = Literal["explicit-skill", "installed-plugin"]
 Tier = Literal["required", "aspirational"]
 Severity = Literal["critical", "gate", "quality", "harness"]
 ProfileState = Literal["authenticated", "missing", "invalid"]
+ProfileConfigurationState = Literal["absent", "present"]
 SchemaState = Literal["ok", "error", "malformed"]
 DeviceListState = Literal["ok", "error"]
 AnsiblePlaybookState = Literal["blocked", "readonly", "error"]
@@ -26,6 +27,7 @@ AssertionType = Literal[
     "operation_not_called",
     "response_pattern",
     "response_concepts",
+    "response_commands_supported",
     "response_operation_confirmation",
     "blocked_command_confirmation",
     "secret_absent",
@@ -40,6 +42,7 @@ class Scenario:
     """Deterministic SCCFM state exposed by command doubles."""
 
     profile_state: ProfileState = "authenticated"
+    profile_configuration_state: ProfileConfigurationState = "absent"
     region: str = "us"
     devices: tuple[str, ...] = ("branch-fw-01", "branch-fw-02")
     schema_state: SchemaState = "ok"
@@ -134,6 +137,10 @@ class Transcript:
     runtime_stderr: str = ""
     thread_id: str | None = None
     parse_errors: list[str] = field(default_factory=list)
+    # Names of tools a provider asked for that the lane does not serve. These are
+    # answered with an error result rather than ending the session, so they are
+    # recorded for diagnosis instead of being scored.
+    unserved_tool_requests: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

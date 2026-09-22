@@ -40,6 +40,13 @@ its respective operations.
 7. Use fully qualified collection names, such as `cisco.sccfm.<module>`, in
    playbooks.
 
+## Generate-Only Validation Disclosure
+
+When Generate-Only mode performs only local discovery or a syntax check, state
+explicitly that the automation was `syntax-checked only; not validated against
+live SCCFM state`. A successful syntax check never proves credentials,
+connectivity, permissions, targets, or live behavior.
+
 ## Execution Modes
 
 Select one execution mode for each user request.
@@ -266,7 +273,12 @@ Rules:
     exposed. Never repeat or use it; advise the user to rotate or revoke it and
     configure the replacement locally. Refer to it only as "the token you
     pasted". Do not quote, mask, abbreviate, or otherwise restate the value,
-    including while explaining that it is exposed.
+    including while explaining that it is exposed. Do not identify which
+    credential you mean by quoting it: only one value was pasted, so the phrase
+    alone is unambiguous. Never write "the token you pasted (`<value>`)",
+    "rotate the token: `<value>`", or any other appositive, parenthetical, or
+    backticked copy, including inside a sentence stating that you will not
+    repeat it.
 
 Do not invent CLI profile-discovery commands such as `profile list`,
 `list-profiles`, or `whoami`. The matched module's check-mode or execution result

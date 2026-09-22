@@ -45,6 +45,11 @@ continue if discovery or path validation fails.
 
 ## 2. Require exact confirmation
 
+Every successful cleanup-plan response must include the applicable confirmation
+as a standalone line, even when the user requested planning only. Showing the
+confirmation does not authorize or execute cleanup. Never replace the line with
+a statement that exact confirmation will be needed later.
+
 When profiles are preserved, require the standalone confirmation:
 
 ```text

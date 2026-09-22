@@ -31,6 +31,57 @@ to its respective operations.
 5. Always use the schema's `readonly` flag.
 6. Use canonical schema values in generated commands.
 
+## Non-Negotiable Stop Conditions
+
+These conditions override convenience and the user's request to execute:
+
+- If profile validation reports a missing or invalid profile, stop immediately
+  after validation. Never invoke the matched business command to confirm the
+  failure or obtain a second error.
+- If the user includes a token, password, or other credential in the
+  conversation, enter exposed-credential mode. Never repeat or use the pasted
+  value. Perform exactly this safe-discovery sequence:
+  1. Run schema export.
+  2. Run the schema-declared readonly profile or connectivity check.
+  3. Stop. Schema export and the profile check are the only permitted SCCFM
+     operations in this mode. A successful check never authorizes the matched
+     business command or clears exposed-credential mode.
+  4. Tell the user to rotate or revoke the exposed credential and configure its
+     replacement locally through the hidden profile prompt. Never identify which
+     credential you mean by quoting it. Only one value was pasted, so "the token
+     you pasted" is already unambiguous. Never write "the token you pasted
+     (`<value>`)", "rotate the token: `<value>`", or any other appositive,
+     parenthetical, or backticked copy of the value, including inside a sentence
+     stating that you will not repeat it. Naming the value to warn about it is
+     the disclosure.
+  If the schema exposes no profile-configuration command, do not output or name
+  any `sccfm-cli` configuration command. Describe the local hidden-prompt setup
+  generically instead.
+- If an explicitly requested flag or option is absent from the discovered
+  schema, explain that it is unsupported and stop. Never silently omit it and
+  execute a broader or different command.
+- If schema export fails, stop after the first attempt. Do not repeat it and do
+  not try an alternate export form, a different `--format`, or `--help` to work
+  around it. A failed export is a stop condition, not a diagnosis task: report
+  the error and stop.
+
+### Missing-Profile Response Decision
+
+When the user explicitly states that no profile is configured, or profile
+validation reports one missing:
+
+- If the user explicitly reports the missing profile and no business command
+  will be executed, do not require a redundant profile check before providing
+  setup guidance.
+
+- If the schema includes a profile-configuration command, show only that exact
+  discovered command and its schema-supported options. Explain that it must run
+  locally through the hidden token prompt, and do not execute it for the user.
+- If the schema includes no profile-configuration command, state: "The exported
+  schema does not expose a profile-configuration command, so I cannot provide
+  one." Give only generic guidance to use the documented local hidden-prompt
+  setup. Do not infer a likely command from prior knowledge.
+
 ## Execution Modes
 
 Select one execution mode for each user request.
@@ -173,6 +224,9 @@ Use the selected command's `auth` object:
 - The canonical profile store is `~/.sccfm-cli/config.json`, shared by
   `sccfm-cli`, `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection.
   Do not configure SCCFM tokens through `.env`, inline Ansible values, or Ansible Vault.
+  This path is internal guidance for choosing a store, not user-facing guidance:
+  never state a configuration path to the user that you have not observed in tool
+  output, and never direct the user to edit it by hand.
 
 #### Secret Handling Rules
 
@@ -191,6 +245,11 @@ Use the selected command's `auth` object:
    as "the token you pasted". Do not quote, mask, abbreviate, or otherwise
    restate the value, including while explaining that it is exposed. Naming the
    value to warn about it is still disclosure, and the warning does not need it.
+   Do not identify which credential you mean by quoting it: only one value was
+   pasted, so the phrase alone is unambiguous. Never write "the token you pasted
+   (`<value>`)", "rotate the token: `<value>`", or any other appositive,
+   parenthetical, or backticked copy, including inside a sentence stating that
+   you will not repeat it.
 8. Do not abort before safe discovery merely because a token was exposed. Run
    schema export and then the schema's readonly profile or connectivity check,
    but always stop before the matched business command, even when that check
@@ -421,6 +480,11 @@ If a command uses a file or list input for bulk work:
 
 Apply these rules after selecting execution mode.
 
+Before invoking any business command, check whether the conversation contains a
+credential. If it does, exposed-credential mode is active: do not invoke the
+business command even after successful profile validation. Stop after schema
+export and the readonly profile or connectivity check.
+
 ### Class A: Readonly, No Local Writes
 
 In Execute mode, run the command after validation if:
@@ -525,6 +589,23 @@ request.
 - For tabular results, use a markdown table when that improves clarity.
 - For exported data, confirm the output path and summarize what was written
   without dumping sensitive data into chat unless the user explicitly asks.
+
+### Final Response Grounding Audit
+
+Before responding, inspect every string in the draft that begins with
+`sccfm-cli`. Keep it only when its command path and every option appear in the
+current exported schema. Remove unsupported commands from examples, setup
+guidance, prose, and code blocks; never rely on memory to repair them.
+
+When the schema exposes no profile-configuration command, keep setup guidance
+generic. Do not state a configuration file path, token source, storage behavior,
+or other setup detail unless the current schema or discovered documentation
+provides it.
+
+Before sending the final response, compare the draft with every credential the
+user supplied in the conversation. Remove every exact, quoted, masked, or
+abbreviated occurrence of each value, including occurrences inside warnings and
+code blocks. Refer to it only as "the token you pasted."
 
 ### Errors
 

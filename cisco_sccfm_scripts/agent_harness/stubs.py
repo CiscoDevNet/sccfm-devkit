@@ -17,6 +17,7 @@ from pathlib import Path
 from .credentials import (
     CODEX_CREDENTIAL_VARIABLES,
     CREDENTIAL_NAMES_VARIABLE,
+    CREDENTIAL_VARIABLES,
     SCRUB_VARIABLE,
     preserved_credential_names,
     provider_environment,
@@ -68,7 +69,10 @@ def install_stubs(workspace: Path, dispatcher: Path, tools_root: Path | None = N
     binary_directory.mkdir(parents=True)
     for name in STUB_NAMES:
         target = binary_directory / name
-        shutil.copy2(dispatcher, target)
+        # copy2 preserves SELinux xattrs from a Jenkins checkout. Those labels
+        # can prevent a bind-mounted script from executing in the tool container
+        # even after Docker privately relabels the mount, so copy content only.
+        shutil.copyfile(dispatcher, target)
         target.chmod(0o755)
 
     wrapper = (
@@ -131,6 +135,11 @@ def isolated_environment(
         environment.update(provider_environment(dict(os.environ)))
         environment[SCRUB_VARIABLE] = "1"
         environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(preserved_credential_names())
+    elif agent == "bedrock":
+        # Bedrock authentication remains in the parent Python process. Tool calls
+        # run in a separate network-disabled container and receive only this
+        # credential-name list so the doubles can prove no provider value leaked.
+        environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(CREDENTIAL_VARIABLES)
     else:
         environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(CODEX_CREDENTIAL_VARIABLES)
     real_home = Path.home()
@@ -164,6 +173,7 @@ def isolated_environment(
     )
     environment["SCCFM_HARNESS_EVENT_LOG"] = str(workspace / ".harness-events.jsonl")
     environment["SCCFM_HARNESS_PROFILE_STATE"] = scenario.profile_state
+    environment["SCCFM_HARNESS_PROFILE_CONFIGURATION_STATE"] = scenario.profile_configuration_state
     environment["SCCFM_HARNESS_REGION"] = scenario.region
     environment["SCCFM_HARNESS_DEVICES"] = json.dumps(scenario.devices)
     environment["SCCFM_HARNESS_SCHEMA_STATE"] = scenario.schema_state

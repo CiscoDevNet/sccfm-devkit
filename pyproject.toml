@@ -122,6 +122,10 @@ module = [
   "questionary.*",
   "paramiko",
   "paramiko.*",
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*",
   "yaml",
 ]
 ignore_missing_imports = true

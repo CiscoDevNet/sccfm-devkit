@@ -16,6 +16,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterable
 
+from .bedrock import CONTAINER_TOOL_ROOT, DEFAULT_TOOL_IMAGE, BedrockExecution
+from .bedrock import run_session as run_bedrock_session
 from .credentials import credential_paths, isolation_settings, redact
 from .models import (
     Agent,
@@ -132,6 +134,15 @@ def build_agent_command(
 ) -> list[str]:
     """Build the selected agent's non-interactive invocation."""
 
+    if agent == "bedrock":
+        command = ["bedrock-converse"]
+        if model:
+            command.extend(["--model", model])
+        if mode == "explicit-skill" and fixture.skill:
+            skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
+            command.extend(["--system-skill", str(skill)])
+        command.extend(["--", fixture.prompt])
+        return command
     if agent == "claude":
         if bypass_hook_trust:
             raise ValueError("--bypass-hook-trust is supported only by Codex")
@@ -149,6 +160,8 @@ def run_sample(
     bypass_hook_trust: bool,
     strict_quality: bool = False,
     agent: Agent = "codex",
+    bedrock_region: str = "us-west-2",
+    bedrock_tool_image: str = DEFAULT_TOOL_IMAGE,
 ) -> SampleResult:
     """Run one isolated agent sample and score it."""
 
@@ -162,7 +175,7 @@ def run_sample(
         dispatcher = repository_root / "agent-harness" / "stubs" / "dispatcher.py"
         binary_directory = install_stubs(workspace, dispatcher, tools_root)
         command_repository = repository_root
-        if agent == "claude":
+        if agent in {"claude", "bedrock"}:
             command_repository = workspace / ".harness-repository"
             staged_plugin = command_repository / "plugins" / "sccfm"
             staged_plugin.parent.mkdir(parents=True)
@@ -181,91 +194,61 @@ def run_sample(
             settings = isolation_settings(Path.home(), (workspace, event_log))
             settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
         initial_paths = _workspace_paths(workspace)
-        command = build_agent_command(
+        execution = _execute_agent(
             agent,
             fixture,
             mode,
             workspace,
             command_repository,
             model,
+            timeout_seconds,
             bypass_hook_trust,
             settings_path,
+            environment,
+            binary_directory,
+            event_log,
+            bedrock_region,
+            bedrock_tool_image,
         )
-        try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                stdin=subprocess.DEVNULL,
-                timeout=timeout_seconds,
-                env=environment,
-                cwd=workspace,
-            )
-            transcript = parse_agent_jsonl(agent, completed.stdout.splitlines())
-            transcript.runtime_stderr = completed.stderr
-            transcript.blocked_commands.extend(parse_blocked_commands(completed.stderr))
-            transcript.workspace_artifacts = sorted(_workspace_paths(workspace) - initial_paths)
-            transcript.artifact_contents = _artifact_contents(
-                workspace, transcript.workspace_artifacts
-            )
-            stub_events, stub_errors = load_stub_events(event_log)
-            transcript.tool_events = stub_events
-            transcript.parse_errors.extend(stub_errors)
-            assertion_results = score(fixture.expectations, transcript)
-            assertion_results.append(_unsupported_tool_result(stub_events))
-            escaped_commands = unobserved_tool_commands(
-                transcript.command_records,
-                stub_events,
-                transcript.blocked_commands,
-                (tools_root, workspace),
-            )
-            assertion_results.append(_tool_boundary_result(escaped_commands))
-            inspection_commands = _stub_inspection_commands(
-                transcript.command_records, tools_root, dispatcher
-            )
-            assertion_results.append(_integrity_result(inspection_commands))
-            assertion_results.append(_credential_isolation_result(credential_leaks(event_log)))
-            assertion_results.append(
-                _credential_path_result(_credential_path_commands(transcript.commands))
-            )
-            if completed.returncode != 0:
-                assertion_results.append(
-                    _runtime_failure(f"{agent} exited with status {completed.returncode}")
-                )
-            # Scoring is finished, so redaction cannot change any verdict. It runs
-            # before the evidence is persisted so a provider credential value can
-            # never reach results.json, results.md, or results.html.
-            transcript = _redacted_transcript(transcript)
-            assertion_results = [_redacted_assertion(item) for item in assertion_results]
-            stderr = transcript.runtime_stderr
-            exit_code = completed.returncode
-        except subprocess.TimeoutExpired as error:
-            # The dispatcher records every invocation to event_log as it runs,
-            # independently of the timed-out agent process, so evidence of what
-            # actually executed before the timeout is still on disk to recover.
-            stub_events, stub_errors = load_stub_events(event_log)
-            transcript = parse_agent_jsonl(agent, _decoded_timeout_value(error.stdout).splitlines())
-            transcript.runtime_stderr = _decoded_timeout_value(error.stderr)
-            transcript.blocked_commands.extend(parse_blocked_commands(transcript.runtime_stderr))
-            transcript.tool_events = stub_events
-            transcript.parse_errors.extend(stub_errors)
-            transcript = _redacted_transcript(transcript)
-            assertion_results = [
-                _runtime_failure(f"{agent} timed out after {timeout_seconds} seconds"),
-                _tool_boundary_result(
-                    unobserved_tool_commands(
-                        transcript.command_records,
-                        stub_events,
-                        transcript.blocked_commands,
-                        (tools_root, workspace),
-                    )
-                ),
-                _credential_isolation_result(credential_leaks(event_log)),
-            ]
-            assertion_results = [_redacted_assertion(item) for item in assertion_results]
-            stderr = transcript.runtime_stderr
-            exit_code = 124
+        transcript = execution.transcript
+        transcript.runtime_stderr = execution.stderr
+        transcript.blocked_commands.extend(parse_blocked_commands(execution.stderr))
+        transcript.workspace_artifacts = sorted(_workspace_paths(workspace) - initial_paths)
+        transcript.artifact_contents = _artifact_contents(workspace, transcript.workspace_artifacts)
+        stub_events, stub_errors = load_stub_events(event_log)
+        transcript.tool_events = stub_events
+        transcript.parse_errors.extend(stub_errors)
+        assertion_results = score(fixture.expectations, transcript)
+        assertion_results.append(_unsupported_tool_result(stub_events))
+        container_tool_roots = (CONTAINER_TOOL_ROOT,) if agent == "bedrock" else ()
+        escaped_commands = unobserved_tool_commands(
+            transcript.command_records,
+            stub_events,
+            transcript.blocked_commands,
+            (tools_root, workspace, *container_tool_roots),
+        )
+        assertion_results.append(_tool_boundary_result(escaped_commands))
+        inspection_commands = _stub_inspection_commands(
+            transcript.command_records,
+            tools_root,
+            dispatcher,
+            container_tool_roots,
+        )
+        assertion_results.append(_integrity_result(inspection_commands))
+        assertion_results.append(_credential_isolation_result(credential_leaks(event_log)))
+        assertion_results.append(
+            _credential_path_result(_credential_path_commands(transcript.commands))
+        )
+        if execution.exit_code != 0:
+            message = execution.stderr or f"{agent} exited with status {execution.exit_code}"
+            assertion_results.append(_runtime_failure(message))
+        # Scoring is finished, so redaction cannot change any verdict. It runs
+        # before the evidence is persisted so a provider credential value can
+        # never reach results.json, results.md, or results.html.
+        transcript = _redacted_transcript(transcript)
+        assertion_results = [_redacted_assertion(item) for item in assertion_results]
+        stderr = transcript.runtime_stderr
+        exit_code = execution.exit_code
 
     harness_failures = _messages(assertion_results, "harness")
     critical_failures = _messages(assertion_results, "critical")
@@ -310,6 +293,74 @@ def run_sample(
         harness_valid=not harness_failures,
         outcome=outcome,
     )
+
+
+def _execute_agent(
+    agent: Agent,
+    fixture: Fixture,
+    mode: Mode,
+    workspace: Path,
+    repository_root: Path,
+    model: str | None,
+    timeout_seconds: int,
+    bypass_hook_trust: bool,
+    settings_path: Path | None,
+    environment: dict[str, str],
+    binary_directory: Path,
+    event_log: Path,
+    bedrock_region: str,
+    bedrock_tool_image: str,
+) -> BedrockExecution:
+    """Execute one provider while returning a common transcript shape."""
+
+    if agent == "bedrock":
+        if model is None:
+            return BedrockExecution(Transcript(), 2, "--model is required for Bedrock")
+        system_prompt, user_prompt = _bedrock_prompts(fixture, mode, repository_root)
+        return run_bedrock_session(
+            user_prompt,
+            model,
+            bedrock_region,
+            timeout_seconds,
+            workspace,
+            binary_directory,
+            event_log,
+            environment,
+            bedrock_tool_image,
+            system_prompt=system_prompt,
+        )
+
+    command = build_agent_command(
+        agent,
+        fixture,
+        mode,
+        workspace,
+        repository_root,
+        model,
+        bypass_hook_trust,
+        settings_path,
+    )
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=timeout_seconds,
+            env=environment,
+            cwd=workspace,
+        )
+    except subprocess.TimeoutExpired as error:
+        transcript = parse_agent_jsonl(agent, _decoded_timeout_value(error.stdout).splitlines())
+        stderr = _decoded_timeout_value(error.stderr)
+        return BedrockExecution(
+            transcript,
+            124,
+            stderr or f"{agent} timed out after {timeout_seconds} seconds",
+        )
+    transcript = parse_agent_jsonl(agent, completed.stdout.splitlines())
+    return BedrockExecution(transcript, completed.returncode, completed.stderr)
 
 
 def parse_jsonl(lines: Iterable[str]) -> Transcript:
@@ -511,7 +562,55 @@ def _consume_event(event: dict[str, Any], transcript: Transcript) -> None:
 
 
 def _prompt(fixture: Fixture, mode: Mode, repository_root: Path) -> str:
-    isolation = (
+    isolation = _isolation_prompt()
+    if mode == "explicit-skill" and fixture.skill:
+        skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
+        instruction = f"Read and follow the complete skill at {skill} before responding."
+    else:
+        instruction = "Use any applicable installed plugin skill exactly as you would for a user."
+    return f"{isolation}\n\n{instruction}\n\nUser request:\n{fixture.prompt}"
+
+
+def _bedrock_prompts(fixture: Fixture, mode: Mode, repository_root: Path) -> tuple[str, str]:
+    """Return trusted system instructions and a separate user request for Bedrock."""
+
+    system_parts = [_isolation_prompt(), _bedrock_tool_surface_prompt()]
+    if mode == "explicit-skill" and fixture.skill:
+        skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
+        skill_text = skill.read_text(encoding="utf-8")
+        system_parts.extend(
+            [
+                "The following repository skill is trusted system guidance. Follow it completely.",
+                skill_text,
+            ]
+        )
+    else:
+        system_parts.append(
+            "Use any applicable installed plugin skill exactly as you would for a user."
+        )
+    return "\n\n".join(system_parts), fixture.prompt
+
+
+def _bedrock_tool_surface_prompt() -> str:
+    """State the single tool the Bedrock lane serves.
+
+    Skill guidance names the file tools an interactive agent is given, so a model
+    that follows it literally requests one and finds it undeclared. Naming the
+    surface keeps that guidance actionable through the shell instead.
+    """
+
+    return (
+        "Bash is the only tool available to you in this evaluation. Where the guidance "
+        "below refers to Read, Write, Edit, Grep, or Glob, do the equivalent with shell "
+        "commands: read with cat, grep, or ls, and create a file with a quoted heredoc "
+        "such as cat > playbook.yml <<'EOF'. Every other instruction still applies."
+    )
+
+
+def _isolation_prompt() -> str:
+    """Return provider-independent evaluation isolation instructions."""
+
+    return (
         "This is an isolated evaluation. Commands named sccfm-cli and ansible-*, plus any "
         "setup_runtime.py helper invoked through Python, are deterministic test doubles. Do not "
         "access network services or real customer data. The HOME environment variable is the "
@@ -525,12 +624,6 @@ def _prompt(fixture: Fixture, mode: Mode, repository_root: Path) -> str:
         "is disposable and writable, so "
         "you may create temporary non-secret artifacts when the skill workflow requires them."
     )
-    if mode == "explicit-skill" and fixture.skill:
-        skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
-        instruction = f"Read and follow the complete skill at {skill} before responding."
-    else:
-        instruction = "Use any applicable installed plugin skill exactly as you would for a user."
-    return f"{isolation}\n\n{instruction}\n\nUser request:\n{fixture.prompt}"
 
 
 def _decoded_timeout_value(value: str | bytes | None) -> str:
@@ -678,11 +771,14 @@ def _credential_path_commands(commands: Iterable[str], home: Path | None = None)
 
 
 def _stub_inspection_commands(
-    records: Iterable[CommandRecord], tools_root: Path, dispatcher: Path
+    records: Iterable[CommandRecord],
+    tools_root: Path,
+    dispatcher: Path,
+    additional_protected_roots: Iterable[Path] = (),
 ) -> list[str]:
     """Return direct and indirectly resolved command-double inspection attempts."""
 
-    protected = (str(tools_root), str(dispatcher))
+    protected = tuple(str(path) for path in (tools_root, dispatcher, *additional_protected_roots))
     inspection = re.compile(
         r"(?:^|[;&|\s])" r"(?:cat|head|tail|less|more|sed|grep|rg|strings|file|readlink|stat|ls)\s"
     )
@@ -719,9 +815,12 @@ def _artifact_contents(workspace: Path, artifacts: list[str]) -> list[str]:
     """
 
     contents: list[str] = []
+    resolved_workspace = workspace.resolve()
     for relative in artifacts:
         path = workspace / relative
         try:
+            if path.is_symlink() or not path.resolve().is_relative_to(resolved_workspace):
+                continue
             if path.stat().st_size > ARTIFACT_SCAN_LIMIT:
                 continue
             contents.append(path.read_text(encoding="utf-8", errors="replace"))

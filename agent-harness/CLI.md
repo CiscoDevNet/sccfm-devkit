@@ -13,13 +13,15 @@ invokes a model.
 
 | Flag | Default | When to use |
 |---|---|---|
-| `--agent {codex,claude}` | `codex` | Pick the model provider. Claude works with Bedrock, Vertex, Foundry, and API-key logins from environment variables; it runs a credential-isolation preflight before the first fixture. |
+| `--agent {codex,claude,bedrock}` | `codex` | Pick the model provider. `bedrock` calls the Bedrock Converse API directly with ambient AWS credentials and currently supports explicit-skill mode only. |
 | `--mode {explicit-skill,installed-plugin}` | `explicit-skill` | `explicit-skill` isolates instruction quality: user configuration is off and the session is told which `SKILL.md` to read. `installed-plugin` exercises packaging, skill discovery, and hooks. |
 | `--fixture ID` | every matching fixture | Repeatable. Use it while iterating on one skill. Unknown ids fail fast. |
 | `--tier {required,aspirational,all}` | `required` | `required` is the merge gate. `aspirational` is stretch behavior that should not block merges. `all` runs both. |
 | `--fixtures PATH` | `agent-harness/fixtures` | Only to point at a fixture set outside this checkout. |
 | `--samples N` | `1` | Measures non-determinism. One model call per fixture per sample. |
 | `--model NAME` | the provider default | Pin it in CI so baseline changes are attributable to a known model. |
+| `--bedrock-region REGION` | `AWS_REGION`, `AWS_DEFAULT_REGION`, or `us-west-2` | Region for direct Bedrock calls. Used only by `--agent bedrock`. |
+| `--bedrock-tool-image IMAGE` | `python:3.12-slim` | Container image for network-disabled Bedrock tool execution. Pin this in CI when reproducibility matters. |
 
 `--fixture`, `--tier`, and `--mode` intersect. A fixture that does not declare the
 selected mode is skipped, and a selection that matches nothing fails with
@@ -132,10 +134,27 @@ Inspecting an invocation without calling a model:
 poetry run sccfm-agent-harness run --agent claude --dry-run
 ```
 
+Direct Bedrock run without a Claude Code installation:
+
+```bash
+poetry run sccfm-agent-harness run \
+  --agent bedrock \
+  --mode explicit-skill \
+  --fixture cli-readonly-list \
+  --model us.anthropic.claude-sonnet-4-20250514-v1:0 \
+  --bedrock-region us-west-2
+```
+
+This performs a small Bedrock preflight before the first fixture. The parent
+Python process uses the normal AWS credential chain. Model-requested shell
+commands run in a read-only, network-disabled Docker container without AWS
+credentials. In explicit-skill mode, the trusted skill content is supplied as
+Bedrock system guidance while the fixture remains a separate user message.
+
 ## Exit codes
 
 | Code | Meaning |
 |---:|---|
 | `0` | Every selected sample passed the configured gate. |
 | `1` | Sample failures or baseline regressions. |
-| `2` | Usage or setup error, including an unknown fixture id, an empty selection, a stale Codex plugin, or a failed Claude credential-isolation preflight. Setup errors abort before any fixture runs. |
+| `2` | Usage or setup error, including an unknown fixture id, an empty selection, a stale Codex plugin, or a failed provider preflight. Setup errors abort before any fixture runs. |

@@ -15,6 +15,12 @@ from .models import BlockedCommand, CommandRecord, ToolEvent
 
 SHELLS = {"bash", "sh", "zsh"}
 CONTROL_TOKENS = {";", "&&", "||", "|", "&", "\n"}
+PUNCTUATION_CHARS = ";&|\n"
+# Longest first, so a run of punctuation splits into the operators a shell sees.
+CONTROL_OPERATORS = ("&&", "||", ";", "|", "&", "\n")
+# A terminator at either end of a command separates nothing, so it neither hides
+# nor introduces a second segment.
+TERMINATORS = {";", "\n"}
 SHELL_KEYWORDS = {"then", "else", "elif", "do"}
 TOOLS = {
     "sccfm-cli",
@@ -34,6 +40,7 @@ TOOLS = {
 # event.
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 REDIRECTION = re.compile(r"^\d*(?:>>|>|<<|<)(?P<target>[^<>]*)$")
+REDIRECTION_OPERATOR = re.compile(r"^\d*(?:>>|>|<<|<)$")
 EXPANSION = re.compile(r"\$\{[^}]*\}|\$\([^)]*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|^~")
 
 
@@ -67,15 +74,8 @@ def is_single_operation_command(command: str, expected_operation: str) -> bool:
     preceding ``cd``, pipeline, or second command.
     """
 
-    source = _unwrap_shell(command)
-    try:
-        lexer = shlex.shlex(source, posix=True, punctuation_chars=";&|\n")
-        lexer.whitespace = " \t\r"
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except ValueError:
-        return False
-    if any(token in CONTROL_TOKENS for token in tokens):
+    tokens = _tokenize(command)
+    if tokens is None or any(token in CONTROL_TOKENS for token in tokens):
         return False
     invocations = _invocations(command)
     if len(invocations) != 1:
@@ -83,6 +83,18 @@ def is_single_operation_command(command: str, expected_operation: str) -> bool:
     executable, argv = invocations[0]
     operation, _classification = _classify(Path(executable).name, argv)
     return operation == expected_operation
+
+
+def shell_invocations(command: str) -> list[tuple[str, list[str]]]:
+    """Return every recognized tool invocation one written command line composes.
+
+    Reading a command a response presents requires the reading a shell would give
+    it. A pipeline, a redirection, a trailing comment, and a ``&&`` chain are
+    shell syntax rather than arguments, so treating the whole line as one argv
+    turns a correct command into an unrecognizable one.
+    """
+
+    return _invocations(command)
 
 
 def load_stub_events(path: Path) -> tuple[list[ToolEvent], list[str]]:
@@ -112,6 +124,11 @@ def load_stub_events(path: Path) -> tuple[list[ToolEvent], list[str]]:
             continue
         operation, classification = _classify(tool, argv)
         command = shlex.join([tool, *argv])
+        # A double publishes structured output here when scoring has to read the
+        # payload itself rather than whatever survived the agent's shell: a
+        # schema piped through a filter reaches the agent as a projection, while
+        # the event log still carries what the double actually served.
+        published = payload.get("schema")
         events.append(
             ToolEvent(
                 tool=tool,
@@ -119,7 +136,7 @@ def load_stub_events(path: Path) -> tuple[list[ToolEvent], list[str]]:
                 argv=tuple(argv),
                 classification=classification,
                 command=command,
-                output="",
+                output=json.dumps(published) if isinstance(published, dict) else "",
                 exit_code=exit_code if isinstance(exit_code, int) else None,
                 origin="stub-event-log",
             )
@@ -192,7 +209,9 @@ def unobserved_tool_commands(
             if failed_before_execution:
                 continue
             expected_exit_code = (
-                _reported_process_exit_code(record) if len(invocations) == 1 else None
+                _reported_process_exit_code(record)
+                if len(invocations) == 1 and not _has_shell_composition(record.command)
+                else None
             )
             if (
                 not _consume(remaining, operation, tuple(argv), expected_exit_code)
@@ -237,6 +256,86 @@ def _reported_process_exit_code(record: CommandRecord) -> int | None:
     return record.exit_code
 
 
+def _has_shell_composition(command: str) -> bool:
+    """Return whether another shell segment can determine the process exit code."""
+
+    tokens = _tokenize(command)
+    if tokens is None:
+        return True
+    return any(token in CONTROL_TOKENS for token in tokens)
+
+
+def _tokenize(command: str) -> list[str] | None:
+    """Split a command into words and the individual control operators a shell sees.
+
+    ``shlex`` groups a run of punctuation characters into one token, so
+    ``"sccfm-cli status ;\\n sccfm-cli objects network delete"`` arrives with a
+    single ``";\\n"`` token that matches no control operator: the composition is
+    invisible and the second invocation is absorbed into the first command's
+    argv. Every run is expanded here so that cannot happen.
+
+    Two shapes are normalized in the other direction, because they compose
+    nothing and must not suppress exit-code correlation: a ``>&`` descriptor
+    duplication is rejoined onto its redirection word, and a terminator at
+    either end of the command is dropped.
+
+    Returns ``None`` when the command cannot be lexed, leaving the decision
+    about unparseable input to each caller.
+    """
+
+    source = _unwrap_shell(command)
+    try:
+        lexer = shlex.shlex(source, posix=True, punctuation_chars=PUNCTUATION_CHARS)
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        lexed = list(lexer)
+    except ValueError:
+        return None
+
+    tokens: list[str] = []
+    descriptor_pending = False
+    for token in lexed:
+        if token and set(token) <= set(PUNCTUATION_CHARS):
+            for operator in _control_operators(token):
+                if operator == "&" and tokens and REDIRECTION_OPERATOR.match(tokens[-1]):
+                    tokens[-1] += operator
+                    descriptor_pending = True
+                    continue
+                tokens.append(operator)
+                descriptor_pending = False
+            continue
+        if descriptor_pending:
+            tokens[-1] += token
+            descriptor_pending = False
+            continue
+        tokens.append(token)
+
+    start = 0
+    end = len(tokens)
+    while start < end and tokens[start] in TERMINATORS:
+        start += 1
+    while end > start and tokens[end - 1] in TERMINATORS:
+        end -= 1
+    return tokens[start:end]
+
+
+def _control_operators(run: str) -> list[str]:
+    """Split one run of punctuation characters into separate control operators."""
+
+    operators: list[str] = []
+    position = 0
+    while position < len(run):
+        for operator in CONTROL_OPERATORS:
+            if run.startswith(operator, position):
+                operators.append(operator)
+                position += len(operator)
+                break
+        else:  # pragma: no cover - every punctuation character is an operator
+            operators.append(run[position])
+            position += 1
+    return operators
+
+
 def _token_matches(parsed: str, recorded: str) -> bool:
     """Compare one argument, tolerating expansions the shell resolved at runtime.
 
@@ -264,13 +363,8 @@ def _invocations(command: str) -> list[tuple[str, list[str]]]:
 
 
 def _invocations_with_context(command: str) -> list[tuple[str, list[str], bool]]:
-    source = _unwrap_shell(command)
-    try:
-        lexer = shlex.shlex(source, posix=True, punctuation_chars=";&|\n")
-        lexer.whitespace = " \t\r"
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except ValueError:
+    tokens = _tokenize(command)
+    if tokens is None:
         return []
 
     invocations = []
