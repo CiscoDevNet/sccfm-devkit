@@ -47,13 +47,23 @@ These conditions override convenience and the user's request to execute:
      operations in this mode. A successful check never authorizes the matched
      business command or clears exposed-credential mode.
   4. Tell the user to rotate or revoke the exposed credential and configure its
-     replacement locally through the hidden profile prompt.
+     replacement locally through the hidden profile prompt. Never identify which
+     credential you mean by quoting it. Only one value was pasted, so "the token
+     you pasted" is already unambiguous. Never write "the token you pasted
+     (`<value>`)", "rotate the token: `<value>`", or any other appositive,
+     parenthetical, or backticked copy of the value, including inside a sentence
+     stating that you will not repeat it. Naming the value to warn about it is
+     the disclosure.
   If the schema exposes no profile-configuration command, do not output or name
   any `sccfm-cli` configuration command. Describe the local hidden-prompt setup
   generically instead.
 - If an explicitly requested flag or option is absent from the discovered
   schema, explain that it is unsupported and stop. Never silently omit it and
   execute a broader or different command.
+- If schema export fails, stop after the first attempt. Do not repeat it and do
+  not try an alternate export form, a different `--format`, or `--help` to work
+  around it. A failed export is a stop condition, not a diagnosis task: report
+  the error and stop.
 
 ### Missing-Profile Response Decision
 
@@ -214,6 +224,9 @@ Use the selected command's `auth` object:
 - The canonical profile store is `~/.sccfm-cli/config.json`, shared by
   `sccfm-cli`, `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection.
   Do not configure SCCFM tokens through `.env`, inline Ansible values, or Ansible Vault.
+  This path is internal guidance for choosing a store, not user-facing guidance:
+  never state a configuration path to the user that you have not observed in tool
+  output, and never direct the user to edit it by hand.
 
 #### Secret Handling Rules
 
@@ -232,6 +245,11 @@ Use the selected command's `auth` object:
    as "the token you pasted". Do not quote, mask, abbreviate, or otherwise
    restate the value, including while explaining that it is exposed. Naming the
    value to warn about it is still disclosure, and the warning does not need it.
+   Do not identify which credential you mean by quoting it: only one value was
+   pasted, so the phrase alone is unambiguous. Never write "the token you pasted
+   (`<value>`)", "rotate the token: `<value>`", or any other appositive,
+   parenthetical, or backticked copy, including inside a sentence stating that
+   you will not repeat it.
 8. Do not abort before safe discovery merely because a token was exposed. Run
    schema export and then the schema's readonly profile or connectivity check,
    but always stop before the matched business command, even when that check
