@@ -137,6 +137,10 @@ class Transcript:
     runtime_stderr: str = ""
     thread_id: str | None = None
     parse_errors: list[str] = field(default_factory=list)
+    # Names of tools a provider asked for that the lane does not serve. These are
+    # answered with an error result rather than ending the session, so they are
+    # recorded for diagnosis instead of being scored.
+    unserved_tool_requests: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

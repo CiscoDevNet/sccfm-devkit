@@ -19,6 +19,10 @@ releases:
           commands.
         - Cleaned up named Bedrock tool containers when a model-requested command
           times out, keeping harness failures observable.
+        - Told Bedrock sessions that the shell is their only tool and answered a
+          request for a tool the harness does not serve with an error the model
+          can recover from, so following the skill's file-handling guidance no
+          longer ends a sample before the work is scored.
     fragments: []
     release_date: '2026-09-22'
   0.42.1:

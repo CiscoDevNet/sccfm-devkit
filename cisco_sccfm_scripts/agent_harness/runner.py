@@ -574,7 +574,7 @@ def _prompt(fixture: Fixture, mode: Mode, repository_root: Path) -> str:
 def _bedrock_prompts(fixture: Fixture, mode: Mode, repository_root: Path) -> tuple[str, str]:
     """Return trusted system instructions and a separate user request for Bedrock."""
 
-    system_parts = [_isolation_prompt()]
+    system_parts = [_isolation_prompt(), _bedrock_tool_surface_prompt()]
     if mode == "explicit-skill" and fixture.skill:
         skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
         skill_text = skill.read_text(encoding="utf-8")
@@ -589,6 +589,22 @@ def _bedrock_prompts(fixture: Fixture, mode: Mode, repository_root: Path) -> tup
             "Use any applicable installed plugin skill exactly as you would for a user."
         )
     return "\n\n".join(system_parts), fixture.prompt
+
+
+def _bedrock_tool_surface_prompt() -> str:
+    """State the single tool the Bedrock lane serves.
+
+    Skill guidance names the file tools an interactive agent is given, so a model
+    that follows it literally requests one and finds it undeclared. Naming the
+    surface keeps that guidance actionable through the shell instead.
+    """
+
+    return (
+        "Bash is the only tool available to you in this evaluation. Where the guidance "
+        "below refers to Read, Write, Edit, Grep, or Glob, do the equivalent with shell "
+        "commands: read with cat, grep, or ls, and create a file with a quoted heredoc "
+        "such as cat > playbook.yml <<'EOF'. Every other instruction still applies."
+    )
 
 
 def _isolation_prompt() -> str:

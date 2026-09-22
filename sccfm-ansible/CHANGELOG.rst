@@ -18,6 +18,7 @@ Bugfixes
 - Named the exposed-credential, repeated schema export, and configuration path patterns the CLI and Ansible skills must avoid, because harness runs showed the previous wording left all three reachable.
 - Grounded harness command scoring in the schema the command double published, and read each presented command line the way a shell reads it, so a filtered or redirected export, a command chain, a disclaimed mention, and a placeholder value are no longer reported as invented commands.
 - Cleaned up named Bedrock tool containers when a model-requested command times out, keeping harness failures observable.
+- Told Bedrock sessions that the shell is their only tool and answered a request for a tool the harness does not serve with an error the model can recover from, so following the skill's file-handling guidance no longer ends a sample before the work is scored.
 
 v0.42.1
 ========

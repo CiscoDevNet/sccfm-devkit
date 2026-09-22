@@ -129,6 +129,15 @@ fixture request separately as the user message. Claude Code plugin discovery
 and hooks are runtime features and therefore remain covered by
 `--agent claude --mode installed-plugin`.
 
+Bedrock is served exactly one tool, `Bash`, so the system instructions state that
+and point the file-handling steps of a skill at shell equivalents. Skill guidance
+names the tools an interactive agent is given, and a model that followed it
+literally used to request `Write` and end the session. A request for any tool the
+lane does not serve is now answered with an error result the way a failed command
+is, so the model can fall back to a heredoc within the same sample; the requested
+name is recorded in `transcript.unserved_tool_requests` for diagnosis and is not
+scored.
+
 The parent Python process is the only process that can reach Bedrock. Every
 model-requested shell command runs in a separate Docker container with no
 network, no AWS variables, a read-only root filesystem, and only the disposable

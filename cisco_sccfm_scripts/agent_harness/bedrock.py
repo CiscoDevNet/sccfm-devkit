@@ -26,6 +26,14 @@ CONTAINER_BINARY_DIRECTORY = CONTAINER_TOOL_ROOT / "bin"
 CONTAINER_EVENT_LOG = CONTAINER_TOOL_ROOT / "events.jsonl"
 
 
+class UnservedToolRequest(ValueError):
+    """A tool request the harness cannot execute but can answer with an error."""
+
+    def __init__(self, tool_name: str, message: str) -> None:
+        super().__init__(message)
+        self.tool_name = tool_name
+
+
 @dataclass(frozen=True)
 class BedrockExecution:
     """Provider execution result consumed by the common harness scorer."""
@@ -120,7 +128,17 @@ def run_session(
                 )
             tool_results = []
             for tool_use in tool_uses:
-                command = _tool_command(tool_use)
+                try:
+                    command = _tool_command(tool_use)
+                except UnservedToolRequest as error:
+                    # A model that reaches for a tool this lane does not serve can
+                    # still complete the task with the shell, so the request is
+                    # answered with an error result the way a failed command is.
+                    # Ending the session instead would discard a whole sample over
+                    # one recoverable turn.
+                    transcript.unserved_tool_requests.append(error.tool_name)
+                    tool_results.append(_tool_error_result(tool_use, str(error)))
+                    continue
                 record = _run_bash(
                     command,
                     workspace,
@@ -226,19 +244,46 @@ def _tool_uses(message: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _tool_command(tool_use: dict[str, Any]) -> str:
-    if tool_use.get("name") != "Bash":
-        raise ValueError(f"Bedrock requested unsupported tool {tool_use.get('name')!r}")
+    name = tool_use.get("name")
+    if name != "Bash":
+        raise UnservedToolRequest(
+            name if isinstance(name, str) else repr(name),
+            f"The tool {name!r} is not available in this evaluation. Bash is the only "
+            "tool: read files with cat, grep, or ls, and create them with a quoted "
+            "heredoc such as cat > playbook.yml <<'EOF'.",
+        )
     tool_input = tool_use.get("input")
     command = tool_input.get("command") if isinstance(tool_input, dict) else None
     if not isinstance(command, str) or not command.strip():
-        raise ValueError("Bedrock Bash tool request did not contain a command")
+        raise UnservedToolRequest(
+            "Bash",
+            "The Bash tool request did not contain a command. Put the POSIX shell "
+            "command to run in the 'command' field.",
+        )
     return command
 
 
-def _tool_result(tool_use: dict[str, Any], record: CommandRecord) -> dict[str, Any]:
+def _tool_use_id(tool_use: dict[str, Any]) -> str:
     tool_use_id = tool_use.get("toolUseId")
     if not isinstance(tool_use_id, str):
         raise ValueError("Bedrock tool request did not contain toolUseId")
+    return tool_use_id
+
+
+def _tool_error_result(tool_use: dict[str, Any], message: str) -> dict[str, Any]:
+    """Return the error result that lets a model retry an unserved tool request."""
+
+    return {
+        "toolResult": {
+            "toolUseId": _tool_use_id(tool_use),
+            "content": [{"text": message}],
+            "status": "error",
+        }
+    }
+
+
+def _tool_result(tool_use: dict[str, Any], record: CommandRecord) -> dict[str, Any]:
+    tool_use_id = _tool_use_id(tool_use)
     output = record.output[-MAX_TOOL_OUTPUT:]
     text = f"Exit code: {record.exit_code}\n{output}".rstrip()
     return {

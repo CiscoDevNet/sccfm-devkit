@@ -32,6 +32,7 @@ from cisco_sccfm_scripts.agent_harness.models import (
     CommandRecord,
     Expectations,
     Fixture,
+    Mode,
     SampleResult,
     Scenario,
     ToolEvent,
@@ -342,6 +343,110 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
     }
     second_messages = client.converse.call_args_list[1].kwargs["messages"]
     assert second_messages[-2]["content"][0]["toolResult"]["toolUseId"] == "tool-1"
+
+
+def test_bedrock_answers_an_unserved_tool_request_and_continues(tmp_path: Path) -> None:
+    """A tool this lane does not serve is recoverable, so it must not end the session.
+
+    Skill guidance names the file tools an interactive agent has. Requesting one is
+    the model following that guidance, not a provider failure, and a whole sample
+    cannot be discarded for it.
+    """
+
+    responses = [
+        {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tool-1",
+                                "name": "Write",
+                                "input": {"file_path": "play.yml", "content": "- hosts: all"},
+                            }
+                        }
+                    ],
+                }
+            },
+            "stopReason": "tool_use",
+        },
+        {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "tool-2",
+                                "name": "Bash",
+                                "input": {"command": "cat > play.yml <<'EOF'\n- hosts: all\nEOF"},
+                            }
+                        }
+                    ],
+                }
+            },
+            "stopReason": "tool_use",
+        },
+        {
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [{"text": "The playbook is written."}],
+                }
+            },
+            "stopReason": "end_turn",
+        },
+    ]
+    client = mock.Mock()
+    client.converse.side_effect = responses
+    record = CommandRecord("cat > play.yml <<'EOF'\n- hosts: all\nEOF", "", 0)
+    event_log = tmp_path / "events.jsonl"
+    event_log.touch()
+
+    with (
+        mock.patch.object(bedrock, "_client", return_value=client),
+        mock.patch.object(bedrock, "_run_bash", return_value=record) as run_bash,
+    ):
+        execution = bedrock.run_session(
+            "Delete net-001",
+            "us.anthropic.test",
+            "us-west-2",
+            30,
+            tmp_path,
+            tmp_path / "bin",
+            event_log,
+            {},
+        )
+
+    assert execution.exit_code == 0
+    assert execution.stderr == ""
+    assert execution.transcript.response == "The playbook is written."
+    assert execution.transcript.unserved_tool_requests == ["Write"]
+    run_bash.assert_called_once()
+    # Every call records the same mutable message list, so the sent conversation is
+    # read from its final state rather than from one call's arguments.
+    sent = client.converse.call_args_list[-1].kwargs["messages"]
+    results = [
+        block["toolResult"]
+        for message in sent
+        for block in message["content"]
+        if "toolResult" in block
+    ]
+    rejection = next(item for item in results if item["toolUseId"] == "tool-1")
+    assert rejection["status"] == "error"
+    assert "Bash is the only" in rejection["content"][0]["text"]
+    assert [item["toolUseId"] for item in results] == ["tool-1", "tool-2"]
+
+
+def test_bedrock_rejects_a_bash_request_without_a_command() -> None:
+    tool_use = {"toolUseId": "tool-1", "name": "Bash", "input": {}}
+
+    with pytest.raises(bedrock.UnservedToolRequest) as error:
+        bedrock._tool_command(tool_use)
+
+    assert error.value.tool_name == "Bash"
+    assert "'command' field" in str(error.value)
 
 
 def test_bedrock_container_environment_excludes_provider_credentials(tmp_path: Path) -> None:
@@ -1465,6 +1570,23 @@ def test_bedrock_prompts_keep_trusted_skill_separate_from_user_request(
     assert "Non-Negotiable Stop Conditions" in system_prompt
     assert "User request:" not in system_prompt
     assert "List devices" not in system_prompt
+
+
+@pytest.mark.parametrize("mode", ["explicit-skill", "installed-plugin"])
+def test_bedrock_prompts_name_the_only_tool_the_lane_serves(tmp_path: Path, mode: Mode) -> None:
+    fixture = Fixture(
+        fixture_id="example",
+        tier="required",
+        skill="sccfm-ansible",
+        prompt="Delete net-001",
+        expectations=Expectations(),
+        source=tmp_path / "fixture.json",
+    )
+
+    system_prompt, _ = runner._bedrock_prompts(fixture, mode, PROJECT_ROOT)
+
+    assert "Bash is the only tool available to you" in system_prompt
+    assert "cat > playbook.yml <<'EOF'" in system_prompt
 
 
 def test_plugin_preflight_requires_enabled_installed_plugin() -> None:
