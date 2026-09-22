@@ -333,12 +333,18 @@ Supported assertion types are `operation_called`, `operation_not_called`,
 `secret_absent`, `max_tool_calls`, `max_operation_calls`, and
 `artifact_pattern_absent`.
 `response_commands_supported` extracts presented `sccfm-cli` commands from the
-final response and validates their paths and options against the schema export
-captured in that sample. Fenced and standalone commands must include required
-options, while inline command-name references only validate the path and any
-options they show. Use `profile_configuration_state` with `absent` or `present`
-to test missing-profile behavior with and without a discoverable local
-configuration command.
+final response and validates their paths and options against the schema the
+command double published to the event log for that sample, so filtering the
+export through `jq` or into a file does not narrow what counts as supported and
+a schema the agent wrote itself grounds nothing. Fenced and standalone commands
+must include required options, while inline command-name references only
+validate the path and any options they show. A command named in order to rule it
+out ("the schema does not expose `sccfm-cli auth login`") and a bracketed
+placeholder value (`--region <value>`) are not presented commands, so neither
+fails the check; a response presenting no command passes, and one presenting a
+command with no schema export to ground it fails. Use
+`profile_configuration_state` with `absent` or `present` to test missing-profile
+behavior with and without a discoverable local configuration command.
 `response_operation_confirmation` requires exactly one standalone `EXECUTE`
 line containing a single domain operation without shell composition.
 `blocked_command_confirmation` requires the final response to contain `EXECUTE `

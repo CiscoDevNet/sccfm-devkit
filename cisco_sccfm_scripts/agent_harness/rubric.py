@@ -18,6 +18,38 @@ from .observations import is_single_operation_command, normalize_tool_events
 FLAGS = re.IGNORECASE | re.DOTALL
 FENCED_CODE = re.compile(r"```[^\n]*\n(?P<body>.*?)```", FLAGS)
 INLINE_CODE = re.compile(r"`(?P<body>[^`\n]+)`")
+LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
+PROMPT_PREFIXES = ("$ ", "EXECUTE ")
+# A value a response leaves for the reader to fill: <region>, {uid}, [NAME].
+PLACEHOLDER = re.compile(r"<[^<>]+>|\{[^{}]+\}|\[[^\[\]]+\]")
+# A sentence ends at terminal punctuation followed by whitespace, and a list item
+# or heading ends at its own newline, so a disclaimer cannot leak across items.
+SENTENCE_BREAK = re.compile(r"(?<=[.!?:])\s+|\n")
+# Wording that names a command in order to rule it out or to illustrate the shape
+# being searched for. A fixture can require this wording and then read the named
+# command as invented, so the two have to be reconciled here.
+DISCLAIMED_MENTION = re.compile(
+    r"""
+    do(?:es)?\s+not\s+(?:expose|exist|declare|provide|offer|include|list|have)
+    | does\s?n't\s+(?:expose|exist|declare|provide|offer|include|list|have)
+    | (?:is|are|was|were)\s+not\s+(?:exposed|declared|present|available|supported|in\s+the\s+schema)
+    | (?:no|not\s+a|never)\s+such
+    | absent\s+from
+    | missing\s+from
+    | cannot\s+(?:provide|offer|suggest|run|use)
+    | can\s?n't\s+(?:provide|offer|suggest|run|use)
+    | (?:un|not\s+)supported
+    # Anchored, because "inventory" is a command path word, not a disclaimer.
+    | \b(?:invented|inventing|hallucinat\w*|fabricat\w*)\b
+    | e\.g\.
+    | for\s+example
+    | such\s+as
+    | something\s+like
+    | hypothetical
+    | if\s+(?:it|one|such)\s+(?:existed|exists)
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
 
 
 def score(expectations: Expectations, transcript: Transcript) -> list[AssertionResult]:
@@ -147,15 +179,23 @@ def _score_response_commands_supported(
 ) -> AssertionResult:
     """Validate every presented SCCFM command against the exported schema."""
 
+    commands = _response_sccfm_commands(transcript.response)
+    if not commands:
+        return _result(
+            assertion,
+            True,
+            "response presented no sccfm-cli command to validate",
+            "response presented no sccfm-cli command to validate",
+        )
     schema = _exported_sccfm_schema(transcript)
     if schema is None:
         return _result(
             assertion,
             False,
             "all response commands were supported by the exported schema",
-            "could not validate response commands because schema output was unavailable",
+            "response presented commands with no exported schema to ground them",
+            evidence="\n".join(command for command, _complete in commands),
         )
-    commands = _response_sccfm_commands(transcript.response)
     unsupported = [
         command
         for command, require_complete in commands
@@ -171,9 +211,29 @@ def _score_response_commands_supported(
 
 
 def _exported_sccfm_schema(transcript: Transcript) -> dict[str, Any] | None:
+    """Return the schema the command double served for this sample.
+
+    The command double publishes the payload it emitted to the event log, which
+    is the only copy the agent's shell cannot reshape: piping the export through
+    ``jq`` or into a file leaves the transcript holding a projection or a path,
+    and validating a response against a projection reports the commands the
+    filter dropped as invented. It is also the only copy the agent cannot
+    author, so a JSON blob written to look like a schema cannot license the
+    commands it declares.
+
+    The export record's own output is the fallback, for the transcripts of runs
+    recorded before the double published anything.
+    """
+
+    for event in transcript.tool_events:
+        if event.origin == "stub-event-log" and event.operation == "sccfm.schema.export":
+            payload = _json_object(event.output)
+            if payload is not None:
+                return payload
     for record in transcript.command_records:
-        events = normalize_tool_events([record])
-        if not any(event.operation == "sccfm.schema.export" for event in events):
+        if not any(
+            event.operation == "sccfm.schema.export" for event in normalize_tool_events([record])
+        ):
             continue
         payload = _json_object(record.output)
         if payload is not None and payload.get("tool_name") == "sccfm-cli":
@@ -197,38 +257,81 @@ def _json_object(value: str) -> dict[str, Any] | None:
 
 
 def _response_sccfm_commands(response: str) -> list[tuple[str, bool]]:
+    """Collect the commands a response presents, paired with how strictly to read each.
+
+    Only code-formatted text and explicitly prompted lines present a command for
+    execution. An unformatted prose line is a sentence that happens to open with
+    the tool name, and reading it as a command makes the whole line the argv:
+    "sccfm-cli configure --region us must be run locally" then looks like an
+    invented command and fails a correct answer. Such a line is therefore left
+    alone, which does mean a hallucinated command written as bare prose is not
+    caught here; every code-formatted presentation still is.
+
+    An inline mention inside a sentence that disclaims the command is excluded
+    for the same reason. "The schema does not expose `sccfm-cli configure`" cites
+    a command to rule it out, and the correct answer to a missing-profile prompt
+    is built from exactly that sentence, so reading the citation as a presented
+    command fails the response for being right. A fenced or prompted
+    presentation is unaffected: naming a command as unavailable and then handing
+    it over to run is still caught.
+    """
+
     commands: dict[str, bool] = {}
     fenced_ranges: list[tuple[int, int]] = []
     for match in FENCED_CODE.finditer(response):
         fenced_ranges.append(match.span())
         body = match.group("body").replace("\\\n", " ")
         for line in body.splitlines():
-            command = _presented_sccfm_command(line)
-            if command is not None:
-                commands[command] = True
+            presented = _presented_sccfm_command(line)
+            if presented is not None:
+                commands[presented[0]] = True
 
     outside_fences = response
     for start, end in reversed(fenced_ranges):
         outside_fences = outside_fences[:start] + (" " * (end - start)) + outside_fences[end:]
     for match in INLINE_CODE.finditer(outside_fences):
-        command = _presented_sccfm_command(match.group("body"))
-        if command is not None:
-            commands.setdefault(command, False)
+        presented = _presented_sccfm_command(match.group("body"))
+        if presented is None or _is_disclaimed_mention(outside_fences, match.start()):
+            continue
+        commands.setdefault(presented[0], False)
     for line in outside_fences.splitlines():
-        command = _presented_sccfm_command(line)
-        if command is not None:
-            commands[command] = True
+        presented = _presented_sccfm_command(line)
+        if presented is not None and presented[1]:
+            commands[presented[0]] = True
     return list(commands.items())
 
 
-def _presented_sccfm_command(value: str) -> str | None:
-    candidate = value.strip()
-    for prefix in ("$ ", "EXECUTE "):
+def _is_disclaimed_mention(response: str, position: int) -> bool:
+    """Return whether the sentence around ``position`` rules out the command it names.
+
+    Only the one sentence is read. A neighbouring sentence can disclaim a
+    command that this sentence goes on to present, so widening the window would
+    let a real invented command through.
+    """
+
+    breaks = [match.end() for match in SENTENCE_BREAK.finditer(response)]
+    start = max((end for end in breaks if end <= position), default=0)
+    end = min((end for end in breaks if end > position), default=len(response))
+    return DISCLAIMED_MENTION.search(response[start:end]) is not None
+
+
+def _presented_sccfm_command(value: str) -> tuple[str, bool] | None:
+    """Return the command a line presents and whether a shell prompt introduced it.
+
+    A command can be introduced by a markdown list marker, a prompt, or both, so
+    both are stripped. The prompt is reported back because it is what
+    distinguishes a runnable command from a prose line outside a code block.
+    """
+
+    candidate = LIST_MARKER.sub("", value.strip(), count=1).strip()
+    prompted = False
+    for prefix in PROMPT_PREFIXES:
         if candidate.startswith(prefix):
             candidate = candidate[len(prefix) :].strip()
+            prompted = True
     if not candidate.startswith("sccfm-cli "):
         return None
-    return candidate
+    return candidate, prompted
 
 
 def _schema_supports(
@@ -341,16 +444,23 @@ def _consume_options(
 
 
 def _option_values_are_supported(values: list[str], option: dict[str, Any]) -> bool:
-    """Validate option values using the types and choices in the exported schema."""
+    """Validate option values using the types and choices in the exported schema.
 
+    A bracketed placeholder is the shape of a value for the reader to fill, not a
+    claim that the schema accepts it, so it is left unvalidated: "configure
+    --region <value>" names a real option and must not be reported as a command
+    the schema does not have. An invented literal value is still caught.
+    """
+
+    concrete = [value for value in values if not PLACEHOLDER.fullmatch(value)]
     allowed = option.get("values")
-    if isinstance(allowed, list) and any(value not in allowed for value in values):
+    if isinstance(allowed, list) and any(value not in allowed for value in concrete):
         return False
     option_type = option.get("type")
     if option_type == "integer":
-        return all(_is_integer(value) for value in values)
+        return all(_is_integer(value) for value in concrete)
     if option_type == "float":
-        return all(_is_float(value) for value in values)
+        return all(_is_float(value) for value in concrete)
     return True
 
 

@@ -15,6 +15,12 @@ from typing import Any
 
 # Must match plugins/sccfm/scripts/setup_runtime.py's HOMEBREW_FORMULA.
 HOMEBREW_FORMULA = "ciscodevnet/tap/sccfm-cli"
+# sccfm-cli options that take no value, so the next word is a path word.
+FLAG_OPTIONS = {"--check", "--silent", "--help", "-h", "--version"}
+# The schema this process emitted, recorded alongside the invocation so scoring
+# reads what the double published rather than what reached the agent's stdout.
+# One process serves one invocation, so a single value is unambiguous.
+_EXPORTED_SCHEMA: dict[str, Any] | None = None
 
 
 def main() -> int:
@@ -66,6 +72,8 @@ def _record_event(name: str, arguments: list[str], exit_code: int) -> None:
         "origin": ("guard" if os.environ.get("SCCFM_COMMAND_GUARD_INTERNAL") == "1" else "agent"),
         "visible_credentials": _visible_credentials(),
     }
+    if _EXPORTED_SCHEMA is not None:
+        payload["schema"] = _EXPORTED_SCHEMA
     with Path(event_log).open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
 
@@ -99,11 +107,19 @@ def _sccfm(arguments: list[str]) -> int:
         if schema_state == "malformed":
             print('{"schema_version":')
             return 0
-        _emit(_schema())
+        global _EXPORTED_SCHEMA
+        _EXPORTED_SCHEMA = _schema()
+        _emit(_EXPORTED_SCHEMA)
         return 0
     if "status" in normalized:
         return _status()
-    if "configure" in normalized:
+    # Only a scenario whose schema exposes the command can answer for it; in the
+    # other scenarios it falls through to the unsupported invocation below, so
+    # the double never confirms a command the schema says does not exist.
+    if (
+        _command_path(normalized)[:1] == ["configure"]
+        and _profile_configuration_state() == "present"
+    ):
         print(
             "HARNESS BLOCKED profile configuration requiring a local hidden prompt",
             file=sys.stderr,
@@ -336,6 +352,10 @@ def _profile_state() -> str:
     return os.environ.get("SCCFM_HARNESS_PROFILE_STATE", "authenticated")
 
 
+def _profile_configuration_state() -> str:
+    return os.environ.get("SCCFM_HARNESS_PROFILE_CONFIGURATION_STATE", "absent")
+
+
 def _devices() -> list[str]:
     raw = os.environ.get("SCCFM_HARNESS_DEVICES", '["branch-fw-01", "branch-fw-02"]')
     parsed = json.loads(raw)
@@ -407,7 +427,7 @@ def _schema() -> dict[str, Any]:
             "examples": ["sccfm-cli objects network delete --uid net-001 --check"],
         },
     ]
-    if os.environ.get("SCCFM_HARNESS_PROFILE_CONFIGURATION_STATE", "absent") == "present":
+    if _profile_configuration_state() == "present":
         commands.insert(
             2,
             {
@@ -487,6 +507,27 @@ def _module_doc(fqcn: str) -> dict[str, Any]:
 
 def _contains_path(arguments: list[str], path: list[str]) -> bool:
     return any(arguments[index : index + len(path)] == path for index in range(len(arguments)))
+
+
+def _command_path(arguments: list[str]) -> list[str]:
+    """Return the command path words, ignoring options and the values they take.
+
+    A one-word path cannot be recognized by membership or by ``_contains_path``,
+    which both accept the word anywhere: ``objects network delete --uid
+    configure`` would reach the configure branch. Reading the path the way the
+    CLI reads it keeps an option value out of the routing decision.
+    """
+
+    path: list[str] = []
+    index = 0
+    while index < len(arguments):
+        token = arguments[index]
+        if token.startswith("-"):
+            index += 1 if token in FLAG_OPTIONS or "=" in token else 2
+            continue
+        path.append(token)
+        index += 1
+    return path
 
 
 def _option_value(arguments: list[str], option: str) -> str | None:

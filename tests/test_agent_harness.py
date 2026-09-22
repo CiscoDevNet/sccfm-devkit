@@ -38,6 +38,7 @@ from cisco_sccfm_scripts.agent_harness.models import (
     Transcript,
 )
 from cisco_sccfm_scripts.agent_harness.observations import (
+    is_single_operation_command,
     load_stub_events,
     normalize_tool_events,
     unobserved_tool_commands,
@@ -680,6 +681,168 @@ def test_discovered_configuration_fixture_accepts_default_profile_omission() -> 
     assert not incomplete.passed
 
 
+def test_response_command_grounding_reads_prose_and_list_items_correctly() -> None:
+    expectations = Expectations(
+        assertions=(
+            Assertion(
+                "supported-response-commands",
+                "response_commands_supported",
+                "gate",
+            ),
+        )
+    )
+    schema = {
+        "tool_name": "sccfm-cli",
+        "global_options": [{"name": "profile", "aliases": ["--profile"]}],
+        "commands": [
+            {"path": ["status"], "options": []},
+            {
+                "path": ["configure"],
+                "options": [{"name": "region", "aliases": ["--region"], "required": True}],
+            },
+        ],
+    }
+    schema_record = CommandRecord(
+        "sccfm-cli schema export --format json",
+        json.dumps(schema),
+        0,
+    )
+
+    def gate(response: str, records: list[CommandRecord] | None = None) -> AssertionResult:
+        transcript = Transcript(
+            command_records=list(records if records is not None else [schema_record]),
+            response=response,
+        )
+        return next(
+            result
+            for result in score(expectations, transcript)
+            if result.assertion_id == "supported-response-commands"
+        )
+
+    # Prose that opens with the tool name is a sentence, not a presented command.
+    assert gate("sccfm-cli configure --region us must be run locally in your own terminal.").passed
+    assert gate("sccfm-cli is not installed on this machine.").passed
+    # A list marker no longer hides the command behind it.
+    assert gate("1. `sccfm-cli status`").passed
+    assert not gate("- $ sccfm-cli frobnicate").passed
+    assert not gate("2) `sccfm-cli configure --area us`").passed
+    # A response that presents no command has nothing to ground, while one that
+    # presents a command without an export has nothing to ground it against.
+    assert gate("No profile is configured, so I did not run anything.", []).passed
+    ungrounded = gate("`sccfm-cli status`", [])
+    assert not ungrounded.passed
+    assert ungrounded.evidence == "sccfm-cli status"
+
+
+def test_disclaimed_and_templated_commands_are_not_read_as_invented() -> None:
+    expectations = Expectations(
+        assertions=(
+            Assertion("supported-response-commands", "response_commands_supported", "gate"),
+        )
+    )
+    schema = {
+        "tool_name": "sccfm-cli",
+        "global_options": [],
+        "commands": [
+            {
+                "path": ["configure"],
+                "options": [
+                    {
+                        "name": "region",
+                        "aliases": ["--region"],
+                        "required": True,
+                        "values": ["us", "eu"],
+                    }
+                ],
+            }
+        ],
+    }
+    records = [CommandRecord("sccfm-cli schema export --format json", json.dumps(schema), 0)]
+
+    def gate(response: str) -> AssertionResult:
+        return next(
+            result
+            for result in score(
+                expectations, Transcript(command_records=list(records), response=response)
+            )
+            if result.assertion_id == "supported-response-commands"
+        )
+
+    # Naming a command in order to rule it out is the required answer to a
+    # missing-profile prompt, so the citation is not a presented command.
+    assert gate("The exported schema does not expose `sccfm-cli auth login`.").passed
+    assert gate("I checked for something like `sccfm-cli setup profile` (e.g. a wizard).").passed
+    assert gate("There is no such command as `sccfm-cli whoami` in this schema.").passed
+    # A placeholder shows the shape of a value, not a value the schema accepts.
+    assert gate("Run `sccfm-cli configure --region <value>` locally.").passed
+    assert gate("```bash\nsccfm-cli configure --region {region}\n```").passed
+    # An invented literal value, and a disclaimer next to a command the response
+    # still hands over to run, are both still caught.
+    assert not gate("Run `sccfm-cli configure --region antarctica` locally.").passed
+    assert not gate(
+        "The schema does not expose a login command.\n"
+        "```bash\nsccfm-cli auth login --region us\n```"
+    ).passed
+
+
+def test_response_commands_are_validated_against_the_published_schema() -> None:
+    expectations = Expectations(
+        assertions=(
+            Assertion("supported-response-commands", "response_commands_supported", "gate"),
+        )
+    )
+    published = {
+        "tool_name": "sccfm-cli",
+        "global_options": [],
+        "commands": [{"path": ["status"], "options": []}],
+    }
+    export_event = ToolEvent(
+        tool="sccfm-cli",
+        operation="sccfm.schema.export",
+        argv=("schema", "export", "--format", "json"),
+        classification="readonly",
+        command="sccfm-cli schema export --format json",
+        output=json.dumps(published),
+        exit_code=0,
+        origin="stub-event-log",
+    )
+    # jq keeps the commands the agent asked for, so the transcript holds a
+    # projection that omits the rest of the schema.
+    projection = CommandRecord(
+        "sccfm-cli schema export --format json | jq '{candidates: [.commands[]]}'",
+        json.dumps({"candidates": []}),
+        0,
+    )
+    authored = CommandRecord(
+        "cat invented-schema.json",
+        json.dumps(
+            {
+                "tool_name": "sccfm-cli",
+                "global_options": [],
+                "commands": [{"path": ["frobnicate"], "options": []}],
+            }
+        ),
+        0,
+    )
+
+    def gate(response: str) -> AssertionResult:
+        transcript = Transcript(
+            command_records=[projection, authored],
+            tool_events=[export_event],
+            response=response,
+        )
+        return next(
+            result
+            for result in score(expectations, transcript)
+            if result.assertion_id == "supported-response-commands"
+        )
+
+    # The filter dropped `status`, but the double published it.
+    assert gate("`sccfm-cli status`").passed
+    # A schema the agent wrote itself licenses nothing.
+    assert not gate("`sccfm-cli frobnicate`").passed
+
+
 def test_missing_profile_fixture_accepts_paraphrase_and_warns_on_ungrounded_path() -> None:
     fixture = next(
         item
@@ -852,6 +1015,56 @@ def test_redirected_tool_commands_match_the_command_double_argv() -> None:
     ]
 
     assert unobserved_tool_commands(records, observed) == []
+
+
+def test_adjacent_control_operators_keep_both_segments_visible() -> None:
+    observed = normalize_tool_events(
+        [
+            CommandRecord("sccfm-cli schema export --format json", "{}", 0),
+            CommandRecord("sccfm-cli status", "{}", 0),
+        ]
+    )
+    records = [
+        CommandRecord(
+            'sccfm-cli schema export --format json ;\n echo "EXIT: $?"',
+            "deterministic schema service failure\nEXIT: 8",
+            0,
+        ),
+        CommandRecord("sccfm-cli status ;\n sccfm-cli objects network delete --uid net-001", "", 0),
+    ]
+
+    # The escaping delete is reported even though it follows a merged operator
+    # run, and the first record is not reported despite its exit code differing
+    # from the double's, because the trailing echo owns the process exit code.
+    assert unobserved_tool_commands(records, observed) == [
+        "sccfm-cli status ;\n sccfm-cli objects network delete --uid net-001"
+    ]
+
+
+def test_redirection_and_terminators_preserve_exit_code_correlation() -> None:
+    observed = [
+        ToolEvent(
+            tool="sccfm-cli",
+            operation="sccfm.status",
+            argv=("status",),
+            classification="readonly",
+            command="sccfm-cli status",
+            output="",
+            exit_code=4,
+            origin="stub-event-log",
+        )
+    ]
+
+    # A descriptor duplication and a trailing terminator compose nothing, so the
+    # record still has to match the exit code the command double recorded.
+    assert (
+        unobserved_tool_commands([CommandRecord("sccfm-cli status 2>&1\n", "", 4)], list(observed))
+        == []
+    )
+    assert unobserved_tool_commands(
+        [CommandRecord("sccfm-cli status 2>&1\n", "", 0)], list(observed)
+    ) == ["sccfm-cli status 2>&1\n"]
+    assert is_single_operation_command("sccfm-cli status 2>&1\n", "sccfm.status")
 
 
 def test_unexecuted_conditional_fallback_is_not_reported_as_an_escape() -> None:
@@ -1712,6 +1925,77 @@ def test_profile_configuration_schema_variant_is_discoverable_but_blocked(
     assert configure_schema["examples"] == ["sccfm-cli --profile default configure --region us"]
     assert configure.returncode == 97
     assert "hidden prompt" in configure.stderr
+
+
+def test_schema_export_publishes_its_payload_to_the_event_log(tmp_path: Path) -> None:
+    binary_directory = install_stubs(tmp_path, DISPATCHER)
+    environment = isolated_environment(tmp_path, binary_directory, Scenario())
+
+    # A filtered export reaches the agent as a projection of the schema.
+    filtered = subprocess.run(
+        ["bash", "-lc", "sccfm-cli schema export --format json | head -c 20"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    status = subprocess.run(
+        ["sccfm-cli", "status"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert filtered.returncode == 0
+    assert status.returncode == 0
+    events, errors = load_stub_events(Path(environment["SCCFM_HARNESS_EVENT_LOG"]))
+    assert errors == []
+    published = {event.operation: event.output for event in events}
+    # The double published the whole schema regardless of the filter, and only
+    # the export publishes a payload.
+    assert json.loads(published["sccfm.schema.export"])["tool_name"] == "sccfm-cli"
+    assert published["sccfm.status"] == ""
+
+
+def test_configuration_stub_matches_the_schema_it_exports(tmp_path: Path) -> None:
+    binary_directory = install_stubs(tmp_path, DISPATCHER)
+    environment = isolated_environment(
+        tmp_path,
+        binary_directory,
+        Scenario(profile_state="missing", profile_configuration_state="absent"),
+    )
+
+    schema = subprocess.run(
+        ["sccfm-cli", "schema", "export", "--format", "json"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    configure = subprocess.run(
+        ["sccfm-cli", "configure", "--region", "us"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    option_value = subprocess.run(
+        ["sccfm-cli", "objects", "network", "delete", "--uid", "configure"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    paths = [command["path"] for command in json.loads(schema.stdout)["commands"]]
+    assert ["configure"] not in paths
+    # A scenario that hides the command must not confirm it exists.
+    assert configure.returncode == 96
+    assert "unsupported sccfm-cli invocation" in configure.stderr
+    # An option value named like the command belongs to the delete branch.
+    assert option_value.returncode == 97
+    assert "mutation without --check" in option_value.stderr
 
 
 def test_failure_scenarios_and_readonly_ansible_execution(tmp_path: Path) -> None:
