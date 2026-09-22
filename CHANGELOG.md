@@ -1,3 +1,26 @@
+## v0.43.0 (2026-09-22)
+
+### Feat
+
+- **lh-121335**: add Bedrock agent harness backend
+
+### Fix
+
+- **lh-121335**: recover from unserved Bedrock tools
+- **lh-121335**: read presented commands the way a shell reads them
+- **lh-121335**: close three skill guidance gaps found by the harness
+- **lh-121335**: ground response command scoring in published schema
+- **lh-121335**: harden Bedrock harness execution and command validation
+- **lh-121335**: prepare Ansible changelog for 0.43.0
+- **lh-121335**: stabilize agent harness evaluation
+- **lh-121335**: refine harness safety evaluation
+- **lh-121335**: validate suggested commands against schema
+- **lh-121335**: harden skill fallback and confirmation output
+- **lh-121335**: enforce safe discovery for exposed credentials
+- **lh-121335**: strengthen Bedrock skill instruction priority
+- **lh-121335**: avoid preserving SELinux labels on stubs
+- **lh-121335**: make Bedrock tool mounts executable
+
 ## v0.42.1 (2026-09-18)
 
 ### Fix
