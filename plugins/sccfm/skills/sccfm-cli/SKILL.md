@@ -219,14 +219,14 @@ Use the selected command's `auth` object:
 - If `auth.requires_profile` is false, skip profile verification.
 - If `auth.requires_profile` is true, verify a configured customer profile is
   available before executing.
-- Profiles contain a region and API token. Tokens come from developer.cisco.com
-  or the SCC Firewall Manager UI.
-- The canonical profile store is `~/.sccfm-cli/config.json`, shared by
-  `sccfm-cli`, `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection.
-  Do not configure SCCFM tokens through `.env`, inline Ansible values, or Ansible Vault.
-  This path is internal guidance for choosing a store, not user-facing guidance:
-  never state a configuration path to the user that you have not observed in tool
-  output, and never direct the user to edit it by hand.
+- Profiles contain a region and API token. Tokens are generated in the SCC
+  Firewall Manager UI by creating an API-only user. Do not direct users to any
+  other source for a token.
+- Profiles live in one canonical named-profile store, shared by `sccfm-cli`,
+  `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection. Do not
+  configure SCCFM tokens through `.env`, inline Ansible values, or Ansible Vault.
+  Never state a configuration path to the user that you have not observed in tool
+  output, and never direct the user to edit the store by hand.
 
 #### Secret Handling Rules
 

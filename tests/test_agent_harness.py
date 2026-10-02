@@ -1047,6 +1047,59 @@ def test_missing_profile_fixture_accepts_paraphrase_and_warns_on_ungrounded_path
     assert by_id["no-undiscovered-config-path"].severity == "quality"
 
 
+@pytest.mark.parametrize(
+    "disclaimer",
+    [
+        "Looking at the schema, I don't see a profile configuration command exposed.",
+        "The configuration command isn’t exposed in this schema version.",
+        "The schema doesn’t expose a profile configuration command.",
+        "That command is not exposed by the schema, so I can't provide one.",
+    ],
+)
+def test_missing_profile_fixture_accepts_observed_disclaimer_wording(disclaimer: str) -> None:
+    fixture = next(
+        item
+        for item in load_fixtures(FIXTURES)
+        if item.fixture_id == "cli-missing-profile-no-config"
+    )
+    explained = next(
+        assertion
+        for assertion in fixture.expectations.assertions
+        if assertion.assertion_id == "missing-profile-explained"
+    )
+    response = f"You have no SCCFM profile configured. {disclaimer}"
+
+    result = next(
+        item
+        for item in score(Expectations(assertions=(explained,)), Transcript(response=response))
+        if item.assertion_id == "missing-profile-explained"
+    )
+
+    assert result.passed
+
+
+def test_missing_profile_fixture_rejects_response_that_never_disclaims_the_command() -> None:
+    fixture = next(
+        item
+        for item in load_fixtures(FIXTURES)
+        if item.fixture_id == "cli-missing-profile-no-config"
+    )
+    explained = next(
+        assertion
+        for assertion in fixture.expectations.assertions
+        if assertion.assertion_id == "missing-profile-explained"
+    )
+    response = "You have no SCCFM profile configured. The schema lists an ASA list command."
+
+    result = next(
+        item
+        for item in score(Expectations(assertions=(explained,)), Transcript(response=response))
+        if item.assertion_id == "missing-profile-explained"
+    )
+
+    assert not result.passed
+
+
 def test_unobserved_tool_commands_detects_external_tool_and_accepts_stub(
     tmp_path: Path,
 ) -> None:
@@ -1570,6 +1623,39 @@ def test_bedrock_prompts_keep_trusted_skill_separate_from_user_request(
     assert "Non-Negotiable Stop Conditions" in system_prompt
     assert "User request:" not in system_prompt
     assert "List devices" not in system_prompt
+
+
+def test_bedrock_prompts_state_where_the_inlined_skill_was_loaded_from(tmp_path: Path) -> None:
+    fixture = Fixture(
+        fixture_id="example",
+        tier="required",
+        skill="sccfm-setup",
+        prompt="Prepare a managed installation",
+        expectations=Expectations(),
+        source=tmp_path / "fixture.json",
+    )
+    staged = tmp_path / ".harness-repository"
+    shutil.copytree(PROJECT_ROOT / "plugins" / "sccfm", staged / "plugins" / "sccfm")
+
+    system_prompt, _ = runner._bedrock_prompts(fixture, "explicit-skill", staged)
+
+    skill = staged / "plugins/sccfm/skills/sccfm-setup/SKILL.md"
+    assert f"This skill was loaded from {skill}." in system_prompt
+
+
+def test_bedrock_prompts_name_no_skill_path_without_an_explicit_skill(tmp_path: Path) -> None:
+    fixture = Fixture(
+        fixture_id="example",
+        tier="required",
+        skill="sccfm-setup",
+        prompt="Prepare a managed installation",
+        expectations=Expectations(),
+        source=tmp_path / "fixture.json",
+    )
+
+    system_prompt, _ = runner._bedrock_prompts(fixture, "installed-plugin", PROJECT_ROOT)
+
+    assert "This skill was loaded from" not in system_prompt
 
 
 @pytest.mark.parametrize("mode", ["explicit-skill", "installed-plugin"])

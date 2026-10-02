@@ -155,6 +155,14 @@ def test_distributed_skills_match_canonical_sources(skill_name: str) -> None:
     assert distributed.read_bytes() == canonical.read_bytes()
 
 
+def test_cli_skill_does_not_seed_an_unobserved_config_path() -> None:
+    # The skill forbids stating a path the agent has not observed, so naming the
+    # path here would hand the agent the exact text it must not repeat.
+    skill = (REPOSITORY_ROOT / "skills" / "sccfm-cli" / "SKILL.md").read_text()
+
+    assert "config.json" not in skill
+
+
 def test_install_plan_uses_one_pipx_environment_and_matching_versions(tmp_path: Path) -> None:
     setup_runtime = load_setup_runtime()
     collection_base = tmp_path / "collections"
