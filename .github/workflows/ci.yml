@@ -26,6 +26,8 @@ env:
     --ignore-vuln PYSEC-2026-1996
     --ignore-vuln PYSEC-2026-1998
     --ignore-vuln PYSEC-2026-1999
+    --ignore-vuln PYSEC-2026-4175
+    --ignore-vuln PYSEC-2026-4177
 
 jobs:
   lint-and-test:

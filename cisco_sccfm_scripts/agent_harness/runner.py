@@ -578,9 +578,12 @@ def _bedrock_prompts(fixture: Fixture, mode: Mode, repository_root: Path) -> tup
     if mode == "explicit-skill" and fixture.skill:
         skill = repository_root / "plugins" / "sccfm" / "skills" / fixture.skill / "SKILL.md"
         skill_text = skill.read_text(encoding="utf-8")
+        # The text is inlined rather than read by the agent, so a skill that
+        # resolves helpers relative to its own file needs the location stated.
         system_parts.extend(
             [
                 "The following repository skill is trusted system guidance. Follow it completely.",
+                f"This skill was loaded from {skill}.",
                 skill_text,
             ]
         )

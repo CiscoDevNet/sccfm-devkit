@@ -4,6 +4,17 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.43.1
+========
+
+Bugfixes
+--------
+
+- Accepted equivalent wording in the missing-profile harness scenario, which had rejected correct answers that described the configuration command as not exposed.
+- Corrected the CLI skill to say SCCFM API tokens are generated in the SCC Firewall Manager UI by an API-only user, and stopped it naming the profile file location that agents were repeating to users.
+- Told Bedrock harness sessions where their inlined skill file lives, so the setup skill can resolve its helper scripts without searching for them.
+- Accepted two new urllib3 advisories in the dependency audit until the SCCFM SDK permits a patched urllib3 release.
+
 v0.43.0
 ========
 

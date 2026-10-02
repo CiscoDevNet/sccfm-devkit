@@ -59,7 +59,7 @@ def test_cisco_sccfm_cli_skill_should_cover_schema_driven_operation() -> None:
         "Credential Verification Algorithm",
         "only hardcoded command exception",
         "AWS credentials and internal SystemDB tokens are out of scope",
-        "developer.cisco.com",
+        "API-only user",
         "SystemDB",
         "Homebrew",
         "macOS",
@@ -80,6 +80,8 @@ def test_cisco_sccfm_cli_skill_should_cover_schema_driven_operation() -> None:
     for fragment in expected_fragments:
         assert fragment in body
     assert "SCCFM_APPROVAL_COMMAND:" not in body
+    # Tokens are issued only by the SCCFM UI; the developer portal hosts docs.
+    assert "developer.cisco.com" not in body
 
     assert "sccfm-cli-interactive" in body
     assert "SCCFM_API_TOKEN" not in body
