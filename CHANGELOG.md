@@ -1,3 +1,9 @@
+## v0.43.1 (2026-10-02)
+
+### Fix
+
+- **lh-132058**: align harness grading and skill guidance with runs
+
 ## v0.43.0 (2026-09-22)
 
 ### Feat
