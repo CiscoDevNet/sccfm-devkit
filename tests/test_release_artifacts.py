@@ -332,7 +332,7 @@ def test_workflows_separate_automatic_preparation_from_manual_deployment() -> No
     assert "DEP002_EXCEPTION_EXPIRES" not in release
     assert "exceptions expired" not in ci
     assert "exceptions expired" not in release
-    assert ci.count("--ignore-vuln PYSEC-2026-") == 6
+    assert ci.count("--ignore-vuln PYSEC-2026-") == 8
     assert "--ignore-vuln PYSEC-2026-" not in release
     assert "\n    environment:" not in release
     assert "\n    environment:" not in ci
