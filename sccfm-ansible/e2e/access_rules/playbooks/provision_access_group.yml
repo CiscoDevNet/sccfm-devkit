@@ -36,18 +36,47 @@
         - dst_obj is failed
         - "'already exists' not in (dst_obj.msg | default('') | lower)"
 
-    - name: Create test ACL and apply as global access-group
+    # The API rejects script pushes against a NOT_SYNCED device, and the
+    # suites that run before this one leave the vASA re-syncing.  Filtering
+    # on configState makes the module report "No devices found" until the
+    # device is SYNCED, so retry only on that.  Keep retries * delay well
+    # under the 300s playbook timeout in conftest.py.
+    - name: Create test ACL and apply as global access-group (waits for SYNCED)
       cisco.sccfm.execute_asa_cli:
-        query: "{{ asa_test_query }}"
+        query: "{{ asa_test_query }} AND configState:SYNCED"
         commands:
           - "configure terminal"
           - "access-list {{ test_acl_name }} extended permit ip any any"
           - "access-group {{ test_acl_name }} global"
           - "end"
       register: cli_result
+      until: >-
+        cli_result is not failed
+        or 'no devices found' not in (cli_result.msg | default('') | lower)
+      retries: 18
+      delay: 10
 
-    - name: Assert CLI execution succeeded
+    - name: Show ASA response to the provisioning commands
+      ansible.builtin.debug:
+        var: cli_result.results
+
+    # pytest only prints a playbook's output when its phase fails, so the
+    # debug output above is lost when this phase passes.  Save the response
+    # for list_access_groups.yml to print if the access group never appears.
+    - name: Save ASA response for list_access_groups diagnostics
+      ansible.builtin.copy:
+        content: "{{ cli_result.results | to_nice_json }}"
+        dest: "/tmp/ci_access_group_provision.json"
+        mode: "0600"
+
+    # execute_asa_cli only fails on API/transaction errors; commands the ASA
+    # rejects come back as a per-device error_msg on a successful result.
+    - name: Assert the ASA accepted the provisioning commands
       ansible.builtin.assert:
         that:
-          - cli_result is not failed
-        fail_msg: "Failed to provision test access group via CLI"
+          - cli_result.results | length == 1
+          - cli_result.results | selectattr('error_msg') | list | length == 0
+        fail_msg: >-
+          Expected exactly one device with no CLI errors, got
+          {{ cli_result.results | length }} result(s):
+          {{ cli_result.results | map(attribute='error_msg') | list }}

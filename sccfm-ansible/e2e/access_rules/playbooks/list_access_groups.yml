@@ -15,32 +15,98 @@
       profile: default
 
   tasks:
-    - name: List access groups for CI ASA device (with retry for CDO sync)
-      cisco.sccfm.list_access_groups:
-        query: "{{ access_group_query }}"
-        limit: 10
-      register: result
-      # Stop retrying when results arrive OR when a non-retryable error
-      # occurs (e.g. missing api_token).  Only empty-result responses are
-      # worth retrying while CDO indexes the new access group.
-      until: >-
-        (result.access_groups | default([])) | length > 0
-        or (result is failed
-            and 'not found' not in (result.msg | default('') | lower)
-            and (result.access_groups | default([])) | length == 0)
-      retries: 12
-      delay: 10
+    - name: List access groups, printing diagnostics if none appear
+      block:
+        - name: List access groups for CI ASA device (with retry for CDO sync)
+          cisco.sccfm.list_access_groups:
+            query: "{{ access_group_query }}"
+            limit: 10
+          register: result
+          # Stop retrying when results arrive OR when a non-retryable error
+          # occurs (e.g. missing api_token).  Only empty-result responses are
+          # worth retrying while CDO indexes the new access group.
+          until: >-
+            (result.access_groups | default([])) | length > 0
+            or (result is failed
+                and 'not found' not in (result.msg | default('') | lower)
+                and (result.access_groups | default([])) | length == 0)
+          retries: 12
+          delay: 10
 
-    - name: Assert at least one access group is returned
-      ansible.builtin.assert:
-        that:
-          - not result.changed
-          - result.access_groups | length > 0
-          - result.count > 0
-        fail_msg: >-
-          Expected at least one access group for query '{{ access_group_query }}'.
-          Ensure the provision_access_group phase ran successfully and CDO
-          has synced the device config.
+        - name: Assert at least one access group is returned
+          ansible.builtin.assert:
+            that:
+              - not result.changed
+              - result.access_groups | length > 0
+              - result.count > 0
+            fail_msg: >-
+              Expected at least one access group for query '{{ access_group_query }}'.
+              Ensure the provision_access_group phase ran successfully and CDO
+              has synced the device config.
+
+      # Each diagnostic tolerates its own failure so the original error is
+      # the one reported.
+      rescue:
+        - name: "Diagnostics: read saved provisioning response"
+          ansible.builtin.slurp:
+            src: "/tmp/ci_access_group_provision.json"
+          register: provision_response
+          failed_when: false
+
+        - name: "Diagnostics: provisioning response (error_msg is the ASA's reply)"
+          ansible.builtin.debug:
+            msg: >-
+              {{ provision_response.content | b64decode | from_json
+                 if provision_response.content is defined
+                 else 'Not saved: provision_access_group.yml did not reach the save task.' }}
+
+        - name: "Diagnostics: look up CI ASA devices (fake version so all are returned)"
+          cisco.sccfm.list_asa_not_on_version:
+            query: "{{ asa_test_query }}"
+            version: "9.99(0)"
+          register: devices
+          failed_when: false
+
+        - name: "Diagnostics: CI ASA devices and their sync state"
+          ansible.builtin.debug:
+            msg: "{{ devices.devices | default(devices.msg | default('no output')) }}"
+
+        - name: "Diagnostics: read ACL config from the ASA itself"
+          cisco.sccfm.execute_asa_cli:
+            query: "{{ asa_test_query }}"
+            commands:
+              - "show running-config access-group"
+              - "show running-config access-list {{ test_acl_name }}"
+          register: asa_config
+          failed_when: false
+
+        - name: "Diagnostics: ACL config on the ASA"
+          ansible.builtin.debug:
+            msg: "{{ asa_config.results | default(asa_config.msg | default('no output')) }}"
+
+        - name: "Diagnostics: list all access groups, unfiltered"
+          cisco.sccfm.list_access_groups:
+            limit: 50
+          register: all_groups
+          failed_when: false
+
+        - name: "Diagnostics: access groups SCCFM knows about, as [name, entity_uid]"
+          ansible.builtin.debug:
+            msg:
+              count: "{{ all_groups.count | default('n/a') }}"
+              groups: >-
+                {{ all_groups.access_groups | default([]) | map(attribute='name')
+                   | zip(all_groups.access_groups | default([])
+                         | map(attribute='entity_uid')) | list }}
+              error: "{{ all_groups.msg | default('') }}"
+
+        - name: Fail with the original error
+          ansible.builtin.fail:
+            msg: >-
+              No access group matched '{{ access_group_query }}' after
+              {{ result.attempts | default(1) }} attempt(s); see the
+              diagnostics above.  Module message:
+              {{ ansible_failed_result.msg | default('none') }}
 
     - name: Cache access group UID for subsequent plays
       ansible.builtin.copy:

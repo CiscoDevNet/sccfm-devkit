@@ -61,7 +61,7 @@ def run(ctx: ProfileContext) -> None:
             "end",
         ]
     )
-    run_cli(
+    result = run_cli(
         "inventory",
         "devices",
         "asa",
@@ -76,3 +76,7 @@ def run(ctx: ProfileContext) -> None:
         profile=ctx.profile,
         config_path=ctx.config_path,
     )
+    # The command exits 0 even when the ASA rejects a line (the rejection is
+    # in each result's error_msg), and pytest hides output from passing
+    # phases.  Keep the raw output so list_access_groups can report it.
+    ctx.state.set("provision_cli_output", result.stdout)

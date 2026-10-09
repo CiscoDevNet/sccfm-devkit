@@ -69,6 +69,11 @@
         path: "/tmp/ci_access_group_uid"
         state: absent
 
+    - name: Remove saved provisioning response
+      ansible.builtin.file:
+        path: "/tmp/ci_access_group_provision.json"
+        state: absent
+
     # ── Network object cleanup ────────────────────────────────────
     # Runs after ACL teardown so objects are no longer referenced.
     # When the CLI teardown above was skipped (device NOT_SYNCED),
