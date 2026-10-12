@@ -319,3 +319,97 @@ def test_check_mode_should_report_targets_without_executing_cli(
     assert payload["matched_devices"] == 1
     assert payload["devices"][0]["uid"] == "uid-asa-1"
     assert payload["devices"][0]["device_type"] == "ASA"
+
+
+def _patch_execute_with_results(
+    monkeypatch: MonkeyPatch, devices: list[Device], results: list[CdoCliResult]
+) -> None:
+    def fake_get_devices(
+        self: InventoryService, *, limit: int, offset: int, query: str | None = None
+    ) -> DevicePage:
+        return DevicePage(count=len(devices), items=devices)
+
+    def fake_execute_cli(
+        self: AsaCommandLineService, *, device_uids: list[str], asa_commands: list[str]
+    ) -> list[CdoCliResult]:
+        return results
+
+    def stub_asa_cli_init(self: AsaCommandLineService, config: Any) -> None:
+        return None
+
+    monkeypatch.setattr(InventoryService, "get_devices", fake_get_devices)
+    monkeypatch.setattr(AsaCommandLineService, "execute_cli", fake_execute_cli)
+    monkeypatch.setattr(AsaCommandLineService, "__init__", stub_asa_cli_init)
+
+
+def _results_with_one_failure() -> list[CdoCliResult]:
+    return [
+        CdoCliResult(uid="r-1", device_uid="uid-1", result="", error_msg=None),
+        CdoCliResult(uid="r-2", device_uid="uid-2", result="Command failed", error_msg=None),
+    ]
+
+
+def test_should_exit_non_zero_and_keep_json_results_when_a_device_fails(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+) -> None:
+    """A per-device 'Command failed' must not be reported as success."""
+    results = _results_with_one_failure()
+    _patch_execute_with_results(monkeypatch, sample_devices, results)
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "cli",
+            "execute",
+            "-u",
+            "uid-1",
+            "-u",
+            "uid-2",
+            "--script",
+            "access-list acl permit ip any any",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert json.loads(result.stdout) == [item.model_dump(mode="json") for item in results]
+    assert "CLI commands failed on 1 of 2 device(s): edge-nva" in result.stderr
+
+
+def test_should_exit_non_zero_after_printing_table_when_a_device_fails(
+    cli_runner: CliRunner,
+    default_config: Config,
+    mock_inventory_service: None,
+    monkeypatch: MonkeyPatch,
+    sample_devices: list[Device],
+) -> None:
+    _patch_execute_with_results(monkeypatch, sample_devices, _results_with_one_failure())
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "inventory",
+            "devices",
+            "asa",
+            "cli",
+            "execute",
+            "-u",
+            "uid-1",
+            "-u",
+            "uid-2",
+            "--script",
+            "access-list acl permit ip any any",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Command failed" in result.stdout
+    assert "CLI commands failed on 1 of 2 device(s): edge-nva" in result.stderr

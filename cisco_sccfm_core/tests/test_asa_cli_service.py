@@ -6,10 +6,14 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
+import pytest
 from scc_firewall_manager_sdk import CdoCliResult, CdoTransaction
 
 from cisco_sccfm_core.constants import FAST_POLLING_INTERVAL_SEC
-from cisco_sccfm_core.services.inventory.asa_cli_service import AsaCommandLineService
+from cisco_sccfm_core.services.inventory.asa_cli_service import (
+    AsaCommandLineService,
+    is_failed_cli_result,
+)
 
 DEVICE_UID = "11111111-1111-4111-8111-111111111111"
 
@@ -69,3 +73,23 @@ def test_get_cli_result_uses_keyword_uid() -> None:
     service.command_line_interface_api.get_cli_result.assert_called_once_with(
         cli_result_uid="result-1"
     )
+
+
+@pytest.mark.parametrize(
+    ("result_text", "error_msg", "expected"),
+    [
+        ("Cisco Adaptive Security Appliance Software Version 9.4(1)200", None, False),
+        ("", None, False),
+        (None, None, False),
+        ("Command failed", None, True),
+        ("access-list ok\nERROR: % Invalid input detected at '^' marker.", None, True),
+        ("", "Device unreachable", True),
+        ("hostname ERROR:-not-a-prefix", None, False),
+    ],
+)
+def test_is_failed_cli_result_detects_per_device_failures(
+    result_text: str | None, error_msg: str | None, expected: bool
+) -> None:
+    result = CdoCliResult(uid="r1", deviceUid=DEVICE_UID, result=result_text, errorMsg=error_msg)
+
+    assert is_failed_cli_result(result) is expected

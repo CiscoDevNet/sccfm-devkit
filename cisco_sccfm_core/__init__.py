@@ -32,6 +32,7 @@ from cisco_sccfm_core.services.inventory import (
     FtdCommandLineService,
     InventoryService,
     ShunEntrySpec,
+    is_failed_cli_result,
 )
 from cisco_sccfm_core.services.object_management import (
     NetworkGroupListResponse,
@@ -89,6 +90,7 @@ __all__ = [
     "HealthService",
     "HealthStatus",
     "InventoryService",
+    "is_failed_cli_result",
     "NetworkGroupListResponse",
     "NetworkGroupMemberMutationResult",
     "NetworkGroupResponse",

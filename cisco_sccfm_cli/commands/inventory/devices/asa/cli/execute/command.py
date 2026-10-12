@@ -20,7 +20,7 @@ from cisco_sccfm_cli.commands.inventory.devices.asa.shared import (
 )
 from cisco_sccfm_cli.commands.inventory.options import config_path_option, format_option
 from cisco_sccfm_cli.utils import with_spinner
-from cisco_sccfm_core import AsaCommandLineService
+from cisco_sccfm_core import AsaCommandLineService, is_failed_cli_result
 
 
 class AsaExecuteCliCommand(AsaDeviceTargetCommand):
@@ -30,7 +30,10 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
 
     @property
     def help_text(self) -> str:
-        return "Execute CLI commands on ASA devices."
+        return (
+            "Execute CLI commands on ASA devices. Exits with status 1 if SCC Firewall Manager "
+            "reports a command failure on any device; every device's result is still printed."
+        )
 
     def build_params(self) -> Sequence[click.Parameter]:
         return [
@@ -115,6 +118,12 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
             script=script,
             output_format=format,
         )
+        failed = [result for result in results if is_failed_cli_result(result)]
+        if failed:
+            names = ", ".join(_device_label(result.device_uid, uid_to_device) for result in failed)
+            raise click.ClickException(
+                f"CLI commands failed on {len(failed)} of {len(results)} device(s): {names}"
+            )
 
     def _validate_script_filters(
         self,
@@ -127,3 +136,8 @@ class AsaExecuteCliCommand(AsaDeviceTargetCommand):
         has_script_file = bool(script_file)
         if has_script == has_script_file:
             ctx.fail("Provide exactly one of --script or --script-file.")
+
+
+def _device_label(device_uid: str, uid_to_device: dict[str, Device]) -> str:
+    device = uid_to_device.get(device_uid)
+    return device.name if device else device_uid
