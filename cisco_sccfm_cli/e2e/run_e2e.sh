@@ -45,6 +45,14 @@ fi
 echo "Installing sccfm package (with dev extras)..."
 poetry install --no-interaction --with dev
 
+# ── Debug hold: see sccfm-ansible/e2e/run_e2e.sh ──────────────────
+# The Ansible runner keeps its vASA up for manual testing; skip this
+# suite entirely, including onboarding the CLI vASA.
+if [[ -f "${REPO_ROOT}/sccfm-ansible/e2e/HOLD_VASA_MINUTES" ]]; then
+  echo "HOLD: HOLD_VASA_MINUTES is set; skipping the sccfm-cli e2e suite."
+  exit 0
+fi
+
 # ── Onboard a CLI-dedicated vASA (opt-in via ASA_HOST) ────────────
 ONBOARDED_VASA=0
 
