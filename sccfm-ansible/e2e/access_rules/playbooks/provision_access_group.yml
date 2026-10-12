@@ -15,6 +15,14 @@
     group/cisco.sccfm.all:
       profile: default
 
+  # EXPERIMENT: API-onboarded ASAs are not on the "New ASA Policy View", so
+  # the access-groups API never lists their ACLs.  Try switching the CI device
+  # with a public PATCH of deviceMetadata.additional before the config read.
+  # No module wraps modify_device yet, so call the REST API like remove_vasa.yml.
+  vars:
+    sccfm_api_base: "https://ci.manage.security.cisco.com/api/rest"
+    profile_token: "{{ lookup('cisco.sccfm.profile', 'default', field='api_token') }}"
+
   tasks:
     - name: Create source network object for access rule tests
       cisco.sccfm.create_network_object:
@@ -88,6 +96,62 @@
           {{ cli_result.results | length }} result(s):
           {{ cli_result.results | items2dict(key_name='device_uid', value_name='result') }}
           (error_msg: {{ cli_result.results | map(attribute='error_msg') | list }})
+
+    # ── EXPERIMENT: switch the CI device to the new policy view ─────────
+    # no_log keeps the bearer token out of the output; only selected fields
+    # of the registered results are printed below.
+    - name: "Experiment: read the CI device before the switch"
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ cli_result.results[0].device_uid }}"
+        headers:
+          Authorization: "Bearer {{ profile_token }}"
+      register: ci_device_before
+      no_log: true
+      failed_when: false
+
+    - name: "Experiment: set deviceMetadata.additional.isNewPolicyObjectModel on the CI device"
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ cli_result.results[0].device_uid }}"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ profile_token }}"
+        body_format: json
+        body:
+          deviceMetadata:
+            additional:
+              isNewPolicyObjectModel: "true"
+        status_code: [200, 202, 204]
+      register: policy_model_patch
+      no_log: true
+      failed_when: false
+
+    - name: "Experiment: read the CI device after the switch"
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ cli_result.results[0].device_uid }}"
+        headers:
+          Authorization: "Bearer {{ profile_token }}"
+      register: ci_device_after
+      no_log: true
+      failed_when: false
+
+    - name: "Experiment: policy view switch results"
+      ansible.builtin.set_fact:
+        policy_model_experiment:
+          ci_device_before: "{{ ci_device_before.json.deviceMetadata | default('absent') }}"
+          patch:
+            status: "{{ policy_model_patch.status | default('n/a') }}"
+            response: "{{ policy_model_patch.json | default(policy_model_patch.msg | default('')) }}"
+          ci_device_after: "{{ ci_device_after.json.deviceMetadata | default('absent') }}"
+
+    - name: "Experiment: show policy view switch results"
+      ansible.builtin.debug:
+        var: policy_model_experiment
+
+    - name: "Experiment: save policy view switch results for list_access_groups diagnostics"
+      ansible.builtin.copy:
+        content: "{{ policy_model_experiment | to_nice_json }}"
+        dest: "/tmp/ci_access_group_policy_model.json"
+        mode: "0600"
 
     # SCCFM does not re-read the device after a CLI push: the ACL is on the
     # ASA but no access group appears until the configuration is read.
