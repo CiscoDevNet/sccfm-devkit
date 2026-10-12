@@ -39,13 +39,12 @@
     # The API rejects script pushes against a NOT_SYNCED device, and the
     # suites that run before this one leave the vASA re-syncing.  Filtering
     # on configState makes the module report "No devices found" until the
-    # device is SYNCED, so retry only on that.  Keep retries * delay well
-    # under the 300s playbook timeout in conftest.py.
+    # device is SYNCED, so retry only on that.  This wait plus the read below
+    # must stay well under the 300s playbook timeout in conftest.py.
     #
-    # No "configure terminal"/"end": with them, SCCFM applied the lines but
-    # reported "Command failed" and never re-read the config, so the access
-    # group never appeared.  The core services (e.g. asa_boot_image_service)
-    # also send bare config lines.
+    # No "configure terminal"/"end": SCCFM applies scripts containing them
+    # but reports "Command failed".  The core services (e.g.
+    # asa_boot_image_service) also send bare config lines.
     - name: Create test ACL and apply as global access-group (waits for SYNCED)
       cisco.sccfm.execute_asa_cli:
         query: "{{ asa_test_query }} AND configState:SYNCED"
@@ -56,7 +55,7 @@
       until: >-
         cli_result is not failed
         or 'no devices found' not in (cli_result.msg | default('') | lower)
-      retries: 18
+      retries: 12
       delay: 10
 
     - name: Show ASA response to the provisioning commands
@@ -89,3 +88,11 @@
           {{ cli_result.results | length }} result(s):
           {{ cli_result.results | items2dict(key_name='device_uid', value_name='result') }}
           (error_msg: {{ cli_result.results | map(attribute='error_msg') | list }})
+
+    # SCCFM does not re-read the device after a CLI push: the ACL is on the
+    # ASA but no access group appears until the configuration is read.
+    - name: Read the ASA configuration into SCCFM
+      cisco.sccfm.read_asa_config:
+        uids: "{{ cli_result.results | map(attribute='device_uid') | list }}"
+        wait: true
+        timeout: 120

@@ -59,10 +59,9 @@ def run(ctx: ProfileContext) -> None:
     # mid-sync, and the API rejects script pushes against NOT_SYNCED devices.
     wait_for_synced(ctx, query=ASA_TEST_QUERY)
 
-    # No "configure terminal"/"end": with them, SCCFM applied the lines but
-    # reported "Command failed" and never re-read the config, so the access
-    # group never appeared.  The core services (e.g. asa_boot_image_service)
-    # also send bare config lines.
+    # No "configure terminal"/"end": SCCFM applies scripts containing them
+    # but reports "Command failed".  The core services (e.g.
+    # asa_boot_image_service) also send bare config lines.
     provisioning_script = "\n".join(
         [
             f"access-list {TEST_ACL_NAME} extended permit ip any any",
@@ -88,6 +87,24 @@ def run(ctx: ProfileContext) -> None:
     # list_access_groups can report it.
     ctx.state.set("provision_cli_output", result.stdout)
     _assert_accepted(get_json(result))
+
+    # SCCFM does not re-read the device after a CLI push: the ACL is on the
+    # ASA but no access group appears until the configuration is read.
+    run_cli(
+        "inventory",
+        "devices",
+        "asa",
+        "read-config",
+        "--query",
+        ASA_TEST_QUERY,
+        "--wait",
+        "--timeout",
+        "120",
+        "--format",
+        "json",
+        profile=ctx.profile,
+        config_path=ctx.config_path,
+    )
 
 
 def _assert_accepted(payload: object) -> None:

@@ -7,6 +7,7 @@ from __future__ import annotations
 from cisco_sccfm_core.services.inventory.asa_boot_image_service import AsaBootImageService
 from cisco_sccfm_core.services.inventory.asa_boot_registry_service import AsaBootRegistryService
 from cisco_sccfm_core.services.inventory.asa_cli_service import AsaCommandLineService
+from cisco_sccfm_core.services.inventory.asa_config_read_service import AsaConfigReadService
 from cisco_sccfm_core.services.inventory.asa_disk_file_service import AsaDiskFileService
 from cisco_sccfm_core.services.inventory.asa_ha_check_service import (
     AsaHaCheckReport,
@@ -52,6 +53,7 @@ __all__ = [
     "AsaBootImageService",
     "AsaBootRegistryService",
     "AsaCommandLineService",
+    "AsaConfigReadService",
     "AsaDiskFileService",
     "AsaHaCheckReport",
     "AsaHaCheckService",

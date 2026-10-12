@@ -26,6 +26,7 @@ from cisco_sccfm_cli.commands.inventory.devices.asa.list_not_on_version import (
     AsaListNotOnVersionCommand,
 )
 from cisco_sccfm_cli.commands.inventory.devices.asa.onboard import AsaOnboardCommand
+from cisco_sccfm_cli.commands.inventory.devices.asa.read_config import AsaReadConfigCommand
 from cisco_sccfm_cli.commands.inventory.devices.asa.shun import AsaShunCommand
 from cisco_sccfm_cli.commands.inventory.devices.asa.smartlicense.command import SmartlicenseCommand
 from cisco_sccfm_cli.commands.inventory.devices.asa.upgrade import AsaUpgradeCommand
@@ -53,6 +54,7 @@ class AsaCommand(BaseCommand):
             SmartlicenseCommand(console),
             AsaOnboardCommand(console),
             AsaListLocalUsersCommand(console),
+            AsaReadConfigCommand(console),
             AsaShunCommand(console),
             AsaUpgradeCommand(console),
             AsaUserCommand(console),
