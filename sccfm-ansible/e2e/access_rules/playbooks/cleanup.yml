@@ -57,10 +57,8 @@
       cisco.sccfm.execute_asa_cli:
         query: "{{ asa_test_query }}"
         commands:
-          - "configure terminal"
           - "no access-group {{ test_acl_name }} global"
           - "clear configure access-list {{ test_acl_name }}"
-          - "end"
       register: cli_result
       failed_when: false
 

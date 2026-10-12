@@ -6,8 +6,11 @@
 
 from __future__ import annotations
 
+import re
+
+from cisco_sccfm_cli.e2e._payload import normalize_rows
 from cisco_sccfm_cli.e2e._profile import ProfileContext
-from cisco_sccfm_cli.e2e._runner import run_cli
+from cisco_sccfm_cli.e2e._runner import get_json, run_cli
 from cisco_sccfm_cli.e2e._sync import wait_for_synced
 from cisco_sccfm_cli.e2e.access_rules.phases.test_data import (
     ASA_TEST_QUERY,
@@ -17,6 +20,9 @@ from cisco_sccfm_cli.e2e.access_rules.phases.test_data import (
     TEST_SOURCE_NETWORK,
     TEST_SOURCE_VALUE,
 )
+
+# Same check asa_boot_image_service applies to CLI results.
+_CLI_ERROR_RE = re.compile(r"(?im)^ERROR:|Command failed")
 
 
 def run(ctx: ProfileContext) -> None:
@@ -53,12 +59,14 @@ def run(ctx: ProfileContext) -> None:
     # mid-sync, and the API rejects script pushes against NOT_SYNCED devices.
     wait_for_synced(ctx, query=ASA_TEST_QUERY)
 
+    # No "configure terminal"/"end": with them, SCCFM applied the lines but
+    # reported "Command failed" and never re-read the config, so the access
+    # group never appeared.  The core services (e.g. asa_boot_image_service)
+    # also send bare config lines.
     provisioning_script = "\n".join(
         [
-            "configure terminal",
             f"access-list {TEST_ACL_NAME} extended permit ip any any",
             f"access-group {TEST_ACL_NAME} global",
-            "end",
         ]
     )
     result = run_cli(
@@ -76,7 +84,25 @@ def run(ctx: ProfileContext) -> None:
         profile=ctx.profile,
         config_path=ctx.config_path,
     )
-    # The command exits 0 even when the ASA rejects a line (the rejection is
-    # in each result's error_msg), and pytest hides output from passing
-    # phases.  Keep the raw output so list_access_groups can report it.
+    # pytest hides output from passing phases.  Keep the raw output so
+    # list_access_groups can report it.
     ctx.state.set("provision_cli_output", result.stdout)
+    _assert_accepted(get_json(result))
+
+
+def _assert_accepted(payload: object) -> None:
+    """Fail if SCCFM reports the script as rejected.
+
+    ``cli execute`` exits 0 even then: the rejection is in each row's
+    ``error_msg`` or as "Command failed"/"ERROR:" in its ``result``.
+    """
+    rows = normalize_rows(payload)
+    rejected = [
+        row
+        for row in rows
+        if row.get("error_msg") or _CLI_ERROR_RE.search(str(row.get("result") or ""))
+    ]
+    if len(rows) != 1 or rejected:
+        raise AssertionError(
+            f"Expected exactly one device with no CLI errors, got {len(rows)} result(s): {rows!r}"
+        )

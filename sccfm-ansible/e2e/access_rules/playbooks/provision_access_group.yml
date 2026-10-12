@@ -41,14 +41,17 @@
     # on configState makes the module report "No devices found" until the
     # device is SYNCED, so retry only on that.  Keep retries * delay well
     # under the 300s playbook timeout in conftest.py.
+    #
+    # No "configure terminal"/"end": with them, SCCFM applied the lines but
+    # reported "Command failed" and never re-read the config, so the access
+    # group never appeared.  The core services (e.g. asa_boot_image_service)
+    # also send bare config lines.
     - name: Create test ACL and apply as global access-group (waits for SYNCED)
       cisco.sccfm.execute_asa_cli:
         query: "{{ asa_test_query }} AND configState:SYNCED"
         commands:
-          - "configure terminal"
           - "access-list {{ test_acl_name }} extended permit ip any any"
           - "access-group {{ test_acl_name }} global"
-          - "end"
       register: cli_result
       until: >-
         cli_result is not failed
@@ -69,14 +72,20 @@
         dest: "/tmp/ci_access_group_provision.json"
         mode: "0600"
 
-    # execute_asa_cli only fails on API/transaction errors; commands the ASA
-    # rejects come back as a per-device error_msg on a successful result.
+    # execute_asa_cli only fails on API/transaction errors.  A rejected
+    # script comes back on a successful result, either as a per-device
+    # error_msg or as "Command failed"/"ERROR:" in the result text (the same
+    # check asa_boot_image_service applies).
     - name: Assert the ASA accepted the provisioning commands
       ansible.builtin.assert:
         that:
           - cli_result.results | length == 1
           - cli_result.results | selectattr('error_msg') | list | length == 0
+          - >-
+            cli_result.results | map(attribute='result') | map('string')
+            | select('search', '(?im)^ERROR:|Command failed') | list | length == 0
         fail_msg: >-
           Expected exactly one device with no CLI errors, got
           {{ cli_result.results | length }} result(s):
-          {{ cli_result.results | map(attribute='error_msg') | list }}
+          {{ cli_result.results | items2dict(key_name='device_uid', value_name='result') }}
+          (error_msg: {{ cli_result.results | map(attribute='error_msg') | list }})

@@ -100,13 +100,13 @@
                          | map(attribute='entity_uid')) | list }}
               error: "{{ all_groups.msg | default('') }}"
 
+        # The module's own error, if any, is in the "fatal:" line above.
         - name: Fail with the original error
           ansible.builtin.fail:
             msg: >-
               No access group matched '{{ access_group_query }}' after
               {{ result.attempts | default(1) }} attempt(s); see the
-              diagnostics above.  Module message:
-              {{ ansible_failed_result.msg | default('none') }}
+              diagnostics above.
 
     - name: Cache access group UID for subsequent plays
       ansible.builtin.copy:
