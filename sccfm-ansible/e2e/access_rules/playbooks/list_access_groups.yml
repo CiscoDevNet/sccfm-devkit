@@ -60,6 +60,19 @@
                  if provision_response.content is defined
                  else 'Not saved: provision_access_group.yml did not reach the save task.' }}
 
+        - name: "Diagnostics: read saved configuration read transaction"
+          ansible.builtin.slurp:
+            src: "/tmp/ci_access_group_read.json"
+          register: read_transaction
+          failed_when: false
+
+        - name: "Diagnostics: configuration read transaction (status, timings, details)"
+          ansible.builtin.debug:
+            msg: >-
+              {{ read_transaction.content | b64decode | from_json
+                 if read_transaction.content is defined
+                 else 'Not saved: provision_access_group.yml did not reach the read step.' }}
+
         - name: "Diagnostics: look up CI ASA devices (fake version so all are returned)"
           cisco.sccfm.list_asa_not_on_version:
             query: "{{ asa_test_query }}"

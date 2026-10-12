@@ -96,3 +96,14 @@
         uids: "{{ cli_result.results | map(attribute='device_uid') | list }}"
         wait: true
         timeout: 120
+      register: read_result
+
+    - name: Show the configuration read transaction
+      ansible.builtin.debug:
+        var: read_result.transaction
+
+    - name: Save the read transaction for list_access_groups diagnostics
+      ansible.builtin.copy:
+        content: "{{ read_result.transaction | to_nice_json }}"
+        dest: "/tmp/ci_access_group_read.json"
+        mode: "0600"

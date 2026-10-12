@@ -5,8 +5,8 @@
 """List access groups for the test ACL, retrying until CDO indexes it.
 
 If it never appears, the failure includes read-only diagnostics: the
-provisioning response, device sync state, the ACL config on the ASA itself,
-and every access group SCCFM knows about.
+provisioning response, the configuration read, device sync state, the ACL
+config on the ASA itself, and every access group SCCFM knows about.
 """
 
 from __future__ import annotations
@@ -63,6 +63,9 @@ def _diagnostics(ctx: ProfileContext) -> str:
     sections = {
         "Provisioning response (error_msg is the ASA's reply)": str(
             ctx.state.pop("provision_cli_output", "(not recorded: provision phase did not finish)")
+        ),
+        "Configuration read transaction (status, timings, details)": str(
+            ctx.state.pop("read_config_output", "(not recorded: provision did not reach the read)")
         ),
         "CI ASA devices and their sync state": _cli_output(
             ctx, "inventory", "devices", "asa", "list", "--query", ASA_TEST_QUERY, "--limit", "10"

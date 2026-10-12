@@ -90,7 +90,7 @@ def run(ctx: ProfileContext) -> None:
 
     # SCCFM does not re-read the device after a CLI push: the ACL is on the
     # ASA but no access group appears until the configuration is read.
-    run_cli(
+    read_result = run_cli(
         "inventory",
         "devices",
         "asa",
@@ -105,6 +105,7 @@ def run(ctx: ProfileContext) -> None:
         profile=ctx.profile,
         config_path=ctx.config_path,
     )
+    ctx.state.set("read_config_output", read_result.stdout)
 
 
 def _assert_accepted(payload: object) -> None:
