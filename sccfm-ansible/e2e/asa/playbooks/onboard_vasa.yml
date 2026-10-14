@@ -33,6 +33,9 @@
         password: "{{ vault_vasa_password }}"
         connector_type: "{{ default_connector_type }}"
         ignore_certificate: "{{ default_ignore_certificate }}"
+        # As the UI does; the access_rules suite needs the access-groups API
+        # to list this device's ACLs.
+        new_policy_view: true
       register: onboard_result
 
     - name: Show onboard result
