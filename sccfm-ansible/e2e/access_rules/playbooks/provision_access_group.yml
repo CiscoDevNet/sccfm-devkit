@@ -16,9 +16,11 @@
       profile: default
 
   # EXPERIMENT: API-onboarded ASAs are not on the "New ASA Policy View", so
-  # the access-groups API never lists their ACLs.  Try switching the CI device
-  # with a public PATCH of deviceMetadata.additional before the config read.
-  # No module wraps modify_device yet, so call the REST API like remove_vasa.yml.
+  # the access-groups API never lists their ACLs.  The UI sets the flag when it
+  # creates the device, before the first config read, so switch the new CI
+  # device with a public PATCH of deviceMetadata.additional and re-read its
+  # config before pushing any CLI.  No module wraps modify_device yet, so call
+  # the REST API like remove_vasa.yml.
   vars:
     sccfm_api_base: "https://ci.manage.security.cisco.com/api/rest"
     profile_token: "{{ lookup('cisco.sccfm.profile', 'default', field='api_token') }}"
@@ -44,10 +46,96 @@
         - dst_obj is failed
         - "'already exists' not in (dst_obj.msg | default('') | lower)"
 
+    # ── EXPERIMENT: switch the new CI device to the new policy view ─────
+    - name: "Experiment: find the CI device (fake version so it is returned)"
+      cisco.sccfm.list_asa_not_on_version:
+        query: "{{ asa_test_query }}"
+        version: "9.99(0)"
+      register: ci_devices
+
+    - name: "Experiment: remember the CI device UID"
+      ansible.builtin.set_fact:
+        ci_device_uid: "{{ ci_devices.devices[0].uid }}"
+      failed_when: ci_devices.devices | length != 1
+
+    # no_log keeps the bearer token out of the output; only selected fields
+    # of the registered results are printed below.
+    - name: "Experiment: read the CI device before the switch"
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ ci_device_uid }}"
+        headers:
+          Authorization: "Bearer {{ profile_token }}"
+      register: ci_device_before
+      no_log: true
+      failed_when: false
+
+    - name: "Experiment: set deviceMetadata.additional.isNewPolicyObjectModel on the CI device"
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ ci_device_uid }}"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ profile_token }}"
+        body_format: json
+        body:
+          deviceMetadata:
+            additional:
+              isNewPolicyObjectModel: "true"
+        status_code: [200, 202, 204]
+      register: policy_model_patch
+      no_log: true
+      failed_when: false
+
+    - name: "Experiment: read the CI device after the switch"
+      ansible.builtin.uri:
+        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ ci_device_uid }}"
+        headers:
+          Authorization: "Bearer {{ profile_token }}"
+      register: ci_device_after
+      no_log: true
+      failed_when: false
+
+    - name: "Experiment: policy view switch results"
+      ansible.builtin.set_fact:
+        policy_model_experiment:
+          ci_device_uid: "{{ ci_device_uid }}"
+          ci_device_before: "{{ ci_device_before.json.deviceMetadata | default('absent') }}"
+          patch:
+            status: "{{ policy_model_patch.status | default('n/a') }}"
+            response: "{{ policy_model_patch.json | default(policy_model_patch.msg | default('')) }}"
+          ci_device_after: "{{ ci_device_after.json.deviceMetadata | default('absent') }}"
+
+    - name: "Experiment: show policy view switch results"
+      ansible.builtin.debug:
+        var: policy_model_experiment
+
+    - name: "Experiment: save policy view switch results for list_access_groups diagnostics"
+      ansible.builtin.copy:
+        content: "{{ policy_model_experiment | to_nice_json }}"
+        dest: "/tmp/ci_access_group_policy_model.json"
+        mode: "0600"
+
+    # Stop here if the PATCH did not stick: everything after it depends on the
+    # flag, and failing makes the results above visible in the pytest output.
+    - name: "Experiment: assert the CI device is now on the new policy view"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ci_device_after.json.deviceMetadata.additional.isNewPolicyObjectModel
+             | default('')) == 'true'
+        fail_msg: >-
+          The PATCH did not set deviceMetadata.additional.isNewPolicyObjectModel
+          on {{ ci_device_uid }}: {{ policy_model_experiment }}
+
+    - name: "Experiment: read the configuration under the new policy view"
+      cisco.sccfm.read_asa_config:
+        uids: ["{{ ci_device_uid }}"]
+        wait: true
+        timeout: 90
+
     # The API rejects script pushes against a NOT_SYNCED device, and the
     # suites that run before this one leave the vASA re-syncing.  Filtering
     # on configState makes the module report "No devices found" until the
-    # device is SYNCED, so retry only on that.  This wait plus the read below
+    # device is SYNCED, so retry only on that.  This wait plus the two reads
     # must stay well under the 300s playbook timeout in conftest.py.
     #
     # No "configure terminal"/"end": SCCFM applies scripts containing them
@@ -97,69 +185,13 @@
           {{ cli_result.results | items2dict(key_name='device_uid', value_name='result') }}
           (error_msg: {{ cli_result.results | map(attribute='error_msg') | list }})
 
-    # ── EXPERIMENT: switch the CI device to the new policy view ─────────
-    # no_log keeps the bearer token out of the output; only selected fields
-    # of the registered results are printed below.
-    - name: "Experiment: read the CI device before the switch"
-      ansible.builtin.uri:
-        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ cli_result.results[0].device_uid }}"
-        headers:
-          Authorization: "Bearer {{ profile_token }}"
-      register: ci_device_before
-      no_log: true
-      failed_when: false
-
-    - name: "Experiment: set deviceMetadata.additional.isNewPolicyObjectModel on the CI device"
-      ansible.builtin.uri:
-        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ cli_result.results[0].device_uid }}"
-        method: PATCH
-        headers:
-          Authorization: "Bearer {{ profile_token }}"
-        body_format: json
-        body:
-          deviceMetadata:
-            additional:
-              isNewPolicyObjectModel: "true"
-        status_code: [200, 202, 204]
-      register: policy_model_patch
-      no_log: true
-      failed_when: false
-
-    - name: "Experiment: read the CI device after the switch"
-      ansible.builtin.uri:
-        url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ cli_result.results[0].device_uid }}"
-        headers:
-          Authorization: "Bearer {{ profile_token }}"
-      register: ci_device_after
-      no_log: true
-      failed_when: false
-
-    - name: "Experiment: policy view switch results"
-      ansible.builtin.set_fact:
-        policy_model_experiment:
-          ci_device_before: "{{ ci_device_before.json.deviceMetadata | default('absent') }}"
-          patch:
-            status: "{{ policy_model_patch.status | default('n/a') }}"
-            response: "{{ policy_model_patch.json | default(policy_model_patch.msg | default('')) }}"
-          ci_device_after: "{{ ci_device_after.json.deviceMetadata | default('absent') }}"
-
-    - name: "Experiment: show policy view switch results"
-      ansible.builtin.debug:
-        var: policy_model_experiment
-
-    - name: "Experiment: save policy view switch results for list_access_groups diagnostics"
-      ansible.builtin.copy:
-        content: "{{ policy_model_experiment | to_nice_json }}"
-        dest: "/tmp/ci_access_group_policy_model.json"
-        mode: "0600"
-
     # SCCFM does not re-read the device after a CLI push: the ACL is on the
     # ASA but no access group appears until the configuration is read.
     - name: Read the ASA configuration into SCCFM
       cisco.sccfm.read_asa_config:
         uids: "{{ cli_result.results | map(attribute='device_uid') | list }}"
         wait: true
-        timeout: 120
+        timeout: 90
       register: read_result
 
     - name: Show the configuration read transaction
