@@ -361,3 +361,37 @@ def test_should_return_structured_error_on_api_exception(
     assert call_kwargs["error_code"] == "FORBIDDEN"
     assert call_kwargs["error_details"] == {"resource": "device"}
     assert call_kwargs["status_code"] == 403
+
+
+@pytest.mark.parametrize(
+    ("result_text", "error_msg"),
+    [
+        ("Command failed", None),
+        ("access-list ok\nERROR: % Invalid input detected at '^' marker.", None),
+        ("", "Device unreachable"),
+    ],
+)
+@patch("plugins.modules.execute_asa_cli.Config")
+@patch("plugins.modules.execute_asa_cli.AsaCommandLineService")
+@patch("plugins.modules.execute_asa_cli.AnsibleModule")
+def test_should_fail_when_a_device_reports_command_failure(
+    mock_ansible_module_class: MagicMock,
+    mock_cli_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    result_text: str,
+    error_msg: str | None,
+    mock_module_instance_uids: MagicMock,
+) -> None:
+    """A completed transaction with a per-device failure must fail the task."""
+    mock_ansible_module_class.return_value = mock_module_instance_uids
+    failing = CdoCliResult(uid="r-1", device_uid="dev-1", result=result_text, error_msg=error_msg)
+    mock_cli_service_class.return_value.execute_cli.return_value = [failing]
+
+    with pytest.raises(SystemExit):
+        execute_asa_cli.run_module()
+
+    mock_module_instance_uids.exit_json.assert_not_called()
+    call_kwargs = mock_module_instance_uids.fail_json.call_args[1]
+    assert call_kwargs["changed"] is True
+    assert call_kwargs["msg"] == "CLI commands failed on 1 of 1 device(s): dev-1"
+    assert call_kwargs["results"] == [failing.model_dump(mode="json")]

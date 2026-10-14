@@ -21,6 +21,7 @@ from cisco_sccfm_core.services.inventory import (
     AsaBootImageService,
     AsaBootRegistryService,
     AsaCommandLineService,
+    AsaConfigReadService,
     AsaDiskFileService,
     AsaHaCheckReport,
     AsaHaCheckService,
@@ -31,6 +32,7 @@ from cisco_sccfm_core.services.inventory import (
     FtdCommandLineService,
     InventoryService,
     ShunEntrySpec,
+    is_failed_cli_result,
 )
 from cisco_sccfm_core.services.object_management import (
     NetworkGroupListResponse,
@@ -75,6 +77,7 @@ __all__ = [
     "AsaBootImageService",
     "AsaBootRegistryService",
     "AsaCommandLineService",
+    "AsaConfigReadService",
     "AsaDiskFileService",
     "AsaHaCheckReport",
     "AsaHaCheckService",
@@ -87,6 +90,7 @@ __all__ = [
     "HealthService",
     "HealthStatus",
     "InventoryService",
+    "is_failed_cli_result",
     "NetworkGroupListResponse",
     "NetworkGroupMemberMutationResult",
     "NetworkGroupResponse",

@@ -47,10 +47,8 @@ def run(ctx: ProfileContext) -> None:
     # will succeed once the device has synced.
     teardown_script = "\n".join(
         [
-            "configure terminal",
             f"no access-group {TEST_ACL_NAME} global",
             f"clear configure access-list {TEST_ACL_NAME}",
-            "end",
         ]
     )
     run_cli(

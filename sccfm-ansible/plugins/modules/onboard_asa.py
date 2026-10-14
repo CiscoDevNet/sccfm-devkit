@@ -42,6 +42,15 @@ options:
     required: false
     type: bool
     default: false
+  new_policy_view:
+    description:
+      - Onboard the device on the New ASA Policy View, as the SCC Firewall
+        Manager UI does.
+      - Without it, M(cisco.sccfm.list_access_groups) does not list the
+        device's ACLs.
+    required: false
+    type: bool
+    default: false
   grouped_labels:
     description: Mapping of grouped labels to assign to the device.
     required: false
@@ -159,6 +168,7 @@ def build_argument_spec() -> dict[str, dict[str, str | bool | list[str]]]:
         },
         "connector_name": {"type": "str", "required": False},
         "ignore_certificate": {"type": "bool", "required": False, "default": False},
+        "new_policy_view": {"type": "bool", "required": False, "default": False},
         "grouped_labels": {"type": "dict", "required": False},
         "ungrouped_labels": {"type": "list", "elements": "str", "required": False},
         **base_argument_spec(),
@@ -215,7 +225,11 @@ def run_module() -> None:
                 device={},
             )
 
-        asa_device = _onboard_asa(config, asa_create_or_update_input)
+        asa_device = _onboard_asa(
+            config,
+            asa_create_or_update_input,
+            new_policy_view=bool(params.get("new_policy_view", False)),
+        )
         module.exit_json(changed=True, msg="Onboarded successfully", device=asa_device.to_dict())
     except ApiException as e:
         error = SccApiError.from_exception(e)
@@ -224,11 +238,14 @@ def run_module() -> None:
         module.fail_json(msg=f"Unexpected error: {str(e)}")
 
 
-def _onboard_asa(config: ConfigLike, asa_create_or_update_input: AsaCreateOrUpdateInput) -> Device:
+def _onboard_asa(
+    config: ConfigLike, asa_create_or_update_input: AsaCreateOrUpdateInput, *, new_policy_view: bool
+) -> Device:
     try:
         asa_onboard_service = AsaOnboardService(config=config)
         return asa_onboard_service.onboard_asa(
-            asa_create_or_update_input=asa_create_or_update_input
+            asa_create_or_update_input=asa_create_or_update_input,
+            new_policy_view=new_policy_view,
         )
     except Exception as e:
         raise e

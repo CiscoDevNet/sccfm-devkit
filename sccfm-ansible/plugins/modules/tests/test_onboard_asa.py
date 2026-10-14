@@ -252,3 +252,31 @@ def test_check_mode_should_report_would_onboard_when_device_does_not_exist(
     assert call_kwargs["changed"] is True
     assert "Would onboard" in call_kwargs["msg"]
     mock_onboard.onboard_asa.assert_not_called()
+
+
+@pytest.mark.parametrize("new_policy_view", [True, False])
+@patch("plugins.modules.onboard_asa.Config")
+@patch("plugins.modules.onboard_asa.AsaOnboardService")
+@patch("plugins.modules.onboard_asa.InventoryService")
+@patch("plugins.modules.onboard_asa.AnsibleModule")
+def test_should_pass_new_policy_view_to_onboard_service(
+    mock_ansible_module_class: MagicMock,
+    mock_inventory_service_class: MagicMock,
+    mock_asa_onboard_service_class: MagicMock,
+    _mock_config_class: MagicMock,
+    new_policy_view: bool,
+    mock_module_instance: MagicMock,
+    sample_device: Device,
+) -> None:
+    mock_module_instance.params["new_policy_view"] = new_policy_view
+    mock_ansible_module_class.return_value = mock_module_instance
+    mock_inventory_service_class.return_value.get_devices.return_value = DevicePage(
+        count=0, limit=1, offset=0, items=[]
+    )
+    mock_onboard = mock_asa_onboard_service_class.return_value
+    mock_onboard.onboard_asa.return_value = sample_device
+
+    with pytest.raises(SystemExit):
+        onboard_asa.run_module()
+
+    assert mock_onboard.onboard_asa.call_args.kwargs["new_policy_view"] is new_policy_view

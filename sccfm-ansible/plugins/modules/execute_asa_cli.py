@@ -15,6 +15,10 @@ description:
   - See the SCC Firewall Manager API documentation for
     U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/)
     query details.
+  - The module fails when SCC Firewall Manager reports a command failure on any
+    device, either as a per-device C(error_msg) or as C(Command failed) or
+    C(ERROR:) in the result. C(results) is still returned for every device; use
+    C(failed_when) to tolerate failures.
 options:
   query:
     description:
@@ -170,6 +174,7 @@ try:
         AsaCommandLineService,
         InventoryService,
         SccApiError,
+        is_failed_cli_result,
     )
     from cisco_sccfm_core.types import ConfigLike
 except ImportError as exc:
@@ -285,6 +290,21 @@ def run_module() -> None:
             )
 
         results_data = [result.model_dump(mode="json") for result in results]
+        failed_uids = [result.device_uid for result in results if is_failed_cli_result(result)]
+        if failed_uids:
+            # Commands before the failing line may have been applied, so changed=True.
+            module.fail_json(
+                changed=True,
+                msg=(
+                    f"CLI commands failed on {len(failed_uids)} of {len(results)} device(s): "
+                    f"{', '.join(failed_uids)}"
+                ),
+                command=command_script,
+                commands=commands,
+                device_count=len(device_uids),
+                results=results_data,
+            )
+
         module.exit_json(
             changed=True,
             msg=f"Successfully executed CLI commands on {len(device_uids)} device(s)",

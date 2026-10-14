@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import re
+
 from scc_firewall_manager_sdk import (
     CdoCliResult,
     CdoTransaction,
@@ -17,6 +19,19 @@ from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
 from cisco_sccfm_core.services.transaction_service import TransactionService
 from cisco_sccfm_core.types import ConfigLike
 from cisco_sccfm_core.utils import validate_uids
+
+# SCCFM reports "Command failed" as the whole result, and the ASA prefixes its
+# own rejections with "ERROR:" (e.g. "ERROR: % Invalid input detected").
+_FAILED_RESULT_RE = re.compile(r"(?im)^\s*(?:ERROR:|Command failed)")
+
+
+def is_failed_cli_result(result: CdoCliResult) -> bool:
+    """Return True if SCCFM reports the script as failed on this device.
+
+    A completed CLI transaction can still hold per-device failures: either an
+    ``error_msg`` or a failure marker in the ``result`` text.
+    """
+    return bool(result.error_msg) or bool(_FAILED_RESULT_RE.search(result.result or ""))
 
 
 class AsaCommandLineService:

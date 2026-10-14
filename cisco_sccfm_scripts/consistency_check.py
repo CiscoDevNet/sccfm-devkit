@@ -1072,6 +1072,7 @@ def _cli_expected_ansible_module(file: Path) -> Path | None:
             "list_not_on_version": "list_asa_not_on_version",
             "change_boot_image": "change_asa_boot_image",
             "onboard": "onboard_asa",
+            "read_config": "read_asa_config",
         }
         mapped_module = special.get(parts[3])
         return ANSIBLE_MODULES / f"{mapped_module}.py" if mapped_module else None
