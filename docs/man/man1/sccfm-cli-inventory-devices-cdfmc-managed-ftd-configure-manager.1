@@ -1,0 +1,39 @@
+.TH "SCCFM-CLI INVENTORY DEVICES CDFMC-MANAGED-FTD CONFIGURE-MANAGER" "1" "2026-06-19" "0.38.0" "sccfm-cli inventory devices cdfmc-managed-ftd configure-manager Manual"
+.SH NAME
+sccfm-cli\-inventory\-devices\-cdfmc-managed-ftd\-configure-manager \- Complete cdFMC-managed FTD onboarding by...
+.SH SYNOPSIS
+.B sccfm-cli inventory devices cdfmc-managed-ftd configure-manager
+[OPTIONS]
+.SH DESCRIPTION
+Complete cdFMC-managed FTD onboarding by SSHing into the FTD VM and running the 'configure manager add ...' command produced by 'onboard'. Only works if the FTD is reachable on its SSH port (--ftd-port, default 22) from this host, or from the jump host when --jump-host is set.
+.SH OPTIONS
+.TP
+\fB\-\-ftd\-host\fP TEXT
+Management IP address or hostname of the FTD VM.  [required]
+.TP
+\fB\-\-ftd\-port\fP INTEGER RANGE
+SSH port of the FTD VM.  [default: 22; 1<=x<=65535]
+.TP
+\fB\-\-ftd\-user\fP TEXT
+SSH username for the FTD VM.  [required]
+.TP
+\fB\-\-ftd\-password\fP TEXT
+SSH password for the FTD VM (or set SCCFM_FTD_PASSWORD; prompted if needed).
+.TP
+\fB\-\-cli\-key\fP TEXT
+The full 'configure manager add ...' string returned by 'onboard'.  [required]
+.TP
+\fB\-\-jump\-host\fP TEXT
+Optional bastion to tunnel through, as [user@]host[:port]. The FTD then sees the connection from the jump host's IP, so that IP must be on the FTD ssh-access-list.
+.TP
+\fB\-\-jump\-password\fP TEXT
+Password for the jump host (or set SCCFM_JUMP_PASSWORD). Prompted if omitted; leave blank to use SSH key/agent auth.
+.TP
+\fB\-\-ssh\-timeout\fP INTEGER RANGE
+SSH connect and read timeout in seconds.  [default: 30; x>=1]
+.TP
+\fB\-\-check\fP
+Only verify reachability of the FTD SSH port; do not send the command.
+.TP
+\fB\-\-format\fP [table|json]
+Output format  [default: table]

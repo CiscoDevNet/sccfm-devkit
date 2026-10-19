@@ -1,3 +1,12 @@
+## v0.38.0 (2026-06-19)
+
+### Feat
+
+- prepare sccfm for pypi publishing
+- add schema-driven sccfm-cli skill
+- **cdfmc-ftd**: add configure-manager to complete FTD registration over SSH
+- add cli schema export
+
 ## v0.37.0 (2026-06-04)
 
 ### Feat
