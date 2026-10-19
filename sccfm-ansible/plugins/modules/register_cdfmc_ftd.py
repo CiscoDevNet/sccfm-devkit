@@ -7,8 +7,8 @@ from __future__ import annotations
 from ansible.module_utils.basic import AnsibleModule
 from scc_firewall_manager_sdk import ApiException, Device
 
-from sccfm_core import SccApiError
-from sccfm_core.services.inventory import FtdRegisterService
+from cisco_sccfm_core import SccApiError
+from cisco_sccfm_core.services.inventory import FtdRegisterService
 
 from ..module_utils.config import Config, base_argument_spec, create_config
 
@@ -107,7 +107,6 @@ from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
-def build_argument_spec() -> dict:
     return {
         "ftd_uid": {"type": "str", "required": True},
         "skip_initial_deployment": {"type": "bool", "required": False, "default": False},
