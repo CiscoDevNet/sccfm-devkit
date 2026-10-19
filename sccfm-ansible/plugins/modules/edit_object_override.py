@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core.errors import SccApiError
-from sccfm_core.services.object_management import ObjectOverrideService
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: edit_object_override
@@ -41,21 +31,17 @@ options:
       For URL objects this should be the URL string.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -65,8 +51,7 @@ EXAMPLES = r"""
     uid: "abc-123-def"
     target_id: "70bde3c9-328c-4a4b-bdc9-a4d4042bf09a"
     override_value: "10.20.30.40"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Using module_defaults
 - name: Edit object overrides
@@ -74,8 +59,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Edit override
       cisco.sccfm.edit_object_override:
@@ -108,6 +92,27 @@ object_override:
       description: Total number of overrides on the object.
       type: int
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.object_management import ObjectOverrideService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
@@ -149,7 +154,10 @@ def run_module() -> None:
         )
         module.exit_json(
             changed=True,
-            msg=f"Successfully updated override for target '{target_id}' on object '{result.name}'.",
+            msg=(
+                f"Successfully updated override for target '{target_id}' "
+                f"on object '{result.name}'."
+            ),
             object_override=result.to_dict(),
         )
     except ValueError as e:

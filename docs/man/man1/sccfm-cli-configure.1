@@ -1,4 +1,4 @@
-.TH "SCCFM-CLI CONFIGURE" "1" "2026-06-19" "0.38.0" "sccfm-cli configure Manual"
+.TH "SCCFM-CLI CONFIGURE" "1" "2026-10-02" "0.43.1" "sccfm-cli configure Manual"
 .SH NAME
 sccfm-cli\-configure \- Configure API connectivity.
 .SH SYNOPSIS
@@ -15,4 +15,4 @@ Path to the configuration file (defaults to ~/.sccfm-cli/config.json).
 SCCFM region (int, us, eu, apj, au, uae, in, ci)  [required]
 .TP
 \fB\-\-api\-token\fP TEXT
-API token for the chosen region  [required]
+API token for the chosen region. Passing it directly is supported for compatibility but may expose it in process listings and shell history; prefer SCCFM_API_TOKEN or the hidden prompt.  [env var: SCCFM_API_TOKEN]

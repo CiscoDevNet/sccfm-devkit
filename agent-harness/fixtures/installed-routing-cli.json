@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "id": "installed-routing-cli",
+  "tier": "aspirational",
+  "skill": "sccfm-cli",
+  "modes": ["installed-plugin"],
+  "prompt": "Using sccfm-cli, list the ASA devices in my default profile and summarize the result.",
+  "expect": [
+    {"id": "schema-discovered", "type": "operation_called", "severity": "gate", "operation": "sccfm.schema.export"},
+    {"id": "cli-list-executed", "type": "operation_called", "severity": "gate", "operation": "sccfm.inventory.devices.asa.list"},
+    {"id": "ansible-module-list-not-used", "type": "operation_not_called", "severity": "gate", "operation": "ansible.module.list"},
+    {"id": "ansible-playbook-not-used", "type": "operation_not_called", "severity": "critical", "operation": "ansible.playbook.execute"}
+  ]
+}

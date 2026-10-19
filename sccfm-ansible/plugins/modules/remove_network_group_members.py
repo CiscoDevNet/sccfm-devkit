@@ -4,24 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core.errors import NotFoundError, SccApiError
-from sccfm_core.services.object_management import (
-    NetworkGroupMemberMutationResult,
-    NetworkGroupService,
-)
-
-from ..module_utils.config import (
-    Config,
-    base_argument_spec,
-    create_config,
-    identifier_argument_spec,
-)
-
 DOCUMENTATION = r"""
 ---
 module: remove_network_group_members
@@ -49,21 +31,17 @@ options:
     required: true
     type: list
     elements: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -74,8 +52,7 @@ EXAMPLES = r"""
     referenced_objects:
       - web-server-01
       - web-server-02
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Remove members by UID
 - name: Remove members from a network group by UID
@@ -91,8 +68,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Remove old web servers from group
       cisco.sccfm.remove_network_group_members:
@@ -133,6 +109,35 @@ network_group:
       description: UIDs of referenced objects in the group.
       type: list
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import NotFoundError, SccApiError
+    from cisco_sccfm_core.services.object_management import (
+        NetworkGroupMemberMutationResult,
+        NetworkGroupService,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import (
+    Config,
+    base_argument_spec,
+    create_config,
+    identifier_argument_spec,
+)
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:
@@ -183,7 +188,10 @@ def run_module() -> None:
                 )
             module.exit_json(
                 changed=False,
-                msg=f"Network group '{result.network_group.name}' already excludes all requested members.",
+                msg=(
+                    f"Network group '{result.network_group.name}' already excludes all "
+                    "requested members."
+                ),
                 network_group=result.network_group.to_dict(),
             )
             return
@@ -191,14 +199,20 @@ def run_module() -> None:
         if result.changed:
             module.exit_json(
                 changed=True,
-                msg=f"Successfully removed members from network group '{result.network_group.name}'.",
+                msg=(
+                    "Successfully removed members from network group "
+                    f"'{result.network_group.name}'."
+                ),
                 network_group=result.network_group.to_dict(),
             )
             return
 
         module.exit_json(
             changed=False,
-            msg=f"Network group '{result.network_group.name}' already excludes all requested members.",
+            msg=(
+                f"Network group '{result.network_group.name}' already excludes all "
+                "requested members."
+            ),
             network_group=result.network_group.to_dict(),
         )
     except NotFoundError as e:

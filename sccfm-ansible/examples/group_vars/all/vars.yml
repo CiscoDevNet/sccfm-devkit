@@ -2,9 +2,6 @@
 # Plain variables (not sensitive)
 # These can be committed to version control
 
-# SCCFM connection settings
-sccfm_region: int
-
 # Common ASA configuration
 default_asa_username: asavuser
 default_ignore_certificate: true

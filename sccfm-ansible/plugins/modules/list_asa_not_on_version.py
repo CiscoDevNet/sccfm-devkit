@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-import re
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, Device, DevicePage
-
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-
-from ..module_utils.config import base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_asa_not_on_version
@@ -63,21 +53,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -85,8 +71,7 @@ EXAMPLES = r"""
 - name: Find ASAs not on 9.20(3)13
   cisco.sccfm.list_asa_not_on_version:
     version: "9.20(3)13"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show devices that need upgrading
@@ -116,8 +101,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Find ASAs not on target version
       cisco.sccfm.list_asa_not_on_version:
@@ -164,6 +148,27 @@ matched_device_count:
   returned: success
   type: int
 """
+
+
+import re
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device, DevicePage
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 _VERSION_RE = re.compile(r"^\d+\.\d+")
 

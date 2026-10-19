@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
-
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaCommandLineService, InventoryService, SccApiError
-from sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: execute_asa_cli
@@ -22,7 +12,9 @@ description:
   - Execute CLI commands on one or more ASA devices managed by SCC Firewall Manager.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
   - The query uses the same syntax as the Get Devices API.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/) for query documentation.
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/)
+    query details.
 options:
   query:
     description:
@@ -66,21 +58,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -91,8 +79,7 @@ EXAMPLES = r"""
     commands:
       - "show version"
       - "show running-config"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: cli_results
 
 # Example 2: Execute commands on specific devices by UID
@@ -111,8 +98,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Show version on branch ASAs
       cisco.sccfm.execute_asa_cli:
@@ -168,6 +154,32 @@ results:
       description: The UID of the CLI result.
       type: str
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaCommandLineService,
+        InventoryService,
+        SccApiError,
+    )
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

@@ -4,18 +4,6 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
-
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaCommandLineService, InventoryService, SccApiError
-from sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
-from sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_asa_local_users
@@ -49,21 +37,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -76,16 +60,14 @@ EXAMPLES = r"""
 - name: List local users using a query
   cisco.sccfm.list_asa_local_users:
     query: "name:branch-* AND connectivityState:ONLINE"
-    region: "us"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 - name: List local users with shared auth
   hosts: localhost
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List local users on branch ASAs
       cisco.sccfm.list_asa_local_users:
@@ -123,6 +105,34 @@ asa_local_users_json:
   returned: success
   type: str
 """
+
+
+import json
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaCommandLineService,
+        InventoryService,
+        SccApiError,
+    )
+    from cisco_sccfm_core.parsers import normalize_cli_output, parse_cli_table, rows_to_dicts
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

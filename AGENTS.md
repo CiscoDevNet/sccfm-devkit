@@ -1,6 +1,6 @@
 # sccfm-devkit
 
-Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python CLI (`sccfm-cli`) plus a `cisco.sccfm` Ansible collection. Shared business logic lives in `sccfm_core`; the CLI entry points are in `sccfm_cli`; Ansible plugins are in `sccfm-ansible/`.
+Toolkit for interacting with SCC Firewall Manager (SCCFM): a Python CLI (`sccfm-cli`) plus a `cisco.sccfm` Ansible collection. Shared business logic lives in `cisco_sccfm_core`; the CLI entry points are in `cisco_sccfm_cli`; Ansible plugins are in `sccfm-ansible/`.
 
 ## Agent skills (read these FIRST)
 
@@ -14,11 +14,11 @@ This repository ships skill files that document how to interact with the CLI and
 
 ## Dev environment tips
 
-- **Python version**: Use Python 3.12 (managed by pyenv; `scripts/setup_environment.sh` installs it automatically).
+- **Python version**: Use Python 3.12 (managed by pyenv; `cisco_sccfm_scripts/setup_environment.sh` installs it automatically).
 - **Virtual env**:
   ```bash
-  scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps, pre-commit hooks
-  source scripts/activate.sh     # activates the project virtualenv
+  cisco_sccfm_scripts/setup_environment.sh   # installs pyenv, Python 3.12.4, Poetry deps, pre-commit hooks
+  source cisco_sccfm_scripts/activate.sh     # activates the project virtualenv
   ```
 - **direnv (recommended)**: Install direnv so the venv activates automatically on `cd`:
   ```bash
@@ -39,17 +39,17 @@ This repository ships skill files that document how to interact with the CLI and
 - Use `questionary` for user prompts.
 - Add virtualenv scripts.
 - **Type hints are mandatory.** Every function and method must be fully typed. `mypy --strict` is enforced.
-- **No long methods.** The code should be structured so it can be easily extended. Use the command pattern for each command; one file per command under `sccfm_cli/commands/`.
-- Each external library (e.g., the `scc-firewall-manager-sdk`) must be isolated in a separate services directory under `sccfm_core/services/`, not in CLI or Ansible modules directly.
+- **No long methods.** The code should be structured so it can be easily extended. Use the command pattern for each command; one file per command under `cisco_sccfm_cli/commands/`.
+- Each external library (e.g., the `scc-firewall-manager-sdk`) must be isolated in a separate services directory under `cisco_sccfm_core/services/`, not in CLI or Ansible modules directly.
 - Humans will be extending this code; do not generate AI slop.
 
 ### Quick run examples
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 
 # Configure credentials once
-sccfm-cli configure --region us --api-token <YOUR_TOKEN>
+sccfm-cli configure --region us  # securely prompts for the token
 
 # Check connectivity
 sccfm-cli status
@@ -58,31 +58,31 @@ sccfm-cli status
 sccfm-cli inventory devices list --format table
 
 # Interactive developer menu (test, lint, format, build collection, etc.)
-devkit
+sccfm-devkit
 ```
 
-## Required environment variables
+## Credential configuration
 
-Copy `.env.example` to `.env` and fill in your values (loaded automatically by direnv):
+The only SCCFM token configuration source is the named profile store:
 
 ```bash
-export SCCFM_REGION=us          # int | us | eu | apj | au | uae | in | ci
-export SCCFM_API_TOKEN="..."    # from SCCFM UI > Settings > API Tokens
+sccfm-cli --profile default configure --region us
 ```
 
-Credentials are also stored under `~/.sccfm-cli/` after running `sccfm-cli configure`. Override the path with `--config-path` or `SCCFM_CONFIG`.
+Profiles are stored in `~/.sccfm-cli/config.json` with owner-only POSIX permissions or inherited Windows user-profile ACLs. Override the path with `--config-path` or `SCCFM_CONFIG`. Do not configure SCCFM tokens through `.env`, inline Ansible parameters, or Ansible Vault. Vault remains appropriate for Ansible-specific device secrets.
 
 ## Testing instructions
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 pytest                          # full unit test suite
 pytest -k "test_inventory"      # filter by name
 coverage run -m pytest && coverage report
 ```
 
-- Unit tests live alongside source: `sccfm_cli/tests/`, `sccfm_core/tests/`, `sccfm-ansible/` (excluding `e2e/`).
-- Tests marked `ci` require a live SCCFM tenant and run only in CI.
+- Unit tests live alongside source: `cisco_sccfm_cli/tests/`, `cisco_sccfm_core/tests/`, `sccfm-ansible/` (excluding `e2e/`).
+- Tests marked `ci` require a live SCCFM tenant and are excluded from the ordinary offline suite;
+  run them explicitly in CI or locally with suitable sandbox credentials.
 - **Test the CLI against a real SCCFM tenant** using a DevNet sandbox:
   Visit [https://devnetsandbox.cisco.com/DevNet](https://devnetsandbox.cisco.com/DevNet) to book a related sandbox.
 
@@ -98,11 +98,15 @@ No MCP servers are currently configured for this project. Skill files under `ski
 ### Ansible collection
 
 ```bash
-# Build and install locally
+# Build and verify the collection artifact
 build-ansible-collection
 
-# Set up tokens and vault
-devkit   # select "change-tokens"
+# Install the exact artifact that was just built
+ansible-galaxy collection install \
+  "dist/cisco-sccfm-$(poetry version --short).tar.gz" --force
+
+# Configure or select profiles interactively
+sccfm-cli-interactive
 
 # Verify inventory plugin
 ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph
@@ -111,7 +115,10 @@ ansible-inventory -i sccfm-ansible/examples/inventory.sccfm.yml --graph
 ansible-playbook -i sccfm-ansible/examples/inventory.sccfm.yml sccfm-ansible/examples/show_devices.yml
 ```
 
-Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_collections.cisco.sccfm` imports.
+Ansible discovers its default collection install directory automatically. For a custom install,
+pass `--collections-path <root>` to `ansible-galaxy` and set `ANSIBLE_COLLECTIONS_PATH` to that
+same root. Point IDEs and `MYPYPATH` at the installed root as needed; do not use the raw
+`sccfm-ansible` source directory as a collection path.
 
 ## PR instructions
 
@@ -119,12 +126,12 @@ Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_
 - **Conventional commits** are enforced via Commitizen and pre-commit hooks:
   ```bash
   pre-commit install && pre-commit install --hook-type commit-msg
-  git cz    # or: ./scripts/cz.sh commit
+  git cz    # or: ./cisco_sccfm_scripts/cz.sh commit
   ```
   CI will fail on non-compliant commit messages.
-- **Security**: Never commit real credentials, tokens, or secrets. Use placeholders and document required env vars. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
-- New commands go in `sccfm_cli/commands/` as a `BaseCommand` subclass, registered in `sccfm_cli/cli.py`.
-- New SDK integrations go in `sccfm_core/services/`.
+- **Security**: Never commit real credentials, tokens, or secrets. Use placeholders and document the canonical profile flow. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+- New commands go in `cisco_sccfm_cli/commands/` as a `BaseCommand` subclass, registered in `cisco_sccfm_cli/cli.py`.
+- New SDK integrations go in `cisco_sccfm_core/services/`.
 - Every behavior change must be accompanied by tests.
 
 ## Contribution conventions
@@ -138,5 +145,5 @@ Add `sccfm-ansible` to `ANSIBLE_COLLECTIONS_PATH` so IDE/mypy resolves `ansible_
   #
   # SPDX-License-Identifier: Apache-2.0
   ```
-- **Secrets**: never read or commit `.env`, `.env.*`, `.vault_pass`, or real `vault.yml` files — use the `*.example` templates. Keep tracked `.envrc` files secret-free. `gitleaks` and `detect-private-key` block secrets in pre-commit.
+- **Secrets**: never read or commit `.vault_pass`, real `vault.yml` files, or SCCFM profile files. Use the `*.example` vault templates for Ansible-specific secrets. Keep tracked `.envrc` files secret-free. `gitleaks` and `detect-private-key` block secrets in pre-commit.
 - See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide.

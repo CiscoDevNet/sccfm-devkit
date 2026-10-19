@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core import SccApiError
-from sccfm_core.services.inventory.cdfmc_access_policy_service import CdfmcAccessPolicyService
-
-from ..module_utils.config import base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_cdfmc_access_policies
@@ -38,21 +28,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -60,8 +46,7 @@ EXAMPLES = r"""
 - name: List cdFMC access policies
   cisco.sccfm.list_cdfmc_access_policies:
     domain_uid: "e276abec-e0f2-11e3-8169-6d9ed49b625f"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show access policies
@@ -74,8 +59,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List access policies for a domain
       cisco.sccfm.list_cdfmc_access_policies:
@@ -110,6 +94,29 @@ offset:
   returned: success
   type: int
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core import SccApiError
+    from cisco_sccfm_core.services.inventory.cdfmc_access_policy_service import (
+        CdfmcAccessPolicyService,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

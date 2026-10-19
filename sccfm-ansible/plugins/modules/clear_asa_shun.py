@@ -4,15 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
-
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaShunService, InventoryService, SccApiError
-
-from ..module_utils.config import base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: clear_asa_shun
@@ -22,7 +13,8 @@ description:
     ASA devices managed by SCC Firewall Manager.
   - Executes C(clear shun) on the target devices.
   - Devices can be selected by a Lucene query or by specifying a list of UIDs.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/).
     for API documentation.
 options:
   query:
@@ -53,21 +45,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -75,8 +63,7 @@ EXAMPLES = r"""
 - name: Clear all shuns on production ASAs
   cisco.sccfm.clear_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Clear shuns on specific devices by UID
 - name: Clear shuns on specific ASA
@@ -90,8 +77,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Clear all shuns on online ASAs
       cisco.sccfm.clear_asa_shun:
@@ -118,6 +104,31 @@ results:
       description: The script that was executed.
       type: str
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoCliResult, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaShunService,
+        InventoryService,
+        SccApiError,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

@@ -1,8 +1,7 @@
 # Installation
 
-These are instructions to install the latest CLI and Python library from PyPI, plus the
-Ansible collection from GitHub releases. Eventually, the `cisco.sccfm` collection will be
-available on Ansible Galaxy.
+These are instructions to install the CLI and Python library from PyPI, plus the matching
+`cisco.sccfm` collection from Ansible Galaxy or a GitHub release.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -18,17 +17,17 @@ available on Ansible Galaxy.
   - [Enable shell completion](#enable-shell-completion)
 - [Using the Python library](#using-the-python-library)
 - [Installing the Ansible collection](#installing-the-ansible-collection)
-  - [Download the Ansible collection Bundle.](#download-the-ansible-collection-bundle)
-  - [Install Ansible Collection](#install-ansible-collection)
+  - [Install a matched release](#install-a-matched-release)
+  - [Install downloaded release artifacts](#install-downloaded-release-artifacts)
   - [Verify installation](#verify-installation)
-  - [Try out examples](#try-out-examples)
+  - [Authentication and examples](#authentication-and-examples)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Installing the CLI
 
-Follow these steps to install the `sccfm` Python package, which provides the `sccfm-cli`
-command and the `sccfm_core` Python library.
+Follow these steps to install the `cisco-sccfm-devkit` Python package, which provides the
+`sccfm-cli` and `sccfm-cli-interactive` commands and the `cisco_sccfm_core` Python library.
 
 ### Prerequisites
 
@@ -48,18 +47,37 @@ pyenv global 3.12
 ### Install with pipx
 
 `pipx` is the recommended install method for the CLI. It keeps the Python environment
-isolated while exposing `sccfm-cli` on your `PATH`.
+isolated while exposing `sccfm-cli` and `sccfm-cli-interactive` on your `PATH`.
 
 ```bash
-pipx install sccfm
+pipx install cisco-sccfm-devkit
 ```
+
+For an explicitly requested CLI-only installation on macOS or Linux, Homebrew
+is also supported:
+
+```bash
+brew tap CiscoDevNet/tap
+brew trust --formula CiscoDevNet/tap/sccfm-cli  # required once on Homebrew 6.0+
+brew install CiscoDevNet/tap/sccfm-cli
+```
+
+Homebrew releases earlier than 6.0 do not provide `brew trust`; omit that line
+there. Formula-specific trust avoids trusting every current and future item in
+the third-party tap.
+
+The Homebrew formula installs the CLI and Python library, but not the
+`cisco.sccfm` Ansible collection by itself. The agent plugin's setup skill can
+keep this CLI and add a private, version-matched Ansible companion under
+`~/.sccfm-agent-plugin/ansible-runtime`; that directory is not added to `PATH`,
+so the Homebrew CLI remains authoritative.
 
 ### Install with pip
 
 Use `pip` when you are installing into an existing virtual environment:
 
 ```bash
-python -m pip install sccfm
+python -m pip install cisco-sccfm-devkit
 ```
 
 ### Install from GitHub Releases
@@ -68,11 +86,12 @@ If you need an exact release artifact before PyPI is available, install the whee
 GitHub Releases:
 
 1. Navigate to the [GitHub Releases](https://github.com/CiscoDevNet/sccfm-devkit/releases) page for this project.
-2. Download the latest wheel asset named like `sccfm-<version>-py3-none-any.whl` to your local machine.
+2. Download the latest wheel asset named like
+   `cisco_sccfm_devkit-<version>-py3-none-any.whl` to your local machine.
 3. Install the downloaded wheel:
 
 ```bash
-pipx install /path/to/sccfm-<version>-py3-none-any.whl
+pipx install /path/to/cisco_sccfm_devkit-<version>-py3-none-any.whl
 ```
 
 ### Install CLI man pages
@@ -81,7 +100,7 @@ Unix-style man pages are generated from the Click command metadata. If you are w
 from the repository, install or refresh them locally with:
 
 ```bash
-source scripts/activate.sh
+source cisco_sccfm_scripts/activate.sh
 install-cli-man-docs
 ```
 
@@ -129,63 +148,83 @@ After sourcing, tab completion will work for all `sccfm` commands and options.
 
 ## Using the Python library
 
-The same PyPI package exposes the typed `sccfm_core` library for Python automation:
+The same PyPI package exposes the typed `cisco_sccfm_core` library for Python automation:
 
 ```python
-from dataclasses import dataclass
+from cisco_sccfm_core import InventoryService
+from cisco_sccfm_core.services import ProfileService
 
-from sccfm_core import InventoryService
+profile = ProfileService().load("default")
+if profile is None:
+    raise RuntimeError("Configure the default profile with sccfm-cli configure")
 
-
-@dataclass(frozen=True)
-class Config:
-    region: str
-    api_token: str
-
-
-inventory = InventoryService(Config(region="us", api_token="..."))
+inventory = InventoryService(profile)
 devices = inventory.get_devices(limit=10, offset=0, query=None)
 ```
 
 The generated `scc-firewall-manager-sdk` remains the low-level SDK dependency.
-`sccfm_core` is the higher-level library used by the CLI and Ansible collection.
+`cisco_sccfm_core` is the higher-level library used by the CLI and Ansible collection.
 
 ## Installing the Ansible collection
 
-> ⚠️ Before you do this, make sure you've installed the sccfm-cli following the instructions in the section above.
+Installing the CLI with `pipx` is not sufficient for Ansible because pipx keeps that package in an
+isolated environment. The collection imports `cisco_sccfm_core` from `cisco-sccfm-devkit`, so the
+Python package must be installed in the Python environment that executes the Ansible modules.
 
-### Download the Ansible collection Bundle.
+### Install a matched release
 
-1. Navigate to the [GitHub Releases](https://github.com/CiscoDevNet/sccfm-devkit/releases) page for this project.
-2. Download the latest tar.gz asset, named like `cisco-sccfm-<version>.tar.gz`, to your local machine.
+Use Python `>=3.12,<4.0` and `ansible-core>=2.20,<2.22`. Replace `X.Y.Z` with a version published
+on both PyPI and Ansible Galaxy, and install both artifacts at that exact version:
 
-### Install Ansible Collection
 ```bash
-ansible-galaxy collection install /path/to/cisco-sccfm-{version}.tar.gz
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install "ansible-core>=2.20,<2.22" "cisco-sccfm-devkit==X.Y.Z"
+ansible-galaxy collection install "cisco.sccfm:==X.Y.Z"
+```
+
+Upgrade or roll back the Python package and collection together. Mixing release versions is
+unsupported.
+
+### Install downloaded release artifacts
+
+To install release artifacts directly, download the wheel and same-version collection tarball from
+[GitHub Releases](https://github.com/CiscoDevNet/sccfm-devkit/releases), then install both into the
+Ansible environment:
+
+```bash
+python -m pip install /path/to/cisco_sccfm_devkit-X.Y.Z-py3-none-any.whl
+ansible-galaxy collection install /path/to/cisco-sccfm-X.Y.Z.tar.gz --force
 ```
 
 ### Verify installation
 
 ```bash
-python -c "import sccfm_core; print('Python package installed')"
-ansible-galaxy collection list | grep cisco.sccfm
+python -c 'from importlib.metadata import version; print(version("cisco-sccfm-devkit"))'
+python -m pip check
+ansible-galaxy collection list cisco.sccfm
+ansible-doc -l -t module cisco.sccfm
+ansible-doc -t inventory cisco.sccfm.sccfm
 ```
 
-### Try out examples
+The Python and collection versions printed above must be identical.
 
-The fastest way to get going is to use the interactive devkit menu:
+### Authentication and examples
+
+The fastest way to get going is to use the interactive CLI menu:
 
 ```bash
-devkit
-# select "change-tokens" from the menu
+sccfm-cli-interactive
+# select "configure-profile" from the menu
 ```
 
-Or run the token setup directly:
+Or configure the canonical profile directly:
 
 ```bash
-change-tokens
+sccfm-cli configure --region us  # securely prompts for the token
 ```
 
-This will prompt for your region, API token, and vault password, then create all the required files (.env, vars.yml, vault.yml).
+The profile is shared by `sccfm-cli`, `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection. Ansible Vault remains available separately for managed-device passwords and other playbook-specific secrets.
 
-See the [Trying out examples](sccfm-ansible/README.md#trying-out-examples) section in the Ansible collection README for the full walkthrough including how to run playbooks.
+See [Trying out examples in the Ansible collection README](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/sccfm-ansible/README.md#trying-out-examples) for the full walkthrough, including how to run playbooks.

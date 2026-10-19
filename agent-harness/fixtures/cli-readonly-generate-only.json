@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "id": "cli-readonly-generate-only",
+  "tier": "aspirational",
+  "skill": "sccfm-cli",
+  "prompt": "Show me the exact sccfm-cli command to list ASA devices from the default profile. Do not run the device list; I will run it myself.",
+  "expect": [
+    {"id": "schema-discovered", "type": "operation_called", "severity": "gate", "operation": "sccfm.schema.export"},
+    {"id": "business-command-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.inventory.devices.asa.list"},
+    {"id": "exact-command-returned", "type": "response_pattern", "severity": "gate", "pattern": "sccfm-cli(?:\\s+--profile\\s+default)?\\s+inventory devices asa list"}
+  ]
+}

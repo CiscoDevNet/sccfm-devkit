@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,8 +49,7 @@ def mock_module_instance() -> MagicMock:
         "uid": None,
         "name": "test-network-group",
         "referenced_objects": ["ref-uid-002"],
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
     mock_module.check_mode = False
     mock_module.exit_json.side_effect = SystemExit(0)

@@ -5,8 +5,8 @@
 # "configure manager add ..." command (the cli_key) produced by onboarding,
 # which tells the FTD to phone home to the cdFMC and register.
 #
-# Unlike the other modules, configure_manager talks directly to the device over
-# SSH, so it does NOT use region/api_token. It needs the FTD's SSH credentials
+# Unlike the SCCFM API modules, configure_manager talks directly to the device
+# over SSH, so it does not use an SCCFM profile. It needs the FTD's SSH credentials
 # (and, optionally, a jump host) instead. Keep device passwords in vault.
 #
 # Only works if the FTD is reachable on its SSH port (ftd_port, default 22) from

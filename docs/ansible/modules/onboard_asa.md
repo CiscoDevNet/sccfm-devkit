@@ -17,13 +17,10 @@ $ ansible-doc -t module cisco.sccfm.onboard_asa
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - connector_name  Name of the Secure Device Connector (SDC) to use
                    (required when connector_type is SDC).
@@ -50,14 +47,10 @@ OPTIONS (= indicates it is required):
         type: str
 
 = password  Password used to authenticate with the device.
-        no_log: true
         type: str
 
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
-        default: null
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
         type: str
 
 - ungrouped_labels  List of free-form labels to assign to the device.
@@ -68,7 +61,7 @@ OPTIONS (= indicates it is required):
 = username  Username used to authenticate with the device.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Using module_defaults (recommended)
@@ -76,8 +69,7 @@ EXAMPLES:
   hosts: all
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Onboard branch-asa-1
       cisco.sccfm.onboard_asa:
@@ -103,10 +95,9 @@ EXAMPLES:
     password: "{{ vault_asa_password }}"
     connector_type: SDC
     connector_name: branch-sdc-1
-    region: us
-    api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+    profile: default
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Onboard branch-asa-1
   cisco.sccfm.onboard_asa:
     name: branch-asa-1

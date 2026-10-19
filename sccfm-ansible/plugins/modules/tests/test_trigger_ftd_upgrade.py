@@ -19,7 +19,7 @@ from scc_firewall_manager_sdk import (
     FtdVersion,
 )
 
-from sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
+from cisco_sccfm_core.models.ftd_upgrade_version import FtdGroupCompatibleVersions
 
 
 def _make_device(
@@ -98,8 +98,7 @@ def base_params() -> dict[str, Any]:
         "upgrade_name": None,
         "wait": False,
         "timeout": 3600,
-        "region": "us",
-        "api_token": "test-token",
+        "profile": "default",
     }
 
 

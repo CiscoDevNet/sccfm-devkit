@@ -18,8 +18,8 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.constants import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER
-from sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
+from cisco_sccfm_core.constants import CDFMC_MANAGED_FTD_DEVICE_TYPE_FILTER
+from cisco_sccfm_core.models.ftd_cli_result import FtdBulkCliResult, FtdDeviceCliResponse
 
 FMC_UID = "09590f30-8cb7-11f0-a508-8e9f8a6273f4"
 SCC_UID = "d4e5f6a7-b8c9-0123-def4-567890abcdef"
@@ -62,8 +62,7 @@ def base_module_params_with_query() -> dict[str, Any]:
         "commands": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -76,8 +75,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
         "commands": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -268,40 +266,6 @@ def test_should_fail_on_api_exception(
         execute_ftd_cli.run_module()
 
     mock_module_instance_query.fail_json.assert_called_once()
-
-
-@patch("plugins.modules.execute_ftd_cli.AnsibleModule")
-def test_should_fail_if_region_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance_query: MagicMock,
-) -> None:
-    del mock_module_instance_query.params["region"]
-    mock_ansible_module_class.return_value = mock_module_instance_query
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            execute_ftd_cli.run_module()
-
-    mock_module_instance_query.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
-    assert "region is required" in call_kwargs["msg"]
-
-
-@patch("plugins.modules.execute_ftd_cli.AnsibleModule")
-def test_should_fail_if_api_token_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance_query: MagicMock,
-) -> None:
-    del mock_module_instance_query.params["api_token"]
-    mock_ansible_module_class.return_value = mock_module_instance_query
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            execute_ftd_cli.run_module()
-
-    mock_module_instance_query.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance_query.fail_json.call_args[1]
-    assert "api_token is required" in call_kwargs["msg"]
 
 
 @patch("plugins.modules.execute_ftd_cli.Config")

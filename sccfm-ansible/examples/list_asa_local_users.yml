@@ -3,8 +3,7 @@
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get list of ASA local users for UIDs
       cisco.sccfm.list_asa_local_users:

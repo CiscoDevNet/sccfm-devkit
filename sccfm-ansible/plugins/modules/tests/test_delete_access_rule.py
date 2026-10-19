@@ -10,15 +10,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 from plugins.modules import delete_access_rule  # noqa: E402
 
-from sccfm_core.errors import NotFoundError
+from cisco_sccfm_core.errors import NotFoundError
 
 
 @pytest.fixture
 def base_module_params() -> dict[str, Any]:
     return {
         "uid": "rule-uid-123",
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -135,5 +134,5 @@ def test_build_argument_spec() -> None:
     """build_argument_spec should include required keys."""
     spec = delete_access_rule.build_argument_spec()
     assert "uid" in spec
-    assert "region" in spec
-    assert "api_token" in spec
+    assert "profile" in spec
+    assert "config_path" in spec

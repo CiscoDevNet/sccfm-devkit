@@ -21,19 +21,16 @@ $ ansible-doc -t module cisco.sccfm.show_asa_shun
   instead and returns per-interface shun/received counters.
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/execute-cli-command/.
   for API documentation.
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
@@ -45,16 +42,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -69,15 +63,14 @@ OPTIONS (= indicates it is required):
         elements: str
         type: list
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Show shun entries on devices matching a query
 - name: Show shun entries on production ASAs
   cisco.sccfm.show_asa_shun:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: shun_entries
 
 # Example 2: Show shun entries on specific devices by UID
@@ -100,8 +93,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Show shun entries
       cisco.sccfm.show_asa_shun:

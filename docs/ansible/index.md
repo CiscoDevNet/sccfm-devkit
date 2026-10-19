@@ -13,6 +13,10 @@ Generated from `ansible-doc` output.
 
 - [cisco.sccfm.sccfm](inventory/sccfm.html)
 
+## Lookup Plugins
+
+- [cisco.sccfm.profile](lookup/profile.html)
+
 ## Modules
 
 - [cisco.sccfm.add_asa_shun](modules/add_asa_shun.html)
@@ -54,6 +58,7 @@ Generated from `ansible-doc` output.
 - [cisco.sccfm.onboard_asa](modules/onboard_asa.html)
 - [cisco.sccfm.onboard_cdfmc_ftd](modules/onboard_cdfmc_ftd.html)
 - [cisco.sccfm.onboard_cdfmc_ftd_ztp](modules/onboard_cdfmc_ftd_ztp.html)
+- [cisco.sccfm.register_cdfmc_ftd](modules/register_cdfmc_ftd.html)
 - [cisco.sccfm.remove_asa_shun](modules/remove_asa_shun.html)
 - [cisco.sccfm.remove_network_group_members](modules/remove_network_group_members.html)
 - [cisco.sccfm.show_asa_shun](modules/show_asa_shun.html)

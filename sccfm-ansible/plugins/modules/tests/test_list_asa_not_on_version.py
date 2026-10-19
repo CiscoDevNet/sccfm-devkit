@@ -58,8 +58,7 @@ def base_params() -> dict[str, Any]:
         "uids": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -465,41 +464,3 @@ def test_never_reports_changed(
 
 
 # ── Auth validation ───────────────────────────────────────────────
-
-
-@patch("plugins.modules.list_asa_not_on_version.AnsibleModule")
-def test_fails_if_region_not_provided(
-    mock_ansible_cls: MagicMock,
-    base_params: dict[str, Any],
-) -> None:
-    """fail_json is called when region is absent and not in env."""
-    params = {**base_params}
-    del params["region"]
-    mock_module = _mock_module(params)
-    mock_ansible_cls.return_value = mock_module
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            list_asa_not_on_version.run_module()
-
-    mock_module.fail_json.assert_called_once()
-    assert "region is required" in mock_module.fail_json.call_args[1]["msg"]
-
-
-@patch("plugins.modules.list_asa_not_on_version.AnsibleModule")
-def test_fails_if_api_token_not_provided(
-    mock_ansible_cls: MagicMock,
-    base_params: dict[str, Any],
-) -> None:
-    """fail_json is called when api_token is absent and not in env."""
-    params = {**base_params}
-    del params["api_token"]
-    mock_module = _mock_module(params)
-    mock_ansible_cls.return_value = mock_module
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            list_asa_not_on_version.run_module()
-
-    mock_module.fail_json.assert_called_once()
-    assert "api_token is required" in mock_module.fail_json.call_args[1]["msg"]

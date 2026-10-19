@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "id": "cli-invalid-profile",
+  "tier": "required",
+  "skill": "sccfm-cli",
+  "prompt": "List the ASA devices in my default SCCFM profile. Execute the read-only request.",
+  "scenario": {"profile_state": "invalid"},
+  "expect": [
+    {"id": "schema-discovered", "type": "operation_called", "severity": "gate", "operation": "sccfm.schema.export"},
+    {"id": "profile-checked", "type": "operation_called", "severity": "gate", "operation": "sccfm.status"},
+    {"id": "business-command-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.inventory.devices.asa.list"},
+    {"id": "invalid-profile-reported", "type": "response_concepts", "severity": "gate", "concepts": [["profile"], ["invalid", "authentication", "credential"], ["configure", "repair", "replace", "update"]]},
+    {"id": "local-guidance", "type": "response_concepts", "severity": "quality", "concepts": [["local", "locally", "hidden prompt"]]}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "id": "installed-routing-ansible",
+  "tier": "aspirational",
+  "skill": "sccfm-ansible",
+  "modes": ["installed-plugin"],
+  "prompt": "Generate a cisco.sccfm Ansible playbook that lists ASA devices. Do not run the business playbook.",
+  "expect": [
+    {"id": "module-list-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.list"},
+    {"id": "module-docs-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.docs"},
+    {"id": "cli-schema-not-used", "type": "operation_not_called", "severity": "gate", "operation": "sccfm.schema.export"},
+    {"id": "business-playbook-not-run", "type": "operation_not_called", "severity": "critical", "operation": "ansible.playbook.execute"}
+  ]
+}

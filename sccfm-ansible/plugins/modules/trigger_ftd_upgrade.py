@@ -4,30 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    CdoTransaction,
-    DevicePage,
-    EntityType,
-)
-
-from sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
-from sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
-from sccfm_core.services.inventory import (
-    FtdUpgradeService,
-    FtdUpgradeVersionService,
-    resolve_upgrade_package_uid,
-)
-from sccfm_core.services.inventory.asa_upgrade_version_service import is_version_downgrade
-from sccfm_core.services.transaction_service import TransactionService
-from sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: trigger_ftd_upgrade
@@ -110,21 +86,17 @@ options:
     required: false
     type: int
     default: 3600
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -134,8 +106,7 @@ EXAMPLES = r"""
     uids:
       - "12345678-1234-1234-1234-123456789abc"
     software_version: "7.4.1"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Stage-only upgrade using a query
 - name: Stage FTD upgrade for branch devices
@@ -159,8 +130,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Stage FTD upgrade for branch devices
       cisco.sccfm.trigger_ftd_upgrade:
@@ -185,6 +155,37 @@ skipped:
   returned: always
   type: dict
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import FTD_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.constants import DEFAULT_TRANSACTION_TIMEOUT_SEC
+    from cisco_sccfm_core.models.cdo_transaction_status import CdoTransactionStatus
+    from cisco_sccfm_core.services.inventory import (
+        FtdUpgradeService,
+        FtdUpgradeVersionService,
+        resolve_upgrade_package_uid,
+    )
+    from cisco_sccfm_core.services.inventory.asa_upgrade_version_service import is_version_downgrade
+    from cisco_sccfm_core.services.transaction_service import TransactionService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+    DEFAULT_TRANSACTION_TIMEOUT_SEC = 3600
+
+
+from ..module_utils.config import base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

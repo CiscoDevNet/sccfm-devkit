@@ -1,7 +1,0 @@
-# Copyright 2026 Cisco Systems, Inc. and its affiliates
-#
-# SPDX-License-Identifier: Apache-2.0
-
-from sccfm_cli.commands.policies.access_group.list.command import ListAccessGroupCommand
-
-__all__ = ["ListAccessGroupCommand"]

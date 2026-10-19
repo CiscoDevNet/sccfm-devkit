@@ -43,8 +43,7 @@ def base_module_params() -> dict[str, Any]:
         "log_level": None,
         "log_interval": None,
         "active": True,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -110,8 +109,7 @@ def test_should_create_access_rule_without_optional_fields(
         "log_level": None,
         "log_interval": None,
         "active": None,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
     mock_ansible_module_class.return_value = mock_module_instance
 
@@ -212,40 +210,6 @@ def test_should_fail_if_service_raises_exception(
     assert "API error: 400" in mock_module_instance.fail_json.call_args[1]["msg"]
 
 
-@patch("plugins.modules.create_access_rule.AnsibleModule")
-def test_should_fail_if_region_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """run_module should fail when region is not provided."""
-    del mock_module_instance.params["region"]
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            create_access_rule.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    assert "region is required" in mock_module_instance.fail_json.call_args[1]["msg"]
-
-
-@patch("plugins.modules.create_access_rule.AnsibleModule")
-def test_should_fail_if_api_token_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """run_module should fail when api_token is not provided."""
-    del mock_module_instance.params["api_token"]
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            create_access_rule.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    assert "api_token is required" in mock_module_instance.fail_json.call_args[1]["msg"]
-
-
 def test_build_argument_spec() -> None:
     """build_argument_spec should include all expected keys."""
     spec = create_access_rule.build_argument_spec()
@@ -256,5 +220,5 @@ def test_build_argument_spec() -> None:
     assert "source_network" in spec
     assert "destination_network" in spec
     assert "protocol" in spec
-    assert "region" in spec
-    assert "api_token" in spec
+    assert "profile" in spec
+    assert "config_path" in spec

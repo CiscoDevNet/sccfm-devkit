@@ -7,7 +7,7 @@ addressing your issue, assessing changes, and helping you finalize your pull req
 we endeavor to review incoming issues and pull requests within 10 days, and will close any lingering issues or pull
 requests after 60 days of inactivity.
 
-Please note that all of your interactions in the project are subject to our [Code of Conduct](/CODE_OF_CONDUCT.md). This
+Please note that all of your interactions in the project are subject to our [Code of Conduct](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/CODE_OF_CONDUCT.md). This
 includes creation of issues or pull requests, commenting on issues or pull requests, and extends to all interactions in
 any real-time space e.g., Slack, Discord, etc.
 
@@ -21,13 +21,13 @@ any real-time space e.g., Slack, Discord, etc.
 ## Reporting Issues
 
 Before reporting a new issue, please ensure that the issue was not already reported or fixed by searching through our
-[issues list](TODO)
+[issues list](https://github.com/CiscoDevNet/sccfm-devkit/issues)
 
 When creating a new issue, please be sure to include a **title and clear description**, as much relevant information as
 possible, and, if possible, a test case.
 
 **If you discover a security bug, please do not report it through GitHub. Instead, please see security procedures in
-[SECURITY.md](/SECURITY.md).**
+[SECURITY.md](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/SECURITY.md).**
 
 ## Sending Pull Requests
 
@@ -39,7 +39,10 @@ reserve breaking changes until the next major version release.
 
 ## Development Setup
 
-1. Run `scripts/setup_environment.sh` to install dependencies and create the virtualenv.
+1. Run `cisco_sccfm_scripts/setup_environment.sh` to install dependencies and create the
+   virtualenv. Poetry is kept in an isolated tooling environment so its dependencies do not
+   conflict with the project runtime. If an older setup reports that Poetry is installed in
+   `.venv/`, remove `.venv/` once and rerun the script.
 
 2. Install [direnv](https://direnv.net/) for automatic environment activation:
 
@@ -50,13 +53,16 @@ reserve breaking changes until the next major version release.
    direnv allow
    ```
 
-3. Set up your SCCFM credentials:
+3. Set up your SCCFM profile:
+
    ```bash
-   cp .env.example .env
-   # Edit .env with your API token
+   sccfm-cli configure --region us  # securely prompts for the token
    ```
 
-Now whenever you `cd` into the project, the virtualenv activates and env vars load automatically.
+   The default profile store uses owner-only POSIX permissions. On Windows, keep it under your
+   user profile and rely on the filesystem's per-user access controls.
+
+Now whenever you `cd` into the project, the virtualenv activates automatically.
 
 ## Committing Changes
 
@@ -64,9 +70,12 @@ We enforce conventional commits via Commitizen. Please:
 
 - Ensure the virtualenv is active (happens automatically with direnv, or run `source .venv/bin/activate`).
 - Install the `pre-commit` hooks (`pre-commit install && pre-commit install --hook-type commit-msg`).
-- Use `./scripts/cz.sh commit` (runs `pre-commit` visibly, then Commitizen) or `poetry run cz commit` to create commits, or ensure your commit messages
+- Use `./cisco_sccfm_scripts/cz.sh commit` (runs `pre-commit` visibly, then Commitizen) or `poetry run cz commit` to create commits, or ensure your commit messages
   follow the Conventional Commits spec (e.g., `feat: add inventory manager list pagination`).
 - CI will fail if commit messages do not comply.
+
+Project maintainers perform releases manually by following the
+[release guide](https://github.com/CiscoDevNet/sccfm-devkit/blob/main/RELEASING.md).
 
 ## Other Ways to Contribute
 

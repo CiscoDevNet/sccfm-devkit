@@ -1,3 +1,14 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Ansible E2E Integration Tests](#ansible-e2e-integration-tests)
+  - [Structure](#structure)
+  - [Why This Shape](#why-this-shape)
+  - [Running](#running)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Ansible E2E Integration Tests
 
 This directory contains the tenant-backed integration tests for the Ansible collection.

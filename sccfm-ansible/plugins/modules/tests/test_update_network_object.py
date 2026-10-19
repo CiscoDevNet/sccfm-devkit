@@ -70,8 +70,7 @@ def base_module_params() -> dict[str, Any]:
         "description": None,
         "labels": None,
         "tags": None,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -119,6 +118,7 @@ def test_should_update_when_value_differs(
     assert call_kwargs["changed"] is True
     assert call_kwargs["network_object"]["literal"] == "192.168.1.0/24"
     assert "Successfully updated" in call_kwargs["msg"]
+    mock_service.get_network_object_by_name.assert_called_once_with(name="test-network-object")
 
 
 @patch("plugins.modules.update_network_object.Config")
@@ -411,47 +411,6 @@ def test_should_fail_on_service_exception(
     mock_module_instance.fail_json.assert_called_once()
     call_kwargs = mock_module_instance.fail_json.call_args[1]
     assert "API error: 400 Bad Request" in call_kwargs["msg"]
-
-
-@patch("plugins.modules.update_network_object.AnsibleModule")
-def test_should_fail_if_region_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """run_module should fail when region is not provided."""
-    del mock_module_instance.params["region"]
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            update_network_object.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance.fail_json.call_args[1]
-    assert "region is required" in call_kwargs["msg"]
-
-
-@patch("plugins.modules.update_network_object.AnsibleModule")
-def test_should_fail_if_api_token_not_provided(
-    mock_ansible_module_class: MagicMock,
-    mock_module_instance: MagicMock,
-) -> None:
-    """run_module should fail when api_token is not provided."""
-    del mock_module_instance.params["api_token"]
-    mock_ansible_module_class.return_value = mock_module_instance
-
-    with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(SystemExit):
-            update_network_object.run_module()
-
-    mock_module_instance.fail_json.assert_called_once()
-    call_kwargs = mock_module_instance.fail_json.call_args[1]
-    assert "api_token is required" in call_kwargs["msg"]
-
-
-# ============================================================
-# _needs_update unit tests
-# ============================================================
 
 
 class TestNeedsUpdate:

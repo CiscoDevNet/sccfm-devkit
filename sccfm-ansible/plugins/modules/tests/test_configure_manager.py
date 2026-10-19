@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from plugins.modules import configure_manager
 
-from sccfm_core.services.inventory import ConfigureManagerResult, FtdConfigureManagerError
+from cisco_sccfm_core.services.inventory import ConfigureManagerResult, FtdConfigureManagerError
 
 _CLI_KEY = "configure manager add fmc.example.com regkey123 natid456"
 

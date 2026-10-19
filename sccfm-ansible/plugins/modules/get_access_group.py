@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core.errors import SccApiError
-from sccfm_core.services.policy import AccessGroupService
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: get_access_group
@@ -25,21 +15,17 @@ options:
     description: Unique identifier (UID) of the access group to retrieve.
     required: true
     type: str
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -47,8 +33,7 @@ EXAMPLES = r"""
 - name: Get access group
   cisco.sccfm.get_access_group:
     uid: "c6fa254e-db7a-447e-a58f-95df1e09c2af"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Show access group name
@@ -61,8 +46,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get access group
       cisco.sccfm.get_access_group:
@@ -88,6 +72,27 @@ access_group:
       description: Whether the access group is shared.
       type: bool
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.policy import AccessGroupService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

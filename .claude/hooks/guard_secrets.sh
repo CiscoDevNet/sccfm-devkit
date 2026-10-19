@@ -7,7 +7,7 @@
 #
 # Fails OPEN (allows) if no Python interpreter is available: this is a defense-in-depth
 # layer, and denying every file read on a machine without the venv would be worse than
-# the brief window before scripts/setup_environment.sh runs.
+# the brief window before cisco_sccfm_scripts/setup_environment.sh runs.
 set -u
 
 ROOT="${CLAUDE_PROJECT_DIR:-.}"

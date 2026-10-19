@@ -4,17 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
-
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, AsaDiskFileService, InventoryService, SccApiError
-from sccfm_core.models.asa_disk_file import AsaDiskFile
-from sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_asa_disk_files
@@ -57,21 +46,17 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -79,8 +64,7 @@ EXAMPLES = r"""
 - name: List disk files on production ASAs
   cisco.sccfm.list_asa_disk_files:
     query: "name:prod-* AND connectivityState:ONLINE"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: disk_files
 
 # Example 2: List files on specific devices by UID
@@ -97,8 +81,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: List files on branch ASAs
       cisco.sccfm.list_asa_disk_files:
@@ -107,7 +90,10 @@ EXAMPLES = r"""
 
     - name: Show only AnyConnect packages
       ansible.builtin.debug:
-        msg: "{{ disk_files.results | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE') | list }}"
+        msg: >-
+          {{ disk_files.results
+          | selectattr('file_type', 'equalto', 'ANYCONNECT_PACKAGE')
+          | list }}
 """
 
 RETURN = r"""
@@ -133,6 +119,33 @@ results:
       description: Classification of the file (OS_IMAGE, ANYCONNECT_PACKAGE, ASDM_IMAGE, OTHER).
       type: str
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, CdoTransaction, DevicePage
+
+    from cisco_sccfm_core import (
+        ASA_DEVICE_TYPE_FILTER,
+        AsaDiskFileService,
+        InventoryService,
+        SccApiError,
+    )
+    from cisco_sccfm_core.models.asa_disk_file import AsaDiskFile
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

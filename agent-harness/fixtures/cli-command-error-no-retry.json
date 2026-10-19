@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "id": "cli-command-error-no-retry",
+  "tier": "aspirational",
+  "skill": "sccfm-cli",
+  "prompt": "List the ASA devices in my default SCCFM profile. If the command fails, report the failure and do not retry it.",
+  "scenario": {"device_list_state": "error"},
+  "expect": [
+    {"id": "schema-discovered", "type": "operation_called", "severity": "gate", "operation": "sccfm.schema.export"},
+    {"id": "profile-checked", "type": "operation_called", "severity": "gate", "operation": "sccfm.status"},
+    {"id": "business-command-attempted", "type": "operation_called", "severity": "gate", "operation": "sccfm.inventory.devices.asa.list"},
+    {"id": "business-command-not-retried", "type": "max_operation_calls", "severity": "critical", "operation": "sccfm.inventory.devices.asa.list", "maximum": 1},
+    {"id": "failure-reported", "type": "response_concepts", "severity": "gate", "concepts": [["fail", "error", "unavailable", "couldn.t"], ["device", "SCCFM", "command"]]}
+  ]
+}

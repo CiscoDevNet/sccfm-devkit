@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core.errors import SccApiError
-from sccfm_core.services.object_management import NetworkGroupListResponse, NetworkGroupService
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_network_groups
@@ -41,29 +31,24 @@ options:
     required: false
     type: int
     default: 0
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
 # Example 1: List all network groups
 - name: List all network groups
   cisco.sccfm.list_network_groups:
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: result
 
 - name: Display network groups
@@ -76,8 +61,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Find web-related network groups
       cisco.sccfm.list_network_groups:
@@ -90,7 +74,7 @@ EXAMPLES = r"""
       ansible.builtin.debug:
         msg: "Found {{ result.count }} groups"
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: List first page of network groups
   cisco.sccfm.list_network_groups:
     limit: 25
@@ -141,6 +125,30 @@ offset:
   returned: success
   type: int
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.object_management import (
+        NetworkGroupListResponse,
+        NetworkGroupService,
+    )
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

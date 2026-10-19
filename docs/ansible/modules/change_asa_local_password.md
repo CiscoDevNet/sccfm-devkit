@@ -21,19 +21,16 @@ $ ansible-doc -t module cisco.sccfm.change_asa_local_password
   Devices can be selected by a Lucene query or by specifying a list of
   UIDs.
   The query uses the same syntax as the Get Devices API.
-  See
-  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/
+  See the SCC Firewall Manager API documentation for
+  https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-devices/.
   for query documentation.
 
 OPTIONS (= indicates it is required):
 
-- api_token  API token for SCCFM.
-        set_via:
-          env:
-          - name: SCCFM_API_TOKEN
+- config_path  Optional path to the canonical SCCFM profile
+                configuration file.
         default: null
-        no_log: true
-        type: str
+        type: path
 
 - limit   Maximum number of devices to return when using `query'.
            Ignored when using `uids'.
@@ -41,7 +38,6 @@ OPTIONS (= indicates it is required):
         type: int
 
 = new_password  The new password to set for the user.
-        no_log: true
         type: str
 
 - offset  Pagination offset when using `query'.
@@ -49,16 +45,13 @@ OPTIONS (= indicates it is required):
         default: 0
         type: int
 
+- profile  Named SCCFM profile configured by `sccfm-cli configure'.
+        default: default
+        type: str
+
 - query   Lucene query to filter ASA devices.
            Mutually exclusive with `uids'.
            The query is automatically combined with `deviceType:ASA'.
-        default: null
-        type: str
-
-- region  SCCFM region (int, us, eu, apj, au, uae, in, or ci).
-        set_via:
-          env:
-          - name: SCCFM_REGION
         default: null
         type: str
 
@@ -71,7 +64,7 @@ OPTIONS (= indicates it is required):
 = username  The local ASA username whose password will be changed.
         type: str
 
-AUTHOR: Cisco SCCFM Team
+AUTHOR: Cisco SCCFM Team (@CiscoDevNet)
 
 EXAMPLES:
 # Example 1: Change password on ASAs matching a query
@@ -80,8 +73,7 @@ EXAMPLES:
     query: "name:branch-* AND connectivityState:ONLINE"
     username: admin
     new_password: "{{ vault_new_asa_password }}"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: password_results
 
 # Example 2: Change password on specific devices by UID
@@ -100,8 +92,7 @@ EXAMPLES:
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Change admin password on all online ASAs
       cisco.sccfm.change_asa_local_password:

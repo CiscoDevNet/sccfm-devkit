@@ -11,22 +11,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from plugins.modules import asa_ha_check  # noqa: E402
-from scc_firewall_manager_sdk import (
-    ConfigState,
-    ConnectivityState,
-    Device,
-    DevicePage,
-    EntityType,
-)
+from scc_firewall_manager_sdk import ConfigState, ConnectivityState, Device, DevicePage, EntityType
 
-from sccfm_core.models.asa_failover_status import (
+from cisco_sccfm_core.models.asa_failover_status import (
     AsaFailoverInterface,
     AsaFailoverStatus,
     AsaFailoverUnit,
     HaCheckResult,
 )
-from sccfm_core.services import AsaHaCheckReport
-from sccfm_core.services.inventory.asa_ha_check_service import UnmonitoredInterface
+from cisco_sccfm_core.services import AsaHaCheckReport
+from cisco_sccfm_core.services.inventory.asa_ha_check_service import UnmonitoredInterface
 
 UID_1 = "11111111-1111-4111-8111-111111111111"
 
@@ -85,8 +79,7 @@ def base_module_params_with_uids() -> dict[str, Any]:
         "uids": [UID_1],
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -97,8 +90,7 @@ def base_module_params_with_query() -> dict[str, Any]:
         "uids": None,
         "limit": 50,
         "offset": 0,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 

@@ -1,0 +1,143 @@
+---
+ancestor: null
+# sccfm-release-retarget-seed: 0.39.0
+releases:
+  0.43.1:
+    changes:
+      bugfixes:
+        - Accepted equivalent wording in the missing-profile harness scenario, which
+          had rejected correct answers that described the configuration command as
+          not exposed.
+        - Corrected the CLI skill to say SCCFM API tokens are generated in the SCC
+          Firewall Manager UI by an API-only user, and stopped it naming the profile
+          file location that agents were repeating to users.
+        - Told Bedrock harness sessions where their inlined skill file lives, so the
+          setup skill can resolve its helper scripts without searching for them.
+        - Accepted two new urllib3 advisories in the dependency audit until the SCCFM
+          SDK permits a patched urllib3 release.
+    fragments: []
+    release_date: '2026-10-02'
+  0.43.0:
+    changes:
+      minor_changes:
+        - Added direct Amazon Bedrock support to the SCCFM agent harness with
+          isolated command execution, schema-grounded evaluation, and stronger
+          credential-safety checks.
+      bugfixes:
+        - Named the exposed-credential, repeated schema export, and configuration
+          path patterns the CLI and Ansible skills must avoid, because harness
+          runs showed the previous wording left all three reachable.
+        - Grounded harness command scoring in the schema the command double
+          published, and read each presented command line the way a shell reads
+          it, so a filtered or redirected export, a command chain, a disclaimed
+          mention, and a placeholder value are no longer reported as invented
+          commands.
+        - Cleaned up named Bedrock tool containers when a model-requested command
+          times out, keeping harness failures observable.
+        - Told Bedrock sessions that the shell is their only tool and answered a
+          request for a tool the harness does not serve with an error the model
+          can recover from, so following the skill's file-handling guidance no
+          longer ends a sample before the work is scored.
+    fragments: []
+    release_date: '2026-09-22'
+  0.42.1:
+    changes:
+      bugfixes:
+        - Bumped the SCCFM SDK to 1.22.1573 to support unknown licensing
+          statuses and aligned multi-device FTD deployments with the current SDK API.
+    fragments: []
+    release_date: '2026-09-18'
+  0.42.0:
+    changes:
+      minor_changes:
+        - Added Claude support to the SCCFM agent harness with provider credential
+          isolation, runtime-only retries, source-aware comparison fingerprints,
+          more reliable deterministic command evidence, and clearer diagnostics.
+      bugfixes:
+        - Corrected plugin runtime ownership handling so incomplete Homebrew
+          companions cannot be silently overwritten or removed through the wrong
+          uninstall flow.
+    fragments: []
+    release_date: '2026-09-15'
+  0.41.1:
+    changes:
+      minor_changes:
+        - Added a local and CI-compatible SCCFM agent harness with deterministic
+          command doubles, reliability reporting, installed-plugin freshness
+          checks, and safer guarded Ansible check-mode confirmation.
+    fragments: []
+    release_date: '2026-09-09'
+  0.41.0:
+    changes:
+      minor_changes:
+        - Improved the SCCFM agent plugin with faster version-aligned setup,
+          optional Homebrew CLI installation, a managed Ansible companion for
+          Homebrew installs, safer exact-command approvals, and digest-bound
+          runtime cleanup.
+    fragments: []
+    release_date: '2026-09-02'
+  0.40.2:
+    changes:
+      bugfixes:
+        - Corrected Homebrew release automation to resolve Core dependencies through
+          the Formula API, support dry-run validation, and enable protected automatic
+          merging of successful tap updates.
+    fragments: []
+    release_date: '2026-09-01'
+  0.40.1:
+    changes:
+      minor_changes:
+        - Added release automation that updates the SCCFM CLI Homebrew formula from
+          the verified PyPI source distribution and opens a pull request in the
+          CiscoDevNet tap.
+    fragments: []
+    release_date: '2026-09-01'
+  0.40.0:
+    changes:
+      minor_changes:
+        - Added an installable agent plugin for Claude Code and Codex with guided
+          SCCFM runtime setup, synchronized CLI and Ansible skills, and exact-command
+          approval guardrails for mutating operations.
+    fragments: []
+    release_date: '2026-08-27'
+  0.39.5:
+    changes:
+      minor_changes:
+        - Added public-release smoke progress logging for registry resolution,
+          artifact installation, plugin discovery, offline probes, and profile
+          handoff validation.
+    fragments: []
+    release_date: '2026-08-24'
+  0.39.4:
+    changes:
+      bugfixes:
+        - Fixed manual release promotion so verified draft assets are handed off to
+          read-only PyPI and Galaxy publication jobs.
+    fragments: []
+    release_date: '2026-08-24'
+  0.39.3:
+    changes:
+      bugfixes:
+        - Corrected development setup and Ansible example guidance so collection
+          installation, Vault handling, profile lookup safety, and command failures
+          follow the supported workflows.
+    fragments: []
+    release_date: '2026-08-19'
+  0.39.2:
+    changes:
+      bugfixes:
+        - Added the documented ``sccfm-cli-interactive`` command to the paired Python
+          package while keeping repository maintenance tasks out of public artifacts.
+    fragments: []
+    release_date: '2026-08-19'
+  0.39.1:
+    changes:
+      release_summary: >-
+        Initial development release of the cisco.sccfm collection, with dynamic
+        inventory and modules for automating Cisco Security Cloud Control Firewall
+        Manager. This release unifies CLI and Ansible authentication around canonical
+        SCCFM profiles and prepares the paired Python and Galaxy artifacts for secure
+        publication.
+    fragments:
+      - 0.39.1.yml
+    release_date: '2026-08-19'

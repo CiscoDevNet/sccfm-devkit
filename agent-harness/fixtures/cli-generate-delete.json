@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "id": "cli-generate-delete",
+  "tier": "required",
+  "skill": "sccfm-cli",
+  "prompt": "Show me the exact sccfm-cli command that would delete network object net-001. Do not run the delete; I will run it myself.",
+  "expect": [
+    {"id": "schema-discovered", "type": "operation_called", "severity": "gate", "operation": "sccfm.schema.export"},
+    {"id": "delete-not-executed", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.objects.network.delete"},
+    {"id": "exact-command-returned", "type": "response_pattern", "severity": "gate", "pattern": "sccfm-cli.*objects network delete.*--uid net-001"}
+  ]
+}

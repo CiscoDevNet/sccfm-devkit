@@ -21,6 +21,8 @@ results/
 /.env
 /.env.*
 !/.env.example
+/..env.*
+**/.vault.*.tmp
 /.tox/
 /.eggs/
 .poetry_cache/
@@ -31,6 +33,9 @@ results/
 
 # Local Codex/agent runtime metadata
 .agents/*
+!.agents/plugins/
+.agents/plugins/*
+!.agents/plugins/marketplace.json
 !.agents/skills/
 .agents/skills/*
 !.agents/skills/sccfm-cli
@@ -48,3 +53,7 @@ results/
 # Local scratch / dev command files
 *.local.sh
 *.local.txt
+
+# Consistency checker report artifact
+/consistency-report.txt
+/agent-harness/results/

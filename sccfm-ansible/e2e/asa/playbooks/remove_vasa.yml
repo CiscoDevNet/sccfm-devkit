@@ -10,7 +10,7 @@
 
   vars:
     sccfm_api_base: "https://ci.manage.security.cisco.com/api/rest"
-    sccfm_api_token: "{{ lookup('env', 'API_TOKEN') }}"
+    profile_token: "{{ lookup('cisco.sccfm.profile', 'default', field='api_token') }}"
     asa_test_query_all: "name:ci-e2e-asa-*"
 
   tasks:
@@ -19,20 +19,22 @@
         url: "{{ sccfm_api_base }}/v1/inventory/devices?limit=50&offset=0&q={{ asa_test_query_all | urlencode }}"
         method: GET
         headers:
-          Authorization: "Bearer {{ sccfm_api_token }}"
+          Authorization: "Bearer {{ profile_token }}"
           Content-Type: "application/json"
         status_code: [200]
       register: device_list
+      no_log: true
 
     - name: Delete each CI vASA device
       ansible.builtin.uri:
         url: "{{ sccfm_api_base }}/v1/inventory/devices/{{ item.uid }}"
         method: DELETE
         headers:
-          Authorization: "Bearer {{ sccfm_api_token }}"
+          Authorization: "Bearer {{ profile_token }}"
           Content-Type: "application/json"
         status_code: [200, 202, 204, 404]
       loop: "{{ device_list.json['items'] | default([]) }}"
       loop_control:
         label: "{{ item.name }} ({{ item.uid }})"
       when: device_list.json['items'] | default([]) | length > 0
+      no_log: true

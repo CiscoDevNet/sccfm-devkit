@@ -23,8 +23,7 @@ def base_module_params() -> dict[str, Any]:
         "domain_uid": "domain-1",
         "limit": 5,
         "offset": 5,
-        "region": "us",
-        "api_token": "test-token-123",
+        "profile": "default",
     }
 
 
@@ -120,5 +119,5 @@ def test_build_argument_spec() -> None:
     assert "domain_uid" in spec
     assert "limit" in spec
     assert "offset" in spec
-    assert "region" in spec
-    assert "api_token" in spec
+    assert "profile" in spec
+    assert "config_path" in spec

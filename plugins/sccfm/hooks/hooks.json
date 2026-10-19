@@ -1,0 +1,42 @@
+{
+  "description": "Shared Claude Code and Codex SCCFM command gate. Keep this policy aligned with ../hooks.json.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py\" --record-plan",
+            "commandWindows": "py -3 \"%CLAUDE_PLUGIN_ROOT%\\hooks\\sccfm_guard.py\" --record-plan",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py\" --record-approval",
+            "commandWindows": "py -3 \"%CLAUDE_PLUGIN_ROOT%\\hooks\\sccfm_guard.py\" --record-approval",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-.}}/hooks/sccfm_guard.py\"",
+            "commandWindows": "py -3 \"%CLAUDE_PLUGIN_ROOT%\\hooks\\sccfm_guard.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

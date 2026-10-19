@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core.errors import SccApiError
-from sccfm_core.services.policy import AccessRuleService
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: create_access_rule
@@ -78,21 +68,17 @@ options:
     description: Whether the rule is active.
     required: false
     type: bool
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -108,8 +94,7 @@ EXAMPLES = r"""
     protocol: tcp
     destination_port: "443"
     remark: "Allow web to database"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Create a deny rule using module_defaults
 - name: Create access rules
@@ -117,8 +102,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Create a deny rule for a source subnet
       cisco.sccfm.create_access_rule:
@@ -132,7 +116,7 @@ EXAMPLES = r"""
         destination_port: "1433"
         remark: "Block blocked-subnet to SQL"
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Create an inactive permit rule
   cisco.sccfm.create_access_rule:
     access_group_uid: "{{ access_group_uid }}"
@@ -177,6 +161,27 @@ access_rule:
       description: Destination network details.
       type: dict
 """
+
+
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.policy import AccessRuleService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

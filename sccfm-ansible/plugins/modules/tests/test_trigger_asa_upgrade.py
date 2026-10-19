@@ -19,7 +19,7 @@ from scc_firewall_manager_sdk import (
     EntityType,
 )
 
-from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
+from cisco_sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
 
 
 def _make_device(
@@ -72,8 +72,7 @@ def base_params() -> dict[str, Any]:
         "force_upgrade": False,
         "ignore_maintenance_window": False,
         "upgrade_name": None,
-        "region": "us",
-        "api_token": "test-token",
+        "profile": "default",
     }
 
 

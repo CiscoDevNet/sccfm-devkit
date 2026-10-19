@@ -4,22 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import (
-    ApiException,
-    AsaCompatibleVersion,
-    DevicePage,
-)
-
-from sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
-from sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
-from sccfm_core.services.inventory import AsaUpgradeVersionService
-from sccfm_core.types import ConfigLike
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: list_asa_compatible_versions
@@ -31,7 +15,8 @@ description:
   - Uses the C(GET /v1/inventory/devices/asas/{deviceUid}/upgrades/versions) API
     endpoint for each device, then returns the common set of versions that every
     device in the group can upgrade to.
-  - See U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/)
+  - See the SCC Firewall Manager API documentation for
+    U(https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/get-compatible-upgrade-versions-for-an-asa/).
     for API documentation.
 options:
   query:
@@ -72,21 +57,17 @@ options:
     required: false
     type: bool
     default: false
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -95,8 +76,7 @@ EXAMPLES = r"""
   cisco.sccfm.list_asa_compatible_versions:
     uids:
       - "12345678-1234-1234-1234-123456789abc"
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
   register: compat_versions
 
 - name: Show compatible versions
@@ -135,8 +115,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ sccfm_api_token }}"
+      profile: default
   tasks:
     - name: Get compatible versions for branch ASAs
       cisco.sccfm.list_asa_compatible_versions:
@@ -168,6 +147,29 @@ device_count:
   returned: success (multi-device or per_device=true)
   type: int
 """
+
+
+from typing import Any, cast
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, AsaCompatibleVersion, DevicePage
+
+    from cisco_sccfm_core import ASA_DEVICE_TYPE_FILTER, InventoryService, SccApiError
+    from cisco_sccfm_core.models.asa_upgrade_version import AsaGroupCompatibleVersions
+    from cisco_sccfm_core.services.inventory import AsaUpgradeVersionService
+    from cisco_sccfm_core.types import ConfigLike
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
 
 
 def build_argument_spec() -> dict[str, dict[str, Any]]:

@@ -20,6 +20,10 @@ Options:
     --region [int|us|eu|apj|au|uae|in|ci|aus]
                                   SCCFM region (int, us, eu, apj, au, uae, in,
                                   ci)  [required]
-    --api-token TEXT              API token for the chosen region  [required]
+    --api-token TEXT              API token for the chosen region. Passing it
+                                  directly is supported for compatibility but
+                                  may expose it in process listings and shell
+                                  history; prefer SCCFM_API_TOKEN or the hidden
+                                  prompt.  [env var: SCCFM_API_TOKEN]
   --help                          Show this message and exit.
 ```

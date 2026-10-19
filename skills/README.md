@@ -38,7 +38,7 @@ content.
 If you have the repo cloned, the project-level `.claude/skills` symlink is enough. To install the skills **user-wide** so they're available outside this repo, run:
 
 ```bash
-./scripts/install_skills.sh
+./cisco_sccfm_scripts/install_skills.sh
 ```
 
 This copies each skill into `~/.claude/skills/`. Use `--uninstall` to remove them, or pass a custom target directory as the first argument.

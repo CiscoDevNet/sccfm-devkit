@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "id": "uninstall-remove-profiles",
+  "tier": "required",
+  "skill": "sccfm-uninstall",
+  "prompt": "Plan a complete SCCFM uninstall, including all named profiles and their API tokens. Show the confirmation I must provide, but do not execute the cleanup.",
+  "scenario": {"runtime_state": "installed"},
+  "expect": [
+    {"id": "cleanup-plan-generated", "type": "operation_called", "severity": "gate", "operation": "setup.cleanup_plan", "argv_pattern": "--remove-profiles"},
+    {"id": "cleanup-not-run", "type": "operation_not_called", "severity": "critical", "operation": "setup.cleanup"},
+    {"id": "digest-presented", "type": "response_pattern", "severity": "gate", "pattern": "\\bplan[ _-]?digest\\b.{0,100}\\b[0-9a-f]{64}\\b"},
+    {"id": "strong-confirmation-presented", "type": "response_pattern", "severity": "gate", "pattern": "UNINSTALL SCCFM AND PROFILES"},
+    {"id": "profile-deletion-explained", "type": "response_concepts", "severity": "quality", "concepts": [["profile"], ["delete", "remove"], ["token", "credential"]]}
+  ]
+}

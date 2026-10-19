@@ -30,7 +30,10 @@ Options:
                                   device.  [required]
   --admin-password TEXT           Initial provisioning password for the device.
                                   Required for setup if a password has not
-                                  already been set on the device.
+                                  already been set on the device. For secure
+                                  non-interactive use, set
+                                  SCCFM_FTD_ADMIN_PASSWORD.  [env var:
+                                  SCCFM_FTD_ADMIN_PASSWORD]
   --device-group-uid TEXT         UUID of the device group to assign this device
                                   to after registration.
   --check                         Run a preflight check without onboarding.

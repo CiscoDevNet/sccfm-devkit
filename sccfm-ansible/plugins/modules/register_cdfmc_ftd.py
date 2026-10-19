@@ -32,26 +32,43 @@ options:
     required: false
     type: bool
     default: false
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
   region:
     description:
       - The SCC Firewall Manager region.
     required: false
     type: str
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     env:
       - name: SCCFM_REGION
   api_token:
     description:
       - The SCC Firewall Manager API token.
     required: false
+    type: path
     type: str
     no_log: true
     env:
       - name: SCCFM_API_TOKEN
 author:
+  - Cisco SCCFM Team (@CiscoDevNet)
   - Cisco SCCFM Team
 """
 
 EXAMPLES = r"""
+- name: Register vFTD with cdFMC using shared authentication defaults
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/cisco.sccfm.all:
+      profile: default
+  tasks:
+    - name: Complete the FTD registration
+      cisco.sccfm.register_cdfmc_ftd:
+        ftd_uid: "{{ ftd_onboard_result.device.uid }}"
 - name: Register vFTD with cdFMC
   cisco.sccfm.register_cdfmc_ftd:
     ftd_uid: "{{ ftd_onboard_result.device.uid }}"
@@ -68,6 +85,28 @@ device:
 """
 
 
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException, Device
+
+    from cisco_sccfm_core import SccApiError
+    from cisco_sccfm_core.services.inventory import FtdRegisterService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+
+
+def build_argument_spec() -> dict[str, dict[str, Any]]:
 def build_argument_spec() -> dict:
     return {
         "ftd_uid": {"type": "str", "required": True},

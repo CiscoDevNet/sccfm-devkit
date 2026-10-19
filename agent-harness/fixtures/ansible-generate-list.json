@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "id": "ansible-generate-list",
+  "tier": "required",
+  "skill": "sccfm-ansible",
+  "prompt": "Generate an Ansible playbook that lists ASA devices using cisco.sccfm. Do not run the business playbook.",
+  "expect": [
+    {"id": "module-list-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.list"},
+    {"id": "module-docs-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.docs", "argv_pattern": "cisco.sccfm.asa_device_info"},
+    {"id": "business-playbook-not-run", "type": "operation_not_called", "severity": "critical", "operation": "ansible.playbook.execute"},
+    {"id": "fqcn-used", "type": "response_pattern", "severity": "gate", "pattern": "cisco.sccfm.asa_device_info"},
+    {"id": "live-validation-disclosed", "type": "response_concepts", "severity": "quality", "concepts": [["not", "no"], ["validat"], ["live"], ["state", "SCCFM"]]}
+  ]
+}

@@ -4,16 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from ansible.module_utils.basic import AnsibleModule
-from scc_firewall_manager_sdk import ApiException
-
-from sccfm_core.errors import SccApiError
-from sccfm_core.services.object_management import NetworkGroupService
-
-from ..module_utils.config import Config, base_argument_spec, create_config
-
 DOCUMENTATION = r"""
 ---
 module: create_network_group
@@ -65,21 +55,17 @@ options:
       For example, C({"environment": ["production", "staging"]}).
     required: false
     type: dict
-  region:
-    description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
+  profile:
+    description: Named SCCFM profile configured by C(sccfm-cli configure).
     required: false
     type: str
-    env:
-      - name: SCCFM_REGION
-  api_token:
-    description: API token for SCCFM.
+    default: default
+  config_path:
+    description: Optional path to the canonical SCCFM profile configuration file.
     required: false
-    type: str
-    no_log: true
-    env:
-      - name: SCCFM_API_TOKEN
+    type: path
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
@@ -94,8 +80,7 @@ EXAMPLES = r"""
     labels:
       - production
       - web
-    region: "{{ sccfm_region }}"
-    api_token: "{{ sccfm_api_token }}"
+    profile: default
 
 # Example 2: Create a group with referenced objects using module_defaults
 - name: Create network groups
@@ -103,8 +88,7 @@ EXAMPLES = r"""
   gather_facts: false
   module_defaults:
     group/cisco.sccfm.all:
-      region: "{{ sccfm_region }}"
-      api_token: "{{ lookup('env', 'SCCFM_API_TOKEN') }}"
+      profile: default
   tasks:
     - name: Create group from existing objects
       cisco.sccfm.create_network_group:
@@ -117,7 +101,7 @@ EXAMPLES = r"""
           environment:
             - production
 
-# Example 3: Using environment variables (SCCFM_REGION and SCCFM_API_TOKEN)
+# Example 3: Using the default configured profile
 - name: Create a group with URL literals
   cisco.sccfm.create_network_group:
     name: trusted-urls
@@ -160,6 +144,27 @@ network_group:
 """
 
 
+from typing import Any
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ..module_utils.dependencies import record_import_error
+
+try:
+    from scc_firewall_manager_sdk import ApiException
+
+    from cisco_sccfm_core.errors import SccApiError
+    from cisco_sccfm_core.services.object_management import NetworkGroupService
+except ImportError as exc:
+    record_import_error(exc)
+    ApiException = RuntimeError
+    NotFoundError = LookupError
+    FtdConfigureManagerError = ValueError
+
+
+from ..module_utils.config import Config, base_argument_spec, create_config
+
+
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "name": {"type": "str", "required": True},
@@ -186,7 +191,7 @@ def run_module() -> None:
 
     try:
         service = NetworkGroupService(config=config)
-        existing = service.get_network_group_by_name(params["name"])
+        existing = service.get_network_group_by_name(name=params["name"])
         if existing:
             module.exit_json(
                 changed=False,

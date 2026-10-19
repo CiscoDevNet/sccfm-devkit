@@ -16,5 +16,7 @@ def assert_module_contract(module_name: str) -> None:
     assert module.RETURN.strip()
 
     argument_spec = module.build_argument_spec()
-    assert "region" in argument_spec
-    assert "api_token" in argument_spec
+    assert argument_spec["profile"]["default"] == "default"
+    assert "config_path" in argument_spec
+    assert "region" not in argument_spec
+    assert "api_token" not in argument_spec

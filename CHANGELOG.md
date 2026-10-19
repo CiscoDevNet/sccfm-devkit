@@ -1,11 +1,157 @@
-## v0.38.0 (2026-06-19)
+## v0.43.1 (2026-10-02)
+
+### Fix
+
+- **lh-132058**: align harness grading and skill guidance with runs
+
+## v0.43.0 (2026-09-22)
 
 ### Feat
 
+- **lh-121335**: add Bedrock agent harness backend
+
+### Fix
+
+- **lh-121335**: recover from unserved Bedrock tools
+- **lh-121335**: read presented commands the way a shell reads them
+- **lh-121335**: close three skill guidance gaps found by the harness
+- **lh-121335**: ground response command scoring in published schema
+- **lh-121335**: harden Bedrock harness execution and command validation
+- **lh-121335**: prepare Ansible changelog for 0.43.0
+- **lh-121335**: stabilize agent harness evaluation
+- **lh-121335**: refine harness safety evaluation
+- **lh-121335**: validate suggested commands against schema
+- **lh-121335**: harden skill fallback and confirmation output
+- **lh-121335**: enforce safe discovery for exposed credentials
+- **lh-121335**: strengthen Bedrock skill instruction priority
+- **lh-121335**: avoid preserving SELinux labels on stubs
+- **lh-121335**: make Bedrock tool mounts executable
+
+## v0.42.1 (2026-09-18)
+
+### Fix
+
+- **sdk**: adapt FTD deployments to SDK API split
+
+## v0.42.0 (2026-09-15)
+
+### Feat
+
+- **lh-115194**: support Claude in the agent harness
+
+## v0.41.0 (2026-09-02)
+
+### Feat
+
+- **lh-115196**: improve SCCFM plugin setup and safety
+
+### Fix
+
+- **lh-115196**: complete ansible setup for homebrew installs
+
+## v0.40.1 (2026-09-01)
+
+### Fix
+
+- pass release context to Homebrew workflow
+
+## v0.40.0 (2026-08-27)
+
+### Feat
+
+- **lh-114214**: add SCCFM agent plugin
+
+### Fix
+
+- **lh-114214**: address plugin review findings
+- **lh-114214**: prepare Ansible changelog for 0.40.0
+- **lh-114214**: use absolute plugin documentation links
+
+## v0.39.5 (2026-08-24)
+
+### Fix
+
+- **lh-114517**: prepare Ansible changelog for 0.39.5
+
+## v0.39.4 (2026-08-24)
+
+### Fix
+
+- **lh-114517**: harden public release verification
+
+## v0.39.3 (2026-08-19)
+
+### Fix
+
+- **lh-114527**: prepare Ansible changelog for 0.39.3
+- **lh-114527**: repair developer setup and Ansible guidance
+
+## v0.39.2 (2026-08-19)
+
+### Fix
+
+- **lh-114358**: publish the interactive customer CLI
+
+## v0.39.1 (2026-08-19)
+
+### Fix
+
+- **lh-102436**: honor keyword-only object lookups
+- **lh-102436**: prepare first ansible release metadata
+- **lh-102436**: vault ansible e2e device password
+- **lh-102436**: make ansible sanity checks pass
+- **lh-102436**: align network group service conventions
+- **lh-102436**: align network object service conventions
+- **lh-102436**: resolve generated documentation conflicts
+- **lh-102436**: integrate profile workflow with release
+- **lh-102436**: correct gitleaks module path
+- **lh-102436**: address release review feedback
+- **lh-102436**: proper release
+- **lh-102436**: fix doc styling
+- **lh-102436**: use repository secrets for publishing
+- **lh-102436**: close remaining release blockers
+- **lh-102436**: use current vault key in CLI E2E
+- **lh-102436**: harden release and credential workflows
+- **lh-102436**: add manual build-once release workflow
+- **lh-102436**: stabilizes the final package metadata and README
+- **lh-102436**: poetry run in venv
+- **lh-102436**: Galaxy metadata/runtime issues
+- **lh-102436**: make the Galaxy artifact independently installable and usable.
+- **lh-102436**: remove tests and e2e files from pypi wheel
+- **lh-102436**: query correct distribution name
+- **lh-102436**: unresolved runtime dependency
+- **lh-102436**: hide api-token
+- **lh-102436**: install resolves a broken SDK
+- **lh-102436**: hide smart licensing token
+- **lh-102436**: Inventory plugin remove exports of the API token
+
+## v0.39.0 (2026-08-18)
+
+### Feat
+
+-  comment fix
+- bug and comment fix
+- unify SCCFM interactive command and token configuration
+
+## v0.38.0 (2026-07-27)
+
+### Feat
+
+- **inventory**: add FtdRegisterService and register_cdfmc_ftd Ansible module
+- **skills**: reference sccfm-ansible skill into sccfm-cli skill and vice versa
+- **lh-102436**: prepare devkit for PyPI publishing
+- **skills**: reference sccfm-ansible skill into sccfm-cli skill and vice versa
+- add schema-driven Ansible skill
 - prepare sccfm for pypi publishing
 - add schema-driven sccfm-cli skill
 - **cdfmc-ftd**: add configure-manager to complete FTD registration over SSH
 - add cli schema export
+
+### Fix
+
+- pass strict typing and FTD confirmation checks
+- **lh-102436**: make packaging metadata portable
+- **README**: Add license statement & clarify name acronym
 
 ## v0.37.0 (2026-06-04)
 

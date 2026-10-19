@@ -1,9 +1,7 @@
 ---
 name: sccfm-cli
-description: Use the customer-facing SCC Firewall Manager CLI by discovering the live schema, validating command metadata, and either executing or generating safe sccfm-cli commands without hardcoded command knowledge.
-when_to_use: When the user asks to use, install, configure, inspect, or generate commands for sccfm-cli or SCC Firewall Manager CLI workflows.
-argument-hint: "[describe the SCCFM CLI task]"
-allowed-tools: "Bash(command -v *) Bash(sccfm-cli *) Bash(source scripts/activate.sh) Bash(brew *) Bash(pipx *) Bash(jq *) Read Grep Glob"
+description: Use the customer-facing SCC Firewall Manager CLI by discovering the live schema, validating command metadata, and either executing or generating safe sccfm-cli commands without hardcoded command knowledge. Use for SCCFM CLI workflows; use the sccfm-ansible skill instead for cisco.sccfm Ansible playbooks, inventories, and modules.
+allowed-tools: "Bash(command -v *) Bash(sccfm-cli *) Bash(source cisco_sccfm_scripts/activate.sh) Bash(brew *) Bash(pipx *) Bash(jq *) Read Grep Glob"
 ---
 
 # SCC Firewall Manager CLI
@@ -15,6 +13,13 @@ not hardcode command names, options, examples, or behavior.
 This skill operates against customer SCC Firewall Manager environments. Optimize
 for customer safety first and convenience second.
 
+## Scope: CLI vs. Ansible
+
+This skill covers only the `sccfm-cli` command-line tool. For `cisco.sccfm`
+Ansible playbooks, inventory files, modules, or the inventory plugin, use the
+`sccfm-ansible` skill. For requests spanning both surfaces, apply each skill only
+to its respective operations.
+
 ## Core Rules
 
 1. Treat every operation as customer-impacting until the schema proves otherwise.
@@ -25,6 +30,57 @@ for customer safety first and convenience second.
 4. Never ask the user to paste secrets into chat.
 5. Always use the schema's `readonly` flag.
 6. Use canonical schema values in generated commands.
+
+## Non-Negotiable Stop Conditions
+
+These conditions override convenience and the user's request to execute:
+
+- If profile validation reports a missing or invalid profile, stop immediately
+  after validation. Never invoke the matched business command to confirm the
+  failure or obtain a second error.
+- If the user includes a token, password, or other credential in the
+  conversation, enter exposed-credential mode. Never repeat or use the pasted
+  value. Perform exactly this safe-discovery sequence:
+  1. Run schema export.
+  2. Run the schema-declared readonly profile or connectivity check.
+  3. Stop. Schema export and the profile check are the only permitted SCCFM
+     operations in this mode. A successful check never authorizes the matched
+     business command or clears exposed-credential mode.
+  4. Tell the user to rotate or revoke the exposed credential and configure its
+     replacement locally through the hidden profile prompt. Never identify which
+     credential you mean by quoting it. Only one value was pasted, so "the token
+     you pasted" is already unambiguous. Never write "the token you pasted
+     (`<value>`)", "rotate the token: `<value>`", or any other appositive,
+     parenthetical, or backticked copy of the value, including inside a sentence
+     stating that you will not repeat it. Naming the value to warn about it is
+     the disclosure.
+  If the schema exposes no profile-configuration command, do not output or name
+  any `sccfm-cli` configuration command. Describe the local hidden-prompt setup
+  generically instead.
+- If an explicitly requested flag or option is absent from the discovered
+  schema, explain that it is unsupported and stop. Never silently omit it and
+  execute a broader or different command.
+- If schema export fails, stop after the first attempt. Do not repeat it and do
+  not try an alternate export form, a different `--format`, or `--help` to work
+  around it. A failed export is a stop condition, not a diagnosis task: report
+  the error and stop.
+
+### Missing-Profile Response Decision
+
+When the user explicitly states that no profile is configured, or profile
+validation reports one missing:
+
+- If the user explicitly reports the missing profile and no business command
+  will be executed, do not require a redundant profile check before providing
+  setup guidance.
+
+- If the schema includes a profile-configuration command, show only that exact
+  discovered command and its schema-supported options. Explain that it must run
+  locally through the hidden token prompt, and do not execute it for the user.
+- If the schema includes no profile-configuration command, state: "The exported
+  schema does not expose a profile-configuration command, so I cannot provide
+  one." Give only generic guidance to use the documented local hidden-prompt
+  setup. Do not infer a likely command from prior knowledge.
 
 ## Execution Modes
 
@@ -107,7 +163,7 @@ Follow these checks in order:
 1. Run `command -v sccfm-cli`.
    - If found, the invocation prefix is `sccfm-cli`.
 2. If you are inside this repository, the binary is not on `PATH`, and
-   `scripts/activate.sh` exists, run `source scripts/activate.sh` once for the
+   `cisco_sccfm_scripts/activate.sh` exists, run `source cisco_sccfm_scripts/activate.sh` once for the
    shell session, then resolve again. Do not use `poetry run`.
 3. Only install or perform setup when the user explicitly asks for it.
 4. Otherwise, stop and tell the user the CLI is not installed or not on `PATH`.
@@ -115,18 +171,43 @@ Follow these checks in order:
 Store the invocation prefix for the rest of the session. Do not switch
 invocation modes mid-session unless the user explicitly asks.
 
-#### Installing via Homebrew
+#### Optional CLI-only Homebrew installation
 
-Only do this if the user explicitly asked for installation or setup.
+Use Homebrew only when the user explicitly asks for Homebrew or a CLI-only
+installation. Route complete CLI-plus-Ansible runtime setup to `sccfm-setup`,
+whose canonical managed path uses pipx and a version-matched Galaxy collection.
 
 1. Verify `brew` is in `PATH`. If not, stop and tell the user to install
    Homebrew.
-2. Use `brew search` or the project release docs to discover the exact
-   tap/formula.
-3. Install only the exact documented formula. Do not invent a Homebrew package
-   name.
-4. If no Homebrew formula is published for the release, say so and use the
-   documented wheel or `pipx` install path instead.
+2. Show the exact setup commands below and require the standalone confirmation
+   `INSTALL SCCFM CLI WITH HOMEBREW` before running any of them. `brew tap` and
+   `brew trust` change local Homebrew state, so do not infer confirmation from a
+   general setup request.
+
+   ```bash
+   brew tap CiscoDevNet/tap
+   brew trust --formula CiscoDevNet/tap/sccfm-cli  # required once on Homebrew 6.0+
+   brew install CiscoDevNet/tap/sccfm-cli
+   ```
+
+   On Homebrew earlier than 6.0, omit the unsupported `brew trust` command.
+   Trust only the SCCFM formula; do not trust the whole tap unless the user
+   explicitly asks to trust every current and future item it contains.
+3. After confirmation, tap and trust as applicable, then inspect the exact
+   `CiscoDevNet/tap/sccfm-cli` formula and show its available version. If the
+   user requested a version, continue only when the formula provides that exact
+   stable version.
+4. Explain that Homebrew installs the CLI and Python library only. It does not
+   install the `cisco.sccfm` Ansible collection by itself. If the user wants
+   Ansible too, route the follow-up to `sccfm-setup`; it keeps the Homebrew CLI
+   and adds a private version-matched Ansible companion without exposing a
+   second CLI.
+5. Install only after the tap, trust, and requested-version checks succeed.
+6. After installation, verify the canonical full formula name and version with
+   Homebrew, resolve `sccfm-cli` on `PATH`, and export its schema. Stop if another
+   installation shadows the Homebrew executable.
+7. If no Homebrew formula is published for the requested release, say so and
+   offer the managed `sccfm-setup` path instead.
 
 ### Step B: Verify Credentials
 
@@ -138,8 +219,14 @@ Use the selected command's `auth` object:
 - If `auth.requires_profile` is false, skip profile verification.
 - If `auth.requires_profile` is true, verify a configured customer profile is
   available before executing.
-- Profiles contain a region and API token. Tokens come from developer.cisco.com
-  or the SCC Firewall Manager UI.
+- Profiles contain a region and API token. Tokens are generated in the SCC
+  Firewall Manager UI by creating an API-only user. Do not direct users to any
+  other source for a token.
+- Profiles live in one canonical named-profile store, shared by `sccfm-cli`,
+  `sccfm-cli-interactive`, and the `cisco.sccfm` Ansible collection. Do not
+  configure SCCFM tokens through `.env`, inline Ansible values, or Ansible Vault.
+  Never state a configuration path to the user that you have not observed in tool
+  output, and never direct the user to edit the store by hand.
 
 #### Secret Handling Rules
 
@@ -148,10 +235,29 @@ Use the selected command's `auth` object:
 3. Never log tokens or include them in final answers.
 4. Never use internal SystemDB credentials.
 5. If a profile is missing, guide the user to run the documented configuration
-   flow locally, or generate a validated configuration command with a placeholder
-   token.
+   flow locally. The token must come from its hidden prompt or schema-declared
+   environment source, never from a generated argv option.
 6. Only configure a profile yourself when the user explicitly provides a secure,
    local mechanism for the token.
+7. If the user includes a token or other credential in chat, treat it as
+   exposed. Never repeat or use it; advise the user to rotate or revoke it and
+   configure the replacement locally through the hidden prompt. Refer to it only
+   as "the token you pasted". Do not quote, mask, abbreviate, or otherwise
+   restate the value, including while explaining that it is exposed. Naming the
+   value to warn about it is still disclosure, and the warning does not need it.
+   Do not identify which credential you mean by quoting it: only one value was
+   pasted, so the phrase alone is unambiguous. Never write "the token you pasted
+   (`<value>`)", "rotate the token: `<value>`", or any other appositive,
+   parenthetical, or backticked copy, including inside a sentence stating that
+   you will not repeat it.
+8. Do not abort before safe discovery merely because a token was exposed. Run
+   schema export and then the schema's readonly profile or connectivity check,
+   but always stop before the matched business command, even when that check
+   succeeds. You cannot prove that an existing profile does not contain the now
+   exposed credential. Resume business operations only after the user rotates or
+   revokes the exposed token and configures its replacement locally. Never
+   substitute the matched business command for the profile check, and never name
+   a command or flag you have not discovered from the schema.
 
 #### Credential Verification Algorithm
 
@@ -159,11 +265,21 @@ Before executing any command where `auth.requires_profile` is true:
 
 1. Determine the profile from the user's request, global options, or schema
    defaults.
-2. Run a readonly profile/connectivity check only if the schema exposes one and
-   the selected execution mode allows validation.
-3. If validation succeeds, proceed with command construction.
-4. If no validation command is available, proceed only if a profile is already
-   configured or the user explicitly provides the profile name to use.
+2. If the schema exposes a readonly profile or connectivity check and the
+   selected execution mode allows validation, run it. Any readonly command that
+   reports authentication, profile, or connectivity state, such as a top-level
+   status command, is that check, including when it declares
+   `requires_profile: true`. Determine profile state from that command's output,
+   never by inspecting configuration files, checking whether a config path
+   exists, or assuming a default.
+3. If validation succeeds, proceed with command construction unless the user
+   exposed a credential in the conversation; in that case stop according to
+   Secret Handling Rule 8.
+4. Treat a validation command as unavailable only when the schema exposes none.
+   In that case, proceed only if a profile is already configured or the user
+   explicitly provides the profile name to use. Never run the matched business
+   command to discover whether a profile exists; an unverified profile is a
+   reason to stop, not a reason to try.
 5. If the profile is missing or invalid, stop and tell the user to configure a
    customer SCC Firewall Manager API token locally.
 6. Do not ask for token contents, do not print token values, and do not retry
@@ -215,7 +331,8 @@ Parse the JSON output. The schema contains:
 - `option_groups`: inter-option constraints
 - `constraints`: validation and preflight constraints
 - `global_options`: flags that must appear before the command path
-- `options`: accepted flags, types, defaults, choices, and descriptions
+- `options`: accepted flags, types, defaults, choices, sensitivity, environment sources, and
+  descriptions
 - `examples`: declared usage examples, if any
 
 Cache the schema in memory for the session. Do not re-export unless:
@@ -324,11 +441,16 @@ Do not add optional flags because they seem convenient.
 ### Sensitive and Risky Flags
 
 1. Never include API tokens in chat output.
-2. Do not pass diagnostic or verbose flags unless the user explicitly asked for
+2. Treat every option with `sensitive: true` as a secret even when its name is neutral. Never put
+   its value on argv or in a generated command. Prefer the schema-declared `envvar`, a hidden local
+   prompt, or another documented non-argv source.
+3. When a sensitive value is required, tell the user which environment variable or local prompt
+   the command uses without asking for or displaying the value.
+4. Do not pass diagnostic or verbose flags unless the user explicitly asked for
    diagnostic output on a failed readonly command.
-3. Do not pass local output/export/config path options unless the user explicitly
+5. Do not pass local output/export/config path options unless the user explicitly
    asked for local writes and provided the destination path.
-4. Never rely on schema default output paths for customer data exports.
+6. Never rely on schema default output paths for customer data exports.
 
 ### Target Identity Rules
 
@@ -357,6 +479,11 @@ If a command uses a file or list input for bulk work:
 ## Step 4: Execution Policy
 
 Apply these rules after selecting execution mode.
+
+Before invoking any business command, check whether the conversation contains a
+credential. If it does, exposed-credential mode is active: do not invoke the
+business command even after successful profile validation. Stop after schema
+export and the readonly profile or connectivity check.
 
 ### Class A: Readonly, No Local Writes
 
@@ -410,17 +537,33 @@ was performed, return the exact command, and do not execute it.
 
 These confirmation rules apply only in Execute mode.
 
-For any Class C command, require the user to send the exact confirmation phrase
-you provide. Use this format:
+For any Class C command, require the user to send the exact shell command from
+the reviewed plan, prefixed with `EXECUTE `. Use this format:
 
 ```text
-EXECUTE sccfm-cli <schema command path> <target-summary>
+EXECUTE <exact shell command>
 ```
+
+Show exactly one standalone `EXECUTE <exact shell command>` confirmation line
+outside any code fence when the plan is complete and ready for confirmation.
+Do not emit a separate machine-readable marker. The plugin's Stop hook derives
+the planned command from that visible line and records only its digest so that a
+later user confirmation cannot authorize a different command. Do not request
+confirmation in Generate-Only mode, for a schema-declared preflight-only plan,
+or after the command has run.
+
+The text after `EXECUTE ` must exactly match the command the agent will submit
+to the shell, including global options, command options, quoting, and targets.
+Require it as a standalone user message without a code fence or explanation.
+Never accept an edited, abbreviated, or compound command. The plugin command
+guard compares it with the previously recorded plan command, creates a ten-minute
+receipt only for an exact match, and consumes that receipt after one matching
+execution attempt or clears it when the turn ends.
 
 For bulk or broad-target mutations, require two confirmations:
 
 1. A first confirmation that they want to proceed with the plan.
-2. A second message containing the exact `EXECUTE ...` phrase.
+2. A second message containing `EXECUTE ` followed by the exact shell command.
 
 #### Red Lines for Mutating Commands
 
@@ -446,6 +589,23 @@ request.
 - For tabular results, use a markdown table when that improves clarity.
 - For exported data, confirm the output path and summarize what was written
   without dumping sensitive data into chat unless the user explicitly asks.
+
+### Final Response Grounding Audit
+
+Before responding, inspect every string in the draft that begins with
+`sccfm-cli`. Keep it only when its command path and every option appear in the
+current exported schema. Remove unsupported commands from examples, setup
+guidance, prose, and code blocks; never rely on memory to repair them.
+
+When the schema exposes no profile-configuration command, keep setup guidance
+generic. Do not state a configuration file path, token source, storage behavior,
+or other setup detail unless the current schema or discovered documentation
+provides it.
+
+Before sending the final response, compare the draft with every credential the
+user supplied in the conversation. Remove every exact, quoted, masked, or
+abbreviated occurrence of each value, including occurrences inside warnings and
+code blocks. Refer to it only as "the token you pasted."
 
 ### Errors
 

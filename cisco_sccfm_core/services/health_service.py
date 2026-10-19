@@ -1,0 +1,35 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# SPDX-License-Identifier: Apache-2.0
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List
+
+from scc_firewall_manager_sdk import UsersApi
+
+from cisco_sccfm_core.factories import ApiClientFactory
+from cisco_sccfm_core.types import ConfigLike
+
+
+@dataclass(frozen=True)
+class HealthStatus:
+    name: str
+    healthy: bool
+    detail: str
+
+
+class HealthService:
+    def __init__(self, config: ConfigLike) -> None:
+        api_client = ApiClientFactory().build(config)
+        self.users_api = UsersApi(api_client)
+
+    def check(self) -> List[HealthStatus]:
+        try:
+            self.users_api.get_token()
+            return [HealthStatus(name="API connectivity", healthy=True, detail="Token valid")]
+        except Exception:
+            return [
+                HealthStatus(name="API connectivity", healthy=False, detail="Token invalid"),
+            ]
