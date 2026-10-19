@@ -32,8 +32,6 @@ def base_module_params() -> dict[str, Any]:
         "ftd_uid": "cdfmc-ftd-uid-123",
         "skip_initial_deployment": False,
         "profile": "default",
-        "region": "us",
-        "api_token": "test-token-123",
     }
 
 
