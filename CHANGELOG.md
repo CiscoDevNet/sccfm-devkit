@@ -1,3 +1,11 @@
+## v0.43.2 (2026-10-20)
+
+### Fix
+
+- **lh-134510**: accept sonnet 5.5 wording in harness fixtures
+- **lh-134510**: stop false harness failures on sonnet 5.5 runs
+- **lh-134510**: drop temperature from bedrock harness requests
+
 ## v0.43.1 (2026-10-02)
 
 ### Fix
