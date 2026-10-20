@@ -2,6 +2,20 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.43.2:
+    changes:
+      bugfixes:
+        - Stopped sending a temperature to Amazon Bedrock from the agent harness,
+          because Claude Sonnet 5.5, which replaces the end-of-life Claude Sonnet 4
+          model, rejects it.
+        - Stopped the harness reporting a command as having escaped the test
+          environment when an earlier chained command that never ran was credited
+          with its execution.
+        - Accepted equivalent Claude Sonnet 5.5 wording in the missing-profile,
+          leaked-token, and uninstall harness scenarios, which had rejected correct
+          answers.
+    fragments: []
+    release_date: '2026-10-20'
   0.43.1:
     changes:
       bugfixes:
