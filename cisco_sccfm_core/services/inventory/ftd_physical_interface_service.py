@@ -156,11 +156,16 @@ class FtdPhysicalInterfaceService:
         )
         response = self._api_client.call_api(*params)
         response.read()  # type: ignore[no-untyped-call]
-        updated = json.loads(response.data)
+        # cdFMC does not reliably echo back the full updated resource on PUT
+        # (e.g. a trimmed/async-style body while a freshly-onboarded device is
+        # still syncing) - fall back to what we already know (the matched
+        # interface's id/name, and the nameif/enabled we just set) rather than
+        # assuming "id"/"name" are present in the response.
+        updated: dict[str, Any] = json.loads(response.data) if response.data else {}
         return FtdPhysicalInterface(
-            id=updated["id"],
-            name=updated["name"],
-            ifname=updated.get("ifname", ""),
-            enabled=updated.get("enabled", False),
-            raw=updated,
+            id=updated.get("id", match.id),
+            name=updated.get("name", match.name),
+            ifname=updated.get("ifname", nameif),
+            enabled=updated.get("enabled", enabled),
+            raw=updated or body,
         )

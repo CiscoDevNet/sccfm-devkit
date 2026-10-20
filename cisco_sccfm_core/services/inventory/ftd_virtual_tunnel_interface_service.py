@@ -181,12 +181,15 @@ class FtdVirtualTunnelInterfaceService:
         )
         response = self._api_client.call_api(*params)
         response.read()  # type: ignore[no-untyped-call]
-        created = json.loads(response.data)
+        # Mirror configure_interface()'s defensiveness: don't assume cdFMC
+        # echoes back the full created resource (e.g. while a freshly-onboarded
+        # device is still syncing) - fall back to what we already requested.
+        created: dict[str, Any] = json.loads(response.data) if response.data else {}
         return True, FtdVirtualTunnelInterface(
-            id=created["id"],
-            name=created.get("name", ""),
-            ifname=created.get("ifname", ""),
+            id=created.get("id", ""),
+            name=created.get("name", ifname),
+            ifname=created.get("ifname", ifname),
             tunnel_id=created.get("tunnelId", tunnel_id),
             enabled=created.get("enabled", enabled),
-            raw=created,
+            raw=created or body,
         )
