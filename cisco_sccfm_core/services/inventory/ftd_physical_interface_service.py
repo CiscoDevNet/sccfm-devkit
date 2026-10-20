@@ -111,6 +111,7 @@ class FtdPhysicalInterfaceService:
         ipv4: Ipv4Config | None = None,
         enabled: bool = True,
         security_zone_uid: str | None = None,
+        mode: str = "ROUTED",
     ) -> FtdPhysicalInterface:
         interfaces = self.list_interfaces(domain_uid, device_id)
         match = next((i for i in interfaces if i.name == interface_name), None)
@@ -125,6 +126,11 @@ class FtdPhysicalInterfaceService:
             **match.raw,
             "ifname": nameif,
             "enabled": enabled,
+            # cdFMC requires "mode" on every PUT - a never-configured
+            # interface's GET representation (match.raw) doesn't carry one,
+            # so it must be set explicitly rather than inherited. Mirrors the
+            # ROUTED mode create_security_zone sets on the security zone side.
+            "mode": mode,
         }
         if ipv4 is not None:
             body["ipv4"] = {

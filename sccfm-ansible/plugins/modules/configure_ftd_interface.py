@@ -61,6 +61,14 @@ options:
     description: UID of the security zone to assign to the interface.
     required: false
     type: str
+  mode:
+    description: >-
+      Interface mode (e.g. C(ROUTED), C(PASSIVE), C(INLINE), C(ERSPAN),
+      C(TAP)). cdFMC requires this on every write; it is not inherited from
+      the interface's current configuration.
+    required: false
+    type: str
+    default: ROUTED
   region:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
@@ -123,6 +131,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "netmask": {"type": "str", "required": False},
         "enabled": {"type": "bool", "required": False, "default": True},
         "security_zone_uid": {"type": "str", "required": False},
+        "mode": {"type": "str", "required": False, "default": "ROUTED"},
         **base_argument_spec(),
     }
 
@@ -145,6 +154,7 @@ def run_module() -> None:
     netmask: str | None = params.get("netmask")
     enabled: bool = params["enabled"]
     security_zone_uid: str | None = params.get("security_zone_uid")
+    mode: str = params["mode"]
 
     if module.check_mode:
         module.exit_json(
@@ -167,6 +177,7 @@ def run_module() -> None:
             ipv4=ipv4,
             enabled=enabled,
             security_zone_uid=security_zone_uid,
+            mode=mode,
         )
         module.exit_json(
             changed=True,
