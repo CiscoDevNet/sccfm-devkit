@@ -4,6 +4,16 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.43.2
+========
+
+Bugfixes
+--------
+
+- Stopped sending a temperature to Amazon Bedrock from the agent harness, because Claude Sonnet 5.5, which replaces the end-of-life Claude Sonnet 4 model, rejects it.
+- Stopped the harness reporting a command as having escaped the test environment when an earlier chained command that never ran was credited with its execution.
+- Accepted equivalent Claude Sonnet 5.5 wording in the missing-profile, leaked-token, and uninstall harness scenarios, which had rejected correct answers.
+
 v0.43.1
 ========
 

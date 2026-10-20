@@ -33,7 +33,7 @@ lower bound near 90%. Raise it on targeted fixtures instead of multiplying the
 whole suite.
 
 Model naming is provider-specific. Bedrock model ids carry a region prefix, so an
-`eu-west-1` profile needs `eu.anthropic.claude-sonnet-5` rather than the `us.`
+`eu-west-1` profile needs `eu.anthropic.claude-sonnet-5-5` rather than the `us.`
 form.
 
 ### Controlling the run
@@ -113,7 +113,7 @@ poetry run sccfm-agent-harness run \
   --mode explicit-skill \
   --tier required \
   --samples 3 \
-  --model eu.anthropic.claude-sonnet-5 \
+  --model eu.anthropic.claude-sonnet-5-5 \
   --compare-baseline agent-harness/baselines/explicit-skill-claude.json
 ```
 
@@ -141,7 +141,7 @@ poetry run sccfm-agent-harness run \
   --agent bedrock \
   --mode explicit-skill \
   --fixture cli-readonly-list \
-  --model us.anthropic.claude-sonnet-4-20250514-v1:0 \
+  --model us.anthropic.claude-sonnet-5-5 \
   --bedrock-region us-west-2
 ```
 

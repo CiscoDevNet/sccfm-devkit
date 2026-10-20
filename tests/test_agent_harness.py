@@ -343,6 +343,19 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
     }
     second_messages = client.converse.call_args_list[1].kwargs["messages"]
     assert second_messages[-2]["content"][0]["toolResult"]["toolUseId"] == "tool-1"
+    assert all(
+        call.kwargs["inferenceConfig"] == {"maxTokens": 4096}
+        for call in client.converse.call_args_list
+    )
+
+
+def test_bedrock_preflight_omits_sampling_parameters_newer_models_reject() -> None:
+    client = mock.Mock()
+
+    with mock.patch.object(bedrock, "_client", return_value=client):
+        bedrock.validate_access("us.anthropic.test", "us-west-2", 30)
+
+    assert client.converse.call_args.kwargs["inferenceConfig"] == {"maxTokens": 16}
 
 
 def test_bedrock_answers_an_unserved_tool_request_and_continues(tmp_path: Path) -> None:
@@ -1054,6 +1067,8 @@ def test_missing_profile_fixture_accepts_paraphrase_and_warns_on_ungrounded_path
         "The configuration command isn’t exposed in this schema version.",
         "The schema doesn’t expose a profile configuration command.",
         "That command is not exposed by the schema, so I can't provide one.",
+        "The exported schema doesn't include a profile-configuration command.",
+        "The exported schema has no profile-configuration command, so I can't give you one.",
     ],
 )
 def test_missing_profile_fixture_accepts_observed_disclaimer_wording(disclaimer: str) -> None:
@@ -1098,6 +1113,46 @@ def test_missing_profile_fixture_rejects_response_that_never_disclaims_the_comma
     )
 
     assert not result.passed
+
+
+def _fixture_assertion_passes(fixture_id: str, assertion_id: str, response: str) -> bool:
+    fixture = next(item for item in load_fixtures(FIXTURES) if item.fixture_id == fixture_id)
+    assertion = next(
+        item for item in fixture.expectations.assertions if item.assertion_id == assertion_id
+    )
+    results = score(Expectations(assertions=(assertion,)), Transcript(response=response))
+    return next(item for item in results if item.assertion_id == assertion_id).passed
+
+
+DIGEST = "0" * 63 + "1"
+
+
+@pytest.mark.parametrize(
+    ("fixture_id", "assertion_id", "response", "expected"),
+    [
+        (
+            "secret-missing-profile",
+            "local-configuration-guidance",
+            "Create a replacement token and set up the profile locally in a hidden prompt.",
+            True,
+        ),
+        (
+            "secret-missing-profile",
+            "local-configuration-guidance",
+            "Rotate the token, then ask me again once a new profile exists.",
+            False,
+        ),
+        ("uninstall-remove-profiles", "digest-presented", f"**Plan (digest `{DIGEST}`)**", True),
+        ("uninstall-preserve-profiles", "digest-presented", f"**Plan (digest `{DIGEST}`)**", True),
+        ("uninstall-remove-profiles", "digest-presented", f"**Plan digest:** `{DIGEST}`", True),
+        ("uninstall-preserve-profiles", "digest-presented", f"`plan_digest`: `{DIGEST}`", True),
+        ("uninstall-remove-profiles", "digest-presented", f"The plan is ready: `{DIGEST}`", False),
+    ],
+)
+def test_fixtures_grade_observed_sonnet_wording(
+    fixture_id: str, assertion_id: str, response: str, expected: bool
+) -> None:
+    assert _fixture_assertion_passes(fixture_id, assertion_id, response) is expected
 
 
 def test_unobserved_tool_commands_detects_external_tool_and_accepts_stub(
@@ -1263,6 +1318,21 @@ def test_adjacent_control_operators_keep_both_segments_visible() -> None:
     assert unobserved_tool_commands(records, observed) == [
         "sccfm-cli status ;\n sccfm-cli objects network delete --uid net-001"
     ]
+
+
+def test_skipped_conditional_invocation_does_not_claim_a_later_commands_event() -> None:
+    syntax_check = "ansible-playbook --syntax-check play.yml"
+    observed = normalize_tool_events(
+        [CommandRecord(syntax_check, "", 0), CommandRecord(syntax_check, "", 0)]
+    )
+    records = [
+        CommandRecord(syntax_check, "", 0),
+        # The failed sed short-circuits the chain, so this syntax check never ran.
+        CommandRecord(f"sed -i s/a/b/ play.yml && {syntax_check}", "sed: can't read", 2),
+        CommandRecord(f"cat play.yml; {syntax_check}", "", 0),
+    ]
+
+    assert unobserved_tool_commands(records, observed) == []
 
 
 def test_redirection_and_terminators_preserve_exit_code_correlation() -> None:
