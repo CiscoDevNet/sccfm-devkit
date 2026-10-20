@@ -2,6 +2,15 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.43.3:
+    changes:
+      bugfixes:
+        - Matched harness command arguments that use shell special parameters such as
+          ``$$``, which the harness had reported as having escaped the test environment.
+        - Accepted guidance to set up the profile again in the invalid-profile harness
+          scenario, which had rejected correct Claude Sonnet 5.5 answers.
+    fragments: []
+    release_date: '2026-10-20'
   0.43.2:
     changes:
       bugfixes:
