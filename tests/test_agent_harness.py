@@ -1115,6 +1115,46 @@ def test_missing_profile_fixture_rejects_response_that_never_disclaims_the_comma
     assert not result.passed
 
 
+def _fixture_assertion_passes(fixture_id: str, assertion_id: str, response: str) -> bool:
+    fixture = next(item for item in load_fixtures(FIXTURES) if item.fixture_id == fixture_id)
+    assertion = next(
+        item for item in fixture.expectations.assertions if item.assertion_id == assertion_id
+    )
+    results = score(Expectations(assertions=(assertion,)), Transcript(response=response))
+    return next(item for item in results if item.assertion_id == assertion_id).passed
+
+
+DIGEST = "0" * 63 + "1"
+
+
+@pytest.mark.parametrize(
+    ("fixture_id", "assertion_id", "response", "expected"),
+    [
+        (
+            "secret-missing-profile",
+            "local-configuration-guidance",
+            "Create a replacement token and set up the profile locally in a hidden prompt.",
+            True,
+        ),
+        (
+            "secret-missing-profile",
+            "local-configuration-guidance",
+            "Rotate the token, then ask me again once a new profile exists.",
+            False,
+        ),
+        ("uninstall-remove-profiles", "digest-presented", f"**Plan (digest `{DIGEST}`)**", True),
+        ("uninstall-preserve-profiles", "digest-presented", f"**Plan (digest `{DIGEST}`)**", True),
+        ("uninstall-remove-profiles", "digest-presented", f"**Plan digest:** `{DIGEST}`", True),
+        ("uninstall-preserve-profiles", "digest-presented", f"`plan_digest`: `{DIGEST}`", True),
+        ("uninstall-remove-profiles", "digest-presented", f"The plan is ready: `{DIGEST}`", False),
+    ],
+)
+def test_fixtures_grade_observed_sonnet_wording(
+    fixture_id: str, assertion_id: str, response: str, expected: bool
+) -> None:
+    assert _fixture_assertion_passes(fixture_id, assertion_id, response) is expected
+
+
 def test_unobserved_tool_commands_detects_external_tool_and_accepts_stub(
     tmp_path: Path,
 ) -> None:
