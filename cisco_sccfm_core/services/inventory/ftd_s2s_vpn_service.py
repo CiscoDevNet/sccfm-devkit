@@ -230,9 +230,15 @@ class FtdS2SVpnService:
                 "PUT", _relative_path_from_self_link(ipsec_settings_self), ipsec_body
             )
 
+        if "id" not in created:
+            raise RuntimeError(
+                f"POST to {create_path} returned HTTP 2xx but the response "
+                f"did not contain the created tunnel's 'id' - the write was "
+                f"likely not applied. Response body: {created!r}"
+            )
         return True, FtdS2SVpnTunnel(
             id=created["id"],
-            name=created["name"],
+            name=created.get("name", name),
             endpoints_path=(
                 _relative_path_from_self_link(endpoints_self)
                 if endpoints_self
@@ -291,6 +297,28 @@ class FtdS2SVpnService:
             "interface": {"id": interface_uid},
         }
         created = self._call("POST", endpoints_path, body)
+        if "id" not in created:
+            # Re-check by listing (same idempotency match used above) before
+            # concluding the write failed - but if it's genuinely not there,
+            # raise with the actual response rather than masking it as success.
+            match = next(
+                (
+                    e
+                    for e in self.list_endpoints(endpoints_path)
+                    if not e.get("extranet", False)
+                    and e.get("device", {}).get("name") == device_name
+                ),
+                None,
+            )
+            if match is None:
+                raise RuntimeError(
+                    f"POST to {endpoints_path} returned HTTP 2xx but the "
+                    f"response did not contain the created endpoint's 'id', "
+                    f"and no matching endpoint for device '{device_name}' was "
+                    f"found on re-list - the write was likely not applied. "
+                    f"Response body: {created!r}"
+                )
+            created = match
         return True, FtdS2SVpnEndpoint(
             id=created["id"], name=created.get("name", device_name), raw=created
         )
@@ -333,6 +361,26 @@ class FtdS2SVpnService:
             },
         }
         created = self._call("POST", endpoints_path, body)
+        if "id" not in created:
+            # Same re-check-before-raising approach as create_endpoint_ftd() above.
+            match = next(
+                (
+                    e
+                    for e in self.list_endpoints(endpoints_path)
+                    if e.get("extranet", False)
+                    and e.get("extranetInfo", {}).get("ipAddress") == peer_ip_address
+                ),
+                None,
+            )
+            if match is None:
+                raise RuntimeError(
+                    f"POST to {endpoints_path} returned HTTP 2xx but the "
+                    f"response did not contain the created endpoint's 'id', "
+                    f"and no matching extranet endpoint for peer "
+                    f"'{peer_ip_address}' was found on re-list - the write "
+                    f"was likely not applied. Response body: {created!r}"
+                )
+            created = match
         return True, FtdS2SVpnEndpoint(
             id=created["id"], name=created.get("name", peer_name), raw=created
         )

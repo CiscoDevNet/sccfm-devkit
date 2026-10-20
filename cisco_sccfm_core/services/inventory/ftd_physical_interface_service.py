@@ -156,16 +156,22 @@ class FtdPhysicalInterfaceService:
         )
         response = self._api_client.call_api(*params)
         response.read()  # type: ignore[no-untyped-call]
-        # cdFMC does not reliably echo back the full updated resource on PUT
-        # (e.g. a trimmed/async-style body while a freshly-onboarded device is
-        # still syncing) - fall back to what we already know (the matched
-        # interface's id/name, and the nameif/enabled we just set) rather than
-        # assuming "id"/"name" are present in the response.
         updated: dict[str, Any] = json.loads(response.data) if response.data else {}
+        if "id" not in updated:
+            # A 2xx response without the resource's "id" means the write was
+            # not actually applied by cdFMC (confirmed: devices stay off the
+            # "pending changes" list and the FTD CLI shows the interface
+            # unconfigured after this call returns). Surface the raw response
+            # instead of silently treating this as success.
+            raise RuntimeError(
+                f"PUT to {path} returned HTTP {response.status} but the "
+                f"response did not contain the updated interface's 'id' - "
+                f"the write was likely not applied. Response body: {updated!r}"
+            )
         return FtdPhysicalInterface(
-            id=updated.get("id", match.id),
+            id=updated["id"],
             name=updated.get("name", match.name),
             ifname=updated.get("ifname", nameif),
             enabled=updated.get("enabled", enabled),
-            raw=updated or body,
+            raw=updated,
         )
