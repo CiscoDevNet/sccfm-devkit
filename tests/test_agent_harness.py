@@ -1067,6 +1067,8 @@ def test_missing_profile_fixture_accepts_paraphrase_and_warns_on_ungrounded_path
         "The configuration command isn’t exposed in this schema version.",
         "The schema doesn’t expose a profile configuration command.",
         "That command is not exposed by the schema, so I can't provide one.",
+        "The exported schema doesn't include a profile-configuration command.",
+        "The exported schema has no profile-configuration command, so I can't give you one.",
     ],
 )
 def test_missing_profile_fixture_accepts_observed_disclaimer_wording(disclaimer: str) -> None:
@@ -1276,6 +1278,21 @@ def test_adjacent_control_operators_keep_both_segments_visible() -> None:
     assert unobserved_tool_commands(records, observed) == [
         "sccfm-cli status ;\n sccfm-cli objects network delete --uid net-001"
     ]
+
+
+def test_skipped_conditional_invocation_does_not_claim_a_later_commands_event() -> None:
+    syntax_check = "ansible-playbook --syntax-check play.yml"
+    observed = normalize_tool_events(
+        [CommandRecord(syntax_check, "", 0), CommandRecord(syntax_check, "", 0)]
+    )
+    records = [
+        CommandRecord(syntax_check, "", 0),
+        # The failed sed short-circuits the chain, so this syntax check never ran.
+        CommandRecord(f"sed -i s/a/b/ play.yml && {syntax_check}", "sed: can't read", 2),
+        CommandRecord(f"cat play.yml; {syntax_check}", "", 0),
+    ]
+
+    assert unobserved_tool_commands(records, observed) == []
 
 
 def test_redirection_and_terminators_preserve_exit_code_correlation() -> None:

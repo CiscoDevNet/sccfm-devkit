@@ -206,17 +206,16 @@ def unobserved_tool_commands(
                 and record.exit_code in {126, 127}
                 and not executable_path.exists()
             )
-            if failed_before_execution:
+            # A conditional invocation may never have run, so it must not claim an
+            # event that a later unconditional invocation of the same command emitted.
+            if failed_before_execution or conditional:
                 continue
             expected_exit_code = (
                 _reported_process_exit_code(record)
                 if len(invocations) == 1 and not _has_shell_composition(record.command)
                 else None
             )
-            if (
-                not _consume(remaining, operation, tuple(argv), expected_exit_code)
-                and not conditional
-            ):
+            if not _consume(remaining, operation, tuple(argv), expected_exit_code):
                 escaped.append(record.command)
     return escaped
 
