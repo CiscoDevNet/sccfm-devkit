@@ -41,7 +41,9 @@ TOOLS = {
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 REDIRECTION = re.compile(r"^\d*(?:>>|>|<<|<)(?P<target>[^<>]*)$")
 REDIRECTION_OPERATOR = re.compile(r"^\d*(?:>>|>|<<|<)$")
-EXPANSION = re.compile(r"\$\{[^}]*\}|\$\([^)]*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|^~")
+EXPANSION = re.compile(
+    r"\$\{[^}]*\}|\$\([^)]*\)|`[^`]*`|\$[A-Za-z_][A-Za-z0-9_]*|\$[$?!#@*0-9-]|^~"
+)
 
 
 def normalize_tool_events(records: list[CommandRecord]) -> list[ToolEvent]:

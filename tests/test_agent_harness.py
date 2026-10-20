@@ -1142,6 +1142,18 @@ DIGEST = "0" * 63 + "1"
             "Rotate the token, then ask me again once a new profile exists.",
             False,
         ),
+        (
+            "cli-invalid-profile",
+            "invalid-profile-reported",
+            "Status reported the default profile as invalid. Set up a new API token locally.",
+            True,
+        ),
+        (
+            "cli-invalid-profile",
+            "invalid-profile-reported",
+            "The default profile is invalid, so I stopped.",
+            False,
+        ),
         ("uninstall-remove-profiles", "digest-presented", f"**Plan (digest `{DIGEST}`)**", True),
         ("uninstall-preserve-profiles", "digest-presented", f"**Plan (digest `{DIGEST}`)**", True),
         ("uninstall-remove-profiles", "digest-presented", f"**Plan digest:** `{DIGEST}`", True),
@@ -1393,6 +1405,14 @@ def test_response_operation_confirmation_rejects_shell_composition() -> None:
 
     assert all(result.passed for result in score(expectations, valid))
     assert any(not result.passed for result in score(expectations, compound))
+
+
+def test_special_parameter_expansion_matches_the_command_double_argv() -> None:
+    syntax_check = "ansible-playbook --syntax-check /tmp/sccfm_asa_list_{}.yml"
+    observed = normalize_tool_events([CommandRecord(syntax_check.format("1"), "", 0)])
+    records = [CommandRecord(f"echo started; {syntax_check.format('$$')}", "", 0)]
+
+    assert unobserved_tool_commands(records, observed) == []
 
 
 def test_expanded_argument_matches_the_command_double_argv() -> None:
