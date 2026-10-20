@@ -10,8 +10,8 @@ from typing import Any
 
 from scc_firewall_manager_sdk import ApiClient
 
-from sccfm_core.factories import ApiClientFactory
-from sccfm_core.types import ConfigLike
+from cisco_sccfm_core import ApiClientFactory
+from cisco_sccfm_core.types import ConfigLike
 
 _DEVICE_RECORDS_PATH = (
     "/v1/cdfmc/api/fmc_config/v1/domain/{domain_uid}/devices/devicerecords"
