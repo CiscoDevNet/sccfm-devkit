@@ -63,12 +63,13 @@ options:
     type: str
   mode:
     description: >-
-      Interface mode (e.g. C(ROUTED), C(PASSIVE), C(INLINE), C(ERSPAN),
-      C(TAP)). cdFMC requires this on every write; it is not inherited from
-      the interface's current configuration.
+      Interface mode (e.g. C(NONE) for a standard routed interface,
+      C(PASSIVE), C(INLINE), C(ERSPAN), C(TAP)). cdFMC requires this on
+      every write; it is not reliably inherited from the interface's
+      current configuration.
     required: false
     type: str
-    default: ROUTED
+    default: NONE
   region:
     description: SCCFM region (int, us, eu, apj, au, uae, in, or ci).
     required: false
@@ -131,7 +132,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
         "netmask": {"type": "str", "required": False},
         "enabled": {"type": "bool", "required": False, "default": True},
         "security_zone_uid": {"type": "str", "required": False},
-        "mode": {"type": "str", "required": False, "default": "ROUTED"},
+        "mode": {"type": "str", "required": False, "default": "NONE"},
         **base_argument_spec(),
     }
 
