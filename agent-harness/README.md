@@ -173,7 +173,7 @@ Inspect the direct Bedrock request without invoking a model:
 ```bash
 poetry run sccfm-agent-harness run \
   --agent bedrock \
-  --model us.anthropic.claude-sonnet-4-20250514-v1:0 \
+  --model us.anthropic.claude-sonnet-5-5 \
   --dry-run
 ```
 

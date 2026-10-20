@@ -343,6 +343,19 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
     }
     second_messages = client.converse.call_args_list[1].kwargs["messages"]
     assert second_messages[-2]["content"][0]["toolResult"]["toolUseId"] == "tool-1"
+    assert all(
+        call.kwargs["inferenceConfig"] == {"maxTokens": 4096}
+        for call in client.converse.call_args_list
+    )
+
+
+def test_bedrock_preflight_omits_sampling_parameters_newer_models_reject() -> None:
+    client = mock.Mock()
+
+    with mock.patch.object(bedrock, "_client", return_value=client):
+        bedrock.validate_access("us.anthropic.test", "us-west-2", 30)
+
+    assert client.converse.call_args.kwargs["inferenceConfig"] == {"maxTokens": 16}
 
 
 def test_bedrock_answers_an_unserved_tool_request_and_continues(tmp_path: Path) -> None:

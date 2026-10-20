@@ -61,7 +61,7 @@ def validate_access(model: str, region: str, timeout_seconds: int) -> None:
         client.converse(
             modelId=model,
             messages=[{"role": "user", "content": [{"text": "Reply with ready."}]}],
-            inferenceConfig={"maxTokens": 16, "temperature": 0},
+            inferenceConfig={"maxTokens": 16},
         )
     except Exception as error:
         diagnostic = redact(str(error))
@@ -98,7 +98,7 @@ def run_session(
                 "modelId": model,
                 "messages": messages,
                 "toolConfig": {"tools": [_bash_tool()]},
-                "inferenceConfig": {"maxTokens": 4096, "temperature": 0},
+                "inferenceConfig": {"maxTokens": 4096},
             }
             if system_prompt:
                 request["system"] = [{"text": system_prompt}]
