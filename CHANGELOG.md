@@ -1,3 +1,10 @@
+## v0.43.3 (2026-10-20)
+
+### Fix
+
+- **lh-134510**: match command substitutions in harness arguments
+- **lh-134510**: match special shell parameters in harness
+
 ## v0.43.2 (2026-10-20)
 
 ### Fix
