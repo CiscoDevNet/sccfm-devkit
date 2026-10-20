@@ -217,28 +217,50 @@ def unobserved_tool_commands(
                 if len(invocations) == 1 and not _has_shell_composition(record.command)
                 else None
             )
-            if not _consume(remaining, operation, tuple(argv), expected_exit_code):
+            if not _consume(remaining, tool, operation, tuple(argv), expected_exit_code):
                 escaped.append(record.command)
     return escaped
 
 
 def _consume(
     remaining: list[ToolEvent],
+    tool: str,
     operation: str,
     argv: tuple[str, ...],
     expected_exit_code: int | None = None,
 ) -> bool:
     """Remove one recorded invocation that this parsed command accounts for."""
 
+    # A bare expansion can change which operation the written argv classifies as,
+    # so the received argv, matched word by word, decides instead.
+    operation_known = not any(EXPANSION.fullmatch(token) for token in argv)
     for index, event in enumerate(remaining):
-        if event.operation != operation or len(event.argv) != len(argv):
+        if event.tool != tool or (operation_known and event.operation != operation):
             continue
         if expected_exit_code is not None and event.exit_code != expected_exit_code:
             continue
-        if all(_token_matches(parsed, recorded) for parsed, recorded in zip(argv, event.argv)):
+        if _argv_matches(argv, event.argv):
             del remaining[index]
             return True
     return False
+
+
+def _argv_matches(parsed: tuple[str, ...], recorded: tuple[str, ...]) -> bool:
+    """Match argv as written against argv as received, word by word.
+
+    An argument that is only an expansion can split into any number of words,
+    including none, so it may absorb any run of received words. Every other
+    argument still has to match a received word of its own.
+    """
+
+    if not parsed:
+        return not recorded
+    head, rest = parsed[0], parsed[1:]
+    if EXPANSION.fullmatch(head):
+        return any(_argv_matches(rest, recorded[count:]) for count in range(len(recorded) + 1))
+    return (
+        bool(recorded) and _token_matches(head, recorded[0]) and _argv_matches(rest, recorded[1:])
+    )
 
 
 def _reported_process_exit_code(record: CommandRecord) -> int | None:
@@ -295,7 +317,14 @@ def _tokenize(command: str) -> list[str] | None:
 
     tokens: list[str] = []
     descriptor_pending = False
+    substitution_depth = 0
     for token in lexed:
+        # The lexer splits an unquoted ``$(...)`` at its spaces and operators, but
+        # the shell substitutes it as a single expansion.
+        if substitution_depth:
+            tokens[-1] += f" {token}"
+            substitution_depth += _substitution_balance(token)
+            continue
         if token and set(token) <= set(PUNCTUATION_CHARS):
             for operator in _control_operators(token):
                 if operator == "&" and tokens and REDIRECTION_OPERATOR.match(tokens[-1]):
@@ -310,6 +339,7 @@ def _tokenize(command: str) -> list[str] | None:
             descriptor_pending = False
             continue
         tokens.append(token)
+        substitution_depth = max(_substitution_balance(token), 0)
 
     start = 0
     end = len(tokens)
@@ -318,6 +348,10 @@ def _tokenize(command: str) -> list[str] | None:
     while end > start and tokens[end - 1] in TERMINATORS:
         end -= 1
     return tokens[start:end]
+
+
+def _substitution_balance(token: str) -> int:
+    return token.count("$(") - token.count(")")
 
 
 def _control_operators(run: str) -> list[str]:

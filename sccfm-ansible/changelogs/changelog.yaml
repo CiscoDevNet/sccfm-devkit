@@ -6,7 +6,8 @@ releases:
     changes:
       bugfixes:
         - Matched harness command arguments that use shell special parameters such as
-          ``$$``, which the harness had reported as having escaped the test environment.
+          ``$$`` or command substitutions such as ``$(cat path.txt)``, which the harness
+          had reported as having escaped the test environment.
         - Accepted guidance to set up the profile again in the invalid-profile harness
           scenario, which had rejected correct Claude Sonnet 5.5 answers.
     fragments: []

@@ -10,7 +10,7 @@ v0.43.3
 Bugfixes
 --------
 
-- Matched harness command arguments that use shell special parameters such as ``$$``, which the harness had reported as having escaped the test environment.
+- Matched harness command arguments that use shell special parameters such as ``$$`` or command substitutions such as ``$(cat path.txt)``, which the harness had reported as having escaped the test environment.
 - Accepted guidance to set up the profile again in the invalid-profile harness scenario, which had rejected correct Claude Sonnet 5.5 answers.
 
 v0.43.2

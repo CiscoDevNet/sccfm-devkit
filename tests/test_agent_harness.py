@@ -1415,6 +1415,41 @@ def test_special_parameter_expansion_matches_the_command_double_argv() -> None:
     assert unobserved_tool_commands(records, observed) == []
 
 
+@pytest.mark.parametrize(
+    ("written", "received"),
+    [
+        (
+            "ansible-playbook --syntax-check $(cat /tmp/asa_path.txt)",
+            "ansible-playbook --syntax-check /tmp/asa_list_1.yml",
+        ),
+        ("ansible-playbook $(cat /tmp/asa_path.txt | head -n 1)", "ansible-playbook /tmp/a.yml"),
+        # The file holding the path was already gone, so the substitution expanded to nothing.
+        ("ansible-playbook $(cat /tmp/asa_path.txt)", "ansible-playbook"),
+    ],
+)
+def test_command_substitution_matches_any_number_of_received_words(
+    written: str, received: str
+) -> None:
+    observed = normalize_tool_events([CommandRecord(received, "", 0)])
+    records = [CommandRecord(f"echo started; ANSIBLE_LOCAL_TEMP=/tmp {written}", "", 0)]
+
+    assert unobserved_tool_commands(records, observed) == []
+
+
+def test_command_substitution_does_not_claim_another_tools_event() -> None:
+    observed = normalize_tool_events([CommandRecord("ansible-doc -j -l -t module", "", 0)])
+    records = [CommandRecord("echo started; ansible-playbook $(cat /tmp/p.txt)", "", 0)]
+
+    assert unobserved_tool_commands(records, observed) == [records[0].command]
+
+
+def test_command_substitution_does_not_excuse_a_missing_literal_argument() -> None:
+    observed = normalize_tool_events([CommandRecord("ansible-playbook /tmp/a.yml", "", 0)])
+    records = [CommandRecord("echo started; ansible-playbook $(cat /tmp/p.txt) extra.yml", "", 0)]
+
+    assert unobserved_tool_commands(records, observed) == [records[0].command]
+
+
 def test_expanded_argument_matches_the_command_double_argv() -> None:
     # The double reports the path the shell expanded; the transcript holds the
     # command as written, so the two can only be compared around the expansion.
