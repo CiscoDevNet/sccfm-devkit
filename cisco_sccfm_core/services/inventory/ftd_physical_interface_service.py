@@ -126,8 +126,19 @@ class FtdPhysicalInterfaceService:
                 f"Available: {available}"
             )
 
+        # "metadata" and "links" are server-generated response envelope
+        # fields (timestamps, domain, committed state, self-link) - they are
+        # not part of the interface's writable schema. Echoing them back
+        # verbatim on PUT (as the old {**match.raw, ...} spread did) causes
+        # cdFMC to reject the whole request with a 422 on "metadata"
+        # specifically, since its deserializer can't map that polymorphic
+        # response-only shape back from client input. Confirmed live:
+        # "Invalid value '...' for field 'metadata'".
+        writable_raw = {
+            k: v for k, v in match.raw.items() if k not in ("metadata", "links")
+        }
         body: dict[str, Any] = {
-            **match.raw,
+            **writable_raw,
             "ifname": nameif,
             "enabled": enabled,
         }
