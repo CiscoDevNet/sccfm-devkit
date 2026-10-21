@@ -79,7 +79,11 @@ class FtdPhysicalInterfaceService:
             method="GET",
             resource_path=path,
             path_params=None,
-            query_params={"limit": 100},
+            # expanded=true is required to get full objects (including
+            # "mode") back from this list endpoint - without it FMC returns
+            # trimmed collection entries, which is why match.raw previously
+            # never carried "mode" at all.
+            query_params={"expanded": "true", "limit": 100},
             header_params={"Accept": "application/json"},
             body=None,
             post_params=None,
@@ -111,7 +115,7 @@ class FtdPhysicalInterfaceService:
         ipv4: Ipv4Config | None = None,
         enabled: bool = True,
         security_zone_uid: str | None = None,
-        mode: str = "NONE",
+        mode: str | None = None,
     ) -> FtdPhysicalInterface:
         interfaces = self.list_interfaces(domain_uid, device_id)
         match = next((i for i in interfaces if i.name == interface_name), None)
@@ -126,14 +130,15 @@ class FtdPhysicalInterfaceService:
             **match.raw,
             "ifname": nameif,
             "enabled": enabled,
-            # cdFMC requires "mode" on every PUT - the non-expanded GET used
-            # by list_interfaces() doesn't always carry it, so it must be set
-            # explicitly rather than inherited from match.raw. "NONE" is the
-            # value for a standard L3 routed interface (confirmed from a live
-            # cdFMC payload) - distinct from the security zone's own ROUTED
-            # interfaceMode, which is a separate field entirely.
-            "mode": mode,
         }
+        # cdFMC requires "mode" on every PUT. Prefer an explicit override if
+        # the caller gave one, otherwise preserve the interface's own current
+        # value from match.raw (now populated since list_interfaces() fetches
+        # expanded objects) - falling back to "NONE" (a standard L3 routed
+        # interface, confirmed from a live cdFMC payload) only if neither is
+        # available. Distinct from the security zone's own ROUTED
+        # interfaceMode, which is a separate field entirely.
+        body["mode"] = mode if mode is not None else match.raw.get("mode", "NONE")
         if ipv4 is not None:
             body["ipv4"] = {
                 "static": {
