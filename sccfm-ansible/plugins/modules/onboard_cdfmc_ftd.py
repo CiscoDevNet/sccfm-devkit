@@ -12,6 +12,10 @@ description:
   - Onboard a cdFMC-managed FTD device using the manual (non-ZTP) registration flow.
   - After the device is created, the module returns a CLI key that must be pasted into
     the FTD device's CLI to complete registration with the cdFMC.
+  - Idempotent by name - if a device with this name already exists, it is returned
+    unchanged (C(changed=false), C(cli_key=null)) instead of failing. Callers should
+    treat a null C(cli_key) as a signal to skip the CLI registration step for that
+    device, since it was already completed in an earlier run.
 options:
   name:
     description: Human-readable name for the FTD device.
@@ -121,10 +125,14 @@ cli_key:
     - The CLI key to paste into the FTD device's CLI to register it with the cdFMC.
     - Paste this value into the FTD CLI once to complete onboarding.
     - Can be passed directly to a subsequent SSH task.
+    - Null when C(changed=false) (device already existed) - there is no new CLI key
+      to paste, since this device was already registered in an earlier run.
   returned: success (changed=True)
   type: str
 device:
-  description: The newly onboarded cdFMC-managed FTD device.
+  description: >-
+    The cdFMC-managed FTD device - newly onboarded (changed=true), or the existing
+    device of the same name (changed=false).
   returned: success
   type: dict
 """
@@ -180,7 +188,19 @@ def build_argument_spec() -> dict:
     }
 
 
-def _check_name_exists(config: ConfigLike, name: str) -> bool:
+def _find_existing_device(config: ConfigLike, name: str) -> Optional[Device]:
+    """Look up a cdFMC-managed FTD device by exact name, idempotently.
+
+    Returns the existing Device if one is already onboarded under this name,
+    or None otherwise. Onboarding is a one-time, non-repeatable action
+    (unlike configure_interface/create_vti_interface/etc., which check for an
+    existing match before writing) - this lets the module skip re-onboarding
+    instead of hard-failing, matching the idempotent pattern used elsewhere
+    in this collection. A re-run against a name that's already registered
+    (e.g. because VMs were deleted and recreated but the device was never
+    deregistered from cdFMC/CDO) can now proceed by reusing the existing
+    device rather than requiring manual cleanup first.
+    """
     inventory_service = InventoryService(config=config)
     escaped = name.replace("\\", "\\\\").replace('"', '\\"')
     page: DevicePage = inventory_service.get_devices(
@@ -188,7 +208,8 @@ def _check_name_exists(config: ConfigLike, name: str) -> bool:
         offset=0,
         query=f'deviceType:{EntityType.CDFMC_MANAGED_FTD.value} AND name:"{escaped}"',
     )
-    return page.count is not None and page.count > 0
+    items = page.items or []
+    return items[0] if items else None
 
 
 def _build_ftd_input(
@@ -249,8 +270,17 @@ def run_module() -> None:
         return
 
     try:
-        if _check_name_exists(config, name):
-            module.fail_json(msg=f"cdFMC-managed FTD device with name '{name}' already exists.")
+        existing = _find_existing_device(config, name)
+        if existing is not None:
+            module.exit_json(
+                changed=False,
+                msg=(
+                    f"cdFMC-managed FTD device '{name}' already exists "
+                    f"(uid={existing.uid}) - reusing it instead of onboarding again."
+                ),
+                cli_key=None,
+                device=existing.to_dict(),
+            )
             return
 
         if module.check_mode:
