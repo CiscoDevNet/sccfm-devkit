@@ -269,12 +269,26 @@ class FtdS2SVpnService:
         self,
         endpoints_path: str,
         *,
-        device_id: str,
+        domain_uid: str,
         device_name: str,
         interface_uid: str,
         connection_type: str = "BIDIRECTIONAL",
     ) -> tuple[bool, FtdS2SVpnEndpoint]:
-        """Create (or find idempotently by device name) the FTD/VTI side of a tunnel endpoint."""
+        """Create (or find idempotently by device name) the FTD/VTI side of a tunnel endpoint.
+
+        The device's cdFMC device-record id is resolved here from device_name via
+        get_fmc_device_id() - it must NOT be accepted as a caller-supplied parameter.
+        A caller-supplied id is easy to get wrong by passing a device id from a
+        different namespace (e.g. CDO/SCCFM's own inventory device.uid, as returned
+        by onboard_cdfmc_ftd/register_cdfmc_ftd) instead of the cdFMC domain-scoped
+        devicerecords id this endpoint actually requires - both are syntactically
+        valid UUIDs, so a mismatch isn't caught by validation and instead surfaces
+        as an opaque backend "Internal Error" on this POST. Resolving by name here
+        mirrors the pattern already used by configure_ftd_interface/create_vti_interface
+        (FtdPhysicalInterfaceService/FtdVirtualTunnelInterfaceService's own
+        get_fmc_device_id calls) rather than trusting a passed-in id.
+        """
+        device_id = self.get_fmc_device_id(domain_uid, device_name)
         existing = next(
             (
                 e

@@ -36,11 +36,16 @@ options:
       C(tunnel.endpoints_path).
     required: true
     type: str
-  device_id:
+  domain_uid:
     description: >-
-      cdFMC device record UID for the FTD side of this endpoint. Required (together with
-      C(device_name) and C(interface_uid)) unless C(peer_ip_address) is set for an
-      extranet endpoint.
+      cdFMC domain UID. Required (together with C(device_name) and C(interface_uid))
+      unless C(peer_ip_address) is set for an extranet endpoint - used to resolve
+      C(device_name) to its cdFMC device-record id internally, the same way
+      C(configure_ftd_interface)/C(create_vti_interface) do. Do not try to pass a
+      device id directly - this module intentionally has no such parameter, since a
+      device id from a different namespace (e.g. CDO/SCCFM's own inventory
+      device.uid) is a valid-looking UUID that silently causes an opaque backend
+      error instead of a clean validation failure.
     required: false
     type: str
   device_name:
@@ -93,7 +98,7 @@ EXAMPLES = r"""
 - name: Add the FTD/VTI side of the tunnel
   cisco.sccfm.create_s2s_vpn_endpoint:
     endpoints_path: "{{ tunnel_result.tunnel.endpoints_path }}"
-    device_id: "{{ ftd_device_id }}"
+    domain_uid: "{{ cdfmc_domain_uid }}"
     device_name: "vftd-a"
     interface_uid: "{{ vti_result.virtual_tunnel_interface.id }}"
     region: "{{ sccfm_region }}"
@@ -129,7 +134,7 @@ changed:
 def build_argument_spec() -> dict[str, dict[str, Any]]:
     return {
         "endpoints_path": {"type": "str", "required": True},
-        "device_id": {"type": "str", "required": False},
+        "domain_uid": {"type": "str", "required": False},
         "device_name": {"type": "str", "required": False},
         "interface_uid": {"type": "str", "required": False},
         "connection_type": {
@@ -148,7 +153,7 @@ def build_argument_spec() -> dict[str, dict[str, Any]]:
 def run_module() -> None:
     module = AnsibleModule(
         argument_spec=build_argument_spec(),
-        required_together=[["device_id", "device_name", "interface_uid"]],
+        required_together=[["domain_uid", "device_name", "interface_uid"]],
         required_one_of=[["device_name", "peer_ip_address"]],
         mutually_exclusive=[["device_name", "peer_ip_address"]],
         supports_check_mode=True,
@@ -179,7 +184,7 @@ def run_module() -> None:
         else:
             changed, endpoint = service.create_endpoint_ftd(
                 endpoints_path,
-                device_id=params["device_id"],
+                domain_uid=params["domain_uid"],
                 device_name=params["device_name"],
                 interface_uid=params["interface_uid"],
                 connection_type=params["connection_type"],
