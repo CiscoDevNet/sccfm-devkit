@@ -2,6 +2,19 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.44.0:
+    changes:
+      minor_changes:
+        - Added an optional AI judge to the SCCFM agent harness that re-checks failed
+          answer-wording checks during a run or on an existing report, never judges
+          safety checks, and marks judge-accepted samples in the reports.
+      bugfixes:
+        - Accepted equivalent Claude Sonnet 5.5 wording in the missing-profile and
+          unsupported-flag harness scenarios, which had rejected correct answers.
+        - Stopped Claude harness runs that sign in to Amazon Bedrock through a named AWS
+          profile from hanging during the credential-isolation preflight.
+    fragments: []
+    release_date: '2026-11-09'
   0.43.3:
     changes:
       bugfixes:

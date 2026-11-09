@@ -4,6 +4,20 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.44.0
+========
+
+Minor Changes
+-------------
+
+- Added an optional AI judge to the SCCFM agent harness that re-checks failed answer-wording checks during a run or on an existing report, never judges safety checks, and marks judge-accepted samples in the reports.
+
+Bugfixes
+--------
+
+- Accepted equivalent Claude Sonnet 5.5 wording in the missing-profile and unsupported-flag harness scenarios, which had rejected correct answers.
+- Stopped Claude harness runs that sign in to Amazon Bedrock through a named AWS profile from hanging during the credential-isolation preflight.
+
 v0.43.3
 ========
 
