@@ -2082,6 +2082,27 @@ def test_claude_bedrock_profile_is_resolved_by_the_parent_process(
     ]
 
 
+def test_resolved_claude_bedrock_credentials_are_redacted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("AWS_PROFILE", "harness-dev")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    session = _frozen_aws_credentials(token="resolved-session-token")
+    frozen = session.get_credentials.return_value.get_frozen_credentials.return_value
+    frozen.secret_key = "resolved-secret-value"
+
+    with mock.patch("boto3.Session", return_value=session):
+        isolated_environment(tmp_path, install_stubs(tmp_path, DISPATCHER), Scenario(), "claude")
+
+    # The resolved values exist only in Claude's environment, never in os.environ,
+    # so redaction has to know about them explicitly.
+    redacted = credentials.redact("leak resolved-secret-value and resolved-session-token")
+    assert "resolved-secret-value" not in redacted
+    assert "resolved-session-token" not in redacted
+
+
 def test_claude_bedrock_profile_resolution_failure_is_a_setup_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

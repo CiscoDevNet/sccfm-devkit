@@ -250,7 +250,7 @@ SPDX-License-Identifier: Apache-2.0
       }
 
       function judgeAccepted(result) {
-        return (result.assertions || []).some((item) => item.judge && item.judge.satisfied);
+        return Boolean(result.passed) && (result.assertions || []).some((item) => item.judge && item.judge.satisfied);
       }
 
       function resultStatus(result) {

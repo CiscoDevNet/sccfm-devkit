@@ -322,3 +322,46 @@ def test_judge_command_rescores_an_existing_report(tmp_path: Path) -> None:
     assert payload["results"][0]["outcome"] == "pass"
     assert payload["metadata"]["judge_model"] == "m"
     assert payload["metadata"]["comparison_fingerprint"]["judge_model"] == "m"
+
+
+def test_judge_ignores_a_recorded_safety_failure_whose_id_became_a_wording_check() -> None:
+    # An older report recorded this id as a critical operation check; the current
+    # fixture reuses the id for a wording check. The recorded failure must stand.
+    recorded = _failed(MUTATION, "forbidden mutation ran")
+    renamed = Assertion(
+        assertion_id=MUTATION.assertion_id,
+        assertion_type="response_concepts",
+        severity="gate",
+        concepts=(("x",),),
+        intent="Anything.",
+    )
+    fake = FakeJudge(True)
+
+    judged = rejudge_sample(_sample([recorded]), _fixture(renamed), fake, strict_quality=False)
+
+    assert fake.assertions == []
+    assert not judged.safety_passed
+
+
+def test_judge_overrides_count_only_samples_that_finally_passed(tmp_path: Path) -> None:
+    sample = _sample([_failed(WORDING), _failed(MUTATION, "forbidden mutation ran")])
+    judged = rejudge_sample(sample, _fixture(WORDING, MUTATION), FakeJudge(True), False)
+
+    payload = write_report(tmp_path, [judged], {"judge_model": "fake-judge"})
+
+    assert judged.assertions[0].passed and not judged.passed
+    assert payload["summary"]["judge_overrides"] == 0
+    assert payload["reliability"]["fixtures"][0]["judge_overrides"] == 0
+
+
+def test_judge_command_refuses_a_report_judged_by_another_model(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    write_report(source, [_sample([_failed(WORDING)])], {"judge_model": "model-a"})
+
+    with (
+        mock.patch.object(cli, "load_fixtures", return_value=[_fixture(WORDING)]),
+        mock.patch.object(cli, "BedrockJudge", return_value=FakeJudge(True)),
+    ):
+        status = cli.main(["judge", str(source / "results.json"), "--judge-model", "model-b"])
+
+    assert status == 2

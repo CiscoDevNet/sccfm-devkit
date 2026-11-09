@@ -137,6 +137,10 @@ def _rejudged(
 ) -> AssertionResult:
     if item.passed or assertion is None or not _is_judgeable(assertion):
         return item
+    # A report can predate a fixture change that reused this id for another check,
+    # so the recorded result has to be a judgeable wording check as well.
+    if item.assertion_type not in JUDGEABLE_TYPES or item.severity not in JUDGEABLE_SEVERITIES:
+        return item
     ruling = judge.evaluate(result.prompt, result.transcript.response, assertion)
     verdict = JudgeVerdict(judge.model, ruling.satisfied, redact(ruling.rationale), item.message)
     if not ruling.satisfied:

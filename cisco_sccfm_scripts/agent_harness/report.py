@@ -103,7 +103,9 @@ def _transcript(raw: dict[str, Any]) -> Transcript:
 
 
 def _judge_overridden(result: SampleResult) -> bool:
-    return any(item.judge is not None and item.judge.satisfied for item in result.assertions)
+    return result.passed and any(
+        item.judge is not None and item.judge.satisfied for item in result.assertions
+    )
 
 
 def write_dashboard(

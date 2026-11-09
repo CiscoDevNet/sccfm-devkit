@@ -110,6 +110,12 @@ def provider_environment(source: dict[str, str] | None = None) -> dict[str, str]
     }
 
 
+# Credential values the harness resolved itself (for example from an AWS profile).
+# They live only in Claude's launch environment, never in os.environ, so redact()
+# has to be told about them explicitly.
+_RESOLVED_SECRETS: dict[str, str] = {}
+
+
 def claude_provider_environment(source: dict[str, str]) -> dict[str, str]:
     """Return Claude's provider variables with any Bedrock AWS profile pre-resolved.
 
@@ -151,6 +157,7 @@ def _resolved_aws_profile(profile: str, region: str | None) -> dict[str, str]:
     }
     if frozen.token:
         resolved["AWS_SESSION_TOKEN"] = frozen.token
+    _RESOLVED_SECRETS.update({value: name for name, value in resolved.items()})
     resolved_region = region or session.region_name
     if resolved_region:
         resolved["AWS_REGION"] = resolved_region
@@ -178,6 +185,8 @@ def redact(text: str, source: dict[str, str] | None = None) -> str:
         value = environment.get(name)
         if value and len(value) > 3:
             text = text.replace(value, f"[redacted {name}]")
+    for value, name in _RESOLVED_SECRETS.items():
+        text = text.replace(value, f"[redacted {name}]")
     return text
 
 

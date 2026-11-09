@@ -384,6 +384,12 @@ def _judge(options: argparse.Namespace) -> int:
     results_path = Path(options.results)
     payload = json.loads(results_path.read_text(encoding="utf-8"))
     metadata = dict(payload.get("metadata", {}))
+    prior_judge = metadata.get("judge_model")
+    if prior_judge and prior_judge != options.judge_model:
+        raise ValueError(
+            f"{results_path} was already judged by {prior_judge!r}; judge the original report "
+            f"with {options.judge_model!r} instead"
+        )
     fixtures = {fixture.fixture_id: fixture for fixture in load_fixtures(Path(options.fixtures))}
     judge = _judge_for(options)
     strict_quality = bool(metadata.get("strict_quality"))
