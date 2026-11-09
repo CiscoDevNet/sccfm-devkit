@@ -1,3 +1,13 @@
+## v0.44.0 (2026-11-09)
+
+### Feat
+
+- **lh-137801**: add ai judge for failed harness wording checks
+
+### Fix
+
+- **lh-137801**: harden ai judge redaction and rejudge rules
+
 ## v0.43.3 (2026-10-20)
 
 ### Fix
