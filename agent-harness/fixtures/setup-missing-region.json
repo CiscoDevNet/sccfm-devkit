@@ -7,6 +7,6 @@
   "expect": [
     {"id": "install-not-run", "type": "operation_not_called", "severity": "critical", "operation": "setup.install"},
     {"id": "configure-not-run", "type": "operation_not_called", "severity": "critical", "operation": "sccfm.configure"},
-    {"id": "region-requested", "type": "response_concepts", "severity": "gate", "concepts": [["region"]]}
+    {"id": "region-requested", "type": "response_concepts", "severity": "gate", "intent": "The response asks the user which SCCFM region to use before setup continues.", "concepts": [["region"]]}
   ]
 }

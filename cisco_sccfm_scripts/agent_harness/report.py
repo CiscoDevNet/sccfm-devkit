@@ -12,7 +12,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence, cast
 
-from .models import Fixture, SampleResult
+from .models import (
+    AssertionResult,
+    BlockedCommand,
+    CommandRecord,
+    Fixture,
+    JudgeVerdict,
+    SampleResult,
+    Scenario,
+    ToolEvent,
+    Transcript,
+)
 
 DASHBOARD_TEMPLATE = Path(__file__).resolve().parents[2] / "agent-harness" / "dashboard.html"
 
@@ -35,6 +45,7 @@ def write_report(
             "functional": _category(results, "functional_passed", valid_only=True),
             "quality": _category(results, "quality_passed", valid_only=True),
             "quality_warnings": sum(len(result.warnings) for result in results),
+            "judge_overrides": sum(_judge_overridden(result) for result in results),
         },
         "reliability": {
             "confidence_level": 0.95,
@@ -49,6 +60,52 @@ def write_report(
     (output_directory / "results.md").write_text(_markdown(payload), encoding="utf-8")
     write_dashboard(output_directory / "results.html", payload)
     return payload
+
+
+def load_results(payload: dict[str, Any]) -> list[SampleResult]:
+    """Rebuild sample results from a JSON report written by ``write_report``."""
+
+    return [_sample_result(item) for item in payload.get("results", [])]
+
+
+def _sample_result(raw: dict[str, Any]) -> SampleResult:
+    scenario = raw.get("scenario")
+    return SampleResult(
+        **{
+            **raw,
+            "assertions": [_assertion_result(item) for item in raw["assertions"]],
+            "transcript": _transcript(raw["transcript"]),
+            "scenario": (
+                Scenario(**{**scenario, "devices": tuple(scenario["devices"])})
+                if isinstance(scenario, dict)
+                else None
+            ),
+        }
+    )
+
+
+def _assertion_result(raw: dict[str, Any]) -> AssertionResult:
+    judge = raw.get("judge")
+    return AssertionResult(**{**raw, "judge": JudgeVerdict(**judge) if judge else None})
+
+
+def _transcript(raw: dict[str, Any]) -> Transcript:
+    return Transcript(
+        **{
+            **raw,
+            "command_records": [CommandRecord(**item) for item in raw["command_records"]],
+            "tool_events": [
+                ToolEvent(**{**item, "argv": tuple(item["argv"])}) for item in raw["tool_events"]
+            ],
+            "blocked_commands": [BlockedCommand(**item) for item in raw["blocked_commands"]],
+        }
+    )
+
+
+def _judge_overridden(result: SampleResult) -> bool:
+    return result.passed and any(
+        item.judge is not None and item.judge.satisfied for item in result.assertions
+    )
 
 
 def write_dashboard(
@@ -140,6 +197,7 @@ def _reliability(results: Sequence[SampleResult]) -> list[dict[str, Any]]:
                 "confidence_lower": lower,
                 "confidence_upper": upper,
                 "flaky": passed > 0 and failed > 0,
+                "judge_overrides": sum(_judge_overridden(result) for result in valid),
             }
         )
     return reliability
@@ -220,6 +278,12 @@ def _markdown(payload: dict[str, Any]) -> str:
         "| Functional | Quality | Gate | Duration |",
         "|---|---|---|---:|---:|---|---|---|---|---|---:|",
     ]
+    judge_model = payload.get("metadata", {}).get("judge_model")
+    if judge_model:
+        lines[8:8] = [
+            f"- AI judge (`{judge_model}`): **{summary.get('judge_overrides', 0)}** samples "
+            "passed only after the judge accepted equivalent wording",
+        ]
     freshness = payload.get("metadata", {}).get("plugin_freshness")
     if isinstance(freshness, dict):
         lines[8:8] = [
@@ -231,7 +295,7 @@ def _markdown(payload: dict[str, Any]) -> str:
         lines.append(
             f"| {result['fixture_id']} | {result.get('agent', 'codex')} | "
             f"{result['mode']} | {result['sample']} | {result.get('runtime_attempts', 1)} | "
-            f"{result.get('outcome', 'pass' if result['passed'] else 'agent-fail')} | "
+            f"{_outcome_label(result)} | "
             f"{_status(result['safety_passed'])} | {_status(result['functional_passed'])} | "
             f"{_status(result['quality_passed'])} | {_status(result['passed'])} | "
             f"{result['duration_seconds']:.3f}s |"
@@ -266,6 +330,7 @@ def _markdown(payload: dict[str, Any]) -> str:
                     ],
                 ]
             )
+    lines.extend(_judge_rulings(payload["results"]))
     reliability = payload.get("reliability", {}).get("fixtures", [])
     if reliability:
         lines.extend(
@@ -276,8 +341,8 @@ def _markdown(payload: dict[str, Any]) -> str:
                 "Invalid harness samples are excluded from pass rates and confidence intervals.",
                 "",
                 "| Fixture | Agent | Valid / attempted | Pass rate "
-                "| 95% confidence interval | Flaky |",
-                "|---|---|---:|---:|---:|---|",
+                f"| 95% confidence interval | Flaky |{' Judge-accepted |' if judge_model else ''}",
+                f"|---|---|---:|---:|---:|---|{'---:|' if judge_model else ''}",
             ]
         )
         for item in reliability:
@@ -289,8 +354,50 @@ def _markdown(payload: dict[str, Any]) -> str:
                 f"| {item['fixture_id']} | {item.get('agent', 'codex')} | "
                 f"{item['valid']} / {item['attempted']} | "
                 f"{rate} | {interval} | {'yes' if item['flaky'] else 'no'} |"
+                + (f" {item.get('judge_overrides', 0)} |" if judge_model else "")
             )
     return "\n".join(lines) + "\n"
+
+
+def _outcome_label(result: dict[str, Any]) -> str:
+    outcome = str(result.get("outcome", "pass" if result["passed"] else "agent-fail"))
+    accepted = any((item.get("judge") or {}).get("satisfied") for item in result["assertions"])
+    return f"{outcome} (AI judge)" if outcome == "pass" and accepted else outcome
+
+
+def _judge_rulings(results: list[dict[str, Any]]) -> list[str]:
+    rows = [
+        _ruling_row(result, item)
+        for result in results
+        for item in result["assertions"]
+        if item.get("judge")
+    ]
+    if not rows:
+        return []
+    return [
+        "",
+        "## AI judge rulings",
+        "",
+        "Failed wording checks the AI judge re-read. An accepted ruling turned the check "
+        "into a pass.",
+        "",
+        "| Fixture | Sample | Check | Ruling | Keyword check | Judge rationale |",
+        "|---|---:|---|---|---|---|",
+        *rows,
+    ]
+
+
+def _ruling_row(result: dict[str, Any], item: dict[str, Any]) -> str:
+    judge = item["judge"]
+    ruling = "accepted" if judge["satisfied"] else "rejected"
+    return (
+        f"| {result['fixture_id']} | {result['sample']} | {item['assertion_id']} | {ruling} | "
+        f"{_cell(judge['lexical_message'])} | {_cell(judge['rationale'])} |"
+    )
+
+
+def _cell(text: str) -> str:
+    return " ".join(str(text).split()).replace("|", "\\|")
 
 
 def _status(passed: bool) -> str:

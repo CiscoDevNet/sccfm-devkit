@@ -4,8 +4,8 @@ Every flag accepted by `poetry run sccfm-agent-harness`, and when to reach for i
 See [README.md](README.md) for what the harness evaluates, the report format, and
 how Claude provider credentials are isolated.
 
-The CLI has three subcommands: `validate`, `run`, and `dashboard`. Only `run`
-invokes a model.
+The CLI has four subcommands: `validate`, `run`, `dashboard`, and `judge`. Only `run`
+and `judge` invoke a model.
 
 ## `run`
 
@@ -44,6 +44,7 @@ form.
 | `--timeout SECONDS` | `300` | Raise it for Ansible fixtures, which run many commands; 420 is comfortable. The same value bounds the Claude credential-isolation preflight. Must be at least 1. |
 | `--runtime-retries N` | `1` | Retries provider exits and timeouts only. Assertion, safety, and harness-integrity failures are never retried. Recovered samples retain the prior runtime error and attempt count in `results.json`. |
 | `--output DIR` | `agent-harness/results/<UTC timestamp>` | Point reports at a specific directory, for example a CI artifact path. |
+| `--judge-model MODEL` | off | Bedrock model that re-checks failed `response_concepts` wording assertions with an AI judge. See [README.md](README.md#ai-judge). Uses `--bedrock-region` and works with every `--agent`. Adds `judge_model` to the comparison fingerprint. |
 | `--strict-quality` | off | Promotes quality-only failures into the process exit gate. Use it when deliberately improving answer quality; leave it off for normal gating, where quality failures are warnings. |
 
 ### Baselines
@@ -87,6 +88,21 @@ Re-renders the HTML dashboard from an existing JSON report without spending mode
 calls. Use it after changing the dashboard template, or to review an older run.
 `--output` defaults to the JSON path with an `.html` suffix. `--fixtures` supplies
 the fixture metadata used to enrich reports written by an older harness version.
+
+## `judge`
+
+```bash
+poetry run sccfm-agent-harness judge RESULTS.json --judge-model MODEL \
+  [--fixtures PATH] [--output DIR] [--timeout SECONDS] [--bedrock-region REGION]
+```
+
+Re-checks the failed wording assertions of an existing report with the AI judge
+and writes a new `results.json`, `results.md`, and `results.html`. Use it on a
+report downloaded from CI to tell wording false negatives from real failures
+without rerunning the agent. Only failed `agent-fail` samples cost a model call.
+`--output` defaults to `<RESULTS stem>-judged/` next to the input. The judge reads
+each assertion's `intent` from the current `--fixtures`, so a fixture removed since
+the run is left as originally scored. Exits `1` while any sample still fails.
 
 ## Typical invocations
 

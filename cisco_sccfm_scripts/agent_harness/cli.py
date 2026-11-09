@@ -28,14 +28,15 @@ from .credentials import (
     redact,
 )
 from .fixtures import load_fixtures
-from .models import Agent, Fixture, Mode, Scenario
+from .judge import BedrockJudge, Judge, rejudge_sample
+from .models import Agent, Fixture, Mode, SampleResult, Scenario
 from .plugin_state import (
     PLUGIN_ID,
     inspect_plugin_freshness,
     plugin_tree_digest,
     refresh_local_plugin,
 )
-from .report import compare_baseline, write_dashboard, write_report
+from .report import compare_baseline, load_results, write_dashboard, write_report
 from .runner import build_agent_command, run_sample
 from .stubs import isolated_environment
 
@@ -55,6 +56,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
             return _run(options)
         if options.command == "dashboard":
             return _dashboard(options)
+        if options.command == "judge":
+            return _judge(options)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
@@ -78,6 +81,16 @@ def _parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--fixtures", default=str(DEFAULT_FIXTURES))
     dashboard.add_argument("--output", type=Path)
 
+    judge = subparsers.add_parser(
+        "judge", help="re-check failed wording assertions of an existing JSON report"
+    )
+    judge.add_argument("results", type=Path)
+    judge.add_argument("--judge-model", required=True)
+    judge.add_argument("--fixtures", default=str(DEFAULT_FIXTURES))
+    judge.add_argument("--output", type=Path)
+    judge.add_argument("--timeout", type=int, default=120)
+    _add_bedrock_region(judge)
+
     run = subparsers.add_parser("run", help="run one or more evaluation cases")
     run.add_argument("--fixtures", default=str(DEFAULT_FIXTURES))
     run.add_argument("--fixture", action="append", dest="fixture_ids")
@@ -89,9 +102,10 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--samples", type=int, default=1)
     run.add_argument("--model")
     run.add_argument(
-        "--bedrock-region",
-        default=os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-west-2")),
+        "--judge-model",
+        help="Bedrock model that re-checks failed wording assertions; safety is never judged",
     )
+    _add_bedrock_region(run)
     run.add_argument(
         "--bedrock-tool-image",
         default=os.environ.get("SCCFM_HARNESS_BEDROCK_TOOL_IMAGE", DEFAULT_TOOL_IMAGE),
@@ -123,6 +137,13 @@ def _parser() -> argparse.ArgumentParser:
         help="promote quality-only semantic failures to the process exit gate",
     )
     return parser
+
+
+def _add_bedrock_region(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--bedrock-region",
+        default=os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-west-2")),
+    )
 
 
 def _validate(fixtures_directory: Path) -> int:
@@ -180,6 +201,7 @@ def _run(options: argparse.Namespace) -> int:
         _validate_claude_isolation(executable, options.model, options.timeout)
     if agent == "bedrock" and not options.dry_run:
         validate_access(options.model, options.bedrock_region, options.timeout)
+    judge = _judge_for(options) if options.judge_model and not options.dry_run else None
     plugin_freshness = None
     if mode == "installed-plugin" and agent == "codex":
         plugin_payload = _plugin_list_payload(executable)
@@ -254,6 +276,8 @@ def _run(options: argparse.Namespace) -> int:
                     f"runtime failure; retrying {fixture.fixture_id} "
                     f"({attempt}/{options.runtime_retries})"
                 )
+            if judge is not None:
+                result = _rejudged(result, fixture, judge, options.strict_quality)
             results.append(result)
             if result.outcome == "harness-invalid":
                 print(f"HARNESS INVALID: {'; '.join(result.failures)}")
@@ -279,6 +303,8 @@ def _run(options: argparse.Namespace) -> int:
         "model": model,
         "source_digest": source_digest,
     }
+    if options.judge_model:
+        fingerprint["judge_model"] = options.judge_model
     payload = write_report(
         output_directory,
         results,
@@ -304,6 +330,7 @@ def _run(options: argparse.Namespace) -> int:
             "samples": options.samples,
             "runtime_retries": options.runtime_retries,
             "strict_quality": options.strict_quality,
+            "judge_model": options.judge_model,
         },
     )
     print(
@@ -351,6 +378,51 @@ def _dashboard(options: argparse.Namespace) -> int:
     write_dashboard(output_path, payload, fixtures)
     print(f"dashboard: {output_path}")
     return 0
+
+
+def _judge(options: argparse.Namespace) -> int:
+    results_path = Path(options.results)
+    payload = json.loads(results_path.read_text(encoding="utf-8"))
+    metadata = dict(payload.get("metadata", {}))
+    prior_judge = metadata.get("judge_model")
+    if prior_judge and prior_judge != options.judge_model:
+        raise ValueError(
+            f"{results_path} was already judged by {prior_judge!r}; judge the original report "
+            f"with {options.judge_model!r} instead"
+        )
+    fixtures = {fixture.fixture_id: fixture for fixture in load_fixtures(Path(options.fixtures))}
+    judge = _judge_for(options)
+    strict_quality = bool(metadata.get("strict_quality"))
+    results = [
+        _rejudged(result, fixtures.get(result.fixture_id), judge, strict_quality)
+        for result in load_results(payload)
+    ]
+    metadata["judge_model"] = options.judge_model
+    fingerprint = dict(metadata.get("comparison_fingerprint") or {})
+    metadata["comparison_fingerprint"] = {**fingerprint, "judge_model": options.judge_model}
+    output_directory = options.output or results_path.with_name(f"{results_path.stem}-judged")
+    write_report(output_directory, results, metadata)
+    print(f"reports: {output_directory}")
+    return 1 if any(not result.passed for result in results) else 0
+
+
+def _rejudged(
+    result: SampleResult, fixture: Fixture | None, judge: Judge, strict_quality: bool
+) -> SampleResult:
+    if fixture is None:
+        return result
+    judged = rejudge_sample(result, fixture, judge, strict_quality)
+    if judged.passed and not result.passed:
+        print(f"AI JUDGE ACCEPTED: {result.fixture_id} sample {result.sample}")
+    return judged
+
+
+def _judge_for(options: argparse.Namespace) -> Judge:
+    """Build the judge after proving its model can return a well-formed ruling."""
+
+    judge = BedrockJudge(options.judge_model, options.bedrock_region, options.timeout)
+    judge.preflight()
+    return judge
 
 
 def _plugin_list_payload(codex: str) -> str:
@@ -412,7 +484,7 @@ def _validate_claude_isolation(claude: str, model: str | None, timeout_seconds: 
     with tempfile.TemporaryDirectory(prefix="sccfm-claude-preflight-") as temporary:
         root = Path(temporary)
         environment = isolated_environment(root, root / "bin", Scenario(), "claude")
-        names = preserved_credential_names()
+        names = preserved_credential_names(environment)
         settings, report = install_probe(root, names, isolation_settings(Path.home(), (root,)))
         command = [
             claude,

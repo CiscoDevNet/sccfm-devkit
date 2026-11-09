@@ -313,7 +313,7 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
     event_log.touch()
 
     with (
-        mock.patch.object(bedrock, "_client", return_value=client),
+        mock.patch.object(bedrock, "runtime_client", return_value=client),
         mock.patch.object(bedrock, "_run_bash", return_value=record) as run_bash,
     ):
         execution = bedrock.run_session(
@@ -352,7 +352,7 @@ def test_bedrock_session_runs_tool_loop_and_records_transcript(tmp_path: Path) -
 def test_bedrock_preflight_omits_sampling_parameters_newer_models_reject() -> None:
     client = mock.Mock()
 
-    with mock.patch.object(bedrock, "_client", return_value=client):
+    with mock.patch.object(bedrock, "runtime_client", return_value=client):
         bedrock.validate_access("us.anthropic.test", "us-west-2", 30)
 
     assert client.converse.call_args.kwargs["inferenceConfig"] == {"maxTokens": 16}
@@ -418,7 +418,7 @@ def test_bedrock_answers_an_unserved_tool_request_and_continues(tmp_path: Path) 
     event_log.touch()
 
     with (
-        mock.patch.object(bedrock, "_client", return_value=client),
+        mock.patch.object(bedrock, "runtime_client", return_value=client),
         mock.patch.object(bedrock, "_run_bash", return_value=record) as run_bash,
     ):
         execution = bedrock.run_session(
@@ -1159,6 +1159,45 @@ DIGEST = "0" * 63 + "1"
         ("uninstall-remove-profiles", "digest-presented", f"**Plan digest:** `{DIGEST}`", True),
         ("uninstall-preserve-profiles", "digest-presented", f"`plan_digest`: `{DIGEST}`", True),
         ("uninstall-remove-profiles", "digest-presented", f"The plan is ready: `{DIGEST}`", False),
+        (
+            "cli-missing-profile-config-discovered",
+            "hidden-prompt-explained",
+            "Create the profile on your own machine. It asks for the API token at a hidden "
+            "prompt.",
+            True,
+        ),
+        (
+            "cli-missing-profile-config-discovered",
+            "hidden-prompt-explained",
+            "Run it yourself in your own terminal. The command asks for your API token at a "
+            "hidden prompt.",
+            True,
+        ),
+        (
+            "cli-missing-profile-config-discovered",
+            "hidden-prompt-explained",
+            "I ran configure for you and pasted the token at the prompt.",
+            False,
+        ),
+        (
+            "cli-no-invented-flag",
+            "unsupported-flag-explained",
+            "The `inventory devices asa list` command doesn't support `--include-retired`. Its "
+            "only options are `--limit` and `--format`.",
+            True,
+        ),
+        (
+            "cli-no-invented-flag",
+            "unsupported-flag-explained",
+            "The `inventory devices asa list` command has no `--include-retired` option.",
+            True,
+        ),
+        (
+            "cli-no-invented-flag",
+            "unsupported-flag-explained",
+            "I ran the list with `--include-retired`.",
+            False,
+        ),
     ],
 )
 def test_fixtures_grade_observed_sonnet_wording(
@@ -2006,6 +2045,91 @@ def test_isolated_environment_keeps_claude_provider_credentials_for_the_parent(
     assert "SCCFM_API_TOKEN" not in environment
     # zsh re-reads .zshenv for every subprocess, so the disposable home overrides it.
     assert str(binary_directory) in (tmp_path / "home" / ".zshenv").read_text(encoding="utf-8")
+
+
+def _frozen_aws_credentials(token: str | None = "not-a-real-token") -> mock.Mock:
+    session = mock.Mock(region_name="us-east-2")
+    session.get_credentials.return_value.get_frozen_credentials.return_value = mock.Mock(
+        access_key="not-a-real-key", secret_key="not-a-real-secret", token=token
+    )
+    return session
+
+
+def test_claude_bedrock_profile_is_resolved_by_the_parent_process(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The disposable HOME hides ~/.aws, so a profile-based login (credential_process,
+    # SSO, assume-role) would leave Claude without credentials and hang its session.
+    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_REGION"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("AWS_PROFILE", "harness-dev")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    binary_directory = install_stubs(tmp_path, DISPATCHER)
+
+    with mock.patch("boto3.Session", return_value=_frozen_aws_credentials()) as session:
+        environment = isolated_environment(tmp_path, binary_directory, Scenario(), "claude")
+
+    session.assert_called_once_with(profile_name="harness-dev")
+    assert "AWS_PROFILE" not in environment
+    assert environment["AWS_ACCESS_KEY_ID"] == "not-a-real-key"
+    assert environment["AWS_SECRET_ACCESS_KEY"] == "not-a-real-secret"
+    assert environment["AWS_SESSION_TOKEN"] == "not-a-real-token"
+    assert environment["AWS_REGION"] == "us-east-2"
+    assert environment[credentials.CREDENTIAL_NAMES_VARIABLE].split() == [
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+    ]
+
+
+def test_resolved_claude_bedrock_credentials_are_redacted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("AWS_PROFILE", "harness-dev")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    session = _frozen_aws_credentials(token="resolved-session-token")
+    frozen = session.get_credentials.return_value.get_frozen_credentials.return_value
+    frozen.secret_key = "resolved-secret-value"
+
+    with mock.patch("boto3.Session", return_value=session):
+        isolated_environment(tmp_path, install_stubs(tmp_path, DISPATCHER), Scenario(), "claude")
+
+    # The resolved values exist only in Claude's environment, never in os.environ,
+    # so redaction has to know about them explicitly.
+    redacted = credentials.redact("leak resolved-secret-value and resolved-session-token")
+    assert "resolved-secret-value" not in redacted
+    assert "resolved-session-token" not in redacted
+
+
+def test_claude_bedrock_profile_resolution_failure_is_a_setup_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.setenv("AWS_PROFILE", "harness-dev")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    session = mock.Mock()
+    session.get_credentials.return_value = None
+
+    with (
+        mock.patch("boto3.Session", return_value=session),
+        pytest.raises(ValueError, match="AWS profile 'harness-dev'"),
+    ):
+        isolated_environment(tmp_path, install_stubs(tmp_path, DISPATCHER), Scenario(), "claude")
+
+
+def test_claude_static_aws_keys_are_not_re_resolved(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "not-a-real-key")
+    monkeypatch.setenv("AWS_PROFILE", "harness-dev")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+
+    with mock.patch("boto3.Session") as session:
+        isolated_environment(tmp_path, install_stubs(tmp_path, DISPATCHER), Scenario(), "claude")
+
+    session.assert_not_called()
 
 
 def test_isolated_environment_strips_bedrock_credentials_from_tools(

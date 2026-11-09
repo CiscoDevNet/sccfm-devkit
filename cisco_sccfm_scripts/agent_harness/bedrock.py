@@ -57,7 +57,7 @@ def validate_access(model: str, region: str, timeout_seconds: int) -> None:
     """Prove the ambient AWS identity can invoke the selected Bedrock model."""
 
     try:
-        client = _client(region, timeout_seconds)
+        client = runtime_client(region, timeout_seconds)
         client.converse(
             modelId=model,
             messages=[{"role": "user", "content": [{"text": "Reply with ready."}]}],
@@ -93,7 +93,7 @@ def run_session(
 
     try:
         for _round in range(MAX_TOOL_ROUNDS + 1):
-            client = _client(region, _remaining_seconds(deadline))
+            client = runtime_client(region, _remaining_seconds(deadline))
             request: dict[str, Any] = {
                 "modelId": model,
                 "messages": messages,
@@ -165,7 +165,9 @@ def run_session(
     return BedrockExecution(transcript, 1, "Bedrock session ended unexpectedly")
 
 
-def _client(region: str, timeout_seconds: int) -> Any:
+def runtime_client(region: str, timeout_seconds: int) -> Any:
+    """Return a Bedrock runtime client bounded by the remaining time budget."""
+
     import boto3
     from botocore.config import Config
 
