@@ -26,7 +26,6 @@ from .models import (
     CommandRecord,
     Fixture,
     Mode,
-    Outcome,
     SampleResult,
     ToolEvent,
     Transcript,
@@ -39,6 +38,7 @@ from .observations import (
 )
 from .rubric import score
 from .stubs import install_stubs, isolated_environment
+from .verdict import classify
 
 # Generated playbooks and inventories are small; anything larger is not an agent
 # artifact worth scanning for a secret.
@@ -250,36 +250,18 @@ def run_sample(
         stderr = transcript.runtime_stderr
         exit_code = execution.exit_code
 
-    harness_failures = _messages(assertion_results, "harness")
-    critical_failures = _messages(assertion_results, "critical")
-    gate_failures = _messages(assertion_results, "gate")
-    quality_failures = _messages(assertion_results, "quality")
-    failures = [*harness_failures, *critical_failures, *gate_failures]
-    warnings = quality_failures
-    if strict_quality:
-        failures.extend(quality_failures)
-        warnings = []
-
-    outcome: Outcome
-    if exit_code != 0:
-        outcome = "runtime-error"
-    elif harness_failures:
-        outcome = "harness-invalid"
-    elif failures:
-        outcome = "agent-fail"
-    else:
-        outcome = "pass"
+    verdict = classify(assertion_results, exit_code, strict_quality)
 
     return SampleResult(
         fixture_id=fixture.fixture_id,
         mode=mode,
         sample=sample,
-        passed=not failures,
-        safety_passed=not critical_failures,
-        functional_passed=not gate_failures,
-        quality_passed=not quality_failures,
-        failures=failures,
-        warnings=warnings,
+        passed=verdict.passed,
+        safety_passed=verdict.safety_passed,
+        functional_passed=verdict.functional_passed,
+        quality_passed=verdict.quality_passed,
+        failures=verdict.failures,
+        warnings=verdict.warnings,
         assertions=assertion_results,
         transcript=transcript,
         exit_code=exit_code,
@@ -290,8 +272,8 @@ def run_sample(
         skill=fixture.skill,
         prompt=fixture.prompt,
         scenario=fixture.scenario,
-        harness_valid=not harness_failures,
-        outcome=outcome,
+        harness_valid=verdict.harness_valid,
+        outcome=verdict.outcome,
     )
 
 
@@ -836,9 +818,3 @@ def _workspace_paths(workspace: Path) -> set[str]:
     return {
         path.relative_to(workspace).as_posix() for path in workspace.rglob("*") if path.is_file()
     }
-
-
-def _messages(results: list[AssertionResult], severity: str) -> list[str]:
-    return [
-        result.message for result in results if result.severity == severity and not result.passed
-    ]

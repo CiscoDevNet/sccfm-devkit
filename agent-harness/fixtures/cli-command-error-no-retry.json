@@ -10,6 +10,6 @@
     {"id": "profile-checked", "type": "operation_called", "severity": "gate", "operation": "sccfm.status"},
     {"id": "business-command-attempted", "type": "operation_called", "severity": "gate", "operation": "sccfm.inventory.devices.asa.list"},
     {"id": "business-command-not-retried", "type": "max_operation_calls", "severity": "critical", "operation": "sccfm.inventory.devices.asa.list", "maximum": 1},
-    {"id": "failure-reported", "type": "response_concepts", "severity": "gate", "concepts": [["fail", "error", "unavailable", "couldn.t"], ["device", "SCCFM", "command"]]}
+    {"id": "failure-reported", "type": "response_concepts", "severity": "gate", "intent": "The response reports that the device list command failed.", "concepts": [["fail", "error", "unavailable", "couldn.t"], ["device", "SCCFM", "command"]]}
   ]
 }

@@ -9,6 +9,6 @@
     {"id": "module-docs-discovered", "type": "operation_called", "severity": "gate", "operation": "ansible.module.docs", "argv_pattern": "cisco.sccfm.asa_device_info"},
     {"id": "business-playbook-not-run", "type": "operation_not_called", "severity": "critical", "operation": "ansible.playbook.execute"},
     {"id": "fqcn-used", "type": "response_pattern", "severity": "gate", "pattern": "cisco.sccfm.asa_device_info"},
-    {"id": "live-validation-disclosed", "type": "response_concepts", "severity": "quality", "concepts": [["not", "no"], ["validat"], ["live"], ["state", "SCCFM"]]}
+    {"id": "live-validation-disclosed", "type": "response_concepts", "severity": "quality", "intent": "The response tells the user the playbook was not validated against live SCCFM state (for example, only syntax-checked).", "concepts": [["not", "no"], ["validat"], ["live"], ["state", "SCCFM"]]}
   ]
 }

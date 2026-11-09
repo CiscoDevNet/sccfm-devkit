@@ -110,6 +110,53 @@ def provider_environment(source: dict[str, str] | None = None) -> dict[str, str]
     }
 
 
+def claude_provider_environment(source: dict[str, str]) -> dict[str, str]:
+    """Return Claude's provider variables with any Bedrock AWS profile pre-resolved.
+
+    The evaluated session runs with a disposable ``HOME``, so a profile-based login
+    (``credential_process``, SSO, assume-role) cannot find ``~/.aws/config`` and
+    Claude waits on a credential chain that never resolves. The parent process
+    still sees the real home, so it resolves the profile into short-lived keys,
+    which ``CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`` removes from every subprocess.
+    """
+
+    environment = provider_environment(source)
+    profile = environment.get("AWS_PROFILE")
+    if not source.get("CLAUDE_CODE_USE_BEDROCK") or not profile:
+        return environment
+    if "AWS_ACCESS_KEY_ID" in environment:
+        return environment
+    del environment["AWS_PROFILE"]
+    environment.update(_resolved_aws_profile(profile, environment.get("AWS_REGION")))
+    return environment
+
+
+def _resolved_aws_profile(profile: str, region: str | None) -> dict[str, str]:
+    import boto3
+
+    try:
+        session = boto3.Session(profile_name=profile)
+        credentials = session.get_credentials()
+        frozen = credentials.get_frozen_credentials() if credentials is not None else None
+    except Exception as error:
+        raise ValueError(
+            f"could not resolve AWS profile {profile!r} for Claude on Bedrock: "
+            f"{redact(str(error))[-300:]}"
+        ) from None
+    if frozen is None:
+        raise ValueError(f"AWS profile {profile!r} returned no credentials for Claude on Bedrock")
+    resolved = {
+        "AWS_ACCESS_KEY_ID": frozen.access_key,
+        "AWS_SECRET_ACCESS_KEY": frozen.secret_key,
+    }
+    if frozen.token:
+        resolved["AWS_SESSION_TOKEN"] = frozen.token
+    resolved_region = region or session.region_name
+    if resolved_region:
+        resolved["AWS_REGION"] = resolved_region
+    return resolved
+
+
 def preserved_credential_names(source: dict[str, str] | None = None) -> tuple[str, ...]:
     """Return the credential variables actually present in the parent process."""
 

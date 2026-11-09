@@ -94,6 +94,12 @@ those variables; the evaluated session does not get them:
   Appending to the event log stays possible because the doubles run inside that
   sandbox, so treat forged events as the residual risk this layer does not cover;
   the escaped-command and inspection assertions exist to catch it.
+- The disposable `HOME` hides `~/.aws/config`, so a Bedrock login through
+  `AWS_PROFILE` (`credential_process`, SSO, assume-role) cannot resolve inside
+  Claude. The harness resolves that profile in its own process for every Claude
+  launch and passes short-lived `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
+  `AWS_SESSION_TOKEN` instead; `AWS_PROFILE` itself is not passed. Static keys
+  already in the environment are used as they are.
 - Customer SCCFM, Ansible, and CDO credentials are still stripped for both
   agents; only the provider variables Claude needs to authenticate are kept.
 
@@ -270,6 +276,44 @@ does not gate on Wilson confidence bounds. Provider/runtime exits and timeouts
 are retried once by default; assertion and safety failures are never retried,
 and recovered samples retain their attempt count and prior runtime diagnostics.
 
+## AI judge
+
+Keyword groups produce occasional false negatives: a response that says "run it on
+your own machine" fails a group that expects "locally". Pass `--judge-model` to
+`run`, or run the `judge` subcommand on an existing report, to have a Bedrock model
+take a second look at those failures:
+
+```bash
+poetry run sccfm-agent-harness judge \
+  agent-harness/results/<UTC timestamp>/results.json \
+  --judge-model us.anthropic.claude-opus-5-5
+```
+
+The judge is deliberately narrow:
+
+- It re-checks only failed `response_concepts` assertions of `gate` or `quality`
+  severity, and only in `agent-fail` samples. Operation, secret, confirmation,
+  command-grounding, harness, and every `critical` assertion stay deterministic, so
+  the judge can rescue wording but can never excuse unsafe behavior.
+- It grades the fixture's `intent`, sees the keyword groups only as context, and
+  must answer through the `record_verdict` tool. The tool is offered rather than
+  forced, because Bedrock rejects a forced tool choice for some models such as
+  Opus 5.5; a reply that does not call it is malformed. The evaluated response is
+  delimited and escaped, and the judge is told to treat it as data.
+- A provider error or malformed verdict fails closed: the lexical failure stands.
+  Before any sample is judged, a preflight asks the model for one real ruling and
+  aborts the command if it cannot produce a well-formed one.
+- The judge sees the already-redacted response, never raw provider credentials.
+
+Each judged assertion keeps its keyword-check message in `judge.lexical_message`
+alongside the judge's model and rationale. Reports count `judge_overrides` per
+fixture and overall, and the dashboard shows the ruling beneath the assertion.
+`judge_model` joins the comparison fingerprint, so judged and unjudged runs are
+never compared against each other's baselines. Prefer a judge model different
+from, and at least as capable as, the evaluated model. When the same phrasing keeps
+needing the judge, add it to the fixture's concept groups so the deterministic
+check accepts it.
+
 ## Baselines and CI
 
 Create an intentionally reviewed baseline:
@@ -366,7 +410,9 @@ line containing a single domain operation without shell composition.
 followed by the exact last hook-blocked command for its configured operation.
 `response_concepts`
 requires at least one regex from each concept group, so equivalent wording is
-accepted without turning critical safety checks over to a model judge.
+accepted without a model call. Each one also declares an `intent`: the requirement
+in plain language, which the optional [AI judge](#ai-judge) grades against when the
+groups miss a phrasing nobody anticipated.
 
 Severities have distinct behavior:
 

@@ -172,6 +172,7 @@ def _load_assertion(raw: object, path: Path, index: int) -> Assertion:
     argv_pattern = _optional_regex(raw.get("argv_pattern"), path, f"{prefix}.argv_pattern")
     pattern = _optional_regex(raw.get("pattern"), path, f"{prefix}.pattern")
     value = _optional_string(raw.get("value"), path, f"{prefix}.value")
+    intent = _optional_string(raw.get("intent"), path, f"{prefix}.intent")
     maximum = raw.get("maximum")
     concepts = _load_concepts(raw.get("concepts", []), path, prefix)
 
@@ -193,6 +194,8 @@ def _load_assertion(raw: object, path: Path, index: int) -> Assertion:
         raise ValueError(f"{path}: {prefix}.pattern is required")
     if assertion_type == "response_concepts" and not concepts:
         raise ValueError(f"{path}: {prefix}.concepts is required")
+    if assertion_type == "response_concepts" and intent is None:
+        raise ValueError(f"{path}: {prefix}.intent is required")
     if assertion_type == "secret_absent" and value is None:
         raise ValueError(f"{path}: {prefix}.value is required")
     if assertion_type in {"max_tool_calls", "max_operation_calls"} and (
@@ -210,6 +213,7 @@ def _load_assertion(raw: object, path: Path, index: int) -> Assertion:
         concepts=concepts,
         value=value,
         maximum=cast(int | None, maximum),
+        intent=intent,
     )
 
 

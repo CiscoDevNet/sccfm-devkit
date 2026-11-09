@@ -51,7 +51,7 @@ SPDX-License-Identifier: Apache-2.0
     .subtle { color: var(--muted); margin: 0; }
     .run-meta { text-align: right; color: var(--muted); line-height: 1.55; }
 
-    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 24px 0 14px; }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 24px 0 14px; }
     .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
     .metric-label { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: .82rem; }
     .metric-value { margin-top: 8px; font-size: 1.7rem; font-weight: 750; letter-spacing: -.03em; }
@@ -83,6 +83,7 @@ SPDX-License-Identifier: Apache-2.0
     .status.warn { color: var(--warning); }
     .status.fail { color: var(--danger); }
     .status.invalid { color: var(--warning); }
+    .status.judged { color: var(--quality); }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 
     .detail { padding: 22px; min-width: 0; }
@@ -199,6 +200,7 @@ SPDX-License-Identifier: Apache-2.0
             <option value="failed">Gate failures</option>
             <option value="invalid">Harness-invalid samples</option>
             <option value="warnings">Quality warnings</option>
+            <option value="judged">Accepted by AI judge</option>
             <option value="passed">Clean passes</option>
           </select>
         </div>
@@ -247,9 +249,14 @@ SPDX-License-Identifier: Apache-2.0
         return [...names].map(agentLabel);
       }
 
+      function judgeAccepted(result) {
+        return (result.assertions || []).some((item) => item.judge && item.judge.satisfied);
+      }
+
       function resultStatus(result) {
         if (result.harness_valid === false) return {label: "Harness invalid", kind: "invalid"};
         if (!result.passed) return {label: "Failed", kind: "fail"};
+        if (judgeAccepted(result)) return {label: "Passed · AI judge", kind: "judged"};
         if ((result.warnings || []).length || !result.quality_passed) {
           return {label: "Warning", kind: "warn"};
         }
@@ -296,6 +303,7 @@ SPDX-License-Identifier: Apache-2.0
           metadata.model || "configured model",
         ];
         if (metadata.agent_version) parts.push(metadata.agent_version);
+        if (metadata.judge_model) parts.push(`AI judge ${metadata.judge_model}`);
         if (metadata.source_digest) parts.push(`source ${String(metadata.source_digest).slice(0, 12)}`);
         if (metadata.fixture_digest) parts.push(`fixtures ${String(metadata.fixture_digest).slice(0, 12)}`);
         if (metadata.plugin_freshness) {
@@ -338,13 +346,27 @@ SPDX-License-Identifier: Apache-2.0
           );
           return card;
         }));
+        const metadata = data.metadata || {};
+        if (metadata.judge_model) {
+          const accepted = Number((data.summary || {}).judge_overrides || 0);
+          const card = element("div", "metric");
+          const heading = element("div", "metric-label");
+          heading.append(element("span", "", "AI judge"));
+          card.append(
+            heading,
+            element("div", "metric-value", String(accepted)),
+            element("div", "metric-note", `samples passed only after ${metadata.judge_model} accepted equivalent wording`),
+          );
+          container.append(card);
+        }
       }
 
       function matchesFilter(result, filter) {
         if (filter === "invalid") return result.harness_valid === false;
         if (filter === "failed") return !result.passed;
         if (filter === "warnings") return Boolean((result.warnings || []).length || !result.quality_passed);
-        if (filter === "passed") return Boolean(result.passed && !(result.warnings || []).length && result.quality_passed);
+        if (filter === "judged") return judgeAccepted(result);
+        if (filter === "passed") return Boolean(result.passed && !judgeAccepted(result) && !(result.warnings || []).length && result.quality_passed);
         return true;
       }
 
@@ -402,7 +424,7 @@ SPDX-License-Identifier: Apache-2.0
         const identity = element("div");
         identity.append(element("h2", "", result.fixture_id || "Unnamed test"));
         const tags = element("div", "tags");
-        [resultAgent(result), result.mode, result.skill, result.tier, `sample ${result.sample || 1}`, Number(result.runtime_attempts || 1) > 1 ? `${result.runtime_attempts} runtime attempts` : null].filter(Boolean)
+        [resultAgent(result), result.mode, result.skill, result.tier, `sample ${result.sample || 1}`, Number(result.runtime_attempts || 1) > 1 ? `${result.runtime_attempts} runtime attempts` : null, judgeAccepted(result) ? "accepted by AI judge" : null].filter(Boolean)
           .forEach((value) => tags.append(tag(value)));
         identity.append(tags);
         const verdict = element("div", "verdict");
@@ -583,6 +605,14 @@ SPDX-License-Identifier: Apache-2.0
             element("div", "assertion-name", assertion.assertion_id || assertion.assertion_type),
             element("div", "assertion-message", assertion.message || "No explanation recorded"),
           );
+          if (assertion.judge) {
+            const judge = assertion.judge;
+            const ruling = judge.satisfied ? "accepted" : "rejected";
+            copy.append(
+              element("div", "assertion-message", `AI judge (${judge.model}) ${ruling}: ${judge.rationale}`),
+              element("div", "assertion-message", `Keyword check: ${judge.lexical_message}`),
+            );
+          }
           if (assertion.evidence) {
             const evidence = document.createElement("details");
             evidence.className = "evidence";
@@ -645,7 +675,8 @@ SPDX-License-Identifier: Apache-2.0
         const table = document.createElement("table");
         const head = document.createElement("thead");
         const headRow = document.createElement("tr");
-        ["Fixture", "Agent", "Valid / attempted", "Pass rate", "95% confidence", "State"].forEach((label, index) => {
+        const judged = Boolean((data.metadata || {}).judge_model);
+        ["Fixture", "Agent", "Valid / attempted", "Pass rate", "95% confidence", "State", ...(judged ? ["Judge-accepted"] : [])].forEach((label, index) => {
           headRow.append(element("th", index > 1 && index < 5 ? "number" : "", label));
         });
         head.append(headRow);
@@ -663,6 +694,7 @@ SPDX-License-Identifier: Apache-2.0
             percentage(item.pass_rate),
             confidence,
             state,
+            ...(judged ? [String(item.judge_overrides || 0)] : []),
           ].forEach((value, index) => row.append(element("td", index > 1 && index < 5 ? "number" : "", value)));
           body.append(row);
         });

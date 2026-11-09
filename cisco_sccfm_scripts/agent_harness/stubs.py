@@ -19,8 +19,8 @@ from .credentials import (
     CREDENTIAL_NAMES_VARIABLE,
     CREDENTIAL_VARIABLES,
     SCRUB_VARIABLE,
+    claude_provider_environment,
     preserved_credential_names,
-    provider_environment,
 )
 from .models import Agent, Scenario
 
@@ -132,9 +132,10 @@ def isolated_environment(
         if key not in blocked_names and not key.startswith(blocked_prefixes)
     }
     if agent == "claude":
-        environment.update(provider_environment(dict(os.environ)))
+        provider = claude_provider_environment(dict(os.environ))
+        environment.update(provider)
         environment[SCRUB_VARIABLE] = "1"
-        environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(preserved_credential_names())
+        environment[CREDENTIAL_NAMES_VARIABLE] = " ".join(preserved_credential_names(provider))
     elif agent == "bedrock":
         # Bedrock authentication remains in the parent Python process. Tool calls
         # run in a separate network-disabled container and receive only this

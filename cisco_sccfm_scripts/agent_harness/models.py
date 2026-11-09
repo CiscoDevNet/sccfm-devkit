@@ -65,6 +65,9 @@ class Assertion:
     concepts: tuple[tuple[str, ...], ...] = ()
     value: str | None = None
     maximum: int | None = None
+    # Plain-language requirement a response_concepts check stands for. The AI
+    # judge grades against it when the keyword groups miss equivalent wording.
+    intent: str | None = None
 
 
 @dataclass(frozen=True)
@@ -144,6 +147,16 @@ class Transcript:
 
 
 @dataclass(frozen=True)
+class JudgeVerdict:
+    """An AI judge's second opinion on a failed wording assertion."""
+
+    model: str
+    satisfied: bool
+    rationale: str
+    lexical_message: str
+
+
+@dataclass(frozen=True)
 class AssertionResult:
     """Evidence-backed result for one typed assertion."""
 
@@ -153,6 +166,7 @@ class AssertionResult:
     passed: bool
     message: str
     evidence: str | None = None
+    judge: JudgeVerdict | None = None
 
 
 @dataclass
