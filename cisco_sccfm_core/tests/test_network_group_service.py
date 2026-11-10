@@ -206,7 +206,7 @@ class TestNetworkGroupServiceUpdate:
 
         call_kwargs = mock_api.modify_object_without_preload_content.call_args
         update_req = call_kwargs.kwargs["update_request"]
-        content = update_req.value.default_content.actual_instance
+        content = update_req.value.default_content
         assert content.referenced_object_uids == [new_ref]
         assert len(content.literals) == 2
 
@@ -239,7 +239,7 @@ class TestNetworkGroupServiceUpdate:
 
         call_kwargs = mock_api.modify_object_without_preload_content.call_args
         update_req = call_kwargs.kwargs["update_request"]
-        content = update_req.value.default_content.actual_instance
+        content = update_req.value.default_content
         assert len(content.literals) == 1
         assert content.referenced_object_uids == [new_ref]
 
@@ -313,7 +313,7 @@ class TestNetworkGroupServiceMemberMutation:
 
         call_kwargs = mock_api.modify_object_without_preload_content.call_args
         update_req = call_kwargs.kwargs["update_request"]
-        content = update_req.value.default_content.actual_instance
+        content = update_req.value.default_content
         assert content.referenced_object_uids == [old_ref, new_ref]
         assert len(content.literals) == 1
 
@@ -386,7 +386,7 @@ class TestNetworkGroupServiceMemberMutation:
 
         call_kwargs = mock_api.modify_object_without_preload_content.call_args
         update_req = call_kwargs.kwargs["update_request"]
-        content = update_req.value.default_content.actual_instance
+        content = update_req.value.default_content
         assert content.referenced_object_uids == [keep_ref]
         assert len(content.literals) == 1
 

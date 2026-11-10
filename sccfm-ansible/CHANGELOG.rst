@@ -4,6 +4,14 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.44.1
+========
+
+Bugfixes
+--------
+
+- Bumped the SCCFM SDK to 1.23.738, which permits urllib3 2.8 with its security fixes, and removed the urllib3 exceptions from the dependency audit.
+
 v0.44.0
 ========
 

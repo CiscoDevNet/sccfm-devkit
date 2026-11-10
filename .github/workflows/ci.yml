@@ -17,17 +17,6 @@ concurrency:
 
 env:
   PIP_AUDIT_VERSION: "2.10.1"
-  # The pinned SCCFM SDK requires urllib3<2.1; keep these explicit until the SDK
-  # permits a patched urllib3 release.
-  DEP002_PIP_AUDIT_EXCEPTIONS: >-
-    --ignore-vuln PYSEC-2026-141
-    --ignore-vuln PYSEC-2026-1994
-    --ignore-vuln PYSEC-2026-1995
-    --ignore-vuln PYSEC-2026-1996
-    --ignore-vuln PYSEC-2026-1998
-    --ignore-vuln PYSEC-2026-1999
-    --ignore-vuln PYSEC-2026-4175
-    --ignore-vuln PYSEC-2026-4177
 
 jobs:
   lint-and-test:
@@ -74,7 +63,6 @@ jobs:
             | awk 'NF >= 2 {print $1 "==" $2}' \
             > "${RUNTIME_REQUIREMENTS}"
           test -s "${RUNTIME_REQUIREMENTS}"
-          read -r -a AUDIT_EXCEPTION_ARGS <<< "${DEP002_PIP_AUDIT_EXCEPTIONS}"
           pipx run --spec "pip-audit==${PIP_AUDIT_VERSION}" pip-audit \
             --strict \
             --no-deps \
@@ -83,7 +71,6 @@ jobs:
             --progress-spinner off \
             --aliases on \
             --desc off \
-            "${AUDIT_EXCEPTION_ARGS[@]}" \
             --requirement "${RUNTIME_REQUIREMENTS}"
 
       - name: License headers
@@ -422,7 +409,6 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          read -r -a AUDIT_EXCEPTION_ARGS <<< "${DEP002_PIP_AUDIT_EXCEPTIONS}"
 
           verify_python_distribution() {
             local artifact_path="$1"
@@ -450,7 +436,6 @@ jobs:
               --progress-spinner off \
               --aliases on \
               --desc off \
-              "${AUDIT_EXCEPTION_ARGS[@]}" \
               --requirement "${requirements}"
             "${smoke_python}" -I - "${artifact_kind}" <<'PY'
           import importlib
