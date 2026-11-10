@@ -2,6 +2,13 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.44.1:
+    changes:
+      bugfixes:
+        - Bumped the SCCFM SDK to 1.23.738, which permits urllib3 2.8 with its security
+          fixes, and removed the urllib3 exceptions from the dependency audit.
+    fragments: []
+    release_date: '2026-11-10'
   0.44.0:
     changes:
       minor_changes:

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from scc_firewall_manager_sdk.models.create_request import CreateRequest
-from scc_firewall_manager_sdk.models.network_object_content import NetworkObjectContent
 from scc_firewall_manager_sdk.models.object_content import ObjectContent
 from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValue
 from scc_firewall_manager_sdk.models.update_request import UpdateRequest
@@ -308,9 +307,7 @@ class NetworkObjectService:
         Returns:
             A SharedObjectValue wrapping the network content.
         """
-        network_content = NetworkObjectContent(literal=value)
-        object_content = ObjectContent(actual_instance=network_content)
         return SharedObjectValue(
-            defaultContent=object_content,
+            defaultContent=ObjectContent(literal=value),
             objectType=self.OBJECT_TYPE,
         )

@@ -10,12 +10,10 @@ import warnings
 from dataclasses import dataclass
 from typing import Any
 
-from scc_firewall_manager_sdk.models.network_object_content import NetworkObjectContent
 from scc_firewall_manager_sdk.models.object_content import ObjectContent
 from scc_firewall_manager_sdk.models.override import Override
 from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValue
 from scc_firewall_manager_sdk.models.update_request import UpdateRequest
-from scc_firewall_manager_sdk.models.url_object_content import UrlObjectContent
 
 from cisco_sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 from cisco_sccfm_core.types import ConfigLike
@@ -559,19 +557,17 @@ class ObjectOverrideService:
     def _build_object_content(self, raw_content: dict[str, Any], object_type: str) -> ObjectContent:
         """Reconstruct an ObjectContent SDK model from a raw dict."""
         if object_type == "NETWORK_OBJECT":
-            return ObjectContent(
-                actual_instance=NetworkObjectContent(literal=str(raw_content["literal"]))
-            )
+            return ObjectContent(literal=str(raw_content["literal"]))
         if object_type == "URL_OBJECT":
-            return ObjectContent(actual_instance=UrlObjectContent(url=str(raw_content["url"])))
+            return ObjectContent(url=str(raw_content["url"]))
         raise ValueError(f"Unsupported object type: {object_type}")
 
     def _build_content_from_value(self, value: str, object_type: str) -> ObjectContent:
         """Build an ObjectContent from the CLI override value string."""
         if object_type == "NETWORK_OBJECT":
-            return ObjectContent(actual_instance=NetworkObjectContent(literal=value))
+            return ObjectContent(literal=value)
         if object_type == "URL_OBJECT":
-            return ObjectContent(actual_instance=UrlObjectContent(url=value))
+            return ObjectContent(url=value)
         raise ValueError(f"Unsupported object type: {object_type}")
 
     def _build_override_from_raw(self, raw_override: dict[str, Any], object_type: str) -> Override:

@@ -303,12 +303,12 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
             "update_request"
         ]
         # New default should be the promoted override value
-        assert update_request.value.default_content.actual_instance.literal == "11.14.11.14"
+        assert update_request.value.default_content.literal == "11.14.11.14"
         # Promoted target's override should be removed
         assert len(update_request.value.overrides) == 1
         remaining = update_request.value.overrides[0]
         assert remaining.target_id == "0b2f5a0d-6ccb-45e6-a65c-7d9dd48d7b55"
-        assert remaining.content.actual_instance.literal == "11.10.11.122"
+        assert remaining.content.literal == "11.10.11.122"
 
     def test_should_send_null_overrides_when_only_override_promoted(
         self, monkeypatch: MonkeyPatch
@@ -351,7 +351,7 @@ class TestObjectOverrideServiceApplyOverrideAsDefault:
         update_request = mock_api.modify_object_without_preload_content.call_args.kwargs[
             "update_request"
         ]
-        assert update_request.value.default_content.actual_instance.literal == "5.5.5.5"
+        assert update_request.value.default_content.literal == "5.5.5.5"
         assert update_request.value.overrides is None
 
     def test_should_raise_when_override_not_found(self, monkeypatch: MonkeyPatch) -> None:

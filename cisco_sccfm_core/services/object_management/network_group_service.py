@@ -12,13 +12,10 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from scc_firewall_manager_sdk.models.create_request import CreateRequest
-from scc_firewall_manager_sdk.models.group_content import GroupContent
-from scc_firewall_manager_sdk.models.network_object_content import NetworkObjectContent
 from scc_firewall_manager_sdk.models.object_content import ObjectContent
 from scc_firewall_manager_sdk.models.shared_object_value import SharedObjectValue
 from scc_firewall_manager_sdk.models.single_content import SingleContent
 from scc_firewall_manager_sdk.models.update_request import UpdateRequest
-from scc_firewall_manager_sdk.models.url_object_content import UrlObjectContent
 
 from cisco_sccfm_core.errors import NotFoundError
 from cisco_sccfm_core.services.object_management.network_object_service import NetworkObjectService
@@ -509,13 +506,12 @@ class NetworkGroupService:
             referenced_object_uids: UIDs of existing objects to reference.
 
         Returns:
-            A SharedObjectValue wrapping the GroupContent.
+            A SharedObjectValue wrapping the group content.
         """
-        group_content = GroupContent(
+        object_content = ObjectContent(
             literals=single_contents if single_contents else None,
             referenced_object_uids=referenced_object_uids if referenced_object_uids else None,
         )
-        object_content = ObjectContent(actual_instance=group_content)
         return SharedObjectValue(
             defaultContent=object_content,
             objectType=self.OBJECT_TYPE,
@@ -534,13 +530,13 @@ class NetworkGroupService:
             url_literals: URL literal strings.
 
         Returns:
-            A list of SingleContent wrapping the appropriate content type.
+            A list of SingleContent with the network or URL value set.
         """
         contents: list[SingleContent] = []
         for lit in network_literals:
-            contents.append(SingleContent(actual_instance=NetworkObjectContent(literal=lit)))
+            contents.append(SingleContent(literal=lit))
         for url in url_literals:
-            contents.append(SingleContent(actual_instance=UrlObjectContent(url=url)))
+            contents.append(SingleContent(url=url))
         return contents
 
     @staticmethod
@@ -557,7 +553,7 @@ class NetworkGroupService:
 
         Inspects each literal dict to determine whether it is a network
         literal (has ``literal`` key) or a URL literal (has ``url`` key)
-        and wraps it in the appropriate SDK model.
+        and sets the matching SDK model field.
 
         Args:
             raw_content: The raw ``defaultContent`` dict from the API.
@@ -569,15 +565,9 @@ class NetworkGroupService:
         contents: list[SingleContent] = []
         for item in raw_literals:
             if item.get("url"):
-                contents.append(
-                    SingleContent(actual_instance=UrlObjectContent(url=item["url"])),
-                )
+                contents.append(SingleContent(url=item["url"]))
             elif item.get("literal"):
-                contents.append(
-                    SingleContent(
-                        actual_instance=NetworkObjectContent(literal=item["literal"]),
-                    ),
-                )
+                contents.append(SingleContent(literal=item["literal"]))
         return contents
 
     def _resolve_referenced_object_uids(self, referenced_objects: list[str]) -> list[str]:

@@ -272,7 +272,7 @@ class TestObjectOverrideServiceDeleteOverride:
         assert len(update_request.value.overrides) == 1
         remaining = update_request.value.overrides[0]
         assert remaining.target_id == "device-789"
-        assert remaining.content.actual_instance.literal == "6.6.6.6"
+        assert remaining.content.literal == "6.6.6.6"
 
     def test_should_send_null_overrides_when_last_override_deleted(
         self, monkeypatch: MonkeyPatch

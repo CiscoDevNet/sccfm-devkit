@@ -329,9 +329,9 @@ class TestObjectOverrideServiceEditOverride:
         ]
         assert len(update_request.value.overrides) == 2
         edited = next(o for o in update_request.value.overrides if o.target_id == "device-456")
-        assert edited.content.actual_instance.literal == "10.10.10.10"
+        assert edited.content.literal == "10.10.10.10"
         untouched = next(o for o in update_request.value.overrides if o.target_id == "device-789")
-        assert untouched.content.actual_instance.literal == "6.6.6.6"
+        assert untouched.content.literal == "6.6.6.6"
 
     def test_should_raise_when_override_not_found(self, monkeypatch: MonkeyPatch) -> None:
         mock_api = Mock()
@@ -402,7 +402,7 @@ class TestObjectOverrideServiceEditOverride:
             "update_request"
         ]
         edited = update_request.value.overrides[0]
-        assert edited.content.actual_instance.url == "new.example.com"
+        assert edited.content.url == "new.example.com"
 
     def test_should_raise_for_unsupported_object_type(self, monkeypatch: MonkeyPatch) -> None:
         mock_api = Mock()
