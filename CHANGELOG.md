@@ -1,3 +1,10 @@
+## v0.44.1 (2026-11-10)
+
+### Fix
+
+- **lh-137917**: resolve consistency findings in object override service
+- **lh-137917**: bump sccfm sdk to 1.23.738 for urllib3 2.8
+
 ## v0.44.0 (2026-11-09)
 
 ### Feat
