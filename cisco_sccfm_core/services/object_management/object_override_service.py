@@ -18,6 +18,12 @@ from scc_firewall_manager_sdk.models.update_request import UpdateRequest
 from cisco_sccfm_core.services.object_management.object_api_helper import ObjectApiHelper
 from cisco_sccfm_core.types import ConfigLike
 
+
+def _string_or_empty(value: Any) -> str:
+    """Normalize missing API values to the response model's empty-string sentinel."""
+    return str(value or "")
+
+
 _SUPPORTED_TYPES = {"NETWORK_OBJECT", "URL_OBJECT"}
 
 
@@ -32,9 +38,9 @@ class ObjectTargetItem:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ObjectTargetItem":
         return cls(
-            id=str(data.get("id") or ""),
-            display_name=str(data.get("displayName") or ""),
-            type=str(data.get("type") or ""),
+            id=_string_or_empty(data.get("id")),
+            display_name=_string_or_empty(data.get("displayName")),
+            type=_string_or_empty(data.get("type")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,8 +59,8 @@ class ObjectTargetsResponse:
     def from_dict(cls, data: dict[str, Any]) -> "ObjectTargetsResponse":
         raw_targets: list[dict[str, Any]] = data.get("targets") or []
         return cls(
-            uid=str(data.get("uid") or ""),
-            name=str(data.get("name") or ""),
+            uid=_string_or_empty(data.get("uid")),
+            name=_string_or_empty(data.get("name")),
             targets=[ObjectTargetItem.from_dict(t) for t in raw_targets],
         )
 
@@ -81,9 +87,9 @@ class UpdateDefaultValueResponse:
         default_content: dict[str, Any] = value.get("defaultContent") or {}
         literal = default_content.get("literal") or default_content.get("url") or ""
         return cls(
-            uid=str(data.get("uid") or ""),
-            name=str(data.get("name") or ""),
-            object_type=str(value.get("objectType") or ""),
+            uid=_string_or_empty(data.get("uid")),
+            name=_string_or_empty(data.get("name")),
+            object_type=_string_or_empty(value.get("objectType")),
             default_value=str(literal),
         )
 
@@ -110,9 +116,9 @@ class ObjectOverrideResponse:
         value: dict[str, Any] = data.get("value") or {}
         overrides: list[Any] = value.get("overrides") or []
         return cls(
-            uid=str(data.get("uid") or ""),
-            name=str(data.get("name") or ""),
-            object_type=str(value.get("objectType") or ""),
+            uid=_string_or_empty(data.get("uid")),
+            name=_string_or_empty(data.get("name")),
+            object_type=_string_or_empty(value.get("objectType")),
             overrides_count=len(overrides),
         )
 
@@ -136,7 +142,7 @@ class ObjectOverrideItem:
     def from_dict(cls, data: dict[str, Any]) -> "ObjectOverrideItem":
         content: dict[str, Any] = data.get("content") or {}
         value = str(content.get("literal") or content.get("url") or "")
-        return cls(target_id=str(data.get("targetId") or ""), value=value)
+        return cls(target_id=_string_or_empty(data.get("targetId")), value=value)
 
     def to_dict(self) -> dict[str, Any]:
         return {"target_id": self.target_id, "value": self.value}
@@ -162,10 +168,10 @@ class ObjectDetailsResponse:
         raw_overrides: list[dict[str, Any]] = value.get("overrides") or []
         raw_targets: list[dict[str, Any]] = data.get("targets") or []
         return cls(
-            uid=str(data.get("uid") or ""),
-            name=str(data.get("name") or ""),
-            description=str(data.get("description") or ""),
-            object_type=str(value.get("objectType") or ""),
+            uid=_string_or_empty(data.get("uid")),
+            name=_string_or_empty(data.get("name")),
+            description=_string_or_empty(data.get("description")),
+            object_type=_string_or_empty(value.get("objectType")),
             default_value=default_value,
             overrides=[ObjectOverrideItem.from_dict(o) for o in raw_overrides],
             targets=[ObjectTargetItem.from_dict(t) for t in raw_targets],
@@ -575,5 +581,5 @@ class ObjectOverrideService:
         raw_content: dict[str, Any] = raw_override.get("content") or {}
         return Override(
             content=self._build_object_content(raw_content, object_type),
-            targetId=raw_override.get("targetId"),
+            target_id=raw_override.get("targetId"),
         )
