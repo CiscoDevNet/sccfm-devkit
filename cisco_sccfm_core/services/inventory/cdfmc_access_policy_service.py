@@ -66,3 +66,62 @@ class CdfmcAccessPolicyService:
             limit=int(paging.get("limit", data.get("limit", limit))),
             offset=int(paging.get("offset", data.get("offset", offset))),
         )
+
+    def create_access_policy(
+        self,
+        domain_uid: str,
+        name: str,
+        payload: dict | None = None,
+    ) -> FmcAccessPolicy:
+        """Create a new access policy from a caller-supplied payload.
+
+        ``name`` and ``type`` are always forced onto the payload (overriding
+        anything the caller passed for those two keys) so the created
+        policy's name follows the caller's own naming convention
+        (e.g. tied to a device name) regardless of what the raw payload
+        contains. FMC's minimum required fields for AccessPolicy are
+        ``name``, ``type``, and ``defaultAction`` - the caller is
+        responsible for providing ``defaultAction`` (and anything else)
+        via ``payload``.
+        """
+        resource_path = f"/v1/cdfmc/api/fmc_config/v1/domain/{domain_uid}/policy/accesspolicies"
+        body = {**(payload or {}), "name": name, "type": "AccessPolicy"}
+        params = self._api_client.param_serialize(
+            method="POST",
+            resource_path=resource_path,
+            path_params=None,
+            query_params=None,
+            header_params={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body=body,
+            post_params=None,
+            files=None,
+            auth_settings=["bearerAuth"],
+            collection_formats=None,
+        )
+        response = self._api_client.call_api(*params)
+        read_response: Callable[[], object] = response.read
+        read_response()
+        created = json.loads(response.data)
+        return FmcAccessPolicy(uid=created["id"], name=created["name"])
+
+    def get_or_create_access_policy(
+        self,
+        domain_uid: str,
+        name: str,
+        payload: dict | None = None,
+    ) -> tuple[FmcAccessPolicy, bool]:
+        """Idempotently ensure an access policy with ``name`` exists.
+
+        Returns ``(policy, created)`` - ``created`` is False when a policy
+        with this name already existed (in which case ``payload`` is never
+        sent - the existing policy is returned as-is), True when this call
+        just created it.
+        """
+        existing_page = self.get_access_policies(domain_uid, limit=200)
+        existing = next((p for p in existing_page.items if p.name == name), None)
+        if existing is not None:
+            return existing, False
+        return self.create_access_policy(domain_uid, name, payload), True
