@@ -60,7 +60,7 @@ options:
     env:
       - name: SCCFM_API_TOKEN
 author:
-  - Cisco SCCFM Team
+  - Cisco SCCFM Team (@CiscoDevNet)
 """
 
 EXAMPLES = r"""
