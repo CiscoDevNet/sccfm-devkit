@@ -60,10 +60,13 @@ build_python() {
   echo "Building Python ${PYTHON_VERSION}..."
 
   # AL2023 provides OpenSSL 3 in the standard compiler search paths.
-  if ! pyenv install "${PYTHON_VERSION}"; then
+  # Hardened runners mount /tmp with noexec; build beside the installed interpreters.
+  local build_tmpdir="${PYENV_ROOT}/tmp"
+  mkdir -p "${build_tmpdir}"
+  if ! TMPDIR="${build_tmpdir}" pyenv install "${PYTHON_VERSION}"; then
     echo "Python ${PYTHON_VERSION} build failed." >&2
     local log
-    log="$(ls -t /tmp/python-build.*.log 2>/dev/null | head -1)"
+    log="$(ls -t "${build_tmpdir}"/python-build.*.log 2>/dev/null | head -1 || true)"
     if [[ -n "${log}" && -f "${log}" ]]; then
       echo "=== Last 40 lines of build log ===" >&2
       tail -40 "${log}" >&2

@@ -472,7 +472,8 @@ def _verify_profile_handoff(controller: _Controller, lookup_name: str) -> None:
 def verify_public_release(requested: str = "") -> PublicReleaseSummary:
     """Install and smoke-test one matching release from the public registries."""
     version = resolve_public_version(requested)
-    with tempfile.TemporaryDirectory(prefix="sccfm-public-release-") as temporary:
+    # The controller executes installed entry points; hardened /tmp mounts forbid that.
+    with tempfile.TemporaryDirectory(prefix="sccfm-public-release-", dir=Path.cwd()) as temporary:
         _log("Creating an isolated controller with a clean home and collection path")
         controller = _create_controller(Path(temporary))
         _install_public_artifacts(controller, version)

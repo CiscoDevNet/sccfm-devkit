@@ -162,3 +162,53 @@ def test_ci_setup_rejects_python_without_ssl_before_creating_venv(
     assert result.returncode == 1, result.stderr
     assert "No module named ssl" in result.stderr
     assert "venv creation attempted" not in result.stdout
+
+
+@pytest.mark.parametrize("build_status", [0, 73])
+def test_ci_python_build_avoids_noexec_tmp_and_reads_its_build_log(
+    tmp_path: Path, build_status: int
+) -> None:
+    pyenv_root = tmp_path / "pyenv"
+    pyenv_root.mkdir()
+    noexec_tmp = tmp_path / "noexec-tmp"
+    noexec_tmp.mkdir()
+    fake_pyenv = r"""
+pyenv() {
+  case "$1" in
+    versions) return 0 ;;
+    root) printf '%s\n' "$PYENV_ROOT" ;;
+    install)
+      if [[ "$TMPDIR" == "$SCCFM_TEST_NOEXEC_TMP" ]]; then
+        echo 'python-build: TMPDIR cannot hold executables' >&2
+        return 1
+      fi
+      [[ -d "$TMPDIR" ]] || return 90
+      printf 'compiler diagnostic\n' > "$TMPDIR/python-build.fixture.log"
+      return "$SCCFM_TEST_BUILD_STATUS" ;;
+  esac
+}
+"""
+    result = subprocess.run(
+        [
+            "/bin/bash",
+            "-c",
+            f"{_ci_setup_functions()}\n{fake_pyenv}\nPYTHON_VERSION=3.12.4\nbuild_python",
+        ],
+        env={
+            "PATH": "/usr/bin:/bin",
+            "PYENV_ROOT": str(pyenv_root),
+            "TMPDIR": str(noexec_tmp),
+            "SCCFM_TEST_NOEXEC_TMP": str(noexec_tmp),
+            "SCCFM_TEST_BUILD_STATUS": str(build_status),
+        },
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert "cannot hold executables" not in result.stderr
+    assert result.returncode == (0 if build_status == 0 else 1), result.stderr
+    assert (pyenv_root / "tmp/python-build.fixture.log").is_file()
+    if build_status:
+        assert "compiler diagnostic" in result.stderr
