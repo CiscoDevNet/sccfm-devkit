@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# CI environment setup for Amazon Linux 2.
+# CI environment setup for Amazon Linux 2023.
 #
-# Uses system packages (yum) and pyenv (from git) to build Python,
+# Uses system packages (dnf) and pyenv (from git) to build Python,
 # then Poetry for project dependencies.  No Homebrew needed.
 #
 # For local macOS development, use setup_environment.sh instead.
@@ -13,17 +13,17 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${PROJECT_ROOT}/.venv"
 
 install_system_packages() {
-  if ! command -v yum >/dev/null 2>&1; then
-    echo "This script requires yum (Amazon Linux 2)." >&2
+  if ! command -v dnf >/dev/null 2>&1; then
+    echo "This script requires dnf (Amazon Linux 2023)." >&2
     exit 1
   fi
 
   echo "Installing system build dependencies..."
-  sudo yum groupinstall -y 'Development Tools'
-  sudo yum install -y \
+  sudo dnf groupinstall -y 'Development Tools'
+  sudo dnf install -y \
     bzip2-devel \
     libffi-devel \
-    openssl11-devel \
+    openssl-devel \
     readline-devel \
     sqlite-devel \
     xz-devel \
@@ -59,19 +59,8 @@ build_python() {
 
   echo "Building Python ${PYTHON_VERSION}..."
 
-  # Amazon Linux 2 ships OpenSSL 1.0.2 by default but Python 3.12+
-  # requires >= 1.1.1.  The openssl11-devel package puts headers in
-  # /usr/include/openssl11 and libs in /usr/lib64/openssl11.
-  local build_cppflags="" build_ldflags=""
-  if [[ -d /usr/include/openssl11 ]]; then
-    build_cppflags="-I/usr/include/openssl11"
-  fi
-  if [[ -d /usr/lib64/openssl11 ]]; then
-    build_ldflags="-L/usr/lib64/openssl11"
-  fi
-
-  if ! CPPFLAGS="${build_cppflags}" LDFLAGS="${build_ldflags}" \
-       pyenv install "${PYTHON_VERSION}"; then
+  # AL2023 provides OpenSSL 3 in the standard compiler search paths.
+  if ! pyenv install "${PYTHON_VERSION}"; then
     echo "Python ${PYTHON_VERSION} build failed." >&2
     local log
     log="$(ls -t /tmp/python-build.*.log 2>/dev/null | head -1)"
@@ -89,6 +78,11 @@ create_venv() {
 
   if [[ ! -x "${python_bin}" ]]; then
     echo "Python ${PYTHON_VERSION} binary not found." >&2
+    exit 1
+  fi
+
+  if ! "${python_bin}" -c 'import ssl'; then
+    echo "Python ${PYTHON_VERSION} cannot import ssl." >&2
     exit 1
   fi
 
