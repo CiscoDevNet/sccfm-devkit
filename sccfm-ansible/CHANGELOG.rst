@@ -4,6 +4,17 @@ Cisco SCCFM Collection Release Notes
 
 .. contents:: Topics
 
+v0.44.2
+========
+
+Bugfixes
+--------
+
+- Fixed Python environment setup on Amazon Linux 2023 runners by using system OpenSSL 3
+  build dependencies and executable build directories.
+- Kept public-release verification controllers off system temporary directories that prohibit
+  executing installed commands.
+
 v0.44.1
 ========
 

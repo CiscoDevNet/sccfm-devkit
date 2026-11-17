@@ -15,6 +15,7 @@ from urllib.error import HTTPError
 import pytest
 
 import cisco_sccfm_scripts.verify_public_release as verifier
+from cisco_sccfm_scripts.verify_clean_controller import _Controller
 
 _VERSION = "1.2.3"
 
@@ -31,7 +32,7 @@ class _JsonResponse:
         return self._payload[:limit]
 
 
-def _controller(tmp_path: Path) -> verifier._Controller:
+def _controller(tmp_path: Path) -> _Controller:
     work = tmp_path / "work"
     work.mkdir()
     binaries = tmp_path / "bin"
@@ -259,10 +260,10 @@ def test_profile_handoff_configures_offline_and_asserts_lookup(
 ) -> None:
     controller = _controller(tmp_path)
     plugin = "cisco.sccfm.profile"
-    calls: list[tuple[verifier._Controller, list[str | Path]]] = []
+    calls: list[tuple[_Controller, list[str | Path]]] = []
 
     def run(
-        selected: verifier._Controller,
+        selected: _Controller,
         command: list[str | Path],
         *,
         check: bool = True,
@@ -380,3 +381,30 @@ def test_main_writes_machine_readable_summary(
         "offline_probe": "cisco.sccfm.list_devices",
         "version": _VERSION,
     }
+
+
+def test_public_controller_uses_workspace_and_cleans_up_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    system_tmp = tmp_path / "noexec-tmp"
+    system_tmp.mkdir()
+    monkeypatch.chdir(workspace)
+    monkeypatch.setattr(verifier.tempfile, "tempdir", str(system_tmp))
+    monkeypatch.setattr(verifier, "resolve_public_version", lambda requested: _VERSION)
+    created: list[Path] = []
+
+    def check_controller_location(directory: Path) -> _Controller:
+        created.append(directory)
+        assert directory.parent == workspace
+        assert directory.is_dir()
+        raise RuntimeError("stop before registry installation")
+
+    monkeypatch.setattr(verifier, "_create_controller", check_controller_location)
+
+    with pytest.raises(RuntimeError, match="stop before registry installation"):
+        verifier.verify_public_release(_VERSION)
+
+    assert len(created) == 1
+    assert not created[0].exists()

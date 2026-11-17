@@ -2,6 +2,15 @@
 ancestor: null
 # sccfm-release-retarget-seed: 0.39.0
 releases:
+  0.44.2:
+    changes:
+      bugfixes:
+        - Fixed Python environment setup on Amazon Linux 2023 runners by using
+          system OpenSSL 3 build dependencies and executable build directories.
+        - Kept public-release verification controllers off system temporary
+          directories that prohibit executing installed commands.
+    fragments: []
+    release_date: '2026-11-17'
   0.44.1:
     changes:
       bugfixes:
