@@ -1,3 +1,10 @@
+## v0.44.2 (2026-11-17)
+
+### Fix
+
+- **lh-139840**: keep executable work outside system tmp
+- **lh-139840**: adapt ci environment setup to al2023
+
 ## v0.44.1 (2026-11-10)
 
 ### Fix
