@@ -236,11 +236,11 @@ def _resolve_target_version(
     every device in *device_uids* at all - mirrors the fail-fast behaviour
     the previous disk0:-based approach had for "no package available".
     """
-    secure_client_service = AsaSecureClientService(config=config)
-    compatible = secure_client_service.get_compatible_versions(device_uids=device_uids)
-
     if requested_version:
         return requested_version
+
+    secure_client_service = AsaSecureClientService(config=config)
+    compatible = secure_client_service.get_compatible_versions(device_uids=device_uids)
 
     latest = pick_latest_version(compatible)
     if latest is None or not latest.version:
@@ -299,6 +299,12 @@ def run_module() -> None:
 
     uids: list[str] | None = module.params.get("uids")
     query: str | None = module.params.get("query")
+    # Tracks which API call was in flight when an exception hit, so the
+    # generic SERVER_ERROR/500s this beta API area is prone to say WHERE
+    # they happened instead of just "Internal server error" - see
+    # project memory on the 2026-11-24 live-run failures this was added
+    # to diagnose.
+    stage = "resolving device UIDs"
 
     try:
         if uids:
@@ -313,9 +319,11 @@ def run_module() -> None:
             if not device_uids:
                 module.fail_json(msg="No devices found matching the specified query.")
 
+        stage = "resolving target Secure Client version (get_compatible_versions)"
         requested_version: str | None = module.params.get("version")
         target_version = _resolve_target_version(config, device_uids, requested_version)
 
+        stage = "checking already-installed packages (list_installed_packages)"
         # Idempotency: skip if every device already has this version staged
         if _all_devices_have_version(config, device_uids, target_version):
             module.exit_json(
@@ -340,6 +348,7 @@ def run_module() -> None:
         wait_for_completion: bool = module.params.get("wait", False)
         timeout: int = module.params.get("timeout", DEFAULT_TRANSACTION_TIMEOUT_SEC)
 
+        stage = "triggering the push (trigger_secure_client_upgrade)"
         secure_client_service = AsaSecureClientService(config=config)
         transaction = secure_client_service.push_package(
             device_uids=device_uids,
@@ -352,6 +361,7 @@ def run_module() -> None:
             if transaction.transaction_uid is None:
                 module.fail_json(msg="Transaction UID missing from push response.")
 
+            stage = "waiting for the push transaction to finish"
             transaction = TransactionService(config=config).wait_for_transaction_to_finish(
                 transaction_uid=transaction.transaction_uid,
                 timeout_sec=timeout,
@@ -384,13 +394,15 @@ def run_module() -> None:
 
     except ApiException as e:
         error = SccApiError.from_exception(e)
-        module.fail_json(**error.to_dict())
+        error_dict = error.to_dict()
+        error_dict["msg"] = f"[while {stage}] {error_dict.get('msg', '')}"
+        module.fail_json(**error_dict)
     except TimeoutError as e:
-        module.fail_json(msg=str(e))
+        module.fail_json(msg=f"[while {stage}] {e}")
     except ValueError as e:
-        module.fail_json(msg=str(e))
+        module.fail_json(msg=f"[while {stage}] {e}")
     except Exception as e:
-        module.fail_json(msg=f"Unexpected error: {str(e)}")
+        module.fail_json(msg=f"[while {stage}] Unexpected error: {e}")
 
 
 def main() -> None:
