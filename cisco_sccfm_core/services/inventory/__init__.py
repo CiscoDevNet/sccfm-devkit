@@ -13,6 +13,10 @@ from cisco_sccfm_core.services.inventory.asa_ha_check_service import (
     AsaHaCheckService,
 )
 from cisco_sccfm_core.services.inventory.asa_onboard_service import AsaOnboardService
+from cisco_sccfm_core.services.inventory.asa_secure_client_service import (
+    AsaSecureClientService,
+    pick_latest_version,
+)
 from cisco_sccfm_core.services.inventory.asa_shun_service import AsaShunService, ShunEntrySpec
 from cisco_sccfm_core.services.inventory.asa_upgrade_service import AsaUpgradeService
 from cisco_sccfm_core.services.inventory.asa_upgrade_version_service import (
@@ -56,6 +60,7 @@ __all__ = [
     "AsaHaCheckReport",
     "AsaHaCheckService",
     "AsaOnboardService",
+    "AsaSecureClientService",
     "AsaShunService",
     "AsaUpgradeService",
     "AsaUpgradeVersionService",
@@ -80,5 +85,6 @@ __all__ = [
     "ShunEntrySpec",
     "get_asdm_compatibility_info",
     "is_version_downgrade",
+    "pick_latest_version",
     "resolve_upgrade_package_uid",
 ]

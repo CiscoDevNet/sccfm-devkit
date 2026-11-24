@@ -1,0 +1,76 @@
+---
+# Push a Secure Client (AnyConnect) package to ASA devices from CDO's own
+# package catalog - no local .pkg file, disk0: upload, or reachable
+# download/mirror server needed.
+#
+# RUN THIS PLAYBOOK:
+#   ansible-playbook examples/push_asa_secure_client_package.yml \
+#     -e '{"device_uids":["uid-1","uid-2"]}'
+#
+# Push a specific version instead of auto-picking the newest:
+#   ansible-playbook examples/push_asa_secure_client_package.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e version="5.1.15.287"
+#
+# Restrict to a single platform:
+#   ansible-playbook examples/push_asa_secure_client_package.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e '{"platforms":[{"os":"LINUX","cpu_architecture":"X86_64"}]}'
+#
+# Dry-run (check mode):
+#   ansible-playbook examples/push_asa_secure_client_package.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     --check
+#
+# Wait for the push transaction to finish:
+#   ansible-playbook examples/push_asa_secure_client_package.yml \
+#     -e '{"device_uids":["uid-1"]}' \
+#     -e wait_for_completion=true \
+#     -e wait_timeout=1800
+
+- name: Push a Secure Client package to ASA devices from CDO's catalog
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/cisco.sccfm.all:
+      profile: default
+
+  vars:
+    device_uids: []
+    version: ""
+    platforms: []
+    upgrade_name: ""
+    wait_for_completion: false
+    wait_timeout: 3600
+
+  tasks:
+    - name: Validate that device UIDs are provided
+      ansible.builtin.fail:
+        msg: >-
+          device_uids is required. Pass it with
+          -e '{"device_uids":["uid-1","uid-2"]}'
+      when: device_uids | length == 0
+
+    - name: Push Secure Client package
+      cisco.sccfm.push_asa_secure_client_package:
+        uids: "{{ device_uids }}"
+        version: "{{ version if version | length > 0 else omit }}"
+        platforms: "{{ platforms if platforms | length > 0 else omit }}"
+        upgrade_name: "{{ upgrade_name if upgrade_name | length > 0 else omit }}"
+        wait: "{{ wait_for_completion }}"
+        timeout: "{{ wait_timeout }}"
+      register: push_result
+
+    - name: Display push result
+      ansible.builtin.debug:
+        msg: >-
+          changed={{ push_result.changed }},
+          msg={{ push_result.msg }},
+          device_count={{ push_result.device_count }},
+          resolved_version={{ push_result.resolved_version }}
+
+    - name: Display transaction details
+      ansible.builtin.debug:
+        var: push_result.transaction
+      when: push_result.changed
