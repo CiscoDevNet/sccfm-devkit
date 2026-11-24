@@ -46,6 +46,7 @@ action_groups:
     - remove_asa_shun
     - remove_network_group_members
     - show_asa_shun
+    - sync_asa_device_config
     - trigger_asa_upgrade
     - trigger_ftd_upgrade
     - update_access_rule
