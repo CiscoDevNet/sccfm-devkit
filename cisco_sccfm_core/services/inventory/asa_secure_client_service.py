@@ -71,10 +71,16 @@ class AsaSecureClientService:
         across all of them - no client-side intersection needed here.
         """
         validate_uids(device_uids)
+        # NOTE: limit/offset are typed as `string` (not integer) in this
+        # specific beta endpoint's OpenAPI schema, unlike the equivalent
+        # params on older/stable endpoints (e.g. InventoryService.get_devices)
+        # - confirmed live 2026-11-24 when passing plain ints raised a
+        # pydantic validation error from the SDK. Keep these str()'d even if
+        # it looks redundant.
         page = self._secure_client_api.get_asa_compatible_secure_client_versions(
             device_uids=device_uids,
-            limit=limit,
-            offset=offset,
+            limit=str(limit),
+            offset=str(offset),
         )
         return list(page.items or [])
 
@@ -94,10 +100,11 @@ class AsaSecureClientService:
         out of band), since that's a different tracking mechanism.
         """
         validate_uids([device_uid])
+        # Same string-typed limit/offset quirk as get_compatible_versions above.
         page = self._secure_client_api.get_asa_secure_client_packages(
             device_uid=device_uid,
-            limit=limit,
-            offset=offset,
+            limit=str(limit),
+            offset=str(offset),
         )
         return list(page.items or [])
 

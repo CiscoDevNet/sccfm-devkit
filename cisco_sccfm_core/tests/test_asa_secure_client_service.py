@@ -67,8 +67,10 @@ class TestGetCompatibleVersions:
         assert result == versions
         call_kwargs = mock_get.call_args.kwargs
         assert call_kwargs["device_uids"] == [DEVICE_UID]
-        assert call_kwargs["limit"] == 50
-        assert call_kwargs["offset"] == 0
+        # limit/offset are string-typed on this beta endpoint's SDK model,
+        # unlike InventoryService.get_devices' int params - see service docstring.
+        assert call_kwargs["limit"] == "50"
+        assert call_kwargs["offset"] == "0"
 
     def test_should_return_empty_list_when_no_items(
         self, secure_client_service: AsaSecureClientService, monkeypatch: pytest.MonkeyPatch
