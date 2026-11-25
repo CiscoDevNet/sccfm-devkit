@@ -283,6 +283,63 @@ def test_should_fail_when_waited_transaction_errors(
     assert kw["transaction"]["errorMessage"] == "Device unreachable"
 
 
+# ---------- Software-version settling wait (added 2026-11-25) ----------
+
+
+@patch("plugins.modules.push_asa_secure_client_package.Config")
+@patch("plugins.modules.push_asa_secure_client_package.AsaSecureClientService")
+@patch("plugins.modules.push_asa_secure_client_package.AnsibleModule")
+def test_should_wait_for_software_version_before_resolving_target_version(
+    mock_ansible_cls: MagicMock,
+    mock_svc_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    mock_ansible_cls.return_value = mock_module
+
+    mock_svc = MagicMock()
+    mock_svc.get_compatible_versions.return_value = _compatible_versions()
+    mock_svc.list_installed_packages.return_value = []
+    mock_svc.push_package.return_value = _make_transaction()
+    mock_svc_cls.return_value = mock_svc
+
+    with pytest.raises(SystemExit):
+        push_asa_secure_client_package.run_module()
+
+    mock_svc.wait_for_software_version.assert_called_once_with(device_uids=["uid-1"])
+    # Must happen before the catalog lookup, not after.
+    method_names = [call[0] for call in mock_svc.method_calls]
+    assert method_names.index("wait_for_software_version") < method_names.index(
+        "get_compatible_versions"
+    )
+
+
+@patch("plugins.modules.push_asa_secure_client_package.Config")
+@patch("plugins.modules.push_asa_secure_client_package.AsaSecureClientService")
+@patch("plugins.modules.push_asa_secure_client_package.AnsibleModule")
+def test_should_tag_timeout_waiting_for_software_version(
+    mock_ansible_cls: MagicMock,
+    mock_svc_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    mock_ansible_cls.return_value = mock_module
+
+    mock_svc = MagicMock()
+    mock_svc.wait_for_software_version.side_effect = TimeoutError(
+        "Device(s) ['uid-1'] did not report a software version within 300s"
+    )
+    mock_svc_cls.return_value = mock_svc
+
+    with pytest.raises(SystemExit):
+        push_asa_secure_client_package.run_module()
+
+    mock_module.fail_json.assert_called_once()
+    kw = mock_module.fail_json.call_args[1]
+    assert "[while waiting for device(s) to report a software version]" in kw["msg"]
+    mock_svc.get_compatible_versions.assert_not_called()
+
+
 # ---------- Query-based resolution ----------
 
 

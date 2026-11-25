@@ -319,6 +319,16 @@ def run_module() -> None:
             if not device_uids:
                 module.fail_json(msg="No devices found matching the specified query.")
 
+        stage = "waiting for device(s) to report a software version"
+        # See AsaSecureClientService.wait_for_software_version's docstring -
+        # confirmed live 2026-11-25 that a device can show Synced/Online in
+        # CDO's UI while its software version is still blank, which is what
+        # actually causes the get_compatible_versions 500 below, not just
+        # generic backend flakiness.
+        AsaSecureClientService(config=config).wait_for_software_version(
+            device_uids=device_uids
+        )
+
         stage = "resolving target Secure Client version (get_compatible_versions)"
         requested_version: str | None = module.params.get("version")
         target_version = _resolve_target_version(config, device_uids, requested_version)
