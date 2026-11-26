@@ -378,11 +378,25 @@ def run_module() -> None:
             )
 
             if _is_failed_transaction(transaction):
+                # CDO's own error_message on these transactions tends to be as
+                # unhelpful as the errorMsg on its synchronous API errors (e.g.
+                # just "FAILURE" - see the 2026-11-25 build #33 live failure
+                # that prompted this). Surface entity_url/transaction_polling_url
+                # too so whoever reads the Jenkins log has a direct link into
+                # CDO to dig for more detail instead of having to find the
+                # transaction_uid buried in the raw `transaction` dict below.
+                failure_detail = transaction.error_message or "no error detail returned by CDO"
+                msg = (
+                    f"Secure Client push transaction {transaction.transaction_uid} "
+                    f"failed with status: {transaction.cdo_transaction_status} "
+                    f"({failure_detail})."
+                )
+                if transaction.entity_url:
+                    msg += f" Run detail: {transaction.entity_url}"
+                if transaction.transaction_polling_url:
+                    msg += f" Transaction: {transaction.transaction_polling_url}"
                 module.fail_json(
-                    msg=(
-                        f"Secure Client push transaction {transaction.transaction_uid} "
-                        f"failed with status: {transaction.cdo_transaction_status}"
-                    ),
+                    msg=msg,
                     device_count=len(device_uids),
                     resolved_version=target_version,
                     transaction=transaction.to_dict(),

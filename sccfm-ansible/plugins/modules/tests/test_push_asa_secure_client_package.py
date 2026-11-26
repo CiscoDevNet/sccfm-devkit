@@ -29,11 +29,15 @@ def _make_transaction(
     transaction_uid: str = "txn-001",
     status: str = "PENDING",
     error_message: str | None = None,
+    entity_url: str | None = None,
+    transaction_polling_url: str | None = None,
 ) -> CdoTransaction:
     return CdoTransaction(
         transactionUid=transaction_uid,
         cdoTransactionStatus=status,
         errorMessage=error_message,
+        entityUrl=entity_url,
+        transactionPollingUrl=transaction_polling_url,
     )
 
 
@@ -280,7 +284,92 @@ def test_should_fail_when_waited_transaction_errors(
     mock_module.fail_json.assert_called_once()
     kw = mock_module.fail_json.call_args[1]
     assert "failed with status: ERROR" in kw["msg"]
+    assert "Device unreachable" in kw["msg"]
     assert kw["transaction"]["errorMessage"] == "Device unreachable"
+
+
+# ---------- Transaction failure detail surfacing (added 2026-11-25) ----------
+# Regression test for the 2026-11-25 build #33 live failure: CDO's own
+# error_message on a failed push transaction was just "FAILURE" with zero
+# further detail, same opacity problem as the earlier synchronous 500s. This
+# locks in that we at least surface entity_url/transaction_polling_url so the
+# Jenkins log has a direct link into CDO instead of forcing a manual dig
+# through the raw `transaction` dict.
+
+
+@patch("plugins.modules.push_asa_secure_client_package.Config")
+@patch("plugins.modules.push_asa_secure_client_package.TransactionService")
+@patch("plugins.modules.push_asa_secure_client_package.AsaSecureClientService")
+@patch("plugins.modules.push_asa_secure_client_package.AnsibleModule")
+def test_should_surface_run_detail_urls_on_transaction_failure(
+    mock_ansible_cls: MagicMock,
+    mock_svc_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    mock_module.params["wait"] = True
+    mock_ansible_cls.return_value = mock_module
+
+    mock_svc = MagicMock()
+    mock_svc.get_compatible_versions.return_value = _compatible_versions()
+    mock_svc.list_installed_packages.return_value = []
+    mock_svc.push_package.return_value = _make_transaction(status="PENDING")
+    mock_svc_cls.return_value = mock_svc
+
+    failed_transaction = _make_transaction(
+        status="ERROR",
+        error_message="FAILURE",
+        entity_url="https://edge.staging.cdo.cisco.com/v1/inventory/devices/"
+        "secure-client/upgrades/runs/2e711017-3e41-4321-a9f0-2b226fb7e0b1",
+        transaction_polling_url="https://edge.staging.cdo.cisco.com/api/rest/"
+        "v1/transactions/09e6a16c-7972-4b28-b6eb-46cfe25f278c",
+    )
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = failed_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        push_asa_secure_client_package.run_module()
+
+    kw = mock_module.fail_json.call_args[1]
+    assert "FAILURE" in kw["msg"]
+    assert "secure-client/upgrades/runs/2e711017" in kw["msg"]
+    assert "transactions/09e6a16c" in kw["msg"]
+
+
+@patch("plugins.modules.push_asa_secure_client_package.Config")
+@patch("plugins.modules.push_asa_secure_client_package.TransactionService")
+@patch("plugins.modules.push_asa_secure_client_package.AsaSecureClientService")
+@patch("plugins.modules.push_asa_secure_client_package.AnsibleModule")
+def test_should_use_fallback_text_when_no_error_detail_or_urls(
+    mock_ansible_cls: MagicMock,
+    mock_svc_cls: MagicMock,
+    mock_txn_cls: MagicMock,
+    _mock_cfg: MagicMock,
+    mock_module: MagicMock,
+) -> None:
+    mock_module.params["wait"] = True
+    mock_ansible_cls.return_value = mock_module
+
+    mock_svc = MagicMock()
+    mock_svc.get_compatible_versions.return_value = _compatible_versions()
+    mock_svc.list_installed_packages.return_value = []
+    mock_svc.push_package.return_value = _make_transaction(status="PENDING")
+    mock_svc_cls.return_value = mock_svc
+
+    failed_transaction = _make_transaction(status="CANCELLED")
+    mock_txn = MagicMock()
+    mock_txn.wait_for_transaction_to_finish.return_value = failed_transaction
+    mock_txn_cls.return_value = mock_txn
+
+    with pytest.raises(SystemExit):
+        push_asa_secure_client_package.run_module()
+
+    kw = mock_module.fail_json.call_args[1]
+    assert "no error detail returned by CDO" in kw["msg"]
+    assert "Run detail:" not in kw["msg"]
+    assert "Transaction:" not in kw["msg"]
 
 
 # ---------- Software-version settling wait (added 2026-11-25) ----------
